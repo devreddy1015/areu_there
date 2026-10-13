@@ -1,0 +1,15 @@
+[package]
+name = "saans-cli"
+description = "saans: simulate, evaluate and benchmark the Saans pipeline end to end (SYNTHETIC evaluation harness)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "saans"
+path = "src/main.rs"
+
+[dependencies]
+saans-dsp = { path = "../saans-dsp" }
+saans-health = { path = "../saans-health" }
+saans-sim = { path = "../saans-sim" }

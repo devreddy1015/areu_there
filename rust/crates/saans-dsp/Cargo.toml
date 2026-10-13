@@ -1,0 +1,12 @@
+[package]
+name = "saans-dsp"
+description = "Saans signal processing: Rust port of the wifisense reference (presence, breathing, heart rate, FeatureFrame v1). No dependencies."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[[bench]]
+name = "pipeline"
+harness = false

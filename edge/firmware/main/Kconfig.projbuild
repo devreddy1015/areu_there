@@ -1,0 +1,216 @@
+menu "Saans node"
+
+choice SAANS_ROLE
+    prompt "Node role"
+    default SAANS_ROLE_RX
+    help
+        A Saans deployment needs at least one TX and one RX. The TX exists only
+        to put packets in the air at a steady rate so the RX has something to
+        measure the channel with; it does no sensing. The RX captures CSI, runs
+        the DSP and emits FeatureFrames.
+
+config SAANS_ROLE_TX
+    bool "TX — ESP-NOW beacon source"
+config SAANS_ROLE_RX
+    bool "RX — CSI capture, DSP, FeatureFrame sender"
+endchoice
+
+config SAANS_NODE_ID
+    int "Node id (0-254)"
+    range 0 254
+    default 0
+    help
+        Identifies this node on the wire. 255 is reserved for "unknown / an
+        access point" in the tx_id field, so it is not a valid node id.
+
+menu "Radio"
+
+config SAANS_WIFI_CHANNEL
+    int "WiFi channel"
+    range 1 13
+    default 6
+    help
+        TX and RX must agree. ESP-NOW is connectionless, so this is the only
+        thing tying them together.
+
+config SAANS_TX_RATE_HZ
+    int "TX beacon rate (Hz)"
+    depends on SAANS_ROLE_TX
+    range 1 200
+    default SAANS_CSI_RATE_HZ
+    help
+        One beacon out of here is one CSI frame at every RX on the channel, so
+        this IS the rate the RX's DSP sees.
+
+        SET IT TO THE SAME NUMBER AS SAANS_CSI_RATE_HZ ON THE RX, which is why
+        it defaults to it. Nothing between the radio and the DSP decimates:
+        csi_capture queues every callback and rx_role pushes every queued
+        frame. Beaconing faster than the RX's configured rate does not buy
+        headroom against loss — it makes the RX process more frames than it
+        believes it is processing, so its sample clock, its vitals bands and
+        its gap filler are all scaled wrong, and the link-statistics window
+        overflows on top (the RX logs both). Beaconing slower is the case the
+        gap filler exists for and is handled.
+
+        The DSP needs >= 10 Hz: the gross-motion band reaches 4 Hz.
+
+endmenu
+
+menu "Sensing"
+
+config SAANS_N_SUBCARRIERS
+    int "Subcarriers to process"
+    range 8 64
+    default 56
+    help
+        HT20 reports 56 usable subcarriers (LLTF+HT-LTF). The DSP is sized at
+        compile time from this, so raising it costs RAM whether or not the
+        radio delivers them.
+
+config SAANS_CSI_RATE_HZ
+    int "Expected CSI rate (Hz)"
+    range 10 200
+    default 20
+    help
+        Nominal rate the DSP is configured for. The gap filler keeps the time
+        axis uniform when packets are LOST, so this is the rate the pipeline
+        believes in rather than the rate the radio happens to deliver — but
+        that licence only runs one way.
+
+        DELIVERING BELOW IT IS HANDLED. Delivering ABOVE it is not: nothing
+        decimates, so every extra frame is processed as though it arrived at
+        this rate, and the pipeline's clock, bands and windows are all scaled
+        by the ratio. Set the TX beacon rate to this same number.
+
+        It also sizes the 10 s link-statistics window (dsp/node_config.hpp
+        derives the ring from it, with 25% headroom for arrival jitter). A
+        radio delivering more than 25% above this rate overflows that window:
+        csi_rate_chz and loss_permille are then computed over a shorter span
+        than the spec's 10 s, and the extractor's arrival_overflows counter
+        says so.
+
+config SAANS_FRAME_RATE_HZ
+    int "FeatureFrame rate (Hz)"
+    range 1 10
+    default 2
+    help
+        How often a 68-byte FeatureFrame goes to the gateway.
+
+config SAANS_CALIBRATION_S
+    int "Presence calibration (s)"
+    range 10 300
+    default 30
+    help
+        The space must be EMPTY for this long, after the filter warmup.
+        Calibrating with someone present learns them as the baseline and the
+        room then reads as permanently empty.
+
+config SAANS_COMPUTE_BNR
+    bool "Compute best_bnr (per-link quality)"
+    default y
+    help
+        best_bnr is the highest per-subcarrier breathing-to-noise ratio over
+        the last 30 s: a link-quality figure for system health, read by
+        nothing else. No detector uses it.
+
+        It is also the single most expensive field on the node. Its 30 s row
+        store is 120 x 56 floats, 26.9 KB, more than half of what one link
+        costs; turning it off takes a link from 45,408 bytes to 16,584 on the
+        S3 (measured: edge/dsp/bench/run_size_report.sh --target).
+
+        TURN IT OFF ON A NODE CARRYING MORE THAN 3 LINKS. With it on, 171 KB
+        of free DIRAM holds three links and no fourth. With it off the same
+        RAM holds ten.
+
+        best_bnr then goes out as 0.0, which spec/wire.md defines as UNKNOWN —
+        "before the first window, or on a memory-constrained node that does
+        not compute it". Every other field in the frame is bit-identical with
+        this on or off.
+
+        0.0 IS AMBIGUOUS BY DESIGN AND THE GATEWAY MUST NOT READ LINK HEALTH
+        INTO IT, in either direction. A node with this off emits 0.0; so does
+        a node with it on whose window has not filled yet; and so does a node
+        with it on watching a channel that does not vary at all, because a
+        subcarrier with zero standard deviation is scored 0.0 and the field is
+        the maximum over the subcarriers. spec/wire.md folds all of them into
+        "0 = unknown" and there is no flag bit that separates them.
+
+        This is a COMPILE-TIME choice: with it off, the row store is not in
+        the binary at all, and the extractor refuses a configuration that asks
+        for link quality rather than quietly reporting nothing.
+
+endmenu
+
+menu "Privacy (ADR-001, ADR-005)"
+
+config SAANS_VITALS_ENABLED
+    bool "Vitals enabled for this space"
+    default n
+    help
+        OFF by default, and that default is a policy decision, not a
+        convenience. Breathing and heart data are health data under India's
+        DPDP Act 2023 and require opt-in consent per space. With this off the
+        node writes 0.0 into every breathing and heart field, so the gateway
+        never receives what it is not allowed to hold.
+
+config SAANS_HEART_ENABLED
+    bool "Heart rate enabled for this space"
+    depends on SAANS_VITALS_ENABLED
+    default n
+    help
+        Additionally gated. Heart rate from WiFi CSI is unreliable in a way
+        breathing is not; see NOTES.md. Enabling it is a separate decision.
+
+config SAANS_RAW_MODE
+    bool "Also stream raw ADR-018 CSI (debug)"
+    default n
+    help
+        Debug and data collection only. The raw_mode flag is set in every
+        FeatureFrame while this is on, so a dashboard can show that the node
+        is exporting raw channel data. That visibility is the point: raw mode
+        must never be silent.
+
+endmenu
+
+menu "Gateway"
+
+config SAANS_GATEWAY_IP
+    string "Gateway IPv4"
+    default "192.168.1.10"
+
+config SAANS_GATEWAY_PORT
+    int "Gateway UDP port"
+    range 1 65535
+    default 5566
+
+config SAANS_WIFI_SSID
+    string "WiFi SSID (RX uplink)"
+    depends on SAANS_ROLE_RX
+    default "saans"
+
+config SAANS_WIFI_PASSWORD
+    string "WiFi password (RX uplink)"
+    depends on SAANS_ROLE_RX
+    default ""
+
+endmenu
+
+menu "Reliability"
+
+config SAANS_WATCHDOG_S
+    int "Task watchdog timeout (s)"
+    range 5 60
+    default 15
+
+config SAANS_TELEMETRY_S
+    int "Telemetry interval (s)"
+    range 10 3600
+    default 60
+    help
+        Free heap, minimum-ever heap, uptime and reboot count. System health
+        is a first-class output: a node that silently degrades is worse than
+        one that reports it.
+
+endmenu
+
+endmenu

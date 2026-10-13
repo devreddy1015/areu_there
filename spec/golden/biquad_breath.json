@@ -1,0 +1,18 @@
+{
+ "name": "biquad_breath",
+ "scalars": {
+  "f_low": 0.1,
+  "f_high": 0.5,
+  "fs": 20.0
+ },
+ "arrays": {
+  "input": [
+   "biquad_breath__input.f64",
+   2400
+  ],
+  "output": [
+   "biquad_breath__output.f64",
+   2400
+  ]
+ }
+}

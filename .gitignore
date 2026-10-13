@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+edge/firmware/build/
+edge/firmware/sdkconfig
+edge/firmware/sdkconfig.old
+edge/dsp/build/
+edge/dsp/test/build/
+edge/dsp/bench/bench_extractor
+
+# Build output
+rust/target/
+
+# Never commit sensor recordings, event logs or alert/audit state: they can
+# contain health data (ADR-001, ADR-005).
+*.pcap
+*.pcapng
+saans-data/
+*-data/
+events-*.jsonl
+audit-*.jsonl
+alerts.jsonl
+history.json
+
+# Secrets live in environment variables, never in files
+.env
+*.env

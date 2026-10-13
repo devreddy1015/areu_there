@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saans</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dde1e6;
+  --occ: #1f7a4d; --occ-bg: #e7f5ee; --empty: #5d6673; --blind: #8a5a00; --blind-bg: #fff4dc;
+  --adv: #8a5a00; --adv-bg: #fff4dc; --chk: #a1201c; --chk-bg: #fde9e8; --info-bg: #eef1f5;
+  --accent: #2759c7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a; --card: #1b2028; --ink: #e6e9ee; --muted: #9aa4b1; --line: #2c333d;
+    --occ: #5fd39b; --occ-bg: #16301f; --empty: #9aa4b1; --blind: #f0b84a; --blind-bg: #33280f;
+    --adv: #f0b84a; --adv-bg: #33280f; --chk: #ff8a84; --chk-bg: #3a1716; --info-bg: #222934;
+    --accent: #8fb0ff;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px;
+  background: var(--card); border-bottom: 1px solid var(--line); }
+header h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+header .sub { color: var(--muted); font-size: 13px; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--ink); cursor: pointer; }
+nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--card); }
+.conn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.conn[data-s="live"] .dot { background: var(--occ); }
+.conn[data-s="polling"] .dot, .conn[data-s="connecting"] .dot { background: var(--adv); }
+.conn[data-s="offline"] .dot { background: var(--chk); }
+.banner { margin: 0; padding: 8px 16px; background: var(--adv-bg); color: var(--adv); font-size: 13px; }
+main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+section[hidden] { display: none; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+  border-top: 4px solid var(--empty); min-width: 0; }
+.card.occ { border-top-color: var(--occ); }
+.card.blind { border-top-color: var(--blind); }
+.card h2 { margin: 0 0 6px; font-size: 17px; overflow-wrap: anywhere; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.badge { font-size: 12px; padding: 1px 7px; border-radius: 999px; background: var(--info-bg); color: var(--muted); }
+.badge.warn { background: var(--adv-bg); color: var(--adv); font-weight: 600; }
+.badge.ok { background: var(--occ-bg); color: var(--occ); }
+.status { font-size: 22px; font-weight: 650; margin: 2px 0 8px; }
+.occ .status { color: var(--occ); }
+.empty .status { color: var(--empty); }
+.blind .status { color: var(--blind); }
+.status small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 14px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.alert { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--info-bg); font-size: 14px; }
+.alert.advisory { background: var(--adv-bg); }
+.alert.check { background: var(--chk-bg); }
+.alert strong { display: block; }
+.alert.check strong { color: var(--chk); }
+.alert.advisory strong { color: var(--adv); }
+.alert .note { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+select { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); }
+ol.events { list-style: none; margin: 0; padding: 0; }
+ol.events li { display: grid; grid-template-columns: 9.5em 1fr; gap: 2px 12px; padding: 8px 10px;
+  background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line);
+  border-radius: 8px; margin-bottom: 6px; }
+ol.events li.advisory { border-left-color: var(--adv); }
+ol.events li.check { border-left-color: var(--chk); }
+ol.events time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+ol.events .what { font-weight: 600; }
+ol.events .ev { grid-column: 2; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.tile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 12px; }
+.tile.bad b { color: var(--chk); }
+h3 { margin: 18px 0 8px; font-size: 15px; }
+.scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; }
+td.down { color: var(--chk); font-weight: 600; }
+td.up { color: var(--occ); }
+ul.notes { margin: 0; padding-left: 18px; }
+footer { padding: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+@media (max-width: 520px) {
+  nav { margin-left: 0; width: 100%; }
+  nav button { flex: 1; }
+  ol.events li { grid-template-columns: 1fr; }
+  ol.events .ev { grid-column: 1; }
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Saans</h1>
+  <span class="sub" id="sub">camera-free WiFi sensing</span>
+  <span class="conn" id="conn" data-s="connecting"><span class="dot"></span><span id="conn-text">connecting</span></span>
+  <nav role="tablist">
+    <button role="tab" data-tab="spaces" aria-selected="true">Spaces</button>
+    <button role="tab" data-tab="events" aria-selected="false">Events</button>
+    <button role="tab" data-tab="system" aria-selected="false">System</button>
+  </nav>
+</header>
+<p class="banner">Saans is advisory — not a medical device. Alerts never replace existing safety procedures.
+  Every alert says what was observed and how confident it is.</p>
+<main>
+  <section id="tab-spaces"><div class="grid" id="grid"><p class="muted">Waiting for the gateway…</p></div></section>
+  <section id="tab-events" hidden>
+    <div class="toolbar">
+      <label>Space <select id="ev-space"><option value="">all</option></select></label>
+      <label>Severity <select id="ev-sev">
+        <option value="">all</option><option value="advisory">advisory and above</option><option value="check">check</option>
+      </select></label>
+      <span class="muted" id="ev-count"></span>
+    </div>
+    <ol class="events" id="events"></ol>
+  </section>
+  <section id="tab-system" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div id="sys-warn"></div>
+    <h3>Links</h3>
+    <div class="scroll"><table id="links"></table></div>
+    <h3>Unknown links</h3>
+    <div id="unknown" class="muted">none</div>
+    <h3>Gateway</h3>
+    <dl id="gateway"></dl>
+  </section>
+</main>
+<footer>Saans gateway <span id="version"></span>. No identities, ever: everything here is per space, not per person.</footer>
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function append(parent, ...kids) { for (const k of kids) if (k != null) parent.append(k); return parent; }
+
+const S = { spaces: [], events: [], t_s: null, mode: '', version: '', lastState: 0, tab: 'spaces' };
+const MAX_EVENTS = 500;
+
+const EVENT_LABEL = {
+  occupancy_started: 'Someone arrived', occupancy_ended: 'Space became empty',
+  breathing_pause: 'Breathing pause', rate_high: 'Fast breathing', rate_low: 'Slow breathing',
+  inactivity: 'No movement', possible_collapse: 'Possible collapse',
+  rest_started: 'Rest started', rest_ended: 'Rest ended', trend_deviation: 'Change from usual',
+  link_down: 'Link down', link_up: 'Link back up', link_degraded: 'Link degraded',
+  calibration_stale: 'Calibration stale', raw_mode_active: 'Raw CSI debug mode on',
+  space_blind: 'Cannot see the space', space_visible: 'Space visible again',
+};
+const ALERT_LABEL = {
+  blind: 'Cannot see this space', breathing_pause: 'Breathing pause', inactivity: 'No movement',
+  inactivity_no_breathing: 'No movement and no breathing detected', possible_collapse: 'Possible collapse',
+  rate_high: 'Fast breathing', rate_low: 'Slow breathing',
+};
+const SEV_RANK = { info: 0, advisory: 1, check: 2 };
+
+function dur(s) {
+  if (s == null || !isFinite(s)) return '—';
+  s = Math.max(0, s);
+  if (s < 90) return Math.round(s) + ' s';
+  if (s < 5400) return Math.round(s / 60) + ' min';
+  return (s / 3600).toFixed(1) + ' h';
+}
+function num(x, d) { return x == null || !isFinite(x) ? '—' : Number(x).toFixed(d == null ? 1 : d); }
+function link(l) { return l ? l.rx + '←' + l.tx : ''; }
+function spaceName(id) { const s = S.spaces.find((x) => x.space_id === id); return s ? s.name : id; }
+function clock(iso) { return typeof iso === 'string' ? iso.slice(0, 19).replace('T', ' ') : ''; }
+
+// ---------------------------------------------------------------- spaces
+function spaceCard(s) {
+  const kind = s.occupied === true ? 'occ' : s.occupied === false ? 'empty' : 'blind';
+  const card = el('article', 'card ' + kind);
+  append(card, el('h2', null, s.name || s.space_id));
+  const badges = el('div', 'badges');
+  badges.append(s.vitals ? el('span', 'badge ok', 'vitals: consented') : el('span', 'badge', 'vitals: off'));
+  if (s.raw_mode) {
+    const b = el('span', 'badge warn', 'RAW CSI DEBUG MODE ON');
+    b.title = 'Raw channel data is leaving the sensor on ' + (s.raw_mode_links || []).join(', ');
+    badges.append(b);
+  }
+  if (s.vitals_gated_links && s.vitals_gated_links.length) {
+    badges.append(el('span', 'badge warn', 'node sends vitals without consent: ' + s.vitals_gated_links.join(', ')));
+  }
+  if (s.collapse_detection) badges.append(el('span', 'badge', 'collapse detection on'));
+  if (s.resting) badges.append(el('span', 'badge', 'resting'));
+  card.append(badges);
+
+  const status = el('div', 'status', kind === 'occ' ? 'Occupied' : kind === 'empty' ? 'Empty' : 'Unknown');
+  if (kind === 'occ' && s.occupied_since_s != null) status.append(el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
+  if (kind === 'blind') status.append(el('small', null, 'no usable link: not "empty"'));
+  card.append(status);
+
+  const dl = el('dl');
+  const row = (k, v) => append(dl, el('dt', null, k), el('dd', null, v));
+  if (kind === 'occ') row('Still for', dur(s.still_for_s));
+  row('Motion', num(s.motion_index, 2) + ' × empty-room level');
+  row('Motion bouts', (s.motion_bouts_last_hour ?? 0) + ' in the last hour');
+  if (s.vitals) {
+    const b = s.breathing;
+    row('Breathing', b ? num(b.bpm) + ' BPM (confidence ' + num(b.confidence, 2) + ', link ' + link(b.link) + ')'
+      : kind === 'occ' ? 'not confidently detected' : '—');
+    if (s.bpm_median_5min != null) row('5-min median', num(s.bpm_median_5min) + ' BPM, IQR ' + num(s.bpm_iqr_5min));
+  }
+  row('Links usable', (s.links_usable ?? 0) + ' of ' + (s.links_total ?? 0));
+  card.append(dl);
+
+  for (const a of s.alerts || []) {
+    const sev = a.severity || 'advisory';
+    const box = el('div', 'alert ' + sev);
+    append(box, el('strong', null, (ALERT_LABEL[a.name] || a.name) + ' · ' + sev));
+    if (a.evidence) box.append(el('span', null, a.evidence));
+    if (a.since_s != null && s.t_s != null) box.append(el('span', 'note', 'since ' + dur(s.t_s - a.since_s) + ' ago'));
+    box.append(el('span', 'note', a.notice || 'advisory — not a medical device'));
+    card.append(box);
+  }
+  return card;
+}
+
+function renderSpaces() {
+  const grid = $('#grid');
+  if (!S.spaces.length) {
+    grid.replaceChildren(el('p', 'muted', 'No spaces configured: add [[space]] tables to saans.toml.'));
+    return;
+  }
+  grid.replaceChildren(...S.spaces.map(spaceCard));
+  const sel = $('#ev-space');
+  const have = new Set([...sel.options].map((o) => o.value));
+  for (const s of S.spaces) {
+    if (!have.has(s.space_id)) {
+      const o = el('option', null, s.name || s.space_id);
+      o.value = s.space_id;
+      sel.append(o);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- events
+const evKey = (e) => [e.unix_ms, e.space_id, e.type, e.t_s].join('|');
+function mergeEvents(list) {
+  const seen = new Set(S.events.map(evKey));
+  let added = false;
+  for (const e of list) {
+    if (e && !seen.has(evKey(e))) { S.events.push(e); seen.add(evKey(e)); added = true; }
+  }
+  if (!added) return;
+  S.events.sort((a, b) => (b.unix_ms || 0) - (a.unix_ms || 0));
+  S.events.length = Math.min(S.events.length, MAX_EVENTS);
+  renderEvents();
+}
+
+function renderEvents() {
+  const space = $('#ev-space').value;
+  const minSev = SEV_RANK[$('#ev-sev').value] || 0;
+  const shown = S.events.filter((e) => (!space || e.space_id === space) && (SEV_RANK[e.severity] || 0) >= minSev);
+  const ol = $('#events');
+  ol.replaceChildren(...shown.map((e) => {
+    const li = el('li', e.severity || 'info');
+    const t = el('time', null, clock(e.time));
+    if (e.time) t.dateTime = e.time;
+    const what = el('div');
+    append(what, el('span', 'what', EVENT_LABEL[e.type] || e.type), document.createTextNode(' · ' + spaceName(e.space_id)
+      + ' · ' + (e.severity || 'info') + (e.confidence != null ? ' · confidence ' + num(e.confidence, 2) : '')));
+    append(li, t, what, el('div', 'ev', e.evidence || ''));
+    return li;
+  }));
+  if (!shown.length) ol.append(el('li', 'info', 'No events yet.'));
+  $('#ev-count').textContent = shown.length + ' shown';
+}
+
+// ---------------------------------------------------------------- system
+function tile(label, value, bad) {
+  const t = el('div', 'tile' + (bad ? ' bad' : ''));
+  append(t, el('b', null, String(value)), el('span', null, label));
+  return t;
+}
+
+function renderSystem(h, links) {
+  const ing = h.ingest || {};
+  $('#tiles').replaceChildren(
+    tile('datagrams / s', num(h.datagrams_per_s)),
+    tile('links usable', (h.links_usable ?? 0) + ' / ' + (h.links_configured ?? 0), h.links_usable < h.links_configured),
+    tile('spaces blind', (h.spaces_blind || []).length, (h.spaces_blind || []).length > 0),
+    tile('decode errors', h.decode_errors_total ?? 0, h.decode_errors_total > 0),
+    tile('unassigned frames', ing.unassigned ?? 0, ing.unassigned > 0),
+    tile('raw CSI links', h.raw_mode_links_active ?? 0, h.raw_mode_links_active > 0),
+    tile('vitals withheld', ing.vitals_gated ?? 0, ing.vitals_gated > 0),
+    tile('events', h.events_emitted ?? 0),
+    tile('dashboards open', h.ws_clients ?? 0),
+  );
+  const warn = $('#sys-warn');
+  warn.replaceChildren();
+  const notes = [...(h.notes || [])];
+  for (const r of h.raw_mode_links || []) notes.push('Raw CSI debug mode is on for link ' + link(r) + ' in ' + spaceName(r.space_id) + ': raw channel data is leaving the sensor (ADR-001).');
+  for (const g of h.vitals_gated_links || []) notes.push('Link ' + link(g) + ' sends breathing data for ' + spaceName(g.space_id) + ', which has not opted in; it is discarded. Fix the node configuration.');
+  if (h.event_log && h.event_log.write_errors > 0) notes.push('Event log write errors: ' + h.event_log.write_errors + ' (' + (h.event_log.last_error || '') + ')');
+  if (h.history && h.history.errors > 0) notes.push('History save errors: ' + h.history.errors + ' (' + (h.history.last_error || '') + ')');
+  if (notes.length) {
+    const box = el('div', 'alert advisory');
+    const ul = el('ul', 'notes');
+    for (const n of notes) ul.append(el('li', null, n));
+    append(box, el('strong', null, 'Attention'), ul);
+    warn.append(box);
+  }
+
+  const table = $('#links');
+  const head = el('tr');
+  for (const c of ['Space', 'Link', 'State', 'Silent', 'CSI rate', 'Loss', 'Calibrated', 'Best BNR', 'RSSI', 'Noise', 'Frames', 'Raw'])
+    head.append(el('th', null, c));
+  const rows = [head];
+  for (const sp of links || []) {
+    for (const r of sp.links || []) {
+      const tr = el('tr');
+      const cells = [
+        [sp.name || sp.space_id], [link(r.link)], [r.up ? 'up' : 'down', r.up ? 'up' : 'down'],
+        [dur(r.silent_s)], [num(r.rate_hz) + ' Hz'], [num(r.loss * 100, 0) + ' %'],
+        [r.calib_age_h == null ? 'not yet' : num(r.calib_age_h) + ' h ago'], [num(r.best_bnr, 2)],
+        [r.rssi_dbm + ' dBm'], [r.noise_floor_dbm === -128 ? '—' : r.noise_floor_dbm + ' dBm'], [String(r.frames)],
+        [r.raw_mode ? 'ON' : 'off', r.raw_mode ? 'down' : null],
+      ];
+      for (const [v, cls] of cells) tr.append(el('td', cls || null, v));
+      rows.push(tr);
+    }
+  }
+  table.replaceChildren(...rows);
+
+  const unk = $('#unknown');
+  const u = h.unknown_links || [];
+  if (!u.length) { unk.className = 'muted'; unk.textContent = 'none'; }
+  else {
+    unk.className = '';
+    const ul = el('ul', 'notes');
+    for (const x of u) ul.append(el('li', null, 'link ' + x.rx + '←' + x.tx + ' (' + x.kind + '): ' + x.frames
+      + ' frames, last from ' + (x.last_src || '?') + '. No space lists it; add it to saans.toml or fix the node id.'));
+    unk.replaceChildren(ul);
+  }
+
+  const dl = $('#gateway');
+  dl.replaceChildren();
+  const row = (k, v) => append(dl, el('dt', null, k), el('dd', null, v));
+  row('Mode', h.mode || '');
+  row('Gateway time', clock(h.time));
+  row('Uptime', dur(h.uptime_s));
+  row('Datagrams', String(h.datagrams_total ?? 0));
+  if (h.event_log) {
+    row('Event log', h.event_log.dir + ' (' + h.event_log.written + ' written, kept ' + h.event_log.retention_days + ' days)');
+  }
+  S.version = h.version || S.version;
+  $('#version').textContent = S.version ? 'v' + S.version : '';
+}
+
+// ---------------------------------------------------------------- transport
+async function getJSON(path) {
+  const r = await fetch(path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(path + ': ' + r.status);
+  return r.json();
+}
+
+function setConn(s) {
+  const c = $('#conn');
+  c.dataset.s = s;
+  $('#conn-text').textContent = s === 'live' ? 'live' : s === 'polling' ? 'polling' : s;
+}
+
+function onState(spaces, t_s) {
+  S.spaces = Array.isArray(spaces) ? spaces : [];
+  S.t_s = t_s;
+  S.lastState = Date.now();
+  if (ws && ws.readyState === WebSocket.OPEN && $('#conn').dataset.s !== 'live') setConn('live');
+  if (S.tab === 'spaces') renderSpaces();
+}
+
+function handle(m) {
+  if (m.type === 'hello') { S.mode = m.mode; S.version = m.version; $('#sub').textContent = m.mode === 'replay' ? 'replaying a recording' : 'live'; }
+  else if (m.type === 'state') onState(m.spaces, m.t_s);
+  else if (m.type === 'event' && m.event) mergeEvents([m.event]);
+}
+
+let ws = null, retry = 1000, pollTimer = null;
+function startPolling() {
+  if (pollTimer) return;
+  const poll = async () => {
+    try {
+      const sp = await getJSON('/api/spaces');
+      onState(sp, sp.length ? sp[0].t_s : S.t_s);
+      mergeEvents(await getJSON('/api/events?limit=100'));
+      if (!ws || ws.readyState !== WebSocket.OPEN) setConn('polling');
+    } catch (e) { setConn('offline'); }
+  };
+  poll();
+  pollTimer = setInterval(poll, 2000);
+}
+function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+function connect() {
+  setConn('connecting');
+  try {
+    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/live');
+  } catch (e) { startPolling(); setTimeout(connect, retry); retry = Math.min(retry * 2, 30000); return; }
+  ws.onopen = () => { retry = 1000; setConn('live'); stopPolling(); };
+  ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } handle(m); };
+  ws.onclose = () => {
+    // The gateway restarted or the network dropped: poll meanwhile.
+    startPolling();
+    setTimeout(connect, retry);
+    retry = Math.min(retry * 2, 30000);
+  };
+}
+
+async function refreshSystem() {
+  try {
+    const [h, links] = await Promise.all([getJSON('/api/health'), getJSON('/api/links')]);
+    renderSystem(h, links);
+  } catch (e) { /* shown by the connection state */ }
+}
+
+function showTab(name) {
+  S.tab = name;
+  for (const b of document.querySelectorAll('nav button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+  for (const t of ['spaces', 'events', 'system']) $('#tab-' + t).hidden = t !== name;
+  if (name === 'spaces') renderSpaces();
+  if (name === 'events') renderEvents();
+  if (name === 'system') refreshSystem();
+  try { history.replaceState(null, '', '#' + name); } catch (e) { /* file: or sandboxed */ }
+}
+
+for (const b of document.querySelectorAll('nav button')) b.addEventListener('click', () => showTab(b.dataset.tab));
+$('#ev-space').addEventListener('change', renderEvents);
+$('#ev-sev').addEventListener('change', renderEvents);
+setInterval(() => { if (S.tab === 'system') refreshSystem(); }, 5000);
+setInterval(() => {
+  // A live feed that stopped delivering state is not "live".
+  if ($('#conn').dataset.s === 'live' && Date.now() - S.lastState > 5000) setConn(S.mode === 'replay' ? 'replay finished' : 'stale');
+}, 1000);
+
+getJSON('/api/events?limit=200').then(mergeEvents).catch(() => {});
+showTab(['spaces', 'events', 'system'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'spaces');
+connect();
+</script>
+</body>
+</html>

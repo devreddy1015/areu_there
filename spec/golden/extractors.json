@@ -1,0 +1,46 @@
+{
+ "name": "extractors",
+ "scalars": {
+  "fs": 20.0,
+  "br_window_s": 45.0,
+  "br_decimation": 10,
+  "br_resolution_hz": 0.005555555555555556,
+  "hr_window_s": 60.0,
+  "hr_decimation": 2,
+  "hr_resolution_hz": 0.004166666666666667
+ },
+ "arrays": {
+  "input": [
+   "extractors__input.f64",
+   3600
+  ],
+  "br_bpm": [
+   "extractors__br_bpm.f64",
+   180
+  ],
+  "br_conf": [
+   "extractors__br_conf.f64",
+   180
+  ],
+  "br_status": [
+   "extractors__br_status.f64",
+   180
+  ],
+  "hr_bpm": [
+   "extractors__hr_bpm.f64",
+   180
+  ],
+  "hr_conf": [
+   "extractors__hr_conf.f64",
+   180
+  ],
+  "hr_status": [
+   "extractors__hr_status.f64",
+   180
+  ],
+  "at": [
+   "extractors__at.f64",
+   180
+  ]
+ }
+}

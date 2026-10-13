@@ -1,0 +1,94 @@
+{
+ "name": "feature_codec",
+ "scalars": {
+  "frames": 2,
+  "frame_size": 68,
+  "magic": 1397637459
+ },
+ "arrays": {
+  "node_id": [
+   "feature_codec__node_id.f64",
+   2
+  ],
+  "tx_id": [
+   "feature_codec__tx_id.f64",
+   2
+  ],
+  "flags": [
+   "feature_codec__flags.f64",
+   2
+  ],
+  "seq": [
+   "feature_codec__seq.f64",
+   2
+  ],
+  "uptime_ms": [
+   "feature_codec__uptime_ms.f64",
+   2
+  ],
+  "csi_rate_chz": [
+   "feature_codec__csi_rate_chz.f64",
+   2
+  ],
+  "loss_permille": [
+   "feature_codec__loss_permille.f64",
+   2
+  ],
+  "motion_energy": [
+   "feature_codec__motion_energy.f64",
+   2
+  ],
+  "presence_threshold": [
+   "feature_codec__presence_threshold.f64",
+   2
+  ],
+  "gross_motion": [
+   "feature_codec__gross_motion.f64",
+   2
+  ],
+  "breath_rms": [
+   "feature_codec__breath_rms.f64",
+   2
+  ],
+  "breathing_bpm": [
+   "feature_codec__breathing_bpm.f64",
+   2
+  ],
+  "breathing_conf": [
+   "feature_codec__breathing_conf.f64",
+   2
+  ],
+  "heart_bpm": [
+   "feature_codec__heart_bpm.f64",
+   2
+  ],
+  "heart_conf": [
+   "feature_codec__heart_conf.f64",
+   2
+  ],
+  "best_bnr": [
+   "feature_codec__best_bnr.f64",
+   2
+  ],
+  "calib_age_s": [
+   "feature_codec__calib_age_s.f64",
+   2
+  ],
+  "rssi_dbm": [
+   "feature_codec__rssi_dbm.f64",
+   2
+  ],
+  "noise_floor_dbm": [
+   "feature_codec__noise_floor_dbm.f64",
+   2
+  ],
+  "n_subcarriers": [
+   "feature_codec__n_subcarriers.f64",
+   2
+  ],
+  "bytes": [
+   "feature_codec__bytes.f64",
+   136
+  ]
+ }
+}

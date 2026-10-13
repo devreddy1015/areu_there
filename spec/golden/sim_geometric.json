@@ -1,0 +1,55 @@
+{
+ "name": "sim_geometric",
+ "scalars": {
+  "n_subcarriers": 56,
+  "fs": 20.0,
+  "carrier_hz": 2437000000.0,
+  "subcarrier_spacing_hz": 312500.0,
+  "room_w": 6.0,
+  "room_h": 5.0,
+  "tx_x": 1.5,
+  "tx_y": 2.5,
+  "rx_x": 4.5,
+  "rx_y": 2.5,
+  "body_x": 2.6,
+  "body_y": 3.4,
+  "body_points": 3,
+  "body_width_m": 0.3,
+  "body_rcs_m2": 0.3,
+  "wall_reflection": 0.45,
+  "reflection_order": 2,
+  "los_attenuation_db": 3.0,
+  "static_magnitude": 40.0,
+  "breathing_bpm": 14.0,
+  "breathing_amplitude_m": 0.005,
+  "heart_bpm": 68.0,
+  "heart_amplitude_m": 0.0004,
+  "excess_path_m": 0.5236466445180534
+ },
+ "arrays": {
+  "scatterer_x": [
+   "sim_geometric__scatterer_x.f64",
+   4
+  ],
+  "scatterer_y": [
+   "sim_geometric__scatterer_y.f64",
+   4
+  ],
+  "scatterer_rcs": [
+   "sim_geometric__scatterer_rcs.f64",
+   4
+  ],
+  "amplitudes": [
+   "sim_geometric__amplitudes.f64",
+   11200
+  ],
+  "phases": [
+   "sim_geometric__phases.f64",
+   11200
+  ],
+  "sensitivity": [
+   "sim_geometric__sensitivity.f64",
+   56
+  ]
+ }
+}

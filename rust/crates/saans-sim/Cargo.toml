@@ -1,0 +1,10 @@
+[package]
+name = "saans-sim"
+description = "Saans simulator: physically modelled multi-link CSI for scripted timelines (walk, sit, breathe, pause, fidget, fall) with ground truth. SYNTHETIC by construction."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+saans-dsp = { path = "../saans-dsp" }
+serde = { version = "1", features = ["derive"] }

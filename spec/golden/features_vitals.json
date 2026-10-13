@@ -1,0 +1,119 @@
+{
+ "name": "features_vitals",
+ "scalars": {
+  "n_subcarriers": 32,
+  "fs": 20.0,
+  "node_id": 3,
+  "tx_id": 7,
+  "frame_rate_hz": 2.0,
+  "vitals_enabled": 1,
+  "heart_enabled": 1,
+  "calibration_s": 10.0,
+  "max_gap_s": 1.0,
+  "noise_floor_dbm": -92,
+  "frames_out": 336,
+  "frame_size": 68
+ },
+ "arrays": {
+  "seq_in": [
+   "features_vitals__seq_in.f64",
+   3267
+  ],
+  "t_in": [
+   "features_vitals__t_in.f64",
+   3267
+  ],
+  "rssi_in": [
+   "features_vitals__rssi_in.f64",
+   3267
+  ],
+  "amplitudes_in": [
+   "features_vitals__amplitudes_in.f64",
+   104544
+  ],
+  "node_id": [
+   "features_vitals__node_id.f64",
+   336
+  ],
+  "tx_id": [
+   "features_vitals__tx_id.f64",
+   336
+  ],
+  "flags": [
+   "features_vitals__flags.f64",
+   336
+  ],
+  "seq": [
+   "features_vitals__seq.f64",
+   336
+  ],
+  "uptime_ms": [
+   "features_vitals__uptime_ms.f64",
+   336
+  ],
+  "csi_rate_chz": [
+   "features_vitals__csi_rate_chz.f64",
+   336
+  ],
+  "loss_permille": [
+   "features_vitals__loss_permille.f64",
+   336
+  ],
+  "motion_energy": [
+   "features_vitals__motion_energy.f64",
+   336
+  ],
+  "presence_threshold": [
+   "features_vitals__presence_threshold.f64",
+   336
+  ],
+  "gross_motion": [
+   "features_vitals__gross_motion.f64",
+   336
+  ],
+  "breath_rms": [
+   "features_vitals__breath_rms.f64",
+   336
+  ],
+  "breathing_bpm": [
+   "features_vitals__breathing_bpm.f64",
+   336
+  ],
+  "breathing_conf": [
+   "features_vitals__breathing_conf.f64",
+   336
+  ],
+  "heart_bpm": [
+   "features_vitals__heart_bpm.f64",
+   336
+  ],
+  "heart_conf": [
+   "features_vitals__heart_conf.f64",
+   336
+  ],
+  "best_bnr": [
+   "features_vitals__best_bnr.f64",
+   336
+  ],
+  "calib_age_s": [
+   "features_vitals__calib_age_s.f64",
+   336
+  ],
+  "rssi_dbm": [
+   "features_vitals__rssi_dbm.f64",
+   336
+  ],
+  "noise_floor_dbm": [
+   "features_vitals__noise_floor_dbm.f64",
+   336
+  ],
+  "n_subcarriers": [
+   "features_vitals__n_subcarriers.f64",
+   336
+  ],
+  "bytes": [
+   "features_vitals__bytes.f64",
+   22848
+  ]
+ }
+}

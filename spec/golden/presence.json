@@ -1,0 +1,36 @@
+{
+ "name": "presence",
+ "scalars": {
+  "fs": 20.0,
+  "calibration_s": 10.0,
+  "warmup_s": 50.0,
+  "f_low": 0.1,
+  "f_high": 2.0,
+  "sigma_mult": 4.0,
+  "hold_s": 10.0,
+  "energy_window_s": 8.0,
+  "threshold_before_calibration": "inf"
+ },
+ "arrays": {
+  "input": [
+   "presence__input.f64",
+   3600
+  ],
+  "occupied": [
+   "presence__occupied.f64",
+   3600
+  ],
+  "energy": [
+   "presence__energy.f64",
+   3600
+  ],
+  "threshold": [
+   "presence__threshold.f64",
+   3600
+  ],
+  "calibrated": [
+   "presence__calibrated.f64",
+   3600
+  ]
+ }
+}

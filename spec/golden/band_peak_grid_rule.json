@@ -1,0 +1,25 @@
+{
+ "name": "band_peak_grid_rule",
+ "scalars": {
+  "fs": 2.0,
+  "f_low": 0.1,
+  "f_high": 0.5,
+  "resolution_hz": 0.0020000000005,
+  "window": 1,
+  "notch_width_hz": 0.0,
+  "found": 1,
+  "freq_hz": 0.23212322279290218,
+  "power": 553.8329901513976,
+  "confidence": 0.786476725097058
+ },
+ "arrays": {
+  "input": [
+   "band_peak_grid_rule__input.f64",
+   90
+  ],
+  "notch_hz": [
+   "band_peak_grid_rule__notch_hz.f64",
+   0
+  ]
+ }
+}

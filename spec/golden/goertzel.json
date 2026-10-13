@@ -1,0 +1,20 @@
+{
+ "name": "goertzel",
+ "scalars": {
+  "fs": 4.0
+ },
+ "arrays": {
+  "input": [
+   "goertzel__input.f64",
+   240
+  ],
+  "freqs": [
+   "goertzel__freqs.f64",
+   60
+  ],
+  "power": [
+   "goertzel__power.f64",
+   60
+  ]
+ }
+}

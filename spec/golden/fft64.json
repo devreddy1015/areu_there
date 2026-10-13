@@ -1,0 +1,24 @@
+{
+ "name": "fft64",
+ "scalars": {
+  "n": 64
+ },
+ "arrays": {
+  "in_re": [
+   "fft64__in_re.f64",
+   64
+  ],
+  "in_im": [
+   "fft64__in_im.f64",
+   64
+  ],
+  "out_re": [
+   "fft64__out_re.f64",
+   64
+  ],
+  "out_im": [
+   "fft64__out_im.f64",
+   64
+  ]
+ }
+}

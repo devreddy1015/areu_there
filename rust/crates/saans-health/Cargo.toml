@@ -1,0 +1,10 @@
+[package]
+name = "saans-health"
+description = "Saans health monitoring: link-diversity fusion, advisory health detectors and system-health monitoring over FeatureFrame streams."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+saans-dsp = { path = "../saans-dsp" }
+serde = { version = "1", features = ["derive"] }

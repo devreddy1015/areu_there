@@ -1,0 +1,28 @@
+{
+ "name": "static_suppressor",
+ "scalars": {
+  "n_subcarriers": 8,
+  "fs": 20.0,
+  "corner_hz": 0.03,
+  "alpha": 0.00942477796076938,
+  "frames": 600
+ },
+ "arrays": {
+  "amplitudes": [
+   "static_suppressor__amplitudes.f64",
+   4800
+  ],
+  "residuals": [
+   "static_suppressor__residuals.f64",
+   4800
+  ],
+  "weights": [
+   "static_suppressor__weights.f64",
+   4800
+  ],
+  "fused": [
+   "static_suppressor__fused.f64",
+   600
+  ]
+ }
+}

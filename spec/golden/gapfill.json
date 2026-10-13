@@ -1,0 +1,31 @@
+{
+ "name": "gapfill",
+ "scalars": {
+  "max_gap": 5,
+  "filled": 3,
+  "discontinuities": 2,
+  "duplicates": 1
+ },
+ "arrays": {
+  "seq": [
+   "gapfill__seq.f64",
+   14
+  ],
+  "in_amp": [
+   "gapfill__in_amp.f64",
+   14
+  ],
+  "out_amp": [
+   "gapfill__out_amp.f64",
+   16
+  ],
+  "out_seq": [
+   "gapfill__out_seq.f64",
+   16
+  ],
+  "out_from_input": [
+   "gapfill__out_from_input.f64",
+   16
+  ]
+ }
+}

@@ -1,0 +1,45 @@
+# Saans node defaults. Anything here is a deliberate choice; `idf.py menuconfig`
+# overrides land in sdkconfig, which is not committed.
+
+CONFIG_IDF_TARGET="esp32s3"
+
+# --- CSI ---------------------------------------------------------------------
+# Without these the CSI callback never fires. CONFIG_ESP_WIFI_CSI_ENABLED is the
+# whole reason this project runs on an ESP32 at all.
+CONFIG_ESP_WIFI_CSI_ENABLED=y
+
+# --- partitions --------------------------------------------------------------
+# IDF defaults to 2 MB, which the dual-OTA table does not fit in. ESP32-S3
+# DevKits ship with 8 MB or more, so 4 MB is a safe floor that still leaves
+# room for two app slots; raise it if your board has more.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# --- C++ ---------------------------------------------------------------------
+# The DSP is compiled with no exceptions and no RTTI on the host; keep target
+# identical so the host tests are evidence about the firmware, not about a
+# different build of the same source.
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+CONFIG_COMPILER_CXX_RTTI=n
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# --- FPU ---------------------------------------------------------------------
+# The S3 FPU is single precision. Every double in the hot path is a software
+# emulation trap, which is why the DSP is float throughout and the host build
+# uses -Wdouble-promotion.
+CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+
+# --- watchdog ----------------------------------------------------------------
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+
+# --- stacks ------------------------------------------------------------------
+# The DSP allocates nothing after init, but its scratch buffers live on the
+# stack of whichever task calls it. The sensing task gets its own generous
+# stack rather than running inside the WiFi event task.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# --- logging -----------------------------------------------------------------
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y

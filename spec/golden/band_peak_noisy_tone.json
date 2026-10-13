@@ -1,0 +1,25 @@
+{
+ "name": "band_peak_noisy_tone",
+ "scalars": {
+  "fs": 2.0,
+  "f_low": 0.1,
+  "f_high": 0.5,
+  "resolution_hz": 0.002,
+  "window": 1,
+  "notch_width_hz": 0.0,
+  "found": 1,
+  "freq_hz": 0.2321232227927859,
+  "power": 553.8329901392965,
+  "confidence": 0.7864767247890991
+ },
+ "arrays": {
+  "input": [
+   "band_peak_noisy_tone__input.f64",
+   90
+  ],
+  "notch_hz": [
+   "band_peak_noisy_tone__notch_hz.f64",
+   0
+  ]
+ }
+}

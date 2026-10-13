@@ -1,0 +1,52 @@
+# Saans gateway configuration. Run: saans-gateway --config saans.toml
+# Unknown keys are errors, so a typo cannot silently change a setting.
+
+# UDP port the sensors send FeatureFrames (and debug raw CSI) to.
+udp_port = 5566
+# Interface to receive on. Sensors are remote, so all interfaces by default;
+# put the gateway's sensor-VLAN address here to narrow it.
+udp_bind = "0.0.0.0"
+# HTTP API + dashboard. Localhost by default. Binding wider (for example
+# "0.0.0.0:8080") is an explicit choice: the API has no authentication.
+http_addr = "127.0.0.1:8080"
+# Event logs (events-YYYY-MM-DD.jsonl) and history.json live here.
+data_dir = "saans-data"
+# DPDP retention: an event log is deleted once all its events are older.
+event_retention_days = 30
+# Local time offset from UTC in minutes (India: 330). Sets the day
+# boundary of event logs and daily summaries.
+utc_offset_minutes = 330
+
+# raw CSI (debug / data collection only, ADR-001). The gateway runs
+# the same DSP the node would. Raw links are listed as { rx = node, tx = 255 }.
+[raw]
+sample_rate_hz = 20.0   # the CSI rate the nodes are driven at
+subcarriers = 0         # 0 = take the count from each node's first datagram
+calibration_s = 30.0    # empty-room calibration; keep the space empty at start
+
+# One [[space]] per monitored room. A link is (receiving node, transmitting
+# node); tx = 255 means "an access point / unknown". Each link belongs to at
+# most one space; frames from links no space lists are counted in
+# /api/health so a misconfigured node is easy to find.
+[[space]]
+id = "reading-room"
+name = "Reading room"
+links = [{ rx = 1, tx = 255 }, { rx = 2, tx = 255 }]
+# ADR-005: breathing and heart data only with the occupants' written consent.
+vitals = false
+inactivity_alert_min = 30.0
+# Off by default: WiFi cannot tell "fell" from "sat down heavily".
+collapse_detection = false
+
+[[space]]
+id = "rest-room-1"
+name = "Rest room 1 (consented)"
+links = [{ rx = 3, tx = 4 }, { rx = 5, tx = 4 }]
+vitals = true
+# 0 = automatic: 1 vote with fewer than 3 usable links, else a majority.
+presence_quorum = 0
+inactivity_alert_min = 20.0
+collapse_detection = false
+breathing_pause_min_s = 10.0
+rate_high_bpm = 24.0
+rate_low_bpm = 8.0
