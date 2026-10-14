@@ -126,6 +126,103 @@ correct behaviour.** The system saying "I don't know" is the product.
 
 ---
 
+## 2e. Room size and internal wall layout — no, and for a *third* reason
+
+**The deciding quantity is coherent aperture extent.** Not antenna
+count, not bandwidth. Say that out loud, because the bandwidth argument
+in §2a does **not** carry over, and a reader who assumes it does will go
+shopping for UWB — which would not fix this either.
+
+In the near field, depth comes from wavefront curvature, not pulse
+compression. Depth of focus is `4λR²/L²`. At λ = 12.3 cm, resolving a
+wall at R = 3.5 m to 30 cm needs an aperture of **L ≈ 4.5 m — larger
+than the room**. Cross-range at that aperture would be fine
+(λ/L = 2.0°, 14 cm at 4 m), which is precisely why bandwidth is not the
+binding term here.
+
+**Saans has L = 0.** Two or three nodes bolted to walls form no
+aperture, their positions are typed in by a human, and each PLL is
+free-running at 10–40 ppm with no inter-node phase reference.
+
+The backup limit, for the fixed configuration you actually have: 56
+subcarriers × 312.5 kHz is a **17.19 MHz** measured span, so the
+bistatic path-length cell is `c/B` = **17.45 m**. In a 3.5 × 3.5 × 3 m
+room the six first-order reflections sit 0.70–2.22 m of excess path from
+the line of sight. **All of them, plus the LoS, land in one cell** — at
+20 MHz, at 40 MHz, and at a perfectly stitched 83.5 MHz whole-ISM-band
+span (3.6 m cell). Roughly 900 image sources inside the first cell
+against at most ~19–37 degrees of freedom in a 56-subcarrier snapshot.
+That is rank deficiency, not noise, and no amount of integration fixes
+it.
+
+**Long integration reduces variance. It does not improve delay
+resolution.** That conflation is the single most common way to get this
+question wrong.
+
+### Three answers that stop this being re-asked
+
+- **802.11mc FTM ranging** is the first thing anyone suggests, and the
+  ESP32-S3 supports it in shipping firmware. **[sourced]** Measured
+  error is ~1.8 m on S3, with an S2 study showing only ~75% of readings
+  under 5 m and excursions to 20 m; Espressif's own driver guide says
+  RTT distance measurement "is not accurate". A monitored room is 4–8 m
+  across, so the error is the size of the thing being measured. It
+  cannot even reliably detect that a node has been moved.
+- **Wiffract (MobiCom 2022)** is the strongest WiFi geometry result that
+  exists — and it needs a ground robot scanning 140 × 42 positions over
+  a 2 m × 1.2 m aperture with 9 antennas. **[sourced]** The paper states
+  outright that WiFi imaging "cannot capture the depth information".
+  Room size *is* depth.
+- **Acoustics**, for the humility: **[sourced]** five ordinary
+  microphones in arbitrary positions, spacing measured with a tape
+  measure, reconstructed all six walls of a lecture room (PNAS 2013),
+  recovering a 90.0° corner as 90.1°. Sound is ~875,000× slower, so a
+  20 kHz sweep gives a **0.86 cm** range bin against 7.5 m for WiFi
+  HT20. A few hundred rupees of microphones beats every radio system in
+  this literature.
+
+### So: ask, do not infer
+
+A laser distance meter costs about ₹2,000 and is exact. Adding
+`geometry` to `SpaceConfig` — node coordinates, room extent, survey
+provenance — is roughly a day's work and backward compatible. **Effort
+spent inferring what an installer could simply type in is waste**, and
+that sentence is here so the question is not re-litigated.
+
+### A warning about the coverage map in the Explorer
+
+The Explorer's Fresnel coverage map is honest **because the simulator
+knows its node positions exactly**. Do not assume it transfers to a real
+room. **[sourced, measured by the study against this repo]** With node
+positions off by 5 mm the map's correlation with truth falls to 0.87; at
+1 cm, 0.65; at **2 cm, 0.27**. A human with a tape measure does not
+place a node to 5 mm.
+
+So: a to-scale room outline with node markers and a door is fine from
+surveyed config. **A per-cell blind-spot heatmap over a real room is
+not**, and neither is an install-time CLI printing "median 2.7% blind
+area" from a surveyed layout. Those numbers would be precision the
+survey cannot support.
+
+### The weaker claim that might actually be useful
+
+"Is this room *different* from when we calibrated?" — a node was moved,
+a door is propped open, a cupboard now blocks a sensor. That is change
+detection in the static channel, not mapping, and it is the one place
+inference earns its keep here.
+
+Treat it as a **measurement task, not a capability**. The nearest
+single-antenna amplitude-only result **[sourced]** reports 99.6% TPR at
+0% FPR — but the event it detects is *rotating a directional antenna*,
+which perturbs the channel far more than furniture does, and the same
+paper notes that two people walking leave the shape of |H| "largely the
+same". It also uses a deep autoencoder, which ADR-007 forbids until the
+DSP ceiling is measured on real data. Build the cheap version from
+existing telemetry, measure its false-alarm rate on replay, and promise
+nothing until that number exists.
+
+---
+
 ## 3. If you want these capabilities anyway
 
 The honest path does not run through Saans nodes.
@@ -180,9 +277,18 @@ already sits in.
 ## 5. What this does not mean
 
 None of the above says the system is limited in the ways that matter for
-what it is for. Presence, breathing with a calibrated confidence and an
-abstention, per-link signal quality and consent-gated vitals are all
-working, measured (on synthetic data) and useful. The ceiling described
+what it is for. Presence, breathing with a confidence and an abstention, per-link signal
+quality and consent-gated vitals are all working, measured (on synthetic
+data) and useful.
+
+One correction to this file's own earlier wording: it called the
+breathing confidence "calibrated". That is stronger than the evidence.
+`NOTES.md` records the estimator locking onto **twice** the true rate at
+whole-band blind spots, and the Explorer review observed it doing so at
+**confidence 1.00** — i.e. unanimous about a doubled rate. The gate
+turns an unreliable number into a mostly-reliable one that abstains; it
+does not make the confidence a calibrated probability, and the double-
+rate failure is the known case where it does not save you. The ceiling described
 here is on *spatial* capability specifically.
 
 The next three things worth building are in
