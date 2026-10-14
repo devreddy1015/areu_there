@@ -1,6 +1,25 @@
-/* Saans site. Static: no build step, no framework. Fonts are the only
-   external request. Every number shown on the page comes from NOTES.md,
+/* Saans site. Static: no build step, no framework, and no external
+   requests: a page about data that never leaves the room should not tell a
+   font CDN who read it. Every number shown on the page comes from NOTES.md,
    NOTES-localize.md or SAANS_PLAN.md and is labelled synthetic there. */
+
+/* Geist and Geist Mono, latin subset, variable weight. SIL OFL 1.1, see
+   fonts/OFL.txt. Glyphs outside the subset (arrows, Devanagari) fall back
+   to the system font. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/geist-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/geist-mono-latin.woff2") format("woff2");
+}
 
 :root {
   color-scheme: dark;
