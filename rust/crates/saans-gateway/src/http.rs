@@ -517,10 +517,41 @@ mod tests {
         assert_eq!(parse_since("nope"), None);
     }
 
+    /// The dashboard must fetch nothing from the internet: it is served
+    /// from a box in a building that may have no route out, and a
+    /// stylesheet that fails to load is a dashboard nobody can read.
+    ///
+    /// XML namespace URIs are the one exception. `http://www.w3.org/...`
+    /// in `xmlns` or `createElementNS` is an identifier, not an address
+    /// — nothing dereferences it — and SVG cannot be built without it.
+    /// Allowed by name here rather than by assembling the string at
+    /// runtime to slip past the check, which would leave this test
+    /// guarding nothing.
     #[test]
     fn dashboard_has_no_external_urls() {
+        const XML_NS: [&str; 3] =
+            ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"];
+        let mut stripped = DASHBOARD_HTML.to_string();
+        for ns in XML_NS {
+            stripped = stripped.replace(ns, "");
+        }
         for bad in ["http://", "https://", "//cdn", "src=\"//", "@import", "url(http"] {
-            assert!(!DASHBOARD_HTML.contains(bad), "dashboard must stay offline-capable: found {bad:?}");
+            assert!(!stripped.contains(bad), "dashboard must stay offline-capable: found {bad:?}");
+        }
+        // The namespaces that *are* present may only appear as a
+        // namespace argument, never as something to fetch. (A bare
+        // `https:` — the scheme test the WebSocket URL does — is not a
+        // URL and is not matched here.)
+        for scheme in ["http://", "https://"] {
+            for (i, _) in DASHBOARD_HTML.match_indices(scheme) {
+                let rest = &DASHBOARD_HTML[i..];
+                let before = &DASHBOARD_HTML[i.saturating_sub(40)..i];
+                assert!(
+                    XML_NS.iter().any(|ns| rest.starts_with(ns)) && (before.contains("xmlns") || before.contains("createElementNS")),
+                    "unexpected URL at byte {i}: ...{before}{}",
+                    &rest[..rest.len().min(40)]
+                );
+            }
         }
         assert!(DASHBOARD_HTML.contains("not a medical device"));
     }

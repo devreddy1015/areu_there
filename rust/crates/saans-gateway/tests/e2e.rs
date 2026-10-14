@@ -529,8 +529,16 @@ async fn dashboard_is_served_and_self_contained() {
     let csp = r.header("content-security-policy").expect("CSP header");
     assert!(csp.contains("default-src 'none'") && csp.contains("connect-src 'self'"), "{csp}");
     let body = r.body.to_ascii_lowercase();
+    // XML namespace URIs are identifiers, not addresses: nothing
+    // dereferences `createElementNS("http://www.w3.org/2000/svg", ...)`,
+    // and SVG cannot be built without it. The src=/href= check below is
+    // what actually guarantees nothing is fetched.
+    let mut stripped = body.clone();
+    for ns in ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"] {
+        stripped = stripped.replace(ns, "");
+    }
     for bad in ["http://", "https://", "//cdn", "@import", "url(http"] {
-        assert!(!body.contains(bad), "external reference {bad:?} in the dashboard");
+        assert!(!stripped.contains(bad), "external reference {bad:?} in the dashboard");
     }
     // Every src= / href= is relative or a fragment, never protocol-relative.
     for attr in ["src=", "href="] {
