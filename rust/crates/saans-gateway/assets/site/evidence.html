@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Evidence — Saans</title>
+<meta name="description" content="How Saans compares to cameras, mmWave, PIR and wearables; what each detector does; the three-implementation parity chain; and a roadmap of what is built and what is not. Every figure is from simulation.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="evidence">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label" data-reveal="rise">evidence</p>
+  <h1 id="page-title" class="display" data-reveal="rise">what is proven</h1>
+  <p class="lead" data-reveal="rise" style="--i:1">Where WiFi sensing fits beside other sensors, what each detector does, how three implementations are held to one spec, and which phases are finished. Every figure on this page was measured in simulation. There is no hardware yet, so nothing here comes from a real room.</p>
+</section>
+
+<section class="wrap section" id="compare" aria-labelledby="compare-title">
+  <div class="split-head">
+    <h2 id="compare-title" data-reveal="rise"><span>how it </span>compares</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">No sensor is best at everything. Here is where WiFi sensing fits, including where it does not.</p>
+  </div>
+  <div class="table-scroll" data-reveal="unveil">
+    <table class="compare">
+      <thead><tr><th scope="col"></th><th scope="col" class="us">saans · wifi</th><th scope="col">camera</th><th scope="col">mmWave radar</th><th scope="col">PIR</th><th scope="col">wearable</th></tr></thead>
+      <tbody>
+        <tr><td>Captures no images or audio</td><td class="us"><i class="mk mk-yes" title="yes">✓</i></td><td><i class="mk mk-no" title="no">✕</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td></tr>
+        <tr><td>Notices a person sitting still</td><td class="us"><i class="mk mk-yes">✓</i><small>breathing band</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i><small>needs movement</small></td><td><i class="mk mk-some">~</i><small>if worn</small></td></tr>
+        <tr><td>Works in the dark</td><td class="us"><i class="mk mk-yes">✓</i></td><td><i class="mk mk-some">~</i><small>with IR</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td></tr>
+        <tr><td>Breathing rate without contact</td><td class="us"><i class="mk mk-yes">✓</i><small>opt-in per space</small></td><td><i class="mk mk-some">~</i><small>research</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td><td><i class="mk mk-no">✕</i><small>contact sensor</small></td></tr>
+        <tr><td>Nothing to wear, carry or charge</td><td class="us"><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td></tr>
+        <tr><td>Cannot tell who someone is</td><td class="us"><i class="mk mk-yes">✓</i><small>by design</small></td><td><i class="mk mk-no">✕</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td></tr>
+        <tr><td>Position within the room</td><td class="us"><i class="mk mk-no">✕</i><small>not yet</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td><td><i class="mk mk-some">~</i><small>with UWB anchors</small></td></tr>
+        <tr><td>Hardware for one room</td><td class="us">two ~$6–10 boards</td><td>camera + storage</td><td>one radar module</td><td>one sensor</td><td>one per person</td></tr>
+        <tr><td>Measured in real rooms</td><td class="us"><i class="mk mk-no">✕</i><small>not yet · phase S5</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td></tr>
+      </tbody>
+    </table>
+    <div class="legend"><span><i class="mk mk-yes">✓</i>strong fit</span><span><i class="mk mk-some">~</i>with caveats</span><span><i class="mk mk-no">✕</i>no</span></div>
+  </div>
+  <div class="notfor">
+    <div data-reveal="rise">
+      <p class="label">what saans is not for</p>
+      <h3 class="title" style="margin-top:8px">Saying no is part of the design.</h3>
+    </div>
+    <ul data-reveal="rise" style="--i:1">
+      <li><b>Identifying anyone, or taking attendance</b><span class="small muted">Device-free sensing cannot tell people apart. Saans reports spaces, never individuals.</span></li>
+      <li><b>Diagnosis</b><span class="small muted">Not a medical device. Alerts are advisory and never replace existing procedures.</span></li>
+      <li><b>Fall detection</b><span class="small muted">Amplitude-only WiFi cannot see height, so a fall and a sit-down look the same.</span></li>
+      <li><b>Tracking people around a room</b><span class="small muted">Position at this node count lost to a trivial baseline in simulation.</span></li>
+      <li><b>Pose, skeletons, multi-person tracking</b><span class="small muted">None of this exists here, and none of it is claimed.</span></li>
+      <li><b>Counting crowds across campus</b><span class="small muted">Existing access-point analytics count devices per building. Saans works one room at a time.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="wrap section" id="detectors" aria-labelledby="detectors-title">
+  <div class="split-head">
+    <h2 id="detectors-title" data-reveal="rise">detectors</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Each detector writes an event that records what it saw and how confident it was. Health detectors are advisory and run only in spaces that have opted in.</p>
+  </div>
+  <div class="filters" data-reveal="rise">
+    <div class="seg" role="group" aria-label="Filter detectors">
+      <button type="button" data-filter="all" aria-pressed="true">all</button>
+      <button type="button" data-filter="people" aria-pressed="false">people</button>
+      <button type="button" data-filter="health" aria-pressed="false">health</button>
+      <button type="button" data-filter="safety" aria-pressed="false">safety</button>
+      <button type="button" data-filter="system" aria-pressed="false">system</button>
+    </div>
+    <div class="badges" style="margin:0">
+      <span class="chip st-sim"><span class="dot"></span>simulated · measured</span>
+      <span class="chip st-built"><span class="dot"></span>built</span>
+      <span class="chip st-off"><span class="dot"></span>off</span>
+    </div>
+  </div>
+  <div class="det-grid" id="det-grid">
+    <article class="det" data-cat="people"><div class="det-top"><code>OccupancyStarted / Ended</code><span class="chip st-sim"><span class="dot"></span>simulated</span></div><h3>Occupancy</h3><p>A space becomes occupied or empty. The exit event carries the dwell time. 98.2–99.5% accurate, depending on the number of links.</p></article>
+    <article class="det" data-cat="people"><div class="det-top"><code>RestStarted / Ended</code><span class="chip st-built"><span class="dot"></span>built</span></div><h3>Rest period</h3><p>A long still period with steady breathing, reported with start, end, restlessness and pauses. It is not sleep staging.</p></article>
+    <article class="det" data-cat="health"><div class="det-top"><code>BreathingPause</code><span class="chip st-sim"><span class="dot"></span>simulated</span></div><h3>Breathing pause</h3><p>Fires after confident breathing when the band falls quiet for at least 10 s. 98.7% precision. Reported about 9–10 s late because of filter lag.</p></article>
+    <article class="det" data-cat="health"><div class="det-top"><code>RateHigh / RateLow</code><span class="chip st-sim"><span class="dot"></span>simulated</span></div><h3>Fast or slow breathing</h3><p>Rate outside 8–24 BPM at rest for at least 2 min. Raised in 31 of 36 fast-breathing runs, and falsely in 2 of 36 reader runs.</p></article>
+    <article class="det" data-cat="health"><div class="det-top"><code>TrendDeviation</code><span class="chip st-built"><span class="dot"></span>built</span></div><h3>Trend deviation</h3><p>Resting breathing rate compared with that space's own baseline: median ± 3 MAD over at least three days.</p></article>
+    <article class="det" data-cat="safety"><div class="det-top"><code>Inactivity</code><span class="chip st-sim"><span class="dot"></span>simulated</span></div><h3>Lone-worker inactivity</h3><p>Present, with no gross motion for N minutes. Escalates if breathing is not detected. It also fires for a 40-minute reader, which is correct by definition and why it is advisory.</p></article>
+    <article class="det is-off" data-cat="safety"><div class="det-top"><code>PossibleCollapse</code><span class="chip st-off"><span class="dot"></span>off · not usable</span></div><h3>Possible collapse</h3><p>Caught 100% of simulated falls, and also 100% of sit-downs. It ships off and should stay off.</p></article>
+    <article class="det" data-cat="system"><div class="det-top"><code>SpaceBlind / Visible</code><span class="chip st-built"><span class="dot"></span>built</span></div><h3>Blind space</h3><p>No usable link means the space reports “I can't see”, never “empty”.</p></article>
+    <article class="det" data-cat="system"><div class="det-top"><code>LinkDown / Up / Degraded</code><span class="chip st-built"><span class="dot"></span>built</span></div><h3>Link health</h3><p>Silence, falling rate, packet loss and interference, raised for each link so a wiring fault is never mistaken for an empty room.</p></article>
+    <article class="det" data-cat="system"><div class="det-top"><code>CalibrationStale</code><span class="chip st-built"><span class="dot"></span>built</span></div><h3>Stale calibration</h3><p>The age of each link's empty-room calibration, which presence depends on.</p></article>
+    <article class="det" data-cat="system"><div class="det-top"><code>RawModeActive</code><span class="chip st-built"><span class="dot"></span>built</span></div><h3>Raw mode on</h3><p>A node streaming raw CSI for debugging sets a flag in every frame, so the debug mode is always visible.</p></article>
+  </div>
+</section>
+
+<section class="wrap section" id="speed" aria-labelledby="speed-title">
+  <div class="split-head">
+    <h2 id="speed-title" data-reveal="rise"><span>one spec, </span>three implementations</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Python is the reference. Rust and C++ must reproduce it on golden vectors. When they disagree, the implementation that disagrees gets fixed. Tolerances are never loosened quietly.</p>
+  </div>
+  <div class="chain" data-reveal="rise">
+    <div><span class="label">reference</span><span class="lang">Python</span><p class="small muted">Standard library only. Every stage is plain float arithmetic.</p><dl><dt>numbers</dt><dd>f64</dd><dt>role</dt><dd>generates the golden vectors</dd></dl></div>
+    <div><span class="label">gateway</span><span class="lang">Rust</span><p class="small muted">A dependency-free port of the whole reference.</p><dl><dt>tolerance</dt><dd>1e-9 relative</dd><dt>frames</dt><dd>672 / 672 byte-identical</dd></dl></div>
+    <div><span class="label">sensor</span><span class="lang">C++17</span><p class="small muted">Header-only, no heap after init, single-precision FPU.</p><dl><dt>tolerance</dt><dd>1e-4 relative</dd><dt>checks</dt><dd>669 golden checks pass</dd></dl></div>
+  </div>
+  <p class="fine" style="margin-top:16px" data-reveal="rise">Pre-hardware: the golden vectors behind these counts, and the frames behind the bars below, come from the simulator rather than from a radio.</p>
+  <div class="bars" id="bars">
+    <div class="bars-head"><h3 class="title">Frames per second, one core</h3><span class="fine">32 subcarriers, 20 Hz, 3,267 frames, same input</span></div>
+    <div class="bar" style="--i:0"><span class="bar-name">Python · feature extractor</span><span class="bar-track"><span class="bar-fill" style="--w:0.67%"></span></span><span class="bar-val">175</span></div>
+    <div class="bar" style="--i:1"><span class="bar-name">Python · pipeline</span><span class="bar-track"><span class="bar-fill" style="--w:0.73%"></span></span><span class="bar-val">191</span></div>
+    <div class="bar is-rust" style="--i:2"><span class="bar-name">Rust · same algorithm<small>estimate every frame</small></span><span class="bar-track"><span class="bar-fill" style="--w:10.97%"></span></span><span class="bar-val">2,851</span></div>
+    <div class="bar is-rust" style="--i:3"><span class="bar-name">Rust · feature extractor<small>estimate only when a frame is due</small></span><span class="bar-track"><span class="bar-fill" style="--w:97.24%"></span></span><span class="bar-val">25,283</span></div>
+    <div class="bar is-cpp" style="--i:4"><span class="bar-name">C++ · edge DSP, float32<small>host build, separate harness</small></span><span class="bar-track"><span class="bar-fill" style="--w:100%"></span></span><span class="bar-val">≈26k</span></div>
+    <p class="fine" style="padding-top:12px;border-top:1px solid var(--rule)">The language is worth about 15×. Computing spectral estimates only when a frame is due (twice a second rather than twenty times) is worth another ~9×, with identical output.</p>
+  </div>
+
+  <div class="steps">
+    <div class="steps-panel" data-reveal="unveil">
+      <h2>Every number is measured, including the bad ones.</h2>
+      <p class="body ink-soft">Unit tests passed. The evaluation on scripted timelines still found three bugs. Each fix went into the Python reference first, the golden vectors were regenerated, and those vectors caught the same bug in both the Rust and the C++ ports before either was edited by hand.</p>
+    </div>
+    <div>
+      <div class="step" data-reveal="rise"><h3 class="title">Presence threshold too low</h3><span class="label">fixed</span><p class="body ink-soft">Thirty seconds of an 8 s sliding RMS holds only a few independent windows, so the noise estimate came out far too small. The fix was a floor derived from the filter bandwidth.</p><span class="delta">empty room read occupied <b>36%</b> → <b>0.6–1.2%</b></span></div>
+      <div class="step" data-reveal="rise" style="--i:1"><h3 class="title">The motion band leaked breathing</h3><span class="label">fixed</span><p class="body ink-soft">One biquad's skirt passed about 19% of a 0.25 Hz breathing component into the 1–4 Hz motion band. The fix was two cascaded sections.</p><span class="delta">still breather vs empty <b>1.33 / 0.88</b> → <b>0.79 / 0.75</b></span></div>
+      <div class="step" data-reveal="rise" style="--i:2"><h3 class="title">One noisy sample reset every clock</h3><span class="label">fixed</span><p class="body ink-soft">The heartbeat sits in the motion band, so a single sample could restart the stillness timer. The fix was a higher threshold plus three confirming samples.</p><span class="delta">false stillness resets <b>60/h</b> → <b>0.15/h</b></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section" id="status" aria-labelledby="status-title">
+  <div class="split-head">
+    <h2 id="status-title" data-reveal="rise"><span>where it </span>stands</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Every phase has an exit gate that is measured, not declared. Simulation is done. Real rooms need hardware, and that comes next.</p>
+  </div>
+  <ol class="roadmap" style="margin-top:clamp(28px,3vw,48px)">
+    <li data-reveal="rise"><span class="ph">S0</span><span class="title">Spec and golden vectors</span><span class="gate small muted">Wire format, decision records, 21 vector sets from the reference.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
+    <li data-reveal="rise"><span class="ph">S1</span><span class="title">Rust parity</span><span class="gate small muted">All vectors at 1e-9. 672/672 frames byte-identical. Benchmark reported.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
+    <li data-reveal="rise"><span class="ph">S2</span><span class="title">C++ parity and firmware</span><span class="gate small muted">669 float32 golden checks. Firmware builds for esp32s3.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
+    <li data-reveal="rise"><span class="ph">S3</span><span class="title">Health detectors</span><span class="gate small muted">Event-level precision and recall on held-out scripted timelines, including false alarms per hour.</span><span class="chip st-ok"><span class="dot"></span>done · simulated</span></li>
+    <li data-reveal="rise"><span class="ph">S4</span><span class="title">Gateway</span><span class="gate small muted">Replays a recording and a simulated 8-hour night end to end, with API, WebSocket and /metrics.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
+    <li data-reveal="rise"><span class="ph">S5</span><span class="title">Hardware bring-up</span><span class="gate small muted">Presence F1, still person read as empty, breathing against a chest belt, in real rooms.</span><span class="chip st-sim"><span class="dot"></span>needs hardware</span></li>
+    <li data-reveal="rise"><span class="ph">S6</span><span class="title">Multi-link spaces</span><span class="gate small muted">Blind-spot rate with 1, 2 and 3 links, first in simulation and then in real rooms.</span><span class="chip st-sim"><span class="dot"></span>in progress</span></li>
+    <li data-reveal="rise"><span class="ph">S7</span><span class="title">Pilot</span><span class="gate small muted">Two weeks, ≥ 99% uptime, alarm rates per space per day, with ethics approval first.</span><span class="chip st-plan"><span class="dot"></span>later</span></li>
+  </ol>
+  <p class="fine" style="margin-top:16px" data-reveal="rise">Every gate marked done was passed in simulation. No gate on this list has been passed on hardware.</p>
+</section>
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/demo"><b>See the gap yourself<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The demo shows the estimate beside the truth, including where it loses the person.</p></a>
+    <a href="/privacy"><b>What leaves the room<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The wire format, byte by byte.</p></a>
+    <a href="/start"><b>Run it<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Clone, build, replay a capture. No hardware needed.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Live demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+</body>
+</html>

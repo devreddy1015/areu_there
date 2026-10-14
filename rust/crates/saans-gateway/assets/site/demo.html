@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Demo — Saans</title>
+<meta name="description" content="A simulated person in a simulated room, beside what the signal processing actually recovered from it. Synthetic throughout: no hardware, no real room, no real person.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="demo">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+
+<div class="wrap">
+  <p class="simbar" role="note">
+    <b>SIMULATED — SYNTHETIC DATA</b>
+    <span>No radio hardware is involved. The room, the person and the channel are produced by the
+      built-in simulator; the right-hand panel is the real signal processing reading that simulated
+      channel. Nothing in this view is a measurement of a real person.</span>
+  </p>
+</div>
+
+<section class="wrap pagehead" aria-labelledby="demo-title">
+  <p class="label">demo</p>
+  <h1 id="demo-title" class="display">see it run.</h1>
+  <p class="lead">This page drives the gateway's own simulator from your browser. On the left is the
+    room we told it to build and the person we put in it; on the right is what the signal processing
+    recovered from that synthetic channel, through the same ingest path a sensor's frames take.
+    <strong>Move the person half a metre and the right-hand column loses them completely.</strong></p>
+</section>
+
+<section class="wrap section" id="room" aria-labelledby="room-title">
+  <p class="label">the two columns</p>
+  <h2 id="room-title" class="statement" style="margin-top:10px">Drag the person. <em>Watch the pipeline lose them.</em></h2>
+
+  <!-- The verdict spans both columns rather than sitting inside the
+       system one: it quotes the ground-truth position, and a position
+       may appear beside what the pipeline recovered only as what it
+       plainly is here — the input, named as the input, in a box that is
+       about the comparison itself. -->
+  <div id="verdict" class="demo-js verdict-band"></div>
+
+  <div class="demo-cols">
+
+    <div class="demo-panel">
+      <h3 class="title">Ground truth — what we told the simulator</h3>
+      <p class="fine">Everything in this panel is an input we chose, not an inference. The person is
+        where we put them.</p>
+
+      <p class="fine demo-nojs">This column draws the simulated room from the gateway's own
+        <code>/api/sim</code>, which needs JavaScript. With JavaScript off nothing is drawn: the page
+        will not paint a room it could not fetch. The rest of this page reads normally.</p>
+
+      <div class="demo-js">
+        <svg id="demo-plan" class="room" viewBox="0 0 560 500" role="group"
+             aria-label="Plan of the simulated room. It is drawn once the gateway answers."></svg>
+        <p class="fine" id="plan-note" role="status">Loading the simulated room…</p>
+
+        <dl class="demo-dl">
+          <dt>Person — an input we set</dt><dd id="t-pos">—</dd>
+          <dt>Simulator predicts here</dt><dd id="t-cov">—</dd>
+          <dt>Breathing we told it to generate</dt><dd id="t-breath">—</dd>
+        </dl>
+
+        <div class="covkey" id="covkey"></div>
+        <p class="fine" id="covnote"></p>
+
+        <div class="demo-ctl" role="group" aria-label="Where to put the simulated person">
+          <button type="button" class="demo-btn" data-x="3.00" data-y="3.10">seen clearly · 3.00, 3.10</button>
+          <button type="button" class="demo-btn" data-x="3.00" data-y="3.61">the blind spot · 3.00, 3.61</button>
+          <button type="button" class="demo-btn" data-x="3.50" data-y="3.61">seen again · 3.50, 3.61</button>
+          <button type="button" class="demo-btn" id="ex-present">empty the room</button>
+        </div>
+        <p class="fine">Those three points are asserted by a Rust test,
+          <code>the_gap_the_explorer_exists_to_show</code>, so they cannot rot into coordinates that no
+          longer demonstrate anything. Drag the handle, or click anywhere in the room. With the handle
+          focused, <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> move it by one map cell and
+          <kbd>Shift</kbd> and an arrow by 1 m.</p>
+        <p class="fine demo-err" id="ex-err" role="alert"></p>
+      </div>
+
+      <p class="fine" style="margin-top:16px">The map is fetched at 0.03 m per cell and that is not a
+        cosmetic choice. Measured against this gateway's own pipeline, with the person parked in the
+        blind spot at 3.00, 3.61 where the pipeline reports an empty room: a 0.25 m map reads 0.79
+        there, a 0.10 m map reads 1.26 — brighter than this room's median — and only a 0.03 m map reads
+        0.21, effectively blind, which is the true answer. The pattern goes from peak to null in about
+        3 cm. A map that disagrees with the pipeline it is drawn to explain is the one thing this page
+        must never ship.</p>
+    </div>
+
+    <div class="demo-panel">
+      <h3 class="title">What the pipeline recovered</h3>
+      <p class="fine">The real DSP, fed the simulated CSI through the same ingest path as a sensor.
+        No position appears here: a one-antenna link cannot measure one.</p>
+
+      <p class="fine demo-nojs">This column reads the gateway's published state from
+        <code>/api/spaces</code>, which needs JavaScript. With JavaScript off, nothing is shown here —
+        no placeholder numbers are substituted for the ones it could not fetch.</p>
+
+      <div class="demo-js">
+        <p class="fine" id="sys-note" role="status"></p>
+        <div class="badges" id="sys-badges"></div>
+        <dl class="demo-dl" id="sys-dl"></dl>
+        <div id="sys-alerts"></div>
+        <p class="fine" style="margin-top:16px">Occupancy, motion, stillness and breathing are the
+          whole published vocabulary for a space. There is no position field anywhere in the gateway,
+          and nothing in it could produce one.</p>
+      </div>
+    </div>
+
+  </div>
+  <p class="sr-only" aria-live="polite" id="ex-live"></p>
+</section>
+
+<section class="wrap section" id="limits" aria-labelledby="limits-title">
+  <p class="label" data-reveal="rise">the small print</p>
+  <h2 id="limits-title" class="statement" data-reveal="rise" style="margin-top:10px">What this simulator does not model</h2>
+  <div class="limits">
+    <ul class="limits-list" data-reveal="rise">
+      <li><b>Two dimensions, no AGC, no carrier offset</b><p>The simplifications the Python reference
+        already made, which this simulator inherits.</p></li>
+      <li><b>The torso faces every link at once</b><p>Its scatterers are spread across each link's own
+        bisector, as in the reference. A real torso has one orientation.</p></li>
+      <li><b>The body never shadows the line of sight</b><p>And there is no near-field: ranges below
+        10 cm are clamped in the scatterer amplitude.</p></li>
+      <li><b>A fall is a horizontal move</b><p>Falls and sitting down happen in the 2-D slice. A real
+        one is mostly vertical, and lying down does not change the radar cross-section here.</p></li>
+      <li><b>Walking is a constant speed between waypoints</b><p>No gait sway, and a still person has
+        no postural sway at all.</p></li>
+      <li><b>The phases are too clean</b><p>They are the clean channel phase, with no CFO or SFO, so
+        they are far better than what an ESP32 reports. The pipeline uses amplitudes.</p></li>
+    </ul>
+    <div data-reveal="rise" style="--i:1">
+      <p class="body">And one thing about the room itself: this scenario runs <strong>one link</strong>,
+        between two nodes on opposite walls. That is the honest minimum deployment, and it is the
+        configuration whose failure mode this page exists to show. It is not the recommended one.</p>
+      <p class="body" style="margin-top:18px">Measured on this same geometry, adding a second link at a
+        wide angle fills in the first one's nulls almost perfectly: cells below the measured blindness
+        threshold fall from <strong>2.9% of the room to 0.12%</strong>, and the largest connected dead
+        patch from about 20 cm across to a single cell. Nothing a person can sit down in. The blind spot
+        you are about to drag someone into is a property of a one-link deployment, not of the
+        technology.</p>
+      <a class="link" href="/how-it-works" style="margin-top:8px">how link diversity works<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section" id="run" aria-labelledby="run-title">
+  <div class="split-head">
+    <h2 id="run-title" data-reveal="rise"><span>run this </span>yourself</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">The simulator is part of the gateway. One
+      command starts the same synthetic room, the same pipeline and the same API this page is reading.</p>
+  </div>
+  <div class="cmd" data-reveal="unveil">
+    <div class="cmd-bar">
+      <span class="fine">the whole demo, on your own machine</span>
+      <button type="button" class="copy" id="cmd-copy"><svg width="14" height="14" aria-hidden="true"><use href="#i-copy"/></svg><span>copy</span></button>
+    </div>
+<pre id="cmd-text">saans-gateway --config saans.toml --simulate --speed 10</pre>
+  </div>
+  <p class="fine" style="margin-top:14px;max-width:70ch">The room starts empty on purpose: the presence
+    detector calibrates on an empty room and the breathing filters need about fifty seconds to settle, so
+    the person appears two minutes in. <code>--speed 10</code> skips that lead-in.</p>
+  <div class="extra" style="margin-top:20px">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">the source on GitHub<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/rust/crates/saans-gateway/src/simulate.rs">the scenario, in one file<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="link" href="/app">the operator's view of the same room</a>
+  </div>
+</section>
+
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/how-it-works"><b>How it works<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The eight stages between a radio packet and the word “occupied”.</p></a>
+    <a href="/evidence"><b>What is proven<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The measured numbers, the comparisons, and the parts that are not built yet.</p></a>
+    <a href="/privacy"><b>What leaves the room<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Sixty-eight bytes, encoded live on the page, with the consent switch wired up.</p></a>
+    <a href="/hardware"><b>What it runs on<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Two boards on opposite walls, and what a second link buys you.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+<script src="/demo.js" defer></script>
+</body>
+</html>

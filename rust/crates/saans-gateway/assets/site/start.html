@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Get started — Saans</title>
+<meta name="description" content="Run the gateway, flash a node, or read the API. The HTTP, WebSocket, metrics and replay surfaces, with the questions people ask first.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="start">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label" data-reveal="rise">get started</p>
+  <h1 id="page-title" class="display" data-reveal="rise">run it yourself</h1>
+  <p class="lead" data-reveal="rise" style="--i:1">Clone the repository, run the gateway against the synthetic source, and read the API. No hardware is needed: the demo and the replay path run the same pipeline the sensors will. The questions people ask first are at the end of the page.</p>
+</section>
+
+<section class="wrap section" id="integrate" aria-labelledby="integrate-title">
+  <div class="split-head">
+    <h2 id="integrate-title" data-reveal="rise"><span>one gateway, </span>several surfaces</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Everything the gateway serves has already passed the consent gate and the caller's role. Nothing can show more than the space allowed.</p>
+  </div>
+  <div class="int">
+    <ul class="int-list" data-reveal="rise">
+      <li><b>HTTP API</b><span class="chip st-built"><span class="dot"></span>built</span><p>Spaces, events, links and gateway health, as JSON.</p></li>
+      <li><b>WebSocket</b><span class="chip st-built"><span class="dot"></span>built</span><p>State every 0.5 s, plus events as they happen.</p></li>
+      <li><b>Prometheus /metrics</b><span class="chip st-built"><span class="dot"></span>built</span><p>Sensor and gateway health for Grafana.</p></li>
+      <li><b>Event log and replay</b><span class="chip st-built"><span class="dot"></span>built</span><p>Daily JSONL with retention. Recorded pcaps replay with the same readings as live.</p></li>
+      <li><b>MQTT and Home Assistant</b><span class="chip st-plan"><span class="dot"></span>planned</span><p>Retained occupancy per space, so lights and AC can follow it with no custom code.</p></li>
+      <li><b>Telegram and webhook alerts</b><span class="chip st-plan"><span class="dot"></span>planned</span><p>Acknowledge, resolve and escalate. By default no health numbers leave campus.</p></li>
+    </ul>
+    <div class="code" data-reveal="unveil" style="--i:1">
+      <div class="code-bar">
+        <div class="tabs" role="tablist" aria-label="Examples">
+          <button type="button" role="tab" id="tab-run" aria-controls="p-run" aria-selected="true">run it</button>
+          <button type="button" role="tab" id="tab-api" aria-controls="p-api" aria-selected="false" tabindex="-1">http api</button>
+          <button type="button" role="tab" id="tab-live" aria-controls="p-live" aria-selected="false" tabindex="-1">live</button>
+          <button type="button" role="tab" id="tab-json" aria-controls="p-json" aria-selected="false" tabindex="-1">a space</button>
+        </div>
+        <button type="button" class="copy" id="copy"><svg width="14" height="14" aria-hidden="true"><use href="#i-copy"/></svg><span>copy</span></button>
+      </div>
+<pre role="tabpanel" id="p-run" aria-labelledby="tab-run" tabindex="0"><span class="c"># no hardware: the synthetic source models the radio physics</span>
+python3 -m wifisense demo
+
+<span class="c"># host DSP tests, then firmware (Docker is the only dependency)</span>
+edge/build.sh tests
+edge/build.sh menuconfig        <span class="c"># role, channel, consent, gateway</span>
+PORT=/dev/ttyUSB0 edge/build.sh flash-monitor
+
+<span class="c"># the gateway: API, WebSocket, /metrics, dashboard</span>
+cd rust
+cargo run --release -p saans-gateway -- --config saans.toml
+
+<span class="c"># replay a recording through the same pipeline</span>
+python3 -m wifisense replay run.pcap --node <span class="n">3</span></pre>
+<pre role="tabpanel" id="p-api" aria-labelledby="tab-api" tabindex="0" hidden><span class="k">GET</span>  /api/spaces             <span class="c"># every space: state, name, privacy, alerts</span>
+<span class="k">GET</span>  /api/spaces/{id}        <span class="c"># one space and its last 50 events</span>
+<span class="k">GET</span>  /api/events?space=&amp;since=&amp;limit=
+<span class="k">GET</span>  /api/links              <span class="c"># rate, loss, calibration per link</span>
+<span class="k">GET</span>  /api/health             <span class="c"># the gateway's own health</span>
+<span class="k">GET</span>  /metrics                <span class="c"># Prometheus text format</span>
+<span class="k">GET</span>  /api/live               <span class="c"># WebSocket</span>
+
+<span class="c"># machines carry a token; what comes back depends on its role</span>
+curl -H <span class="s">"Authorization: Bearer $SAANS_TOKEN"</span> \
+     http://gateway:8080/api/spaces</pre>
+<pre role="tabpanel" id="p-live" aria-labelledby="tab-live" tabindex="0" hidden><span class="k">const</span> ws = <span class="k">new</span> WebSocket(<span class="s">"ws://gateway:8080/api/live"</span>);
+
+ws.onmessage = (e) =&gt; {
+  <span class="k">const</span> msg = JSON.parse(e.data);
+  <span class="k">if</span> (msg.type === <span class="s">"state"</span>) render(msg);   <span class="c">// every 0.5 s</span>
+  <span class="k">if</span> (msg.type === <span class="s">"event"</span>) log(msg);      <span class="c">// as they happen</span>
+};</pre>
+<pre role="tabpanel" id="p-json" aria-labelledby="tab-json" tabindex="0" hidden><span class="c">// one space's state, as the API returns it (illustrative values)</span>
+{
+  <span class="s">"space_id"</span>: <span class="s">"lab-214"</span>,
+  <span class="s">"occupied"</span>: <span class="k">true</span>,            <span class="c">// null = can't tell</span>
+  <span class="s">"still_for_s"</span>: <span class="n">372.5</span>,
+  <span class="s">"motion_index"</span>: <span class="n">0.81</span>,
+  <span class="s">"breathing"</span>: {                <span class="c">// null unless the space opted in</span>
+    <span class="s">"link"</span>: { <span class="s">"rx"</span>: <span class="n">2</span>, <span class="s">"tx"</span>: <span class="n">1</span> },
+    <span class="s">"bpm"</span>: <span class="n">15.0</span>,
+    <span class="s">"confidence"</span>: <span class="n">0.92</span>,
+    <span class="s">"band_rms"</span>: <span class="n">0.0123</span>,
+    <span class="s">"noise_rms"</span>: <span class="n">0.0031</span>
+  },
+  <span class="s">"bpm_median_5min"</span>: <span class="n">15.1</span>,
+  <span class="s">"bpm_iqr_5min"</span>: <span class="n">0.8</span>,
+  <span class="s">"motion_bouts_last_hour"</span>: <span class="n">3</span>,
+  <span class="s">"resting"</span>: <span class="k">true</span>,
+  <span class="s">"in_breathing_pause"</span>: <span class="k">false</span>,
+  <span class="s">"links_usable"</span>: <span class="n">2</span>,
+  <span class="s">"links_total"</span>: <span class="n">2</span>,
+  <span class="s">"vitals"</span>: <span class="k">true</span>,
+  <span class="s">"active_alerts"</span>: []
+}</pre>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section" id="questions" aria-labelledby="faq-title">
+  <div class="faq-head">
+    <h2 id="faq-title" data-reveal="rise"><span>a few </span>questions</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">What it sees, what it doesn't, and where the evidence stops.</p>
+  </div>
+  <div class="faq-list">
+    <details name="faq" data-reveal="rise"><summary>Does it use a camera or a microphone at any point?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">No. Sensors read radio amplitude and phase, compute features on the board, and send 68 bytes twice a second. There is no image or audio anywhere in the system that could leak.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Can it tell who is in a room, or take attendance?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">No, by design. Device-free WiFi sensing cannot tell people apart, and Saans never tries to. It reports spaces, never individuals.</p></details>
+    <details name="faq" data-reveal="rise"><summary>How accurate is it, really?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">On held-out synthetic timelines, occupancy is 98–99.5% accurate and breathing is within 1 BPM 94–100% of the time, depending on the number of links. Real ESP32 noise, real rooms and real bodies have not been measured yet. That is phase S5, and it needs hardware.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Is it a medical device?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">No. Breathing and heart outputs are engineering measurements. Alerts are advisory and never replace existing procedures, and each one records what it saw and how confident it was.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Why is heart rate off?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">CSI amplitude is nonlinear in chest movement, so breathing harmonics and intermodulation products can be stronger than the cardiac peak. Gating on confidence makes the estimate right 97% of the time, but it then abstains on 39% of scenarios. It stays off until it has been measured against a reference.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Does it detect falls?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">No. A possible-collapse detector exists and caught every simulated fall, and every sit-down too, because amplitude-only WiFi cannot see height. It ships off.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Does it slow down the WiFi?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">It adds a little airtime. A dedicated TX board broadcasts a 12-byte ESP-NOW frame 50 times a second on one channel, so the sample rate is under Saans's control. It never joins or inspects the network's traffic.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Does it need the internet?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">No. Sensors talk to a gateway on the campus network, and the API, dashboard and event log are all local. Nothing calls a cloud service.</p></details>
+    <details name="faq" data-reveal="rise"><summary>Does it work through walls?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">Radio passes through drywall, and a link can span two rooms, but Saans makes no through-wall claim until one has been measured.</p></details>
+    <details name="faq" data-reveal="rise"><summary>What does it cost?<svg class="plus" aria-hidden="true"><use href="#i-plus"/></svg></summary><p class="answer body">The software is MIT-licensed. A room needs two ESP32-S3 boards at about $6–10 each, and a building needs one gateway, such as a Raspberry Pi 5.</p></details>
+  </div>
+</section>
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/demo"><b>Try it without installing anything<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The demo runs the real pipeline against a simulated room.</p></a>
+    <a href="/how-it-works"><b>Understand the output<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>What each field in the feature frame means.</p></a>
+    <a href="/evidence"><b>Know the limits first<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>What this does not do, written down before you deploy it.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Live demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+</body>
+</html>

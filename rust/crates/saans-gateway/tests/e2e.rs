@@ -524,7 +524,8 @@ async fn websocket_streams_state_and_events() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dashboard_is_served_and_self_contained() {
     let g = TestGw::start(config("dashboard", LAB)).await;
-    let r = g.get("/").await;
+    // The dashboard moved to /app when the public site took `/`.
+    let r = g.get("/app").await;
     assert_eq!(r.status, 200);
     assert!(r.header("content-type").unwrap().starts_with("text/html"));
     let csp = r.header("content-security-policy").expect("CSP header");
@@ -555,6 +556,64 @@ async fn dashboard_is_served_and_self_contained() {
     }
     assert!(r.body.contains("not a medical device"));
     assert!(r.body.contains("/api/live"), "the dashboard uses the live feed");
+    g.stop().await;
+}
+
+/// The public site is the other half of the same binary: seven readable
+/// pages and the files they reference, on the same origin as the API so
+/// that `/demo` can call `/api/sim` without anybody inventing CORS.
+///
+/// The offline rule is enforced here with the distinction the dashboard
+/// never needed. A *subresource* — a stylesheet, a script, a font — is
+/// fetched to render the page and must be local, or the gateway in a
+/// building with no route out serves an unreadable page. An `<a href>` to
+/// the repository is somewhere a reader chooses to go, and is the whole
+/// point of publishing the work. The first is banned; the second is
+/// required, and `site::tests` checks both over the embedded bytes.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_site_is_served_from_the_same_origin() {
+    let g = TestGw::start(config("site", LAB)).await;
+
+    for p in saans_gateway::site::PAGES {
+        let r = g.get(p.path).await;
+        assert_eq!(r.status, 200, "GET {}", p.path);
+        assert!(r.header("content-type").unwrap().starts_with("text/html"), "GET {}", p.path);
+        let csp = r.header("content-security-policy").expect("CSP header");
+        // `font-src` is the one the dashboard's policy lacks: without it
+        // the self-hosted Geist files fall through to `default-src
+        // 'none'` and the site renders in a system font.
+        assert!(
+            csp.contains("default-src 'none'") && csp.contains("font-src 'self'"),
+            "{}: {csp}",
+            p.path
+        );
+        assert_eq!(r.header("x-content-type-options"), Some("nosniff"), "GET {}", p.path);
+    }
+
+    let css = g.get("/site.css").await;
+    assert_eq!(css.status, 200);
+    assert!(css.header("content-type").unwrap().starts_with("text/css"));
+    assert!(css.body.contains("--ember"), "the stylesheet is the real one");
+
+    let js = g.get("/site.js").await;
+    assert_eq!(js.status, 200);
+    assert!(js.header("content-type").unwrap().starts_with("text/javascript"));
+
+    // The fonts are why `get_bytes` exists: a woff2 is not text.
+    let (status, headers, bytes) = g.get_bytes("/fonts/geist-latin.woff2").await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        headers.iter().find(|(k, _)| k == "content-type").map(|(_, v)| v.as_str()),
+        Some("font/woff2")
+    );
+    assert_eq!(&bytes[..4], b"wOF2", "served bytes are a real woff2");
+
+    // The licence has to be reachable, not merely present in the tree.
+    assert_eq!(g.get("/fonts/OFL.txt").await.status, 200);
+
+    // A path the site does not define is still the API's 404, not a page.
+    assert_eq!(g.get("/no-such-page").await.status, 404);
+
     g.stop().await;
 }
 

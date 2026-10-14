@@ -34,6 +34,7 @@ pub mod replay;
 pub mod roles;
 pub mod shared;
 pub mod simulate;
+pub mod site;
 pub mod store;
 pub mod timefmt;
 

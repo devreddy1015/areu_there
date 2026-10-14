@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Saans — breathing, sensed without a camera</title>
+<meta name="description" content="Saans turns the WiFi signal already in a room into presence, breathing and safety signals. No camera, no wearable, no microphone. Raw radio never leaves the sensor.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="home">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap hero" aria-labelledby="hero-title">
+  <h1 id="hero-title" class="display"><span class="line">breathing, sensed&nbsp;</span><span class="line">without a camera.</span></h1>
+  <div class="hero-row">
+    <p class="hero-lead body">Saans (साँस, “breath”) turns the WiFi signal already crossing a room into presence, breathing and safety signals. No camera, no wearable, no microphone. The raw radio never leaves the sensor.</p>
+    <p class="hero-note">ESP32-S3 sensors · Rust gateway · Python reference<br>Open source (MIT) · pre-hardware: every number here is synthetic</p>
+    <div class="hero-actions">
+      <a class="button" href="/start">get started<svg class="icon" width="18" height="18" aria-hidden="true"><use href="#i-out"/></svg></a>
+      <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">read the notes<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    </div>
+  </div>
+
+  <figure class="hero-shot">
+    <div class="frame">
+      <div class="console" role="img" aria-label="Illustration of a Saans space view: lab 2.14 is occupied, the person has been still for six minutes, breathing reads 15 BPM at confidence 0.92 from two usable links.">
+        <aside class="c-side" aria-hidden="true">
+          <div class="c-brand"><svg class="mark"><use href="#i-mark"/></svg>saans</div>
+          <div class="c-group">
+            <span class="fine">spaces · 4</span>
+            <div class="c-space is-current"><span class="dot" style="color:var(--ember)"></span><b>lab 2.14</b><span class="fine">breathing</span></div>
+            <div class="c-space"><span class="dot" style="color:var(--rule-strong)"></span><b>library L3</b><span class="fine">empty</span></div>
+            <div class="c-space"><span class="dot" style="color:var(--ink)"></span><b>hostel C corridor</b><span class="fine">motion</span></div>
+            <div class="c-space"><span class="dot" style="color:var(--rose)"></span><b>seminar 1.05</b><span class="fine">blind</span></div>
+          </div>
+          <div class="c-group">
+            <span class="fine">system</span>
+            <div class="c-space"><span class="dot" style="color:var(--sage)"></span><b>links</b><span class="fine">7 / 8 usable</span></div>
+            <div class="c-space"><span class="dot" style="color:var(--sage)"></span><b>calibration</b><span class="fine">2 h ago</span></div>
+            <div class="c-space"><span class="dot" style="color:var(--rule-strong)"></span><b>raw mode</b><span class="fine">off</span></div>
+          </div>
+        </aside>
+        <div class="c-main" aria-hidden="true">
+          <div class="c-head">
+            <h3>lab 2.14 · chemistry</h3>
+            <div class="c-chips">
+              <span class="chip st-built"><span class="dot"></span>occupied</span>
+              <span class="chip">still <span id="still" class="mono">6:12</span></span>
+              <span class="chip" style="color:var(--ember-text)">vitals · consented</span>
+              <span class="chip">2 / 2 links</span>
+            </div>
+          </div>
+          <div class="c-wave">
+            <canvas id="wave"></canvas>
+            <span class="fine">breathing band · 0.1–0.5 Hz</span>
+            <span class="fine c-wave-r">simulated</span>
+          </div>
+          <div class="c-stats">
+            <div class="c-stat"><span class="fine">breathing</span><b><span id="bpm">15.0</span><small>bpm</small></b></div>
+            <div class="c-stat"><span class="fine">confidence</span><b id="conf">0.92</b></div>
+            <div class="c-stat"><span class="fine">5-min median · IQR</span><b>15.1<small>± 0.8</small></b></div>
+            <div class="c-stat"><span class="fine">motion index</span><b id="motion">0.81</b></div>
+          </div>
+          <div class="c-lower">
+            <table class="c-table">
+              <thead><tr><th>link</th><th>rate</th><th>loss</th><th>breathing conf.</th></tr></thead>
+              <tbody>
+                <tr><td>2←1</td><td>20.0 Hz</td><td>0.3%</td><td>0.92</td></tr>
+                <tr><td>3←1</td><td>19.9 Hz</td><td>1.1%</td><td>0.64</td></tr>
+              </tbody>
+            </table>
+            <ul class="c-events">
+              <li><span>14:02</span><span><b>occupancy started</b></span></li>
+              <li><span>14:06</span><span><b>link 3←1 degraded</b> · loss 4.2%</span></li>
+              <li><span>14:07</span><span><b>link 3←1 up</b></span></li>
+              <li><span>14:08</span><span><b>rest started</b> · still, steady breathing</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption class="caption">An illustration drawn in this page from simulated values. It is not a recording and not the gateway's dashboard. Every view of a space is like this one: a state, a confidence, and the links behind it.</figcaption>
+  </figure>
+
+  <div class="strip">
+    <div data-reveal="rise"><b>68&nbsp;B</b><p class="small muted">The whole message a sensor sends, twice a second. Raw radio stays on the node.</p></div>
+    <div data-reveal="rise" style="--i:1"><b>0.009</b><p class="small muted">BPM mean breathing error across 64 synthetic scenarios, 64 of 64 within 0.5 BPM.</p></div>
+    <div data-reveal="rise" style="--i:2"><b>672/672</b><p class="small muted">Rust feature frames byte-identical to the Python reference.</p></div>
+    <div data-reveal="rise" style="--i:3"><b>$6–10</b><p class="small muted">Price of one ESP32-S3 board. A room needs two.</p></div>
+  </div>
+  <p class="fine" style="margin-top:16px" data-reveal="rise">The breathing error and the parity count above come from simulation. No board has been measured in a real room yet.</p>
+</section>
+
+<section class="wrap section" id="problem" aria-labelledby="problem-title">
+  <p class="label" data-reveal="rise">the problem</p>
+  <h2 id="problem-title" class="statement" data-reveal="rise" style="margin-top:10px">Cameras see too much. Motion sensors see too little. <em>A quiet room full of readers looks empty to a PIR, and a camera in a hostel corridor is a liability.</em></h2>
+  <div class="versus">
+    <div class="them" data-reveal="rise">
+      <p class="label">cameras, PIR and wearables</p>
+      <ul class="body">
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-x"/></svg><span>Cameras capture faces, bodies and identity, all personal data under the DPDP Act from the first frame.</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-x"/></svg><span>PIR needs movement. Someone reading or sleeping disappears.</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-x"/></svg><span>Wearables need a willing person who remembers to charge and wear them.</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-x"/></svg><span>Cameras need light, or IR, and a place where filming is acceptable.</span></li>
+      </ul>
+      <p class="verdict">Either they record you, or they guess.</p>
+    </div>
+    <div class="us" data-reveal="rise" style="--i:1">
+      <p class="label">saans</p>
+      <ul class="body">
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg><span>Radio amplitude and phase only. There is no image or audio anywhere in the system.</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg><span>The breathing band picks up the still reader a PIR misses.</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg><span>Nothing to wear, carry or charge. Nobody has to cooperate.</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg><span>Works in the dark, because radio does not need light.</span></li>
+      </ul>
+      <p class="verdict">It measures a space, says how sure it is, and stays quiet when it can't tell.</p>
+    </div>
+  </div>
+  <p class="aside-note body muted" data-reveal="rise">Radio has limits too. It cannot tell who anyone is, a single link can go blind at the wrong spot, and none of this has been measured in a real room yet. Each of those limits is covered below.</p>
+</section>
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/how-it-works"><b>How it works<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The eight stages between a radio packet and the word “occupied”.</p></a>
+    <a href="/demo"><b>See it run<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>A simulated person in a simulated room, beside what the pipeline actually recovers.</p></a>
+    <a href="/evidence"><b>What is proven<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The measured numbers, the comparisons, and the parts that are not built yet.</p></a>
+    <a href="/privacy"><b>What leaves the room<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Sixty-eight bytes, encoded live on the page, with the consent switch wired up.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Live demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+</body>
+</html>

@@ -32,8 +32,14 @@
 //! consent allowed. Neither substitutes for the other: consent decides
 //! what may exist, the principal decides who may see it.
 //!
-//! `/` is deliberately public. It is a static file with no data in it,
-//! and it has to load before anyone can log in.
+//! The static surface is deliberately public: the seven site pages
+//! ([`crate::site`]) and the dashboard at `/app` are files with no data
+//! in them, and the dashboard has to load before anyone can log in. Every
+//! route that carries data is behind [`principal`] without exception.
+//!
+//! The dashboard used to answer `/`. The public site took that path when
+//! the two servers became one, and `assets/site/site.js` forwards the old
+//! `/#system`-style fragments to `/app` so saved links still arrive.
 
 use crate::audit::{Action, AuditLog};
 use crate::auth::{self, Auth, Denied};
@@ -114,7 +120,7 @@ pub struct AppState {
 pub fn router(deps: HttpDeps) -> Router {
     let HttpDeps { shared, stop, cfg, alerts, auth, audit, sim } = deps;
     let mut r = Router::new()
-        .route("/", get(dashboard))
+        .route("/app", get(dashboard))
         .route("/api/me", get(me))
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
@@ -135,6 +141,15 @@ pub fn router(deps: HttpDeps) -> Router {
             .route("/api/sim/coverage", get(sim_coverage))
             .route("/api/sim/person", post(sim_person))
             .route("/api/sim/present", post(sim_present));
+    }
+    // The public site. Registered from the one table in `site.rs` rather
+    // than listed again here, so a page cannot exist as a file and be
+    // unreachable, or be routed and not exist.
+    for p in crate::site::PAGES {
+        r = r.route(p.path, get(move || async move { crate::site::page_response(p.html) }));
+    }
+    for a in crate::site::ASSETS {
+        r = r.route(a.path, get(move || async move { crate::site::asset_response(a) }));
     }
     r.fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
         .with_state(AppState { shared, stop, cfg, alerts, auth, audit, sim })

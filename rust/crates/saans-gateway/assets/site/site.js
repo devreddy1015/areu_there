@@ -1,6 +1,12 @@
 // Saans site: progressive enhancement only. Every section reads correctly
-// without this file; it adds reveal motion, the section rail, and the
-// interactive pieces (pipeline, links, detectors, frame, tabs, waveform).
+// without this file; it adds reveal motion, marks the current page in the
+// header, and runs the interactive pieces (pipeline, links, detectors,
+// frame, tabs, waveform).
+//
+// One file serves all seven pages. Every block below is gated on an
+// element that exists on exactly one of them, so the pages that do not
+// have it simply skip it — which is cheaper and far less brittle than
+// seven bundles that can drift apart.
 (() => {
   "use strict";
 
@@ -43,41 +49,35 @@
     }
   }
 
-  /* ---------- section rail + scroll-spy ---------- */
-  const rail = $("#rail");
-  const header = $("header.nav");
-  if (rail && header && "IntersectionObserver" in window) {
-    const focusables = $$("a", rail);
-    let shown = false;
-    const setShown = (on) => {
-      if (on === shown) return;
-      shown = on;
-      rail.classList.toggle("is-shown", on);
-      rail.setAttribute("aria-hidden", on ? "false" : "true");
-      focusables.forEach((a) => (on ? a.removeAttribute("tabindex") : a.setAttribute("tabindex", "-1")));
-    };
-    new IntersectionObserver(([e]) => setShown(!e.isIntersecting && e.boundingClientRect.top < 0)).observe(header);
-
-    const links = new Map($$("nav a", rail).map((a) => [a.getAttribute("href").slice(1), a]));
-    const railNav = $("nav", rail);
-    let current = null;
-    const spy = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        const a = links.get(e.target.id);
-        if (!a || a === current) continue;
-        current?.classList.remove("is-active");
-        a.classList.add("is-active");
-        current = a;
-        // keep the active pill visible without scrolling the page
-        const left = a.offsetLeft - railNav.clientWidth / 2 + a.clientWidth / 2;
-        railNav.scrollTo({ left, behavior: reduce ? "auto" : "smooth" });
-      }
-    }, { rootMargin: "-40% 0px -55% 0px" });
-    for (const id of links.keys()) {
-      const sec = document.getElementById(id);
-      if (sec) spy.observe(sec);
+  /* ---------- page navigation ----------
+     The site used to be one document with a scroll-spy rail. It is seven
+     pages now, so "where am I" is answered by the URL, not by an
+     observer: one source of truth, and it is correct before any script
+     has run on a page that never scrolls. */
+  const sitenav = $(".sitenav");
+  if (sitenav) {
+    const page = document.body.dataset.page;
+    for (const a of $$("a[data-page]", sitenav)) {
+      if (a.dataset.page === page) a.setAttribute("aria-current", "page");
     }
+    // A hairline under the header, but only once something has scrolled
+    // beneath it. Sentinel over scroll listener: no work per frame.
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = "position:absolute;top:0;height:1px;width:1px";
+    document.body.prepend(probe);
+    whileVisible(probe, (vis) => sitenav.classList.toggle("is-stuck", !vis));
+  }
+
+  /* ---------- links kept alive after the move ----------
+     The dashboard used to live at `/`, so bookmarks and anything that was
+     pasted into a chat look like `/#system`. Those hashes now name a tab
+     inside `/app`. Forward them rather than landing someone on a home
+     page with a fragment that means nothing here. */
+  if (location.pathname === "/" && location.hash.length > 1) {
+    const TABS = ["overview", "explorer", "signals", "topology", "events", "system"];
+    const want = location.hash.slice(1);
+    if (TABS.includes(want)) location.replace("/app#" + want);
   }
 
   /* ---------- pipeline: follow the phase at the centre ---------- */
