@@ -875,3 +875,166 @@ kbd {
   .demo-dl dd { text-align: left; padding-top: 2px; border-top: 0; }
   .demo-btn { flex: 1 1 auto; }
 }
+
+/* ======================================================================
+   /room-sim — a scene file, drawn.
+
+   The amber .simbar on /demo means "these numbers came out of a
+   simulator". This page has no simulator behind it, so it carries a
+   different bar in a different colour: everything here was typed into a
+   file. The two must not look alike, or the one warning teaches people
+   to ignore the other.
+   ====================================================================== */
+.scenebar {
+  display: grid; gap: 5px; margin-top: 16px;
+  padding: 14px clamp(14px, 1.8vw, 20px);
+  border: 1px solid var(--rule-strong);
+  border-left: 4px solid var(--ink);
+  border-radius: var(--r-m);
+  background: var(--surface);
+}
+.scenebar b { color: var(--ink); font-size: var(--t-label); letter-spacing: 0.02em; }
+.scenebar span { font-size: var(--t-label); line-height: 1.5; color: var(--muted); max-width: 96ch; }
+
+.rs-intro { max-width: 78ch; margin-top: var(--gap-m); }
+
+.rs-cols {
+  display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.9fr);
+  gap: clamp(12px, 1.4vw, 20px); margin-top: var(--gap-l); align-items: start;
+}
+.rs-stagewrap { display: grid; gap: 8px; min-width: 0; }
+
+/* The canvas and the labels share one positioned box: the labels are
+   HTML over the canvas rather than textures in the scene, which is what
+   keeps "1.90 x 1.40 x 0.55 m" legible at 375 px and at any zoom. */
+.rs-stage {
+  position: relative; overflow: hidden;
+  height: clamp(340px, 58vh, 680px);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-m);
+}
+.rs-stage canvas { width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.rs-stage canvas:active { cursor: grabbing; }
+.rs-stage.is-top canvas { cursor: move; }
+.rs-stage:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.rs-labels { position: absolute; inset: 0; pointer-events: none; }
+.rs-tag {
+  position: absolute; top: 0; left: 0; white-space: nowrap;
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  font-size: 12px; line-height: 1.35; letter-spacing: -0.01em;
+}
+.rs-tag b { color: var(--ink); font-weight: 600; }
+.rs-tag span, .rs-tag i { display: none; }
+.rs-tag span { color: var(--muted); font-variant-numeric: tabular-nums; font-style: normal; }
+.rs-tag i {
+  font-style: normal; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.04em;
+  color: var(--faint); border: 1px solid var(--rule-strong); border-radius: 3px; padding: 0 3px;
+}
+/* The numbers appear with the dimension overlay, and the source tag
+   appears with them: nothing on this canvas states a measurement
+   without saying where it came from. */
+.rs-stage.is-dims .rs-tag span, .rs-stage.is-dims .rs-tag i { display: inline-block; }
+.rs-tag-node b { color: var(--amber); font-family: var(--mono); font-size: 11px; }
+.rs-tag-dim { background: color-mix(in srgb, var(--bg) 86%, transparent); }
+.rs-tag-dim b { color: var(--amber); font-weight: 500; }
+.rs-tag.is-sel { border-color: var(--ink); background: var(--bg); }
+
+.rs-hint { max-width: 80ch; }
+.rs-err:empty { display: none; }
+.rs-err {
+  color: var(--ember-text); border: 1px solid color-mix(in srgb, var(--ember) 45%, transparent);
+  border-radius: 10px; padding: 10px 12px; max-width: 80ch;
+}
+
+.rs-panel {
+  background: var(--surface); border-radius: var(--r-m);
+  padding: clamp(16px, 1.8vw, 24px); display: grid; gap: 10px; align-content: start;
+  min-width: 0;
+}
+.rs-panel .fine { max-width: 72ch; }
+.rs-panel .title { letter-spacing: -0.03em; }
+.rs-h { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
+
+.rs-mode { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rs-badge {
+  background: var(--ink); color: var(--ink-on-light);
+  font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+  padding: 4px 10px; border-radius: 999px;
+}
+.rs-ctl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.rs-ctl .seg { flex-wrap: wrap; }
+.rs-ctl .seg button { padding: 0 13px; font-size: var(--t-micro); }
+.rs-aside { border-left: 2px solid var(--rule-strong); padding-left: 12px; margin-top: 6px; }
+
+/* Term, value, and the tag that says where the value came from. Every
+   number this page prints goes through this grid. */
+.rs-dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); font-size: var(--t-label); }
+.rs-dl dt { color: var(--muted); padding: 8px 16px 8px 0; border-top: 1px solid var(--rule); }
+.rs-dl dd {
+  padding: 8px 0; border-top: 1px solid var(--rule);
+  display: flex; align-items: baseline; justify-content: flex-end; gap: 8px;
+  text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.rs-src {
+  flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em; color: var(--faint);
+  border: 1px solid var(--rule-strong); border-radius: 3px; padding: 1px 4px;
+}
+
+.rs-list { display: grid; margin-top: 6px; }
+.rs-item {
+  width: 100%; text-align: left; display: grid; gap: 2px;
+  padding: 9px 10px; border-top: 1px solid var(--rule); border-radius: 6px;
+  transition: background-color var(--t-feedback) ease;
+}
+.rs-item:hover { background: var(--surface-2); }
+.rs-item[aria-pressed="true"] { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--amber); }
+.rs-item b { font-size: var(--t-label); font-weight: 600; letter-spacing: -0.02em; }
+.rs-item span {
+  display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+  font-size: var(--t-micro); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.rs-item i {
+  font-style: normal; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em;
+  color: var(--faint); border: 1px solid var(--rule-strong); border-radius: 3px; padding: 0 3px;
+}
+.rs-item em {
+  font-style: normal; font-family: var(--mono); font-size: var(--t-micro); color: var(--faint);
+}
+
+.rs-card { margin-top: 10px; padding: 14px; border-radius: 10px; background: var(--surface-2); }
+.rs-card-h { font-size: var(--t-title); font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
+.rs-card .fine { margin-top: 8px; }
+.rs-none { margin-top: 10px; }
+.rs-mat { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.rs-mat-h { font-family: var(--mono); font-size: var(--t-label); color: var(--ink); }
+.rs-warn { color: var(--amber); margin-top: 6px; }
+
+}
+.rs-link { text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
+.rs-link:hover { text-decoration-color: currentColor; }
+/* The two view toggles are .demo-btn, which was written for the push
+   buttons on /demo and has no pressed state. These stay down. */
+.rs-ctl .demo-btn[aria-pressed="true"] {
+  color: var(--ink-on-light); background: var(--ink); border-color: var(--ink);
+}
+.rs-ctl .demo-btn[aria-pressed="true"]:hover { background: #fffaf0; color: var(--ink-on-light); }
+/* Stacked prose. The site's paragraphs have no margins (site.css resets
+   them) because most sections hold one; these sections hold three. */
+.rs-prose p + p, .rs-prose p + .body { margin-top: 14px; }
+.rs-prose + .next { margin-top: var(--gap-l); }
+#files .rs-prose { margin-top: var(--gap-m); }
+
+@media (max-width: 1080px) {
+  .rs-cols { grid-template-columns: 1fr; }
+  .rs-stage { height: clamp(300px, 52vh, 520px); }
+}
+@media (max-width: 520px) {
+  .rs-stage { height: 320px; }
+  .rs-ctl .demo-btn { flex: 1 1 auto; }
+  .rs-dl { grid-template-columns: 1fr; }
+  .rs-dl dt { padding-bottom: 0; }
+  .rs-dl dd { justify-content: flex-start; text-align: left; padding-top: 2px; border-top: 0; }
+  .rs-tag { font-size: 11px; padding: 2px 6px; }
