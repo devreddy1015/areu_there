@@ -1,0 +1,60 @@
+# The public site as static files on GitHub Pages: the same pages and
+# assets the gateway serves, written out by `saans-gateway --export-site`
+# from the one table in src/site.rs. docs/adr/009-static-copy.md says why
+# and what the copy cannot do.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust/crates/saans-gateway/**"
+      - "scenes/**"
+      - "rust/Cargo.lock"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time. A deployment already running is allowed to
+# finish rather than being cut off half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      # The checks that keep the copy honest: no remote fetches, no
+      # absolute in-site paths, every link landing on a file in the copy.
+      # Nothing is published if they fail.
+      - name: Site tests
+        working-directory: rust
+        run: cargo test --locked -p saans-gateway --lib site::
+      - name: Export the site
+        working-directory: rust
+        run: cargo run --locked -p saans-gateway -- --export-site "$RUNNER_TEMP/site"
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

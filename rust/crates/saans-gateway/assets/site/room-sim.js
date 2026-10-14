@@ -26,7 +26,7 @@
 // in the top-down view a drag pans, because there it is the only way to
 // look at the far end of an 8 m hall up close.
 
-import * as THREE from "/vendor/three.module.min.js";
+import * as THREE from "./vendor/three.module.min.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 
@@ -34,9 +34,9 @@ const $ = (s, el = document) => el.querySelector(s);
 
 /** The three example rooms, in the order the picker shows them. */
 const SCENES = [
-  { key: "bedroom", nav: "bedroom", file: "bedroom.json", path: "/scenes/bedroom.json" },
-  { key: "office", nav: "office", file: "office.json", path: "/scenes/office.json" },
-  { key: "hall-l", nav: "L-shaped hall", file: "hall-l.json", path: "/scenes/hall-l.json" },
+  { key: "bedroom", nav: "bedroom", file: "bedroom.json", path: "scenes/bedroom.json" },
+  { key: "office", nav: "office", file: "office.json", path: "scenes/office.json" },
+  { key: "hall-l", nav: "L-shaped hall", file: "hall-l.json", path: "scenes/hall-l.json" },
 ];
 
 /** The only scene format this page reads, same as the Rust loader. */
@@ -1119,8 +1119,8 @@ function pickAt(e) {
 
 async function loadMaterials() {
   try {
-    const r = await fetch("/scenes/materials.json", { cache: "no-cache" });
-    if (!r.ok) throw new Error("the gateway answered " + r.status);
+    const r = await fetch("scenes/materials.json", { cache: "no-cache" });
+    if (!r.ok) throw new Error("the server answered " + r.status);
     STATE.materials = JSON.parse(await r.text());
     STATE.materialsErr = "";
   } catch (e) {
@@ -1138,7 +1138,7 @@ async function loadScene(entry) {
   setText(EL.err, "");
   try {
     const r = await fetch(entry.path, { cache: "no-cache" });
-    if (!r.ok) throw new Error("the gateway answered " + r.status);
+    if (!r.ok) throw new Error("the server answered " + r.status);
     const scene = readScene(await r.text());
     if (token !== STATE.token) return;
     STATE.scene = scene;

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Dashboard — Saans</title>
+<meta name="description" content="The operator dashboard is part of the gateway. This static copy of the site has no gateway behind it, so it has no dashboard either.">
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="app">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="./"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="how-it-works" data-page="how">how it works</a>
+    <a href="demo" data-page="demo">demo</a>
+    <a href="room-sim" data-page="room-sim">room sim</a>
+    <a href="evidence" data-page="evidence">evidence</a>
+    <a href="privacy" data-page="privacy">privacy</a>
+    <a href="hardware" data-page="hardware">hardware</a>
+    <a href="start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label" data-reveal="rise">dashboard</p>
+  <h1 id="page-title" class="display" data-reveal="rise">not on this copy</h1>
+  <p class="lead" data-reveal="rise" style="--i:1">The operator dashboard reads live state from a
+    gateway's API and WebSocket, behind a sign-in. This copy of the site is a set of static files on a
+    file host, with no gateway behind it, so there is no dashboard to open here. Nothing on this page
+    stands in for one.</p>
+</section>
+
+<section class="wrap section" id="run" aria-labelledby="run-title">
+  <div class="split-head">
+    <h2 id="run-title" data-reveal="rise"><span>run it </span>yourself</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Start a gateway in simulate mode and the
+      dashboard, the demo and the API all answer on your own machine, at
+      <code>http://127.0.0.1:8080/app</code> by default. Every value it shows is simulated.</p>
+  </div>
+  <div class="cmd" data-reveal="unveil">
+    <div class="cmd-bar">
+      <span class="fine">the gateway, with a simulated room</span>
+    </div>
+<pre>cd rust
+cp crates/saans-gateway/saans.example.toml saans.toml
+cargo run --release -p saans-gateway -- --config saans.toml --simulate --speed 10</pre>
+  </div>
+  <div class="extra" style="margin-top:20px">
+    <a class="link" href="start">everything else on getting started</a>
+    <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/README.md">the README<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="how-it-works">How it works</a></li>
+      <li><a href="demo">Simulated demo</a></li>
+      <li><a href="hardware">Hardware</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="site.js" defer></script>
+</body>
+</html>

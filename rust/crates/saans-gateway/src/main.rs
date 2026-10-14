@@ -2,6 +2,7 @@
 //! `saans-gateway --config saans.toml --replay rec.pcap [--speed 0] [--events-out ev.jsonl]`,
 //! or `saans-gateway --config saans.toml --simulate` (the sensing
 //! explorer: a SYNTHETIC room through the real pipeline).
+//! `saans-gateway --export-site DIR` writes the public site as static files.
 
 use clap::{ArgGroup, Parser};
 use saans_gateway::{log, ClockMode, Gateway, GatewayConfig, ReplayOptions, SimGateway, SimulateOptions};
@@ -48,6 +49,11 @@ struct Args {
     /// stdin so it never reaches the shell history or the process list.
     #[arg(long)]
     hash_password: bool,
+    /// Write the public site into DIR as static files and exit: the copy
+    /// published on GitHub Pages. DIR is created, and refused unless
+    /// empty. No config is read; nothing the gateway computes is in it.
+    #[arg(long, value_name = "DIR")]
+    export_site: Option<PathBuf>,
 }
 
 fn main() -> ExitCode {
@@ -55,6 +61,19 @@ fn main() -> ExitCode {
     // Before the config: hashing a password is what you do *to write* one.
     if args.hash_password {
         return hash_password();
+    }
+    // Before the config too: the site is the same in every deployment.
+    if let Some(dir) = &args.export_site {
+        return match saans_gateway::site::export(dir) {
+            Ok(files) => {
+                println!("{}: {} files", dir.display(), files.len());
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("saans-gateway: --export-site: {e}");
+                ExitCode::FAILURE
+            }
+        };
     }
     let cfg = match GatewayConfig::load(&args.config) {
         Ok(c) => c,
