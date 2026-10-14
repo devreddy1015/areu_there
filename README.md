@@ -316,6 +316,10 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/sources/synthetic.py` | Physics-based CSI generator; `scene="geometric"` models Fresnel-zone blind spots |
 | `wifisense/sources/esp32_udp.py` | ESP32 wire format, UDP listener, sequence-gap filling |
 | `wifisense/sources/recorder.py` | Raw-datagram pcap recorder, replayer, per-node link stats |
+| `scenes/` | Scene files: the room as DEFINED. Schema, the ITU-R P.2040 material table, three example rooms |
+| `wifisense/scene.py` | Scene loader and validator (stdlib only), and the conversion to `localize.geometry` |
+| `wifisense/roomplan_import.py` | Apple RoomPlan scan to scene file. A stub: the mapping table is real, the format assumptions are untested |
+| `rust/crates/saans-sim/src/scene.rs` | The same format in Rust, with its own reader |
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
 | `tests/` | 141 core tests (`test_localize_*` belong to the P0b localization work) |
 | `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |

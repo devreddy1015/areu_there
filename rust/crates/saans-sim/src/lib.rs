@@ -96,6 +96,7 @@ pub mod physics;
 mod plan;
 pub mod rng;
 pub mod scenario;
+pub mod scene;
 pub mod scenarios;
 mod sim;
 pub mod wire;
@@ -105,5 +106,8 @@ pub use plan::{
     ARM_OFFSET_M, ARM_SWING_M, BREATHING_AMPLITUDE_M, DEFAULT_BPM, FALL_S, HEART_AMPLITUDE_M, HEART_BPM, MARGIN_M, PAUSE_RAMP_S, SIT_DOWN_DROP_M, SIT_DOWN_S,
 };
 pub use scenario::{Activity, Node, Point, Room, Scatterer, Scenario, Segment, SimOptions, Truth, TruthEvent, TruthKind};
+pub use scene::{
+    MaterialConstants, ObjectMaterial, ObjectType, Person, Phone, Scene, SceneError, SceneNode, SceneObject, SceneRoom, Wall, WallMaterial, MATERIALS, MATERIAL_REFERENCE_GHZ, SCHEMA_VERSION,
+};
 pub use sim::{Coverage, LinkFrame, Simulator, Tick, MAX_COVERAGE_CELLS, RSSI_REF_DBM};
 pub use wire::{RawNode, RawNodes};

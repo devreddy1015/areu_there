@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "name": "Office, 6 x 5 m",
+  "description": "A small shared office: three desks along the window wall, a meeting table, a storage cupboard and a sofa. SCENE data, typed in, not sensed. The four walls carry different materials on purpose — a concrete structural wall, an exterior brick wall and two drywall partitions — because wall material is the one scene property that changes the radio physics, and a viewer should be able to see that it is a DEFINED property and not something the radio worked out. The entry door is 0.9 m, which is an office door; an ordinary interior door is 0.8 m.",
+  "room": {
+    "width_m": 6.0,
+    "depth_m": 5.0,
+    "height_m": 2.9
+  },
+  "walls": [
+    { "id": "south", "from_m": [0.0, 0.0], "to_m": [6.0, 0.0], "material": "drywall", "thickness_m": 0.115 },
+    { "id": "east", "from_m": [6.0, 0.0], "to_m": [6.0, 5.0], "material": "drywall", "thickness_m": 0.115 },
+    { "id": "north", "from_m": [6.0, 5.0], "to_m": [0.0, 5.0], "material": "brick", "thickness_m": 0.23 },
+    { "id": "west", "from_m": [0.0, 5.0], "to_m": [0.0, 0.0], "material": "concrete", "thickness_m": 0.2 }
+  ],
+  "objects": [
+    {
+      "id": "door",
+      "type": "door",
+      "centre_m": [1.2, 0.03, 1.05],
+      "size_m": [0.9, 0.06, 2.1],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "window-west",
+      "type": "window",
+      "centre_m": [1.8, 4.97, 1.5],
+      "size_m": [1.5, 0.06, 1.4],
+      "rotation_deg": 0.0,
+      "material": "glass"
+    },
+    {
+      "id": "window-east",
+      "type": "window",
+      "centre_m": [4.2, 4.97, 1.5],
+      "size_m": [1.5, 0.06, 1.4],
+      "rotation_deg": 0.0,
+      "material": "glass"
+    },
+    {
+      "id": "desk-1",
+      "type": "table",
+      "centre_m": [1.0, 3.6, 0.375],
+      "size_m": [1.4, 0.7, 0.75],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "desk-2",
+      "type": "table",
+      "centre_m": [2.8, 3.6, 0.375],
+      "size_m": [1.4, 0.7, 0.75],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "desk-3",
+      "type": "table",
+      "centre_m": [4.6, 3.6, 0.375],
+      "size_m": [1.4, 0.7, 0.75],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "desk-chair-1",
+      "type": "chair",
+      "centre_m": [1.0, 2.9, 0.475],
+      "size_m": [0.5, 0.5, 0.95],
+      "rotation_deg": 0.0,
+      "material": "fabric"
+    },
+    {
+      "id": "desk-chair-2",
+      "type": "chair",
+      "centre_m": [2.8, 2.9, 0.475],
+      "size_m": [0.5, 0.5, 0.95],
+      "rotation_deg": 0.0,
+      "material": "fabric"
+    },
+    {
+      "id": "desk-chair-3",
+      "type": "chair",
+      "centre_m": [4.6, 2.9, 0.475],
+      "size_m": [0.5, 0.5, 0.95],
+      "rotation_deg": 0.0,
+      "material": "fabric"
+    },
+    {
+      "id": "meeting-table",
+      "type": "table",
+      "centre_m": [3.0, 1.3, 0.375],
+      "size_m": [2.0, 1.0, 0.75],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "meeting-chair-1",
+      "type": "chair",
+      "centre_m": [2.4, 0.55, 0.475],
+      "size_m": [0.5, 0.5, 0.95],
+      "rotation_deg": 0.0,
+      "material": "fabric"
+    },
+    {
+      "id": "meeting-chair-2",
+      "type": "chair",
+      "centre_m": [3.6, 2.05, 0.475],
+      "size_m": [0.5, 0.5, 0.95],
+      "rotation_deg": 180.0,
+      "material": "fabric"
+    },
+    {
+      "id": "cupboard",
+      "type": "almirah",
+      "centre_m": [0.35, 1.5, 1.0],
+      "size_m": [1.2, 0.6, 2.0],
+      "rotation_deg": 90.0,
+      "material": "metal"
+    },
+    {
+      "id": "sofa",
+      "type": "sofa",
+      "centre_m": [5.5, 1.5, 0.4],
+      "size_m": [2.0, 0.9, 0.8],
+      "rotation_deg": 90.0,
+      "material": "fabric"
+    }
+  ],
+  "nodes": [
+    { "id": 0, "label": "west wall, mid height", "pos_m": [0.12, 2.5, 1.2] },
+    { "id": 1, "label": "south wall, right of the door", "pos_m": [2.0, 0.12, 1.2] },
+    { "id": 2, "label": "south wall, near the east corner", "pos_m": [4.5, 0.12, 1.2] },
+    { "id": 3, "label": "east wall, clear of the sofa", "pos_m": [5.88, 3.6, 1.2] },
+    { "id": 4, "label": "north wall, between the windows", "pos_m": [3.0, 4.88, 1.2] },
+    { "id": 5, "label": "north wall, west end", "pos_m": [0.8, 4.88, 1.2] }
+  ],
+  "people": [
+    { "id": "p1", "pos_m": [2.0, 2.0], "height_m": 1.72 },
+    { "id": "p2", "pos_m": [4.2, 3.0], "height_m": 1.6 }
+  ],
+  "phone": {
+    "id": "phone",
+    "pos_m": [3.0, 1.3, 0.78]
+  }
+}
