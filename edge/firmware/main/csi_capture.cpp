@@ -165,7 +165,18 @@ esp_err_t start(std::size_t queue_depth) {
     config.lltf_en = true;
     config.htltf_en = true;
     config.stbc_htltf2_en = false;
-    config.ltf_merge_en = true;
+    // FALSE, deliberately. ESP-IDF: ltf_merge_en "generate htltf data by
+    // averaging lltf and ht_ltf data when receiving HT packet. Otherwise,
+    // use ht_ltf data directly." L-LTF and HT-LTF do not cover the same
+    // subcarriers (+-26 against +-28), so averaging them mixes two
+    // different channel measurements under one set of indices -- and it
+    // flatly contradicts channel_filter_en = false on the next line, which
+    // is set precisely to keep adjacent subcarriers independent.
+    //
+    // This was true until the TX was made to send HT frames, where it was
+    // inert because no HT packet ever arrived. Turning the transmitter on
+    // would have turned this on with it.
+    config.ltf_merge_en = false;
     config.channel_filter_en = false;
     // Phase is left uncorrected on purpose. The DSP works on amplitude, and a
     // 1T1R ESP32 has a free-running PLL whose phase is not usable for ranging

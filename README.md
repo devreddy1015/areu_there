@@ -261,8 +261,16 @@ tuning problem when it is not:
 You have none yet, so: the cheapest real CSI path is an **ESP32-S3 or
 ESP32-C6 devkit, about $6–10**. The ESP-IDF API (`esp_wifi_set_csi_config`,
 `esp_wifi_set_csi_rx_cb`) exposes per-subcarrier CSI directly, and the
-Saans node firmware in `edge/firmware` is ready to flash. One node gives presence and breathing; through-wall work and
-multi-person separation need several.
+Saans node firmware in `edge/firmware` is ready to flash. One link gives presence and breathing for one space; more links per space
+buy blind-spot coverage, not new capabilities.
+
+Multi-person separation and through-wall sensing are **not** on this
+roadmap and are not gated on node count. No through-wall respiration
+result exists on single-antenna hardware anywhere in the literature, and
+a link with no range or bearing resolution cannot tell which side of a
+wall the person is on — so through-wall reach is something to measure
+and suppress, not a feature to pursue. See
+[docs/CAPABILITY_LIMITS.md](docs/CAPABILITY_LIMITS.md).
 
 Consumer WiFi laptops give RSSI only — enough for crude motion, not for
 breathing. Research NICs (Intel 5300, Atheros via nexmon on a Raspberry Pi
