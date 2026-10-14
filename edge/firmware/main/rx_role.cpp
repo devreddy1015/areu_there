@@ -233,6 +233,34 @@ void run_rx_role() {
                      static_cast<unsigned long>(csi::dropped()),
                      static_cast<unsigned long>(send_failures));
 
+            // WHAT THE RADIO IS ACTUALLY DELIVERING. The DSP is compiled for
+            // a fixed subcarrier count on the assumption that these frames
+            // are HT20; nothing in this firmware can enforce that, because it
+            // depends on the transmitter and the driver. Until a bench run
+            // has confirmed it, this line is the evidence.
+            const csi::Stats cs = csi::capture_stats();
+            ESP_LOGI(kTag, "capture: len=%u (first %u) -> %u subcarriers, expecting %u; "
+                           "2nd_ch=%u first_word_invalid=%lu short=%lu layout_changed=%lu too_short=%lu",
+                     static_cast<unsigned>(cs.last_len), static_cast<unsigned>(cs.first_len),
+                     static_cast<unsigned>(cs.last_len / 2U), static_cast<unsigned>(cfg::kNSubcarriers),
+                     static_cast<unsigned>(cs.secondary_channel),
+                     static_cast<unsigned long>(cs.first_word_invalid),
+                     static_cast<unsigned long>(cs.short_frames),
+                     static_cast<unsigned long>(cs.layout_changed),
+                     static_cast<unsigned long>(cs.dropped_short));
+            if (cs.last_len != 0U && cs.last_len / 2U < cfg::kNSubcarriers) {
+                ESP_LOGW(kTag, "THE RADIO IS DELIVERING FEWER SUBCARRIERS THAN THE DSP EXPECTS. "
+                               "The tail is zero-padded, which the BNR stage reads as a quiet "
+                               "channel. Check that the TX is sending HT20 (tx_role sets an MCS "
+                               "rate) and that CONFIG_SAANS_N_SUBCARRIERS matches what arrives.");
+            }
+            if (cs.layout_changed != 0U) {
+                ESP_LOGW(kTag, "CSI buffer length changed mid-run (%lu times): the subcarrier "
+                               "indices do not mean the same thing across frames, and the static "
+                               "suppressor is averaging two different channels together.",
+                         static_cast<unsigned long>(cs.layout_changed));
+            }
+
             // THE DELIVERED RATE IS NOT THE CONFIGURED RATE, AND THAT IS NOT
             // COSMETIC. Nothing on this path decimates — csi_capture queues
             // every callback and the loop above pushes every queued frame — so
