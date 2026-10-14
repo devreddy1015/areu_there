@@ -6,150 +6,328 @@
 <title>Saans</title>
 <link rel="icon" href="data:,">
 <style>
+/* Dark first: this runs on a wall screen in a corridor more often than
+   on a desk. Light is offered for the daytime office case. */
 :root {
-  --bg: #f6f7f9; --card: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dde1e6;
-  --occ: #1f7a4d; --occ-bg: #e7f5ee; --empty: #5d6673; --blind: #8a5a00; --blind-bg: #fff4dc;
-  --adv: #8a5a00; --adv-bg: #fff4dc; --chk: #a1201c; --chk-bg: #fde9e8; --info-bg: #eef1f5;
-  --accent: #2759c7;
+  color-scheme: dark;
+  --bg: #0d1117; --bg2: #111826; --card: #151d2b; --card2: #1a2335;
+  --line: #243049; --line2: #2f3d5a;
+  --ink: #e7eef8; --ink2: #c3cede; --muted: #8b9ab1; --faint: #64748b;
+  --accent: #2ec7c9; --accent-ink: #06202a;
+  --ok: #46c07f; --ok-bg: #11291e;
+  --warn: #e2a63c; --warn-bg: #2b2312;
+  --bad: #ef6a60; --bad-bg: #2d1718;
+  --none: #6b7a90; --none-bg: #1b2231;
+  --focus: #6fd7ff;
+  --sp: 4px;
 }
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --bg: #12151a; --card: #1b2028; --ink: #e6e9ee; --muted: #9aa4b1; --line: #2c333d;
-    --occ: #5fd39b; --occ-bg: #16301f; --empty: #9aa4b1; --blind: #f0b84a; --blind-bg: #33280f;
-    --adv: #f0b84a; --adv-bg: #33280f; --chk: #ff8a84; --chk-bg: #3a1716; --info-bg: #222934;
-    --accent: #8fb0ff;
+    color-scheme: light;
+    --bg: #f4f6f9; --bg2: #eef1f6; --card: #ffffff; --card2: #f7f9fc;
+    --line: #dde3ec; --line2: #ccd5e2;
+    --ink: #121821; --ink2: #2c3645; --muted: #5b6878; --faint: #78859a;
+    --accent: #0f7f86; --accent-ink: #ffffff;
+    --ok: #157a4b; --ok-bg: #e6f5ec;
+    --warn: #8a5a05; --warn-bg: #fdf2dc;
+    --bad: #b02a22; --bad-bg: #fdeceb;
+    --none: #5b6878; --none-bg: #eceff4;
+    --focus: #0b63c5;
   }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px;
-  background: var(--card); border-bottom: 1px solid var(--line); }
-header h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
-header .sub { color: var(--muted); font-size: 13px; }
-nav { display: flex; gap: 4px; margin-left: auto; }
-nav button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px;
-  background: transparent; color: var(--ink); cursor: pointer; }
-nav button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--card); }
-.conn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-.conn[data-s="live"] .dot { background: var(--occ); }
-.conn[data-s="polling"] .dot, .conn[data-s="connecting"] .dot { background: var(--adv); }
-.conn[data-s="offline"] .dot { background: var(--chk); }
-.banner { margin: 0; padding: 8px 16px; background: var(--adv-bg); color: var(--adv); font-size: 13px; }
-main { padding: 16px; max-width: 1200px; margin: 0 auto; }
-section[hidden] { display: none; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
-  border-top: 4px solid var(--empty); min-width: 0; }
-.card.occ { border-top-color: var(--occ); }
-.card.blind { border-top-color: var(--blind); }
-.card h2 { margin: 0 0 6px; font-size: 17px; overflow-wrap: anywhere; }
-.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-.badge { font-size: 12px; padding: 1px 7px; border-radius: 999px; background: var(--info-bg); color: var(--muted); }
-.badge.warn { background: var(--adv-bg); color: var(--adv); font-weight: 600; }
-.badge.ok { background: var(--occ-bg); color: var(--occ); }
-.status { font-size: 22px; font-weight: 650; margin: 2px 0 8px; }
-.occ .status { color: var(--occ); }
-.empty .status { color: var(--empty); }
-.blind .status { color: var(--blind); }
-.status small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 6px; }
-dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 14px; }
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-text-size-adjust: 100%; }
+body { min-height: 100vh; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------------------------------------------------------- app shell */
+header { position: sticky; top: 0; z-index: 20; background: var(--bg2);
+  border-bottom: 1px solid var(--line); }
+.shell { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; }
+.brand { display: flex; align-items: baseline; gap: 8px; margin-right: 4px; }
+.brand b { font-size: 19px; letter-spacing: .04em; }
+.brand span { color: var(--muted); font-size: 12px; }
+.pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 9px;
+  border: 1px solid var(--line2); border-radius: 999px; color: var(--ink2); background: var(--card);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill b { font-weight: 650; letter-spacing: .05em; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--none); flex: none; }
+.pill[data-k="live"] { border-color: var(--ok); color: var(--ok); } .pill[data-k="live"] .dot { background: var(--ok); }
+.pill[data-k="warn"] { border-color: var(--warn); color: var(--warn); } .pill[data-k="warn"] .dot { background: var(--warn); }
+.pill[data-k="bad"] { border-color: var(--bad); color: var(--bad); } .pill[data-k="bad"] .dot { background: var(--bad); }
+.pill[data-k="mode"] { border-color: var(--accent); color: var(--accent); }
+.spacer { flex: 1 1 auto; }
+.who { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+button, .btn { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line2);
+  border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button[disabled] { opacity: .5; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+nav[role="tablist"] { display: flex; gap: 2px; padding: 0 12px; overflow-x: auto; }
+nav button { border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0;
+  background: transparent; color: var(--muted); padding: 8px 13px; white-space: nowrap; }
+nav button:hover { color: var(--ink); border-bottom-color: var(--line2); }
+nav button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.banner { margin: 0; padding: 7px 16px; background: var(--warn-bg); color: var(--warn);
+  font-size: 12.5px; border-bottom: 1px solid var(--line); }
+main { padding: 16px; max-width: 1280px; margin: 0 auto; }
+[hidden] { display: none !important; }
+
+/* ------------------------------------------------------------- blocks */
+h2.sec { margin: 22px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); font-weight: 600; }
+h2.sec:first-child { margin-top: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 8px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; }
+.tile b { display: block; font-size: 21px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.tile span { color: var(--muted); font-size: 11.5px; }
+.tile[data-k="ok"] b { color: var(--ok); } .tile[data-k="warn"] b { color: var(--warn); }
+.tile[data-k="bad"] b { color: var(--bad); } .tile[data-k="none"] b { color: var(--none); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 0;
+  min-width: 0; overflow: hidden; text-align: left; width: 100%; display: block; color: inherit; }
+button.card:hover { border-color: var(--accent); }
+.card .bar { height: 3px; background: var(--none); }
+.card[data-s="occ"] .bar { background: var(--ok); }
+.card[data-s="empty"] .bar { background: var(--none); }
+.card[data-s="blind"] .bar { background: var(--warn); }
+.card .body { padding: 13px 14px 14px; }
+.card h3 { margin: 0 0 7px; font-size: 16.5px; overflow-wrap: anywhere; }
+.state { display: flex; align-items: baseline; gap: 8px; margin: 1px 0 9px; }
+.state b { font-size: 21px; font-weight: 650; }
+.card[data-s="occ"] .state b { color: var(--ok); }
+.card[data-s="empty"] .state b { color: var(--ink2); }
+.card[data-s="blind"] .state b { color: var(--warn); }
+.state small { color: var(--muted); font-size: 12.5px; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 9px; }
+.badge { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--none-bg);
+  color: var(--muted); border: 1px solid transparent; }
+.badge[data-k="ok"] { background: var(--ok-bg); color: var(--ok); }
+.badge[data-k="warn"] { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); font-weight: 600; }
+.badge[data-k="bad"] { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 13.5px; }
 dt { color: var(--muted); }
 dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.alert { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--info-bg); font-size: 14px; }
-.alert.advisory { background: var(--adv-bg); }
-.alert.check { background: var(--chk-bg); }
+.alert { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--none-bg);
+  font-size: 13.5px; border-left: 3px solid var(--none); }
+.alert[data-sev="advisory"] { background: var(--warn-bg); border-left-color: var(--warn); }
+.alert[data-sev="check"] { background: var(--bad-bg); border-left-color: var(--bad); }
 .alert strong { display: block; }
-.alert.check strong { color: var(--chk); }
-.alert.advisory strong { color: var(--adv); }
-.alert .note { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
-select { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line);
-  background: var(--card); color: var(--ink); }
-ol.events { list-style: none; margin: 0; padding: 0; }
-ol.events li { display: grid; grid-template-columns: 9.5em 1fr; gap: 2px 12px; padding: 8px 10px;
-  background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line);
-  border-radius: 8px; margin-bottom: 6px; }
-ol.events li.advisory { border-left-color: var(--adv); }
-ol.events li.check { border-left-color: var(--chk); }
-ol.events time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-ol.events .what { font-weight: 600; }
-ol.events .ev { grid-column: 2; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.alert[data-sev="advisory"] strong { color: var(--warn); }
+.alert[data-sev="check"] strong { color: var(--bad); }
+.alert .note { display: block; color: var(--muted); font-size: 11.5px; margin-top: 3px; }
 .muted { color: var(--muted); }
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
-.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-.tile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
-.tile span { color: var(--muted); font-size: 12px; }
-.tile.bad b { color: var(--chk); }
-h3 { margin: 18px 0 8px; font-size: 15px; }
-.scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
-table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-th { color: var(--muted); font-weight: 500; }
-td.down { color: var(--chk); font-weight: 600; }
-td.up { color: var(--occ); }
-ul.notes { margin: 0; padding-left: 18px; }
-footer { padding: 16px; color: var(--muted); font-size: 12px; text-align: center; }
-@media (max-width: 520px) {
-  nav { margin-left: 0; width: 100%; }
-  nav button { flex: 1; }
+.empty-state { background: var(--card); border: 1px dashed var(--line2); border-radius: 11px;
+  padding: 22px; color: var(--muted); }
+.empty-state h3 { margin: 0 0 8px; color: var(--ink); font-size: 16px; }
+.empty-state code, code { background: var(--bg2); border: 1px solid var(--line); border-radius: 5px;
+  padding: 1px 6px; font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.empty-state ol { margin: 10px 0 0; padding-left: 20px; } .empty-state li { margin: 7px 0; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 11px; }
+label.f { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); }
+select, input[type="search"], input[type="text"], input[type="password"] {
+  font: inherit; font-size: 13.5px; padding: 5px 9px; border-radius: 7px; border: 1px solid var(--line2);
+  background: var(--card); color: var(--ink); }
+input[type="search"] { min-width: 190px; }
+
+ol.events { list-style: none; margin: 0; padding: 0; }
+ol.events li { display: grid; grid-template-columns: 10.5em 1fr; gap: 2px 12px; padding: 8px 11px;
+  background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--line2);
+  border-radius: 8px; margin-bottom: 6px; }
+ol.events li[data-sev="advisory"] { border-left-color: var(--warn); }
+ol.events li[data-sev="check"] { border-left-color: var(--bad); }
+ol.events time { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+ol.events .what { font-weight: 600; }
+ol.events .ev { grid-column: 2; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+
+.scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 9px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+caption { text-align: left; padding: 9px 10px 0; color: var(--muted); font-size: 12px; }
+th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--card); }
+tbody tr:last-child td { border-bottom: 0; }
+td[data-k="bad"] { color: var(--bad); font-weight: 600; }
+td[data-k="ok"] { color: var(--ok); }
+td[data-k="warn"] { color: var(--warn); }
+ul.notes { margin: 0; padding-left: 18px; } ul.notes li { margin: 3px 0; }
+
+/* ------------------------------------------------------------- charts */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
+.chart { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px 8px; }
+.chart h3 { margin: 0; font-size: 13.5px; }
+.chart .meta { color: var(--faint); font-size: 11px; margin: 2px 0 7px; }
+.chart svg { display: block; width: 100%; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.chart .nodata { padding: 26px 8px; text-align: center; color: var(--faint); font-size: 13px; }
+.gridline { stroke: var(--line); stroke-width: 1; }
+.axis { fill: var(--faint); font-size: 10px; }
+.sparkpath { fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+
+/* ----------------------------------------------------------- topology */
+.topo { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.topo svg { display: block; width: 100%; height: auto; }
+.node circle { fill: var(--card2); stroke: var(--accent); stroke-width: 2; }
+.node text { fill: var(--ink); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
+.node:focus-visible circle { stroke: var(--focus); stroke-width: 3; }
+.edge { stroke-width: 2.5; stroke-linecap: round; }
+.edge[data-k="ok"] { stroke: var(--ok); }
+.edge[data-k="warn"] { stroke: var(--warn); stroke-dasharray: 6 4; }
+.edge[data-k="bad"] { stroke: var(--bad); stroke-dasharray: 2 5; }
+
+/* ------------------------------------------------------------- dialog */
+dialog { border: 1px solid var(--line2); border-radius: 12px; background: var(--card); color: var(--ink);
+  padding: 0; max-width: 760px; width: calc(100vw - 32px); max-height: calc(100vh - 48px); }
+dialog::backdrop { background: rgba(2, 6, 14, .66); }
+dialog .head { display: flex; align-items: center; gap: 10px; padding: 13px 15px;
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); }
+dialog .head h2 { margin: 0; font-size: 17px; }
+dialog .content { padding: 15px; overflow: auto; }
+.login { max-width: 360px; margin: 48px auto; }
+.login form { display: grid; gap: 10px; }
+.login input { width: 100%; }
+.err { color: var(--bad); font-size: 13px; min-height: 1.2em; }
+footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-align: center; }
+
+@media (max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
   ol.events li { grid-template-columns: 1fr; }
   ol.events .ev { grid-column: 1; }
-  .grid { grid-template-columns: 1fr; }
+  .shell { padding: 9px 12px; } main { padding: 12px; }
 }
 </style>
 </head>
 <body>
 <header>
-  <h1>Saans</h1>
-  <span class="sub" id="sub">camera-free WiFi sensing</span>
-  <span class="conn" id="conn" data-s="connecting"><span class="dot"></span><span id="conn-text">connecting</span></span>
-  <nav role="tablist">
-    <button role="tab" data-tab="spaces" aria-selected="true">Spaces</button>
-    <button role="tab" data-tab="events" aria-selected="false">Events</button>
-    <button role="tab" data-tab="system" aria-selected="false">System</button>
-  </nav>
+  <div class="shell">
+    <div class="brand"><b>Saans</b><span>camera-free WiFi sensing</span></div>
+    <div class="pills" id="pills"></div>
+    <div class="spacer"></div>
+    <div class="who" id="who"></div>
+  </div>
+  <nav role="tablist" aria-label="Views" id="tabs"></nav>
 </header>
-<p class="banner">Saans is advisory — not a medical device. Alerts never replace existing safety procedures.
-  Every alert says what was observed and how confident it is.</p>
+<p class="banner">Advisory, <strong>not a medical device</strong>. Alerts never replace existing safety
+  procedures: every one says what was observed and how confident it is.</p>
+<p class="sr" aria-live="polite" id="live-status"></p>
+
 <main>
-  <section id="tab-spaces"><div class="grid" id="grid"><p class="muted">Waiting for the gateway…</p></div></section>
-  <section id="tab-events" hidden>
+  <section id="view-login" class="login" hidden>
+    <div class="card"><div class="bar"></div><div class="body">
+      <h3>Sign in</h3>
+      <p class="muted" style="font-size:13px">This gateway is reachable from the network, so it requires
+        a sign-in. Machine clients use <code>Authorization: Bearer</code> instead.</p>
+      <form id="login-form">
+        <label class="f" style="display:grid;gap:4px;color:var(--ink)">User
+          <input type="text" id="login-user" autocomplete="username" required></label>
+        <label class="f" style="display:grid;gap:4px;color:var(--ink)">Password
+          <input type="password" id="login-pass" autocomplete="current-password" required></label>
+        <p class="err" id="login-err" role="alert"></p>
+        <button type="submit" class="primary" id="login-go">Sign in</button>
+      </form>
+    </div></div>
+  </section>
+
+  <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0" hidden>
+    <h2 class="sec">At a glance</h2>
+    <div class="tiles" id="ov-tiles"></div>
+    <h2 class="sec">Spaces</h2>
+    <div class="grid" id="ov-grid"></div>
+  </section>
+
+  <section id="view-signals" role="tabpanel" aria-labelledby="tab-signals" tabindex="0" hidden>
     <div class="toolbar">
-      <label>Space <select id="ev-space"><option value="">all</option></select></label>
-      <label>Severity <select id="ev-sev">
+      <label class="f">Space <select id="sig-space"></select></label>
+      <label class="f">Window <select id="sig-window">
+        <option value="300">last 5 min</option>
+        <option value="900">last 15 min</option>
+        <option value="3600" selected>last hour</option>
+        <option value="0">everything held</option>
+      </select></label>
+      <span class="muted" id="sig-note"></span>
+    </div>
+    <div class="charts" id="sig-charts"></div>
+  </section>
+
+  <section id="view-topology" role="tabpanel" aria-labelledby="tab-topology" tabindex="0" hidden>
+    <h2 class="sec">Sensor topology</h2>
+    <div class="topo" id="topo"></div>
+  </section>
+
+  <section id="view-events" role="tabpanel" aria-labelledby="tab-events" tabindex="0" hidden>
+    <div class="toolbar">
+      <label class="f"><span class="sr">Search events</span>
+        <input type="search" id="ev-q" placeholder="Search evidence and type…"></label>
+      <label class="f">Space <select id="ev-space"><option value="">all</option></select></label>
+      <label class="f">Severity <select id="ev-sev">
         <option value="">all</option><option value="advisory">advisory and above</option><option value="check">check</option>
+      </select></label>
+      <label class="f">Since <select id="ev-since">
+        <option value="0">everything held</option><option value="3600">last hour</option>
+        <option value="21600">last 6 h</option><option value="86400">last 24 h</option>
       </select></label>
       <span class="muted" id="ev-count"></span>
     </div>
-    <ol class="events" id="events"></ol>
+    <ol class="events" id="ev-list"></ol>
   </section>
-  <section id="tab-system" hidden>
-    <div class="tiles" id="tiles"></div>
-    <div id="sys-warn"></div>
-    <h3>Links</h3>
-    <div class="scroll"><table id="links"></table></div>
-    <h3>Unknown links</h3>
-    <div id="unknown" class="muted">none</div>
-    <h3>Gateway</h3>
-    <dl id="gateway"></dl>
+
+  <section id="view-system" role="tabpanel" aria-labelledby="tab-system" tabindex="0" hidden>
+    <div id="sys-body"></div>
   </section>
 </main>
-<footer>Saans gateway <span id="version"></span>. No identities, ever: everything here is per space, not per person.</footer>
+
+<dialog id="detail" aria-labelledby="detail-title">
+  <div class="head">
+    <h2 id="detail-title">Space</h2>
+    <div class="spacer"></div>
+    <button type="button" id="detail-close">Close</button>
+  </div>
+  <div class="content" id="detail-body"></div>
+</dialog>
+
+<footer id="foot">Saans gateway. No identities, ever: everything here is per space, never per person.</footer>
+
 <script>
 'use strict';
 const $ = (s) => document.querySelector(s);
-function el(tag, cls, text) {
+function el(tag, attrs, text) {
   const e = document.createElement(tag);
-  if (cls) e.className = cls;
+  for (const k in attrs || {}) { if (attrs[k] != null) e.setAttribute(k, attrs[k]); }
   if (text != null) e.textContent = text;
   return e;
 }
-function append(parent, ...kids) { for (const k of kids) if (k != null) parent.append(k); return parent; }
+function svg(tag, attrs) {
+  // The namespace is spelled out here, once. It is an identifier, not an
+  // address — nothing fetches it — and the offline-capability test in
+  // http.rs allows it only in this position.
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs || {}) { if (attrs[k] != null) e.setAttribute(k, String(attrs[k])); }
+  return e;
+}
+function add(parent, ...kids) { for (const k of kids) if (k != null) parent.append(k); return parent; }
 
-const S = { spaces: [], events: [], t_s: null, mode: '', version: '', lastState: 0, tab: 'spaces' };
-const MAX_EVENTS = 500;
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'signals', label: 'Signals' },
+  { id: 'topology', label: 'Topology' },
+  { id: 'events', label: 'Events' },
+  { id: 'system', label: 'System', needs: 'system' },
+];
+
+const S = {
+  me: null, spaces: [], events: [], t_s: null, tab: 'overview',
+  lastState: 0, conn: 'connecting', links: [], health: null, history: null,
+  detail: null, announced: '',
+};
+const MAX_EVENTS = 1000;
 
 const EVENT_LABEL = {
   occupancy_started: 'Someone arrived', occupancy_ended: 'Space became empty',
@@ -167,6 +345,7 @@ const ALERT_LABEL = {
 };
 const SEV_RANK = { info: 0, advisory: 1, check: 2 };
 
+// ------------------------------------------------------------ formatting
 function dur(s) {
   if (s == null || !isFinite(s)) return '—';
   s = Math.max(0, s);
@@ -174,76 +353,694 @@ function dur(s) {
   if (s < 5400) return Math.round(s / 60) + ' min';
   return (s / 3600).toFixed(1) + ' h';
 }
+function ago(ms) {
+  if (!ms) return '—';
+  const s = (Date.now() - ms) / 1000;
+  return s < 2 ? 'just now' : dur(s) + ' ago';
+}
 function num(x, d) { return x == null || !isFinite(x) ? '—' : Number(x).toFixed(d == null ? 1 : d); }
-function link(l) { return l ? l.rx + '←' + l.tx : ''; }
-function spaceName(id) { const s = S.spaces.find((x) => x.space_id === id); return s ? s.name : id; }
+function linkName(l) { return l ? l.rx + '←' + l.tx : ''; }
+function spaceName(id) { const s = S.spaces.find((x) => x.space_id === id); return s ? (s.name || id) : id; }
 function clock(iso) { return typeof iso === 'string' ? iso.slice(0, 19).replace('T', ' ') : ''; }
+function stateOf(s) { return s.occupied === true ? 'occ' : s.occupied === false ? 'empty' : 'blind'; }
+function stateWord(k) { return k === 'occ' ? 'Occupied' : k === 'empty' ? 'Empty' : 'Unknown'; }
 
-// ---------------------------------------------------------------- spaces
+// ------------------------------------------------------------- transport
+class HttpError extends Error { constructor(status, path) { super(path + ': ' + status); this.status = status; } }
+async function getJSON(path) {
+  const r = await fetch(path, { cache: 'no-store', credentials: 'same-origin' });
+  if (!r.ok) throw new HttpError(r.status, path);
+  return r.json();
+}
+async function postJSON(path, body) {
+  const r = await fetch(path, {
+    method: 'POST', cache: 'no-store', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new HttpError(r.status, path); e.data = data; throw e; }
+  return data;
+}
+/** A 401 anywhere means the session ended under us: show the sign-in again. */
+function handleAuthLoss(e) {
+  if (e instanceof HttpError && e.status === 401 && S.me && S.me.authenticated) {
+    S.me.authenticated = false;
+    stopLive();
+    renderShell();
+    showLogin();
+    return true;
+  }
+  return false;
+}
+
+// ----------------------------------------------------------------- shell
+function announce(msg) {
+  if (msg === S.announced) return;
+  S.announced = msg;
+  $('#live-status').textContent = msg;
+}
+
+function pill(text, kind, dot, title) {
+  const p = el('span', { class: 'pill', 'data-k': kind || '', title: title || null });
+  if (dot) p.append(el('span', { class: 'dot' }));
+  p.append(el('b', null, text));
+  return p;
+}
+
+function renderShell() {
+  const me = S.me || {};
+  const pills = $('#pills');
+  pills.replaceChildren();
+
+  // Mode and connection are different facts. A connected socket does not
+  // mean sensors are reporting, and a replay is not live however healthy
+  // the socket is.
+  const mode = (me.mode || '').toUpperCase() || 'UNKNOWN';
+  pills.append(pill(mode, 'mode', false,
+    mode === 'REPLAY' ? 'Replaying a recording — these are not live sensors' : 'Live sensor input'));
+
+  const connKind = S.conn === 'live' ? 'live' : (S.conn === 'offline' || S.conn === 'signed out') ? 'bad' : 'warn';
+  pills.append(pill(S.conn, connKind, true, S.conn === 'signed out'
+    ? 'Not connected: sign in first' : 'Gateway connection, not data freshness'));
+
+  const stale = S.lastState && Date.now() - S.lastState > 5000;
+  if (S.lastState) {
+    pills.append(pill('updated ' + ago(S.lastState), stale ? 'warn' : '', false,
+      stale ? 'No state message for over 5 s' : 'Time since the last state message'));
+  } else if (me.authenticated !== false && S.conn !== 'signed out') {
+    pills.append(pill('no data yet', 'warn', false, 'Connected, but the gateway has not sent a state message'));
+  }
+  if (me.version) pills.append(pill('v' + me.version, ''));
+
+  const who = $('#who');
+  who.replaceChildren();
+  if (me.authenticated && me.auth_required) {
+    who.append(el('span', null, me.name + ' · ' + me.role));
+    const out = el('button', { type: 'button' }, 'Sign out');
+    out.addEventListener('click', signOut);
+    who.append(out);
+  } else if (me.auth_required === false) {
+    who.append(el('span', { title: 'http_addr is a loopback address, so the API is reachable only from this machine' },
+      'local access'));
+  }
+  renderTabs();
+  announce('Mode ' + mode + ', connection ' + S.conn + (stale ? ', data stale' : ''));
+}
+
+/**
+ * Build the tab strip once, then only update which is selected.
+ *
+ * This is called from `renderShell`, which runs on every state message
+ * and on a 2 s timer. Replacing the buttons each time would move focus
+ * out of the nav twice a second for a keyboard user, and would drop a
+ * click that landed between a rebuild — both of which it did before.
+ */
+let tabsBuilt = '';
+function renderTabs() {
+  const nav = $('#tabs');
+  const want = visibleTabs();
+  const key = want.map((t) => t.id).join(',');
+  if (key !== tabsBuilt) {
+    tabsBuilt = key;
+    nav.replaceChildren(...want.map((t) => {
+      const b = el('button', { type: 'button', role: 'tab', id: 'tab-' + t.id, 'aria-controls': 'view-' + t.id }, t.label);
+      b.addEventListener('click', () => showTab(t.id));
+      return b;
+    }));
+  }
+  for (const t of want) {
+    const b = $('#tab-' + t.id);
+    if (!b) continue;
+    const on = S.tab === t.id;
+    b.setAttribute('aria-selected', String(on));
+    b.setAttribute('tabindex', on ? '0' : '-1');
+  }
+  nav.hidden = S.me ? !!(S.me.auth_required && !S.me.authenticated) : true;
+}
+
+function visibleTabs() {
+  const can = (S.me && S.me.can) || {};
+  return TABS.filter((t) => !t.needs || can[t.needs]);
+}
+
+$('#tabs').addEventListener('keydown', (e) => {
+  const ids = visibleTabs().map((t) => t.id);
+  const i = ids.indexOf(S.tab);
+  let j = -1;
+  if (e.key === 'ArrowRight') j = (i + 1) % ids.length;
+  else if (e.key === 'ArrowLeft') j = (i - 1 + ids.length) % ids.length;
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = ids.length - 1;
+  if (j < 0) return;
+  e.preventDefault();
+  showTab(ids[j]);
+  const btn = $('#tab-' + ids[j]);
+  if (btn) btn.focus();
+});
+
+function showTab(name) {
+  if (!visibleTabs().some((t) => t.id === name)) name = 'overview';
+  S.tab = name;
+  for (const t of TABS) {
+    const v = $('#view-' + t.id);
+    if (v) v.hidden = t.id !== name || isLoginShown();
+  }
+  renderTabs();
+  if (name === 'overview') renderOverview();
+  if (name === 'signals') { refreshHistory(); }
+  if (name === 'topology') { renderTopology(); refreshSystem(); }
+  if (name === 'events') renderEvents();
+  if (name === 'system') refreshSystem();
+  try { history.replaceState(null, '', '#' + name); } catch (e) { /* sandboxed */ }
+}
+
+// ----------------------------------------------------------------- login
+function isLoginShown() { return !$('#view-login').hidden; }
+function showLogin() {
+  $('#view-login').hidden = false;
+  for (const t of TABS) { const v = $('#view-' + t.id); if (v) v.hidden = true; }
+  $('#login-user').focus();
+}
+function hideLogin() { $('#view-login').hidden = true; }
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const go = $('#login-go');
+  go.disabled = true;
+  $('#login-err').textContent = '';
+  try {
+    await postJSON('/api/login', { user: $('#login-user').value, password: $('#login-pass').value });
+    $('#login-pass').value = '';
+    await start();
+  } catch (err) {
+    $('#login-err').textContent = err.status === 401 ? 'Wrong user or password.' : 'Sign-in failed. Is the gateway reachable?';
+  } finally {
+    go.disabled = false;
+  }
+});
+
+async function signOut() {
+  try { await postJSON('/api/logout', {}); } catch (e) { /* ending a session is best-effort */ }
+  stopLive();
+  S.spaces = []; S.events = []; S.links = []; S.health = null; S.history = null; S.lastState = 0;
+  await start();
+}
+
+// -------------------------------------------------------------- overview
+function tile(label, value, kind, title) {
+  const t = el('div', { class: 'tile', 'data-k': kind || '', title: title || null });
+  return add(t, el('b', null, String(value)), el('span', null, label));
+}
+
+function renderOverview() {
+  const grid = $('#ov-grid');
+  const tiles = $('#ov-tiles');
+  if (!S.spaces.length) {
+    tiles.replaceChildren();
+    grid.replaceChildren(firstRunHelp());
+    return;
+  }
+  const occ = S.spaces.filter((s) => s.occupied === true).length;
+  const empty = S.spaces.filter((s) => s.occupied === false).length;
+  const blind = S.spaces.filter((s) => s.occupied == null).length;
+  const usable = S.spaces.reduce((a, s) => a + (s.links_usable || 0), 0);
+  const total = S.spaces.reduce((a, s) => a + (s.links_total || 0), 0);
+  const alerts = S.spaces.reduce((a, s) => a + (s.alerts || []).filter((x) => x.name !== 'blind').length, 0);
+  const checks = S.spaces.reduce((a, s) => a + (s.alerts || []).filter((x) => x.severity === 'check').length, 0);
+
+  tiles.replaceChildren(
+    tile('spaces', S.spaces.length),
+    tile('occupied', occ, occ ? 'ok' : 'none'),
+    tile('empty', empty, 'none'),
+    tile('unknown — cannot see', blind, blind ? 'warn' : 'none',
+      'No usable link. This is not the same as empty.'),
+    tile('links usable', usable + ' / ' + total, usable < total ? 'warn' : 'ok'),
+    tile('open alerts', alerts, checks ? 'bad' : alerts ? 'warn' : 'none'),
+  );
+  grid.replaceChildren(...S.spaces.map(spaceCard));
+  syncSpaceSelectors();
+}
+
+function firstRunHelp() {
+  const d = el('div', { class: 'empty-state' });
+  add(d, el('h3', null, 'No spaces configured'));
+  add(d, el('p', null, 'The gateway is running and this dashboard is talking to it, but nothing is being watched yet.'));
+  const ol = el('ol');
+  const step = (text, code) => {
+    const li = el('li', null, text);
+    if (code) { li.append(document.createElement('br')); li.append(el('code', null, code)); }
+    return li;
+  };
+  add(ol,
+    step('Add a [[space]] table with its links to saans.toml, then check it: ', 'saans-gateway --config saans.toml --check'),
+    step('No hardware yet? Export a simulated night and replay it — everything will be labelled REPLAY: ',
+      'saans export night --out night.pcap && saans-gateway --config saans.toml --replay night.pcap --speed 1 --serve'),
+    step('With hardware: flash one TX and one RX node (edge/README.md), point them at this gateway’s UDP port, and keep the space EMPTY for the first ~80 s so calibration learns an empty room.'),
+  );
+  add(d, ol);
+  return d;
+}
+
 function spaceCard(s) {
-  const kind = s.occupied === true ? 'occ' : s.occupied === false ? 'empty' : 'blind';
-  const card = el('article', 'card ' + kind);
-  append(card, el('h2', null, s.name || s.space_id));
-  const badges = el('div', 'badges');
-  badges.append(s.vitals ? el('span', 'badge ok', 'vitals: consented') : el('span', 'badge', 'vitals: off'));
-  if (s.raw_mode) {
-    const b = el('span', 'badge warn', 'RAW CSI DEBUG MODE ON');
-    b.title = 'Raw channel data is leaving the sensor on ' + (s.raw_mode_links || []).join(', ');
-    badges.append(b);
-  }
-  if (s.vitals_gated_links && s.vitals_gated_links.length) {
-    badges.append(el('span', 'badge warn', 'node sends vitals without consent: ' + s.vitals_gated_links.join(', ')));
-  }
-  if (s.collapse_detection) badges.append(el('span', 'badge', 'collapse detection on'));
-  if (s.resting) badges.append(el('span', 'badge', 'resting'));
-  card.append(badges);
+  const kind = stateOf(s);
+  const card = el('button', { class: 'card', 'data-s': kind, type: 'button' });
+  card.setAttribute('aria-label', 'Open details for ' + (s.name || s.space_id) + ', currently ' + stateWord(kind));
+  card.addEventListener('click', () => openDetail(s.space_id));
+  add(card, el('div', { class: 'bar' }));
+  const body = el('div', { class: 'body' });
+  add(body, el('h3', null, s.name || s.space_id));
 
-  const status = el('div', 'status', kind === 'occ' ? 'Occupied' : kind === 'empty' ? 'Empty' : 'Unknown');
-  if (kind === 'occ' && s.occupied_since_s != null) status.append(el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
-  if (kind === 'blind') status.append(el('small', null, 'no usable link: not "empty"'));
-  card.append(status);
+  const badges = el('div', { class: 'badges' });
+  badges.append(s.vitals ? el('span', { class: 'badge', 'data-k': 'ok' }, 'vitals: consented')
+                         : el('span', { class: 'badge' }, 'vitals: off'));
+  if (s.raw_mode) {
+    badges.append(el('span', {
+      class: 'badge', 'data-k': 'bad',
+      title: 'Raw channel data is leaving the sensor on ' + (s.raw_mode_links || []).join(', '),
+    }, 'RAW CSI DEBUG'));
+  }
+  if ((s.vitals_gated_links || []).length) {
+    badges.append(el('span', { class: 'badge', 'data-k': 'warn' },
+      'node sends vitals without consent: ' + s.vitals_gated_links.join(', ')));
+  }
+  if (s.collapse_detection) badges.append(el('span', { class: 'badge' }, 'collapse detection'));
+  if (s.resting) badges.append(el('span', { class: 'badge' }, 'resting'));
+  add(body, badges);
+
+  const st = el('div', { class: 'state' });
+  add(st, el('b', null, stateWord(kind)));
+  if (kind === 'occ' && s.occupied_since_s != null && s.t_s != null) {
+    add(st, el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
+  } else if (kind === 'blind') {
+    add(st, el('small', null, 'no usable link — not "empty"'));
+  }
+  add(body, st);
 
   const dl = el('dl');
-  const row = (k, v) => append(dl, el('dt', null, k), el('dd', null, v));
+  const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
   if (kind === 'occ') row('Still for', dur(s.still_for_s));
   row('Motion', num(s.motion_index, 2) + ' × empty-room level');
   row('Motion bouts', (s.motion_bouts_last_hour ?? 0) + ' in the last hour');
   if (s.vitals) {
     const b = s.breathing;
-    row('Breathing', b ? num(b.bpm) + ' BPM (confidence ' + num(b.confidence, 2) + ', link ' + link(b.link) + ')'
+    row('Breathing', !('breathing' in s) ? 'not shown to your role'
+      : b ? num(b.bpm) + ' BPM (confidence ' + num(b.confidence, 2) + ')'
       : kind === 'occ' ? 'not confidently detected' : '—');
-    if (s.bpm_median_5min != null) row('5-min median', num(s.bpm_median_5min) + ' BPM, IQR ' + num(s.bpm_iqr_5min));
   }
-  row('Links usable', (s.links_usable ?? 0) + ' of ' + (s.links_total ?? 0));
-  card.append(dl);
+  const lu = s.links_usable ?? 0, lt = s.links_total ?? 0;
+  row('Links usable', lu + ' of ' + lt + (lu === 0 && lt > 0 ? ' — cannot see the space' : ''));
+  add(body, dl);
 
-  for (const a of s.alerts || []) {
-    const sev = a.severity || 'advisory';
-    const box = el('div', 'alert ' + sev);
-    append(box, el('strong', null, (ALERT_LABEL[a.name] || a.name) + ' · ' + sev));
-    if (a.evidence) box.append(el('span', null, a.evidence));
-    if (a.since_s != null && s.t_s != null) box.append(el('span', 'note', 'since ' + dur(s.t_s - a.since_s) + ' ago'));
-    box.append(el('span', 'note', a.notice || 'advisory — not a medical device'));
-    card.append(box);
-  }
+  for (const a of s.alerts || []) add(body, alertBox(a, s));
+  add(card, body);
   return card;
 }
 
-function renderSpaces() {
-  const grid = $('#grid');
-  if (!S.spaces.length) {
-    grid.replaceChildren(el('p', 'muted', 'No spaces configured: add [[space]] tables to saans.toml.'));
+function alertBox(a, s) {
+  const sev = a.severity || 'advisory';
+  const box = el('div', { class: 'alert', 'data-sev': sev });
+  add(box, el('strong', null, (ALERT_LABEL[a.name] || a.name) + ' · ' + sev));
+  if (a.evidence) add(box, el('span', null, a.evidence));
+  if (a.since_s != null && s && s.t_s != null) add(box, el('span', { class: 'note' }, 'since ' + dur(s.t_s - a.since_s) + ' ago'));
+  add(box, el('span', { class: 'note' }, a.notice || 'advisory — not a medical device'));
+  return box;
+}
+
+// ---------------------------------------------------------- space detail
+const dlg = $('#detail');
+$('#detail-close').addEventListener('click', () => dlg.close());
+dlg.addEventListener('close', () => { S.detail = null; });
+
+async function openDetail(id) {
+  S.detail = id;
+  $('#detail-title').textContent = spaceName(id);
+  $('#detail-body').replaceChildren(el('p', { class: 'muted' }, 'Loading…'));
+  if (!dlg.open) dlg.showModal();
+  try {
+    const [d, hist] = await Promise.all([
+      getJSON('/api/spaces/' + encodeURIComponent(id)),
+      getJSON('/api/history?max_points=240&space=' + encodeURIComponent(id)).catch(() => null),
+    ]);
+    if (S.detail === id) renderDetail(d, hist);
+  } catch (e) {
+    if (handleAuthLoss(e)) { dlg.close(); return; }
+    $('#detail-body').replaceChildren(el('p', { class: 'muted' },
+      e.status === 404 ? 'This space is not visible to your account.' : 'Could not load this space.'));
+  }
+}
+
+function renderDetail(d, hist) {
+  const s = d.state || {};
+  const body = $('#detail-body');
+  body.replaceChildren();
+  const kind = stateOf(s);
+
+  const head = el('div', { class: 'state' });
+  add(head, el('b', null, stateWord(kind)));
+  if (kind === 'occ' && s.occupied_since_s != null && s.t_s != null) add(head, el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
+  if (kind === 'blind') add(head, el('small', null, 'no usable link — not "empty"'));
+  add(body, head);
+
+  const dl = el('dl');
+  const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
+  row('Motion index', num(s.motion_index, 2) + ' × the empty-room level');
+  if (kind === 'occ') row('Still for', dur(s.still_for_s));
+  row('Motion bouts', (s.motion_bouts_last_hour ?? 0) + ' in the last hour');
+  row('Links usable', (s.links_usable ?? 0) + ' of ' + (s.links_total ?? 0));
+  if (s.vitals && !('breathing' in s)) {
+    row('Vital signs', 'this space has consented, but your role is not permitted to see them');
+  } else if (s.vitals) {
+    const b = s.breathing;
+    row('Breathing', b ? num(b.bpm) + ' BPM, confidence ' + num(b.confidence, 2) + ', from link ' + linkName(b.link)
+      : 'no confident estimate right now — the estimator abstains rather than guess');
+    if (s.bpm_median_5min != null) row('5-min median', num(s.bpm_median_5min) + ' BPM, IQR ' + num(s.bpm_iqr_5min));
+    row('In a breathing pause', s.in_breathing_pause ? 'yes' : 'no');
+  } else {
+    row('Vital signs', 'not consented for this space — nothing is measured or stored');
+  }
+  add(body, dl);
+  for (const a of s.alerts || []) add(body, alertBox(a, s));
+
+  const series = hist && (hist.spaces || []).find((x) => x.space_id === s.space_id);
+  add(body, el('h2', { class: 'sec' }, 'Recent trend'));
+  const charts = el('div', { class: 'charts' });
+  if (series && series.points) {
+    add(charts, occupancyChart(series), motionChart(series));
+    if (series.breathing_bpm) add(charts, breathingChart(series));
+  } else {
+    add(charts, noData('No history yet', 'The gateway keeps a bounded in-memory window; it fills as data arrives.'));
+  }
+  add(body, charts);
+
+  // Which links actually produced this answer.
+  const mine = (S.links || []).find((x) => x.space_id === s.space_id);
+  if (mine) {
+    add(body, el('h2', { class: 'sec' }, 'Contributing links'));
+    add(body, linkTable([mine], 'Links configured for this space and their current quality.'));
+  }
+
+  add(body, el('h2', { class: 'sec' }, 'Recent events'));
+  const ol = el('ol', { class: 'events' });
+  const evs = (d.events || []).slice().reverse();
+  if (!evs.length) ol.append(el('li', null, 'Nothing recorded for this space yet.'));
+  for (const e of evs.slice(0, 25)) ol.append(eventItem(e));
+  add(body, ol);
+}
+
+// ---------------------------------------------------------------- charts
+function noData(title, why) {
+  const c = el('div', { class: 'chart' });
+  add(c, el('h3', null, title), el('div', { class: 'nodata' }, why));
+  return c;
+}
+
+/**
+ * A line chart over a shared time axis. `series[].values` may contain
+ * nulls; the line breaks there rather than drawing through a gap, because
+ * a straight line across missing data is a claim nobody measured.
+ */
+function chart(opts) {
+  const { title, meta, t, series, yMin, yMax, unit } = opts;
+  const c = el('div', { class: 'chart' });
+  add(c, el('h3', null, title));
+  if (meta) add(c, el('div', { class: 'meta' }, meta));
+  const present = series.filter((s) => s.values.some((v) => v != null && isFinite(v)));
+  if (!t.length || !present.length) {
+    add(c, el('div', { class: 'nodata' }, 'Not enough data yet.'));
+    return c;
+  }
+  const W = 480, H = 130, L = 40, R = 8, T = 8, B = 20;
+  let lo = yMin, hi = yMax;
+  if (lo == null || hi == null) {
+    const all = present.flatMap((s) => s.values).filter((v) => v != null && isFinite(v));
+    lo = lo == null ? Math.min(...all) : lo;
+    hi = hi == null ? Math.max(...all) : hi;
+  }
+  if (!(hi > lo)) { hi = lo + 1; }
+  // Pad only the ends that were not pinned: padding below an explicit
+  // yMin of 0 would draw a negative axis for a quantity that cannot be
+  // negative, which reads as a measurement rather than as whitespace.
+  const pad = (hi - lo) * 0.08;
+  if (yMin == null) lo -= pad;
+  if (yMax == null) hi += pad;
+  const t0 = t[0], t1 = t[t.length - 1] || t0 + 1;
+  const X = (v) => L + (W - L - R) * ((v - t0) / (t1 - t0 || 1));
+  const Y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+
+  const g = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', preserveAspectRatio: 'none' });
+  for (let i = 0; i <= 2; i++) {
+    const v = lo + (hi - lo) * (i / 2);
+    add(g, svg('line', { class: 'gridline', x1: L, x2: W - R, y1: Y(v), y2: Y(v) }));
+    const lab = svg('text', { class: 'axis', x: 2, y: Y(v) + 3 });
+    lab.textContent = num(v, Math.abs(hi - lo) < 5 ? 2 : 0);
+    add(g, lab);
+  }
+  for (const s of present) {
+    let d = '', pen = false;
+    for (let i = 0; i < t.length; i++) {
+      const v = s.values[i];
+      if (v == null || !isFinite(v)) { pen = false; continue; }
+      d += (pen ? 'L' : 'M') + X(t[i]).toFixed(1) + ' ' + Y(v).toFixed(1) + ' ';
+      pen = true;
+    }
+    add(g, svg('path', { class: 'sparkpath', d: d.trim(), stroke: s.color }));
+  }
+  const span = Math.round(t1 - t0);
+  const x0 = svg('text', { class: 'axis', x: L, y: H - 5 }); x0.textContent = '−' + dur(span);
+  const x1 = svg('text', { class: 'axis', x: W - R, y: H - 5, 'text-anchor': 'end' }); x1.textContent = 'now';
+  add(g, x0, x1);
+
+  const last = present.map((s) => {
+    const v = [...s.values].reverse().find((x) => x != null && isFinite(x));
+    return s.label + ' ' + (v == null ? 'none' : num(v, 2)) + (unit ? ' ' + unit : '');
+  }).join(', ');
+  g.setAttribute('aria-label', title + ' over the last ' + dur(span) + '. Latest: ' + last + '.');
+  add(c, g);
+
+  const legend = el('div', { class: 'legend' });
+  for (const s of present) {
+    const item = el('span');
+    const sw = el('i'); sw.style.background = s.color;
+    add(item, sw, document.createTextNode(s.label));
+    legend.append(item);
+  }
+  add(legend, el('span', null, 'latest: ' + last));
+  add(c, legend);
+  return c;
+}
+
+/** Occupancy is three states, not a number: a band reads better than a line. */
+function occupancyChart(s) {
+  const c = el('div', { class: 'chart' });
+  add(c, el('h3', null, 'Occupancy'));
+  add(c, el('div', { class: 'meta' }, 'source: /api/history · occupied / empty / cannot see'));
+  const t = s.t_s || [];
+  if (!t.length) { add(c, el('div', { class: 'nodata' }, 'Not enough data yet.')); return c; }
+  const W = 480, H = 34;
+  const g = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', preserveAspectRatio: 'none' });
+  const t0 = t[0], t1 = t[t.length - 1] || t0 + 1;
+  const X = (v) => (W * (v - t0)) / (t1 - t0 || 1);
+  const colour = { true: 'var(--ok)', false: 'var(--none)', null: 'var(--warn)' };
+  let counts = { occupied: 0, empty: 0, unknown: 0 };
+  for (let i = 0; i < t.length; i++) {
+    const v = s.occupied[i];
+    const x = X(t[i]);
+    const w = Math.max(1, (i + 1 < t.length ? X(t[i + 1]) : W) - x);
+    add(g, svg('rect', { x: x.toFixed(1), y: 6, width: w.toFixed(1), height: 20, fill: colour[String(v)] }));
+    counts[v === true ? 'occupied' : v === false ? 'empty' : 'unknown']++;
+  }
+  const pct = (n) => Math.round((100 * n) / t.length) + '%';
+  g.setAttribute('aria-label', 'Occupancy band: ' + pct(counts.occupied) + ' occupied, ' + pct(counts.empty)
+    + ' empty, ' + pct(counts.unknown) + ' not visible, over the last ' + dur(t1 - t0) + '.');
+  add(c, g);
+  const legend = el('div', { class: 'legend' });
+  const key = (label, col, n) => {
+    const item = el('span'); const sw = el('i'); sw.style.background = col; sw.style.height = '8px';
+    return add(item, sw, document.createTextNode(label + ' ' + pct(n)));
+  };
+  add(legend, key('occupied', 'var(--ok)', counts.occupied), key('empty', 'var(--none)', counts.empty),
+    key('cannot see', 'var(--warn)', counts.unknown));
+  add(c, legend);
+  return c;
+}
+
+function motionChart(s) {
+  return chart({
+    title: 'Motion index',
+    meta: 'source: /api/history · multiples of the empty-room threshold · 1.0 = the level an empty room stays below',
+    t: s.t_s || [], unit: '×',
+    series: [
+      { label: 'motion', values: s.motion_index || [], color: 'var(--accent)' },
+      { label: 'presence', values: s.presence_index || [], color: 'var(--none)' },
+    ],
+    yMin: 0,
+  });
+}
+
+function breathingChart(s) {
+  return chart({
+    title: 'Breathing',
+    meta: 'source: /api/history · BPM where the estimate was confident; gaps are abstentions, not zeros',
+    t: s.t_s || [], unit: 'BPM',
+    series: [{ label: 'rate', values: s.breathing_bpm || [], color: 'var(--accent)' }],
+  });
+}
+
+function confidenceChart(s) {
+  return chart({
+    title: 'Breathing confidence',
+    meta: 'source: /api/history · 0–1 · the estimator abstains rather than guess',
+    t: s.t_s || [],
+    series: [{ label: 'confidence', values: s.breathing_conf || [], color: 'var(--warn)' }],
+    yMin: 0, yMax: 1,
+  });
+}
+
+function linkChart(l, field, title, meta, unit, yMin, yMax) {
+  return chart({
+    title: title + ' · link ' + l.rx + '←' + l.tx,
+    meta, t: l.t_s || [], unit,
+    series: [{ label: title, values: l[field] || [], color: 'var(--accent)' }],
+    yMin, yMax,
+  });
+}
+
+// --------------------------------------------------------------- signals
+function syncSpaceSelectors() {
+  for (const [sel, withAll] of [[$('#ev-space'), true], [$('#sig-space'), false]]) {
+    const have = new Set([...sel.options].map((o) => o.value));
+    if (withAll && !have.has('')) { const o = el('option', { value: '' }, 'all'); sel.append(o); have.add(''); }
+    for (const s of S.spaces) {
+      if (!have.has(s.space_id)) {
+        const o = el('option', { value: s.space_id }, s.name || s.space_id);
+        sel.append(o);
+      }
+    }
+    for (const o of [...sel.options]) {
+      if (o.value && !S.spaces.some((s) => s.space_id === o.value)) o.remove();
+    }
+  }
+}
+
+async function refreshHistory() {
+  const note = $('#sig-note');
+  const id = $('#sig-space').value || (S.spaces[0] && S.spaces[0].space_id);
+  if (!id) { $('#sig-charts').replaceChildren(firstRunHelp()); note.textContent = ''; return; }
+  const win = Number($('#sig-window').value) || 0;
+  const since = win && S.t_s != null ? Math.max(0, S.t_s - win) : null;
+  let q = '/api/history?max_points=400&space=' + encodeURIComponent(id);
+  if (since != null) q += '&since=' + since;
+  try {
+    const h = await getJSON(q);
+    S.history = h;
+    renderSignals(h, id);
+    note.textContent = 'window held: ' + dur(h.window_s) + ' at one point per ' + h.cadence_s + ' s, in memory only';
+  } catch (e) {
+    if (handleAuthLoss(e)) return;
+    $('#sig-charts').replaceChildren(noData('History unavailable',
+      e.status === 403 ? 'Your role cannot read this.' : 'The gateway did not answer.'));
+  }
+}
+
+function renderSignals(h, id) {
+  const host = $('#sig-charts');
+  const s = (h.spaces || []).find((x) => x.space_id === id);
+  if (!s || !s.points) {
+    host.replaceChildren(noData('Nothing recorded yet',
+      'The window fills as the gateway ticks. With a replay, start it and come back.'));
     return;
   }
-  grid.replaceChildren(...S.spaces.map(spaceCard));
-  const sel = $('#ev-space');
-  const have = new Set([...sel.options].map((o) => o.value));
-  for (const s of S.spaces) {
-    if (!have.has(s.space_id)) {
-      const o = el('option', null, s.name || s.space_id);
-      o.value = s.space_id;
-      sel.append(o);
+  const out = [occupancyChart(s), motionChart(s)];
+  if (s.breathing_bpm) out.push(breathingChart(s), confidenceChart(s));
+  else out.push(noData('Breathing', 'Vital signs are off for this space (ADR-005), so nothing is measured.'));
+  for (const l of (h.links || []).filter((l) => l.space_id === id)) {
+    out.push(linkChart(l, 'rate_hz', 'CSI rate', 'source: /api/history · Hz · below ~10 Hz the gross-motion band is undersampled', 'Hz', 0));
+    out.push(linkChart(l, 'loss', 'Packet loss', 'source: /api/history · fraction of expected frames missing', '', 0, 1));
+    out.push(linkChart(l, 'best_bnr', 'Best breathing-to-noise ratio', 'source: /api/history · power ratio on the best subcarrier', '', 0));
+    out.push(linkChart(l, 'rssi_dbm', 'RSSI', 'source: /api/history · dBm at the receiving node', 'dBm'));
+  }
+  host.replaceChildren(...out);
+}
+
+$('#sig-space').addEventListener('change', refreshHistory);
+$('#sig-window').addEventListener('change', refreshHistory);
+
+// -------------------------------------------------------------- topology
+/**
+ * Deliberately a topology diagram and not a floor plan. The gateway
+ * configuration has no coordinates in it — `[[space]]` is an id, a name
+ * and a list of links — so any room drawing would be invented, and an
+ * invented position is worse than none on a system people act on.
+ */
+let topoDrawn = '';
+function renderTopology() {
+  const host = $('#topo');
+  // Redrawn only when something actually changed. The nodes are
+  // focusable, and rebuilding the SVG under a keyboard user every two
+  // seconds would throw their focus away.
+  const sig = JSON.stringify((S.links || []).map((g) => [g.space_id, (g.links || []).map((r) =>
+    [r.link.rx, r.link.tx, r.up, r.calib_age_h == null, Math.round((r.loss || 0) * 20)])]));
+  if (sig === topoDrawn && host.childElementCount) return;
+  topoDrawn = sig;
+  host.replaceChildren();
+  const groups = S.links && S.links.length ? S.links
+    : S.spaces.map((s) => ({ space_id: s.space_id, name: s.name, links: [] }));
+  if (!groups.length) { host.append(firstRunHelp()); return; }
+
+  add(host, el('p', { class: 'muted', style: 'margin:0 0 10px;font-size:12.5px' },
+    'Not to scale and not a floor plan: the gateway configuration has no room coordinates, '
+    + 'so node positions here are arbitrary. Only the links and their quality are real.'));
+
+  for (const g of groups) {
+    add(host, el('h2', { class: 'sec' }, (g.name || g.space_id) + ' — ' + (g.links || []).length + ' link(s)'));
+    const nodes = [];
+    for (const r of g.links || []) {
+      for (const id of [r.link.rx, r.link.tx]) {
+        if (!nodes.some((n) => n.id === id)) nodes.push({ id, tx: id === 255 });
+      }
     }
+    if (!nodes.length) {
+      add(host, el('p', { class: 'muted' }, 'No links have reported yet for this space.'));
+      continue;
+    }
+    const W = 520, H = 220, cx = W / 2, cy = H / 2, rad = Math.min(W, H) / 2 - 34;
+    const pos = {};
+    nodes.forEach((n, i) => {
+      const a = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+      pos[n.id] = { x: cx + rad * Math.cos(a), y: cy + rad * Math.sin(a) };
+    });
+    const g2 = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img' });
+    let summary = [];
+    for (const r of g.links || []) {
+      const a = pos[r.link.rx], b = pos[r.link.tx];
+      const k = !r.up ? 'bad' : (r.loss > 0.2 || r.calib_age_h == null) ? 'warn' : 'ok';
+      const line = svg('line', { class: 'edge', 'data-k': k, x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+      const why = linkName(r.link) + ': ' + (r.up ? 'up' : 'DOWN, silent ' + dur(r.silent_s))
+        + ', ' + num(r.rate_hz) + ' Hz, loss ' + num(r.loss * 100, 0) + '%'
+        + ', ' + (r.calib_age_h == null ? 'NOT CALIBRATED' : 'calibrated ' + num(r.calib_age_h) + ' h ago');
+      add(line, svg('title')).lastChild.textContent = why;
+      add(g2, line);
+      summary.push(why);
+    }
+    for (const n of nodes) {
+      const grp = svg('g', { class: 'node', tabindex: '0', role: 'img', 'aria-label': n.tx ? 'Access point or unknown transmitter' : 'Node ' + n.id });
+      add(grp, svg('circle', { cx: pos[n.id].x, cy: pos[n.id].y, r: 17 }));
+      const label = svg('text', { x: pos[n.id].x, y: pos[n.id].y });
+      label.textContent = n.tx ? 'AP' : String(n.id);
+      add(grp, label);
+      add(g2, grp);
+    }
+    g2.setAttribute('aria-label', (g.name || g.space_id) + ' topology. ' + (summary.join('. ') || 'No links reporting.'));
+    const box = el('div');
+    add(box, g2);
+    const legend = el('div', { class: 'legend' });
+    const key = (label, k) => {
+      const i = el('i'); i.style.background = k === 'ok' ? 'var(--ok)' : k === 'warn' ? 'var(--warn)' : 'var(--bad)';
+      return add(el('span'), i, document.createTextNode(label));
+    };
+    add(legend, key('up and calibrated', 'ok'), key('degraded or uncalibrated', 'warn'), key('down', 'bad'));
+    add(box, legend);
+    add(host, box);
   }
 }
 
@@ -258,146 +1055,215 @@ function mergeEvents(list) {
   if (!added) return;
   S.events.sort((a, b) => (b.unix_ms || 0) - (a.unix_ms || 0));
   S.events.length = Math.min(S.events.length, MAX_EVENTS);
-  renderEvents();
+  if (S.tab === 'events') renderEvents();
+}
+
+function eventItem(e) {
+  const li = el('li', { 'data-sev': e.severity || 'info' });
+  const t = el('time', null, clock(e.time));
+  if (e.time) t.setAttribute('datetime', e.time);
+  const what = el('div');
+  add(what, el('span', { class: 'what' }, EVENT_LABEL[e.type] || e.type),
+    document.createTextNode(' · ' + spaceName(e.space_id) + ' · ' + (e.severity || 'info')
+      + (e.confidence != null ? ' · confidence ' + num(e.confidence, 2) : '')));
+  return add(li, t, what, el('div', { class: 'ev' }, e.evidence || ''));
 }
 
 function renderEvents() {
   const space = $('#ev-space').value;
   const minSev = SEV_RANK[$('#ev-sev').value] || 0;
-  const shown = S.events.filter((e) => (!space || e.space_id === space) && (SEV_RANK[e.severity] || 0) >= minSev);
-  const ol = $('#events');
-  ol.replaceChildren(...shown.map((e) => {
-    const li = el('li', e.severity || 'info');
-    const t = el('time', null, clock(e.time));
-    if (e.time) t.dateTime = e.time;
-    const what = el('div');
-    append(what, el('span', 'what', EVENT_LABEL[e.type] || e.type), document.createTextNode(' · ' + spaceName(e.space_id)
-      + ' · ' + (e.severity || 'info') + (e.confidence != null ? ' · confidence ' + num(e.confidence, 2) : '')));
-    append(li, t, what, el('div', 'ev', e.evidence || ''));
-    return li;
-  }));
-  if (!shown.length) ol.append(el('li', 'info', 'No events yet.'));
-  $('#ev-count').textContent = shown.length + ' shown';
+  const q = $('#ev-q').value.trim().toLowerCase();
+  const win = Number($('#ev-since').value) || 0;
+  const cutoff = win ? Date.now() - win * 1000 : 0;
+  const shown = S.events.filter((e) =>
+    (!space || e.space_id === space)
+    && (SEV_RANK[e.severity] || 0) >= minSev
+    && (!cutoff || (e.unix_ms || 0) >= cutoff)
+    && (!q || ((EVENT_LABEL[e.type] || e.type || '') + ' ' + (e.evidence || '') + ' ' + spaceName(e.space_id))
+      .toLowerCase().includes(q)));
+  const ol = $('#ev-list');
+  ol.replaceChildren(...shown.map(eventItem));
+  if (!shown.length) {
+    ol.append(el('li', null, S.events.length ? 'No events match these filters.' : 'No events recorded yet.'));
+  }
+  $('#ev-count').textContent = shown.length + ' of ' + S.events.length + ' shown';
 }
+for (const id of ['#ev-space', '#ev-sev', '#ev-since']) $(id).addEventListener('change', renderEvents);
+$('#ev-q').addEventListener('input', renderEvents);
 
 // ---------------------------------------------------------------- system
-function tile(label, value, bad) {
-  const t = el('div', 'tile' + (bad ? ' bad' : ''));
-  append(t, el('b', null, String(value)), el('span', null, label));
-  return t;
+function linkTable(groups, caption) {
+  const wrap = el('div', { class: 'scroll' });
+  const table = el('table');
+  add(table, el('caption', null, caption));
+  const thead = el('thead'); const hr = el('tr');
+  for (const c of ['Space', 'Link', 'State', 'Silent', 'CSI rate', 'Loss', 'Calibrated', 'Best BNR', 'RSSI', 'Noise', 'Frames', 'Raw']) {
+    hr.append(el('th', { scope: 'col' }, c));
+  }
+  add(thead, hr); add(table, thead);
+  const tb = el('tbody');
+  let rows = 0;
+  for (const sp of groups || []) {
+    for (const r of sp.links || []) {
+      rows++;
+      const tr = el('tr');
+      const cells = [
+        [sp.name || sp.space_id], [linkName(r.link)], [r.up ? 'up' : 'down', r.up ? 'ok' : 'bad'],
+        [dur(r.silent_s)], [num(r.rate_hz) + ' Hz', r.rate_hz < 10 ? 'warn' : null],
+        [num(r.loss * 100, 0) + ' %', r.loss > 0.2 ? 'warn' : null],
+        [r.calib_age_h == null ? 'not yet' : num(r.calib_age_h) + ' h ago', r.calib_age_h == null ? 'warn' : null],
+        [num(r.best_bnr, 2)], [r.rssi_dbm + ' dBm'],
+        [r.noise_floor_dbm === -128 ? '—' : r.noise_floor_dbm + ' dBm'], [String(r.frames)],
+        [r.raw_mode ? 'ON' : 'off', r.raw_mode ? 'bad' : null],
+      ];
+      for (const [v, k] of cells) tr.append(el('td', { 'data-k': k }, v));
+      tb.append(tr);
+    }
+  }
+  if (!rows) {
+    const tr = el('tr'); const td = el('td', { colspan: '12' }, 'No links have reported yet.');
+    add(tr, td); tb.append(tr);
+  }
+  add(table, tb); add(wrap, table);
+  return wrap;
+}
+
+async function refreshSystem() {
+  if (!(S.me && S.me.can && S.me.can.system)) return;
+  try {
+    const [h, links] = await Promise.all([getJSON('/api/health'), getJSON('/api/links')]);
+    S.health = h; S.links = links;
+    if (S.tab === 'system') renderSystem(h, links);
+    if (S.tab === 'topology') renderTopology();
+  } catch (e) {
+    if (handleAuthLoss(e)) return;
+    if (S.tab === 'system') {
+      $('#sys-body').replaceChildren(el('p', { class: 'muted' }, 'System data is unavailable right now.'));
+    }
+  }
 }
 
 function renderSystem(h, links) {
+  const body = $('#sys-body');
+  body.replaceChildren();
   const ing = h.ingest || {};
-  $('#tiles').replaceChildren(
+  const tiles = el('div', { class: 'tiles' });
+  const blind = (h.spaces_blind || []).length;
+  add(tiles,
     tile('datagrams / s', num(h.datagrams_per_s)),
-    tile('links usable', (h.links_usable ?? 0) + ' / ' + (h.links_configured ?? 0), h.links_usable < h.links_configured),
-    tile('spaces blind', (h.spaces_blind || []).length, (h.spaces_blind || []).length > 0),
-    tile('decode errors', h.decode_errors_total ?? 0, h.decode_errors_total > 0),
-    tile('unassigned frames', ing.unassigned ?? 0, ing.unassigned > 0),
-    tile('raw CSI links', h.raw_mode_links_active ?? 0, h.raw_mode_links_active > 0),
-    tile('vitals withheld', ing.vitals_gated ?? 0, ing.vitals_gated > 0),
-    tile('events', h.events_emitted ?? 0),
+    tile('links usable', (h.links_usable ?? 0) + ' / ' + (h.links_configured ?? 0),
+      h.links_usable < h.links_configured ? 'warn' : 'ok'),
+    tile('spaces not visible', blind, blind ? 'warn' : 'none'),
+    tile('decode errors', h.decode_errors_total ?? 0, h.decode_errors_total > 0 ? 'bad' : 'none'),
+    tile('unassigned frames', ing.unassigned ?? 0, ing.unassigned > 0 ? 'warn' : 'none'),
+    tile('raw CSI links', h.raw_mode_links_active ?? 0, h.raw_mode_links_active > 0 ? 'bad' : 'none'),
+    tile('vitals withheld', ing.vitals_gated ?? 0, ing.vitals_gated > 0 ? 'warn' : 'none'),
+    tile('events emitted', h.events_emitted ?? 0),
     tile('dashboards open', h.ws_clients ?? 0),
   );
-  const warn = $('#sys-warn');
-  warn.replaceChildren();
+  add(body, el('h2', { class: 'sec' }, 'Gateway'), tiles);
+
+  // Every warning says what happened, what shows it, and what to do.
   const notes = [...(h.notes || [])];
-  for (const r of h.raw_mode_links || []) notes.push('Raw CSI debug mode is on for link ' + link(r) + ' in ' + spaceName(r.space_id) + ': raw channel data is leaving the sensor (ADR-001).');
-  for (const g of h.vitals_gated_links || []) notes.push('Link ' + link(g) + ' sends breathing data for ' + spaceName(g.space_id) + ', which has not opted in; it is discarded. Fix the node configuration.');
-  if (h.event_log && h.event_log.write_errors > 0) notes.push('Event log write errors: ' + h.event_log.write_errors + ' (' + (h.event_log.last_error || '') + ')');
-  if (h.history && h.history.errors > 0) notes.push('History save errors: ' + h.history.errors + ' (' + (h.history.last_error || '') + ')');
+  for (const r of h.raw_mode_links || []) {
+    notes.push('Raw CSI debug mode is on for link ' + linkName(r) + ' in ' + spaceName(r.space_id)
+      + ': raw channel data is leaving the sensor (ADR-001). Turn off CONFIG_SAANS_RAW_MODE on that node unless you are collecting data on purpose.');
+  }
+  for (const g of h.vitals_gated_links || []) {
+    notes.push('Link ' + linkName(g) + ' sends breathing data for ' + spaceName(g.space_id)
+      + ', which has not opted in. The gateway discards it, but the node should not be sending it: rebuild that node with vitals off.');
+  }
+  if (ing.unassigned > 0) {
+    notes.push(ing.unassigned + ' frames arrived from links no space lists. Check the "unknown links" table below and either add them to saans.toml or fix the node id.');
+  }
+  if (h.decode_errors_total > 0) {
+    const e = ing.errors || {};
+    notes.push('Decode errors: ' + Object.entries(e).filter(([, v]) => v > 0).map(([k, v]) => k + ' ' + v).join(', ')
+      + '. CRC errors usually mean a flaky network; version or size errors mean a node is running different firmware from this gateway.');
+  }
+  if (h.event_log && h.event_log.write_errors > 0) notes.push('Event log write errors: ' + h.event_log.write_errors + ' (' + (h.event_log.last_error || '') + '). Events are being lost from disk; check the data directory and its free space.');
+  if (h.history && h.history.errors > 0) notes.push('Daily-summary save errors: ' + h.history.errors + ' (' + (h.history.last_error || '') + ').');
+  if (h.audit && h.audit.write_errors > 0) notes.push('Audit log write errors: ' + h.audit.write_errors + ' (' + (h.audit.last_error || '') + '). Reads of health data are not being recorded.');
   if (notes.length) {
-    const box = el('div', 'alert advisory');
-    const ul = el('ul', 'notes');
+    const box = el('div', { class: 'alert', 'data-sev': 'advisory' });
+    const ul = el('ul', { class: 'notes' });
     for (const n of notes) ul.append(el('li', null, n));
-    append(box, el('strong', null, 'Attention'), ul);
-    warn.append(box);
+    add(box, el('strong', null, 'Needs attention'), ul);
+    add(body, box);
   }
 
-  const table = $('#links');
-  const head = el('tr');
-  for (const c of ['Space', 'Link', 'State', 'Silent', 'CSI rate', 'Loss', 'Calibrated', 'Best BNR', 'RSSI', 'Noise', 'Frames', 'Raw'])
-    head.append(el('th', null, c));
-  const rows = [head];
-  for (const sp of links || []) {
-    for (const r of sp.links || []) {
-      const tr = el('tr');
-      const cells = [
-        [sp.name || sp.space_id], [link(r.link)], [r.up ? 'up' : 'down', r.up ? 'up' : 'down'],
-        [dur(r.silent_s)], [num(r.rate_hz) + ' Hz'], [num(r.loss * 100, 0) + ' %'],
-        [r.calib_age_h == null ? 'not yet' : num(r.calib_age_h) + ' h ago'], [num(r.best_bnr, 2)],
-        [r.rssi_dbm + ' dBm'], [r.noise_floor_dbm === -128 ? '—' : r.noise_floor_dbm + ' dBm'], [String(r.frames)],
-        [r.raw_mode ? 'ON' : 'off', r.raw_mode ? 'down' : null],
-      ];
-      for (const [v, cls] of cells) tr.append(el('td', cls || null, v));
-      rows.push(tr);
-    }
-  }
-  table.replaceChildren(...rows);
+  add(body, el('h2', { class: 'sec' }, 'Links'));
+  add(body, linkTable(links, 'One row per configured link. "Calibrated: not yet" means the node has never completed an empty-room calibration.'));
 
-  const unk = $('#unknown');
   const u = h.unknown_links || [];
-  if (!u.length) { unk.className = 'muted'; unk.textContent = 'none'; }
-  else {
-    unk.className = '';
-    const ul = el('ul', 'notes');
-    for (const x of u) ul.append(el('li', null, 'link ' + x.rx + '←' + x.tx + ' (' + x.kind + '): ' + x.frames
-      + ' frames, last from ' + (x.last_src || '?') + '. No space lists it; add it to saans.toml or fix the node id.'));
-    unk.replaceChildren(ul);
+  add(body, el('h2', { class: 'sec' }, 'Unknown links'));
+  if (!u.length) {
+    add(body, el('p', { class: 'muted' }, 'None — every frame received belongs to a configured space.'));
+  } else {
+    const ul = el('ul', { class: 'notes' });
+    for (const x of u) {
+      ul.append(el('li', null, 'link ' + x.rx + '←' + x.tx + ' (' + x.kind + '): ' + x.frames
+        + ' frames, last from ' + (x.last_src || '?') + '. No space lists it; add it to saans.toml or fix the node id.'));
+    }
+    add(body, ul);
   }
 
-  const dl = $('#gateway');
-  dl.replaceChildren();
-  const row = (k, v) => append(dl, el('dt', null, k), el('dd', null, v));
+  add(body, el('h2', { class: 'sec' }, 'Details'));
+  const dl = el('dl');
+  const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
   row('Mode', h.mode || '');
   row('Gateway time', clock(h.time));
   row('Uptime', dur(h.uptime_s));
   row('Datagrams', String(h.datagrams_total ?? 0));
-  if (h.event_log) {
-    row('Event log', h.event_log.dir + ' (' + h.event_log.written + ' written, kept ' + h.event_log.retention_days + ' days)');
+  if (h.auth) {
+    row('Authentication', h.auth.required
+      ? 'required · ' + h.auth.users + ' user(s), ' + h.auth.tokens + ' token(s), ' + h.auth.sessions_open + ' session(s) open'
+      : 'not required — the API listens on a loopback address only');
   }
-  S.version = h.version || S.version;
-  $('#version').textContent = S.version ? 'v' + S.version : '';
+  if (h.audit) row('Audit log', h.audit.enabled ? h.audit.written + ' entries written' : 'disabled (no data directory)');
+  if (h.series) {
+    row('History held', 'last ' + dur(h.series.window_s) + ' at one point per ' + h.series.cadence_s
+      + ' s · ' + h.series.points + ' points in memory, never written to disk');
+  }
+  if (h.event_log) {
+    row('Event log', h.event_log.dir + ' · ' + h.event_log.written + ' written, kept ' + h.event_log.retention_days + ' days');
+  }
+  add(body, dl);
 }
 
-// ---------------------------------------------------------------- transport
-async function getJSON(path) {
-  const r = await fetch(path, { cache: 'no-store' });
-  if (!r.ok) throw new Error(path + ': ' + r.status);
-  return r.json();
-}
+// ------------------------------------------------------------- live feed
+let ws = null, retry = 1000, pollTimer = null, tickTimer = null;
 
-function setConn(s) {
-  const c = $('#conn');
-  c.dataset.s = s;
-  $('#conn-text').textContent = s === 'live' ? 'live' : s === 'polling' ? 'polling' : s;
-}
+function setConn(s) { if (S.conn !== s) { S.conn = s; renderShell(); } }
 
 function onState(spaces, t_s) {
   S.spaces = Array.isArray(spaces) ? spaces : [];
   S.t_s = t_s;
   S.lastState = Date.now();
-  if (ws && ws.readyState === WebSocket.OPEN && $('#conn').dataset.s !== 'live') setConn('live');
-  if (S.tab === 'spaces') renderSpaces();
+  syncSpaceSelectors();
+  if (S.tab === 'overview') renderOverview();
+  renderShell();
 }
 
 function handle(m) {
-  if (m.type === 'hello') { S.mode = m.mode; S.version = m.version; $('#sub').textContent = m.mode === 'replay' ? 'replaying a recording' : 'live'; }
-  else if (m.type === 'state') onState(m.spaces, m.t_s);
+  if (m.type === 'hello') {
+    S.me = Object.assign({}, S.me, { version: m.version, mode: m.mode, name: m.name, role: m.role, can: m.can || {} });
+    renderShell();
+  } else if (m.type === 'state') onState(m.spaces, m.t_s);
   else if (m.type === 'event' && m.event) mergeEvents([m.event]);
 }
 
-let ws = null, retry = 1000, pollTimer = null;
 function startPolling() {
   if (pollTimer) return;
   const poll = async () => {
     try {
       const sp = await getJSON('/api/spaces');
       onState(sp, sp.length ? sp[0].t_s : S.t_s);
-      mergeEvents(await getJSON('/api/events?limit=100'));
+      mergeEvents(await getJSON('/api/events?limit=200'));
       if (!ws || ws.readyState !== WebSocket.OPEN) setConn('polling');
-    } catch (e) { setConn('offline'); }
+    } catch (e) {
+      if (!handleAuthLoss(e)) setConn('offline');
+    }
   };
   poll();
   pollTimer = setInterval(poll, 2000);
@@ -407,47 +1273,71 @@ function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = 
 function connect() {
   setConn('connecting');
   try {
-    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/live');
-  } catch (e) { startPolling(); setTimeout(connect, retry); retry = Math.min(retry * 2, 30000); return; }
+    ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/api/live');
+  } catch (e) { startPolling(); scheduleReconnect(); return; }
   ws.onopen = () => { retry = 1000; setConn('live'); stopPolling(); };
   ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } handle(m); };
   ws.onclose = () => {
-    // The gateway restarted or the network dropped: poll meanwhile.
+    // The gateway restarted, the session expired, or the network dropped.
+    // Poll meanwhile: polling also tells us which of those it was.
+    ws = null;
     startPolling();
-    setTimeout(connect, retry);
-    retry = Math.min(retry * 2, 30000);
+    scheduleReconnect();
   };
 }
+function scheduleReconnect() {
+  setTimeout(() => { if (S.me && !(S.me.auth_required && !S.me.authenticated)) connect(); }, retry);
+  retry = Math.min(retry * 2, 30000);
+}
 
-async function refreshSystem() {
+function stopLive() {
+  if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already gone */ } ws = null; }
+  stopPolling();
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+}
+
+// ------------------------------------------------------------------ boot
+async function start() {
+  let me;
   try {
-    const [h, links] = await Promise.all([getJSON('/api/health'), getJSON('/api/links')]);
-    renderSystem(h, links);
-  } catch (e) { /* shown by the connection state */ }
+    me = await getJSON('/api/me');
+  } catch (e) {
+    S.conn = 'offline';
+    renderShell();
+    $('#ov-grid').replaceChildren(el('p', { class: 'muted' }, 'Cannot reach the gateway.'));
+    return;
+  }
+  S.me = me;
+  $('#foot').textContent = 'Saans gateway' + (me.version ? ' v' + me.version : '')
+    + '. No identities, ever: everything here is per space, never per person.';
+  renderShell();
+  if (me.auth_required && !me.authenticated) { stopLive(); S.conn = 'signed out'; renderShell(); showLogin(); return; }
+  hideLogin();
+
+  const wanted = location.hash.slice(1);
+  showTab(visibleTabs().some((t) => t.id === wanted) ? wanted : 'overview');
+
+  getJSON('/api/events?limit=500').then(mergeEvents).catch((e) => handleAuthLoss(e));
+  refreshSystem();
+  connect();
+
+  if (!tickTimer) {
+    tickTimer = setInterval(() => {
+      // A socket that stopped delivering state is not "live", whatever
+      // its readyState says.
+      renderShell();
+      if (S.tab === 'system' || S.tab === 'topology') refreshSystem();
+    }, 2000);
+  }
 }
 
-function showTab(name) {
-  S.tab = name;
-  for (const b of document.querySelectorAll('nav button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
-  for (const t of ['spaces', 'events', 'system']) $('#tab-' + t).hidden = t !== name;
-  if (name === 'spaces') renderSpaces();
-  if (name === 'events') renderEvents();
-  if (name === 'system') refreshSystem();
-  try { history.replaceState(null, '', '#' + name); } catch (e) { /* file: or sandboxed */ }
-}
-
-for (const b of document.querySelectorAll('nav button')) b.addEventListener('click', () => showTab(b.dataset.tab));
-$('#ev-space').addEventListener('change', renderEvents);
-$('#ev-sev').addEventListener('change', renderEvents);
-setInterval(() => { if (S.tab === 'system') refreshSystem(); }, 5000);
-setInterval(() => {
-  // A live feed that stopped delivering state is not "live".
-  if ($('#conn').dataset.s === 'live' && Date.now() - S.lastState > 5000) setConn(S.mode === 'replay' ? 'replay finished' : 'stale');
-}, 1000);
-
-getJSON('/api/events?limit=200').then(mergeEvents).catch(() => {});
-showTab(['spaces', 'events', 'system'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'spaces');
-connect();
+// Back and forward should move between views, not out of the dashboard.
+window.addEventListener('hashchange', () => {
+  const want = location.hash.slice(1);
+  if (want && want !== S.tab && visibleTabs().some((t) => t.id === want) && !isLoginShown()) showTab(want);
+});
+window.addEventListener('beforeunload', stopLive);
+start();
 </script>
 </body>
 </html>

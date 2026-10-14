@@ -33,6 +33,9 @@ pub struct GatewayConfig {
     /// boundary of the event logs and the offset printed in timestamps.
     pub utc_offset_minutes: i32,
     pub raw: RawConfig,
+    /// Bounded in-memory time series behind `/api/history`. Never
+    /// persisted: the window is the retention policy.
+    pub history: crate::history::HistoryConfig,
     #[serde(rename = "space")]
     pub spaces: Vec<SpaceConfig>,
     // ---- output interfaces (SAANS_PLAN.md §10) ----
@@ -204,6 +207,7 @@ impl Default for GatewayConfig {
             raw: RawConfig::default(),
             spaces: Vec::new(),
             auth: AuthConfig::default(),
+            history: crate::history::HistoryConfig::default(),
             users: Vec::new(),
             tokens: Vec::new(),
             mqtt: None,
@@ -348,10 +352,18 @@ impl GatewayConfig {
             }
             check_spaces(&format!("token {:?}", t.name), &t.spaces)?;
         }
-        if let Some(m) = &self.mqtt {
-            if m.host.is_empty() || m.base_topic.is_empty() || m.base_topic.contains(['#', '+']) {
-                return err("mqtt: host and base_topic are required; base_topic may not contain wildcards");
-            }
+        if self.mqtt.is_some() {
+            // `mqtt::spawn` is still a stub. Accepting the section would
+            // mean --check passes and the process then panics on startup,
+            // which is worse than refusing it here.
+            return err("[mqtt] is configured but the MQTT publisher is not implemented yet; remove the section");
+        }
+        let h = &self.history;
+        if !(h.window_s > 0.0 && h.window_s <= crate::history::MAX_WINDOW_S) {
+            return err(format!("history.window_s must be in (0, {}]", crate::history::MAX_WINDOW_S));
+        }
+        if !(h.cadence_s >= crate::history::MIN_CADENCE_S && h.cadence_s <= h.window_s) {
+            return err(format!("history.cadence_s must be in [{}, history.window_s]", crate::history::MIN_CADENCE_S));
         }
         for (name, t) in &self.telegram {
             if t.bot_token_env.is_empty() {
@@ -388,6 +400,12 @@ impl GatewayConfig {
             if r.ack_timeout_min > 0.0 && r.escalate_to.is_empty() {
                 return err(format!("alert_route {:?}: ack_timeout_min set but escalate_to is empty", r.name));
             }
+        }
+        if !self.alert_routes.is_empty() {
+            // Checked last, so a route that is also *wrong* still gets
+            // its specific error first. `AlertService::new` is a stub:
+            // without this, --check passes and `Gateway::start` panics.
+            return err("[[alert_route]] is configured but the alert router is not implemented yet; remove the routes");
         }
         Ok(())
     }

@@ -146,6 +146,75 @@ Lost packets are interpolated across by sequence number (up to
 `--max-gap-s`, default 1 s). Without that, 15% loss compresses the time
 axis and a 15 BPM breather reads 17.8 BPM at confidence 0.98.
 
+### The gateway and its dashboard
+
+The gateway ingests FeatureFrames (or raw CSI in debug mode), fuses the
+links of each space, runs the health detectors and serves the dashboard.
+
+```bash
+cd rust
+cargo build --release -p saans-gateway -p saans-cli
+cp crates/saans-gateway/saans.example.toml saans.toml   # then edit it
+./target/release/saans-gateway --config saans.toml --check
+./target/release/saans-gateway --config saans.toml
+```
+
+The dashboard is at the `http_addr` in the config, `http://127.0.0.1:8080/`
+by default. It is one self-contained file served from the binary: no
+CDN, no fonts, no build step, nothing fetched from the internet.
+
+**See it work without hardware.** Export a simulated night and replay
+it; every view is labelled REPLAY throughout, and the recording is the
+same wire format a real node sends:
+
+```bash
+./target/release/saans export night --out night.pcap --layout 2
+./target/release/saans-gateway --config saans.toml --replay night.pcap --speed 25 --serve
+```
+
+The export writes links `1<-0` and `1<-2`, so the space in `saans.toml`
+has to list those; `/api/health` lists anything that arrived from a link
+no space claims, which is the quickest way to find a mismatch.
+
+| View | Shows |
+|---|---|
+| Overview | Per-space state, motion, breathing where consented, usable links, open alerts |
+| Signals | Real trends from `/api/history`: occupancy band, motion, breathing and its confidence, and per-link CSI rate, loss, BNR and RSSI |
+| Topology | Which nodes are linked to which, and the quality of each link. Not a floor plan — the configuration has no room coordinates, so node positions are arbitrary and labelled as such |
+| Events | Searchable and filterable event log with the evidence for each |
+| System | Gateway health, per-link diagnostics, unknown links, auth and audit status (admin or ops only) |
+
+**Data-source modes are never mixed.** `LIVE` and `REPLAY` are shown as
+their own indicator, separate from the connection state, because a
+connected WebSocket does not mean sensors are reporting. A feed that
+stops delivering shows as stale rather than live.
+
+### Who may see what
+
+Authentication is **required automatically whenever `http_addr` is not a
+loopback address**, and the config refuses to start otherwise. On
+loopback it is off and every request is a local admin.
+
+```bash
+saans-gateway --hash-password          # reads the password from stdin
+```
+
+Put the printed Argon2id string in a `[[user]]`. Machines use
+`Authorization: Bearer <token>`, with only the token's SHA-256 in the
+config.
+
+| Role | Sees |
+|---|---|
+| `admin` | Everything, including the audit log |
+| `ops` | Gateway and sensor health, occupancy. **Never** vital signs or health alerts |
+| `safety` | Full state and alerts for their spaces; vital signs only where the space has consented |
+| `occupancy` | Occupied / empty / unknown per space. No vital signs, no health alerts |
+
+Either role can be limited to named spaces. A space outside a
+principal's scope answers 404, not 403 — the scope list is not a
+directory of the building. Reads of consented vital signs are recorded
+in `audit-YYYY-MM-DD.jsonl` alongside logins and denials.
+
 ### Recording and replay
 
     python3 -m wifisense record --port 5566 --out run.pcap [--duration-s 600]
@@ -213,6 +282,9 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/sources/recorder.py` | Raw-datagram pcap recorder, replayer, per-node link stats |
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
 | `tests/` | 141 core tests (`test_localize_*` belong to the P0b localization work) |
+| `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |
+| `docs/UI_GAP_ANALYSIS.md` | What the interface can show, what the gateway publishes, and where they disagree |
+| `docs/UI_IMPLEMENTATION_PLAN.md` | The design the dashboard was built to, and the rules it keeps |
 
 ## Licence
 

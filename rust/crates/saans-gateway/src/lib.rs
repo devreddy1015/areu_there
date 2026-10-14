@@ -11,6 +11,7 @@
 //! - [`hub`]: side effects (logs, history, retention, publishing).
 //! - [`live`]: sockets, the 0.5 s tick, shutdown; [`replay`]: pcap input.
 //! - [`privacy`]: the consent gate every outbound value passes through.
+//! - [`history`]: a bounded in-memory time series for the trend charts.
 //! - [`roles`], [`auth`], [`audit`]: who may see what, and the record of it.
 //! - [`outputs`]: the fan-out MQTT ([`mqtt`]) and alerting ([`alerts`]) consume.
 
@@ -19,6 +20,7 @@ pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod engine;
+pub mod history;
 pub mod http;
 pub mod hub;
 pub mod live;

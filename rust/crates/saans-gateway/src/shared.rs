@@ -8,6 +8,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
+use crate::history::{History, HistoryConfig};
 use crate::outputs::{OutputMsg, OUTPUT_CAPACITY};
 use tokio::sync::broadcast;
 
@@ -40,12 +41,19 @@ pub struct Shared {
     events: Mutex<VecDeque<EventEntry>>,
     pub live_tx: broadcast::Sender<Arc<str>>,
     pub ws_clients: AtomicUsize,
+    /// Bounded time series for `/api/history`, appended by the hub on
+    /// publish and read by the HTTP side. In memory only.
+    pub history: Mutex<History>,
     /// Fan-out to MQTT and alert routing (crate::outputs).
     pub outputs: broadcast::Sender<OutputMsg>,
 }
 
 impl Shared {
     pub fn new(mode: &'static str) -> Arc<Self> {
+        Self::with_history(mode, HistoryConfig::default())
+    }
+
+    pub fn with_history(mode: &'static str, history: HistoryConfig) -> Arc<Self> {
         let (live_tx, _) = broadcast::channel(512);
         let (outputs, _) = broadcast::channel(OUTPUT_CAPACITY);
         Arc::new(Self {
@@ -55,6 +63,7 @@ impl Shared {
             events: Mutex::new(VecDeque::new()),
             live_tx,
             ws_clients: AtomicUsize::new(0),
+            history: Mutex::new(History::new(history)),
             outputs,
         })
     }
@@ -65,6 +74,10 @@ impl Shared {
 
     pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, Published> {
         self.published.write().unwrap_or_else(|p| p.into_inner())
+    }
+
+    pub fn history(&self) -> std::sync::MutexGuard<'_, History> {
+        self.history.lock().unwrap_or_else(|p| p.into_inner())
     }
 
     pub fn ws_clients(&self) -> usize {

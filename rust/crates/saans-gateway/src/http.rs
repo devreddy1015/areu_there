@@ -1,26 +1,41 @@
 //! HTTP API, WebSocket and the embedded dashboard.
 //!
-//! | Route | Returns |
-//! |---|---|
-//! | `GET /` | the dashboard (one self-contained HTML file, no external URLs) |
-//! | `GET /api/spaces` | `[SpaceState]` (+ name, privacy badges, alerts) |
-//! | `GET /api/spaces/{id}` | `{"state": SpaceState, "events": [last 50]}` |
-//! | `GET /api/events?space=&since=&limit=` | events, oldest first |
-//! | `GET /api/links` | `[{"space_id", "name", "links": [LinkReport]}]` |
-//! | `GET /api/health` | gateway self-health |
-//! | `GET /metrics` | Prometheus text format |
-//! | `GET /api/live` | WebSocket: `{"type":"state"}` every 0.5 s, `{"type":"event"}` as they happen |
+//! | Route | Returns | Who |
+//! |---|---|---|
+//! | `GET /` | the dashboard (one self-contained HTML file, no external URLs) | anyone |
+//! | `GET /api/me` | who you are, the mode, the version, what you may see | anyone |
+//! | `POST /api/login` | `{user, password}` → session cookie | anyone |
+//! | `POST /api/logout` | ends the session | anyone |
+//! | `GET /api/spaces` | `[SpaceState]` (+ name, privacy badges, alerts) | in scope |
+//! | `GET /api/spaces/{id}` | `{"state": SpaceState, "events": [last 50]}` | in scope |
+//! | `GET /api/events?space=&since=&limit=` | events, oldest first | in scope |
+//! | `GET /api/history?space=&since=&max_points=` | bounded time series | in scope |
+//! | `GET /api/links` | `[{"space_id", "name", "links": [LinkReport]}]` | ops |
+//! | `GET /api/health` | gateway self-health | ops |
+//! | `GET /metrics` | Prometheus text format | ops |
+//! | `GET /api/live` | WebSocket: `{"type":"state"}` every 0.5 s, `{"type":"event"}` as they happen | in scope |
 //!
-//! Everything served here was redacted by the hub (`privacy`) before it
-//! was published; handlers only copy published snapshots.
+//! **Two locks on every byte of data.** The hub redacts by *consent*
+//! before publishing, so a space with `vitals = false` has no breathing
+//! data in the snapshot at all ([`crate::privacy`]). Handlers here apply
+//! the second lock, by *role and scope* ([`crate::roles`]), to whatever
+//! consent allowed. Neither substitutes for the other: consent decides
+//! what may exist, the principal decides who may see it.
+//!
+//! `/` is deliberately public. It is a static file with no data in it,
+//! and it has to load before anyone can log in.
 
+use crate::audit::{Action, AuditLog};
+use crate::auth::{self, Auth, Denied};
+use crate::privacy;
+use crate::roles::Principal;
 use crate::shared::Shared;
-use crate::timefmt::parse_iso8601;
+use crate::timefmt::{now_unix_ms, parse_iso8601};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -33,7 +48,7 @@ const CSP: &str = "default-src 'none'; script-src 'unsafe-inline'; style-src 'un
                    connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 /// Everything the HTTP side needs. Built by `live.rs` / `main.rs` via
-/// [`HttpDeps::new`]; the auth layer may add private fields here.
+/// [`HttpDeps::new`].
 #[derive(Clone)]
 pub struct HttpDeps {
     pub shared: Arc<Shared>,
@@ -41,6 +56,8 @@ pub struct HttpDeps {
     pub cfg: Arc<crate::config::GatewayConfig>,
     /// `None` when no `[[alert_route]]` is configured.
     pub alerts: Option<Arc<crate::alerts::AlertService>>,
+    pub auth: Arc<Auth>,
+    pub audit: Arc<AuditLog>,
 }
 
 impl HttpDeps {
@@ -50,7 +67,16 @@ impl HttpDeps {
         cfg: Arc<crate::config::GatewayConfig>,
         alerts: Option<Arc<crate::alerts::AlertService>>,
     ) -> Self {
-        Self { shared, stop, cfg, alerts }
+        let auth = Arc::new(Auth::new(&cfg));
+        let dir = (!cfg.data_dir.as_os_str().is_empty()).then(|| cfg.data_dir.clone());
+        let audit = Arc::new(AuditLog::new(dir.as_deref(), cfg.utc_offset_minutes));
+        Self { shared, stop, cfg, alerts, auth, audit }
+    }
+
+    /// For tests and the replay server, which want no audit file.
+    pub fn without_audit(mut self) -> Self {
+        self.audit = Arc::new(AuditLog::new(None, self.cfg.utc_offset_minutes));
+        self
     }
 }
 
@@ -60,21 +86,27 @@ pub struct AppState {
     pub stop: watch::Receiver<bool>,
     pub cfg: Arc<crate::config::GatewayConfig>,
     pub alerts: Option<Arc<crate::alerts::AlertService>>,
+    pub auth: Arc<Auth>,
+    pub audit: Arc<AuditLog>,
 }
 
 pub fn router(deps: HttpDeps) -> Router {
-    let HttpDeps { shared, stop, cfg, alerts } = deps;
+    let HttpDeps { shared, stop, cfg, alerts, auth, audit } = deps;
     Router::new()
         .route("/", get(dashboard))
+        .route("/api/me", get(me))
+        .route("/api/login", post(login))
+        .route("/api/logout", post(logout))
         .route("/api/spaces", get(spaces))
         .route("/api/spaces/{id}", get(space))
         .route("/api/events", get(events))
+        .route("/api/history", get(history))
         .route("/api/links", get(links))
         .route("/api/health", get(health))
         .route("/metrics", get(metrics))
         .route("/api/live", get(live))
         .fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
-        .with_state(AppState { shared, stop, cfg, alerts })
+        .with_state(AppState { shared, stop, cfg, alerts, auth, audit })
 }
 
 fn error(status: StatusCode, msg: &str) -> Response {
@@ -84,6 +116,49 @@ fn error(status: StatusCode, msg: &str) -> Response {
 fn no_store(mut r: Response) -> Response {
     r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
+}
+
+/// 401 with the challenge, so a machine client knows what to present.
+fn unauthorized() -> Response {
+    let mut r = error(StatusCode::UNAUTHORIZED, "authentication required");
+    r.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer realm=\"saans\""));
+    r
+}
+
+fn header_str<'a>(h: &'a HeaderMap, name: header::HeaderName) -> Option<&'a str> {
+    h.get(name).and_then(|v| v.to_str().ok())
+}
+
+/// Set `Secure` on the session cookie only when the request actually
+/// arrived over TLS. The gateway speaks plain HTTP itself, so this is
+/// the reverse proxy's word for it; without the header the cookie would
+/// be dropped by the browser on a plain-HTTP LAN deployment.
+fn is_https(h: &HeaderMap) -> bool {
+    header_str(h, header::HeaderName::from_static("x-forwarded-proto")).is_some_and(|v| v.eq_ignore_ascii_case("https"))
+}
+
+/// The principal for a request, or a 401. Denials are audited: a stream
+/// of them is how you notice someone probing the port.
+fn principal(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Response> {
+    let authz = header_str(h, header::AUTHORIZATION);
+    let cookie = header_str(h, header::COOKIE);
+    app.auth.principal(authz, cookie).map_err(|d| {
+        let why = match d {
+            Denied::Missing => "no credential",
+            Denied::Invalid => "credential rejected",
+        };
+        app.audit.record(now_unix_ms(), Action::Denied, "-", None, json!({ "path": path, "why": why }));
+        unauthorized()
+    })
+}
+
+/// Routes that exist to run the building, not to watch the people in it.
+fn system_only(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Response> {
+    let p = principal(app, h, path)?;
+    if !p.can_see_system() {
+        return Err(error(StatusCode::FORBIDDEN, "this endpoint needs the admin or ops role"));
+    }
+    Ok(p)
 }
 
 async fn dashboard() -> Response {
@@ -96,25 +171,168 @@ async fn dashboard() -> Response {
     no_store(r)
 }
 
-async fn spaces(State(app): State<AppState>) -> Response {
-    let p = app.shared.read();
-    let list: Vec<&Value> = p.spaces.iter().map(|(_, v)| v).collect();
+/// What the shell needs before it can render anything: is a login
+/// required, am I logged in, what may I see, and what is this gateway.
+/// Answers for anonymous callers too — otherwise the login form could
+/// never find out that it is needed.
+async fn me(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let who = app.auth.principal(header_str(&h, header::AUTHORIZATION), header_str(&h, header::COOKIE));
+    let base = json!({
+        "auth_required": app.auth.required(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "mode": app.shared.mode,
+    });
+    let mut v = base;
+    match who {
+        Ok(p) => {
+            v["authenticated"] = true.into();
+            v["name"] = p.name.as_str().into();
+            v["role"] = p.role.as_str().into();
+            v["spaces"] = match &p.spaces {
+                Some(s) => s.iter().cloned().collect::<Vec<_>>().into(),
+                None => Value::Null,
+            };
+            v["can"] = json!({ "system": p.can_see_system(), "audit": p.can_see_audit() });
+        }
+        Err(_) => {
+            v["authenticated"] = false.into();
+            v["can"] = json!({ "system": false, "audit": false });
+        }
+    }
+    no_store(Json(v).into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LoginBody {
+    pub user: String,
+    pub password: String,
+}
+
+/// Logins in flight. Argon2 is deliberately expensive and the failure
+/// path deliberately sleeps, so an unauthenticated flood of them is a
+/// denial-of-service vector against a safety system. Four at a time is
+/// more than any real operator needs and bounds the blocking pool.
+const MAX_LOGINS_IN_FLIGHT: usize = 4;
+static LOGINS_IN_FLIGHT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Decrements on drop, so an early return or a panic cannot leak a slot.
+struct LoginSlot;
+
+impl LoginSlot {
+    fn take() -> Option<Self> {
+        let prev = LOGINS_IN_FLIGHT.fetch_add(1, Ordering::AcqRel);
+        if prev >= MAX_LOGINS_IN_FLIGHT {
+            LOGINS_IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+            return None;
+        }
+        Some(Self)
+    }
+}
+
+impl Drop for LoginSlot {
+    fn drop(&mut self) {
+        LOGINS_IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+async fn login(State(app): State<AppState>, h: HeaderMap, Json(body): Json<LoginBody>) -> Response {
+    if !app.auth.required() {
+        return error(StatusCode::BAD_REQUEST, "this gateway does not use authentication (loopback http_addr)");
+    }
+    let Some(slot) = LoginSlot::take() else {
+        return error(StatusCode::TOO_MANY_REQUESTS, "too many sign-ins at once; try again in a moment");
+    };
+    // Argon2 verification and the fixed failure delay are both blocking,
+    // and this runtime has two worker threads. Running them inline would
+    // let a handful of sign-in attempts stall ingest.
+    let auth = app.auth.clone();
+    let user = body.user.clone();
+    let password = body.password;
+    let attempt = tokio::task::spawn_blocking(move || {
+        let r = auth.login(&user, &password);
+        drop(slot);
+        r
+    })
+    .await;
+    let attempt = match attempt {
+        Ok(r) => r,
+        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "sign-in could not be completed"),
+    };
+    let Some((id, p)) = attempt else {
+        app.audit.record(now_unix_ms(), Action::LoginFailed, &body.user, None, json!({}));
+        // Deliberately the same answer for a wrong password and an
+        // unknown user.
+        return error(StatusCode::UNAUTHORIZED, "wrong user or password");
+    };
+    app.audit.record(now_unix_ms(), Action::Login, &p.name, Some(p.role.as_str()), json!({}));
+    let max_age = (app.cfg.auth.session_hours * 3600.0) as u64;
+    let cookie = auth::session_cookie(&id, max_age, is_https(&h));
+    let mut r = Json(json!({ "name": p.name, "role": p.role.as_str(), "can": { "system": p.can_see_system() } })).into_response();
+    if let Ok(v) = HeaderValue::from_str(&cookie) {
+        r.headers_mut().insert(header::SET_COOKIE, v);
+    }
+    no_store(r)
+}
+
+async fn logout(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let who = app.auth.principal(header_str(&h, header::AUTHORIZATION), header_str(&h, header::COOKIE));
+    app.auth.logout(header_str(&h, header::COOKIE));
+    if let Ok(p) = who {
+        app.audit.record(now_unix_ms(), Action::Logout, &p.name, Some(p.role.as_str()), json!({}));
+    }
+    let mut r = Json(json!({ "ok": true })).into_response();
+    if let Ok(v) = HeaderValue::from_str(&auth::clear_cookie(is_https(&h))) {
+        r.headers_mut().insert(header::SET_COOKIE, v);
+    }
+    no_store(r)
+}
+
+/// Record that this principal was shown a space's consented vitals.
+/// Throttled to once an hour per (principal, space) inside the log.
+fn note_vitals(app: &AppState, p: &Principal, v: &Value) {
+    if !app.audit.enabled() {
+        return;
+    }
+    let id = v.get("space_id").and_then(Value::as_str).unwrap_or("");
+    let consented = v.get("vitals").and_then(Value::as_bool).unwrap_or(false);
+    if p.can_see_vitals(id, consented) {
+        app.audit.vitals_read(now_unix_ms(), p, id);
+    }
+}
+
+async fn spaces(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let p = match principal(&app, &h, "/api/spaces") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let list: Vec<Value> = {
+        let pub_ = app.shared.read();
+        pub_.spaces.iter().filter_map(|(_, v)| privacy::space_for(v, &p)).collect()
+    };
+    for v in &list {
+        note_vitals(&app, &p, v);
+    }
     no_store(Json(list).into_response())
 }
 
-async fn space(State(app): State<AppState>, Path(id): Path<String>) -> Response {
-    let state = {
-        let p = app.shared.read();
-        p.spaces.iter().find(|(sid, _)| *sid == id).map(|(_, v)| v.clone())
+async fn space(State(app): State<AppState>, h: HeaderMap, Path(id): Path<String>) -> Response {
+    let p = match principal(&app, &h, "/api/spaces/{id}") {
+        Ok(p) => p,
+        Err(r) => return r,
     };
-    match state {
-        Some(state) => {
-            let events = app.shared.query_events(Some(&id), None, 50);
-            let events: Vec<&Value> = events.iter().map(|e| e.as_ref()).collect();
-            no_store(Json(json!({ "state": state, "events": events })).into_response())
-        }
-        None => error(StatusCode::NOT_FOUND, "no such space"),
-    }
+    let state = {
+        let pub_ = app.shared.read();
+        pub_.spaces.iter().find(|(sid, _)| *sid == id).and_then(|(_, v)| privacy::space_for(v, &p))
+    };
+    // A space out of scope is indistinguishable from one that does not
+    // exist: the scope list is not a directory of the building.
+    let Some(state) = state else {
+        return error(StatusCode::NOT_FOUND, "no such space");
+    };
+    note_vitals(&app, &p, &state);
+    let events: Vec<Value> =
+        app.shared.query_events(Some(&id), None, 50).iter().filter_map(|e| privacy::event_for(e, &p)).collect();
+    no_store(Json(json!({ "state": state, "events": events })).into_response())
 }
 
 #[derive(Debug, Deserialize)]
@@ -134,7 +352,11 @@ pub fn parse_since(s: &str) -> Option<i64> {
     parse_iso8601(s)
 }
 
-async fn events(State(app): State<AppState>, Query(q): Query<EventsQuery>) -> Response {
+async fn events(State(app): State<AppState>, h: HeaderMap, Query(q): Query<EventsQuery>) -> Response {
+    let p = match principal(&app, &h, "/api/events") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
     let since = match q.since.as_deref().filter(|s| !s.is_empty()) {
         None => None,
         Some(s) => match parse_since(s) {
@@ -144,51 +366,166 @@ async fn events(State(app): State<AppState>, Query(q): Query<EventsQuery>) -> Re
     };
     let limit = q.limit.unwrap_or(100).clamp(1, 1000);
     let space = q.space.as_deref().filter(|s| !s.is_empty());
-    let found = app.shared.query_events(space, since, limit);
-    let found: Vec<&Value> = found.iter().map(|e| e.as_ref()).collect();
+    // Filter after the ring query, so `limit` is a limit on what the
+    // caller receives rather than on what they were eligible for.
+    let found: Vec<Value> =
+        app.shared.query_events(space, since, limit).iter().filter_map(|e| privacy::event_for(e, &p)).collect();
     no_store(Json(found).into_response())
 }
 
-async fn links(State(app): State<AppState>) -> Response {
-    no_store(Json(app.shared.read().links.clone()).into_response())
+#[derive(Debug, Deserialize)]
+pub struct HistoryQuery {
+    pub space: Option<String>,
+    /// Gateway seconds (`t_s`), not wall clock: points strictly after.
+    pub since: Option<f64>,
+    /// Stride the series down to at most this many points. 0 = no limit.
+    pub max_points: Option<usize>,
 }
 
-async fn health(State(app): State<AppState>) -> Response {
-    let mut h = app.shared.read().health.clone();
-    if let Value::Object(m) = &mut h {
+async fn history(State(app): State<AppState>, h: HeaderMap, Query(q): Query<HistoryQuery>) -> Response {
+    let p = match principal(&app, &h, "/api/history") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let space = q.space.as_deref().filter(|s| !s.is_empty());
+    // Capped: a client cannot ask for more points than the ring holds,
+    // and cannot ask for an unbounded response by omitting the limit.
+    let cap = app.cfg.history.capacity();
+    let max_points = q.max_points.map_or(cap, |n| if n == 0 { cap } else { n.min(cap) });
+    let consented = |id: &str| app.cfg.spaces.iter().any(|s| s.id == id && s.vitals);
+    let named = |id: &str| {
+        app.cfg
+            .spaces
+            .iter()
+            .find(|s| s.id == id)
+            .map_or_else(|| id.to_string(), |s| crate::config::GatewayConfig::space_name(s).to_string())
+    };
+    let since = q.since.filter(|x| x.is_finite());
+    let v = app.shared.history().to_json(&p, &consented, &named, space, since, max_points);
+    if app.audit.enabled() {
+        for s in v["spaces"].as_array().into_iter().flatten() {
+            if s.get("breathing_bpm").is_some() {
+                app.audit.vitals_read(now_unix_ms(), &p, s["space_id"].as_str().unwrap_or(""));
+            }
+        }
+    }
+    no_store(Json(v).into_response())
+}
+
+async fn links(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let p = match system_only(&app, &h, "/api/links") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let all = app.shared.read().links.clone();
+    let scoped: Vec<Value> = all
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|sp| p.can_see_space(sp.get("space_id").and_then(Value::as_str).unwrap_or("")))
+        .cloned()
+        .collect();
+    no_store(Json(scoped).into_response())
+}
+
+async fn health(State(app): State<AppState>, h: HeaderMap) -> Response {
+    if let Err(r) = system_only(&app, &h, "/api/health") {
+        return r;
+    }
+    let mut v = app.shared.read().health.clone();
+    if let Value::Object(m) = &mut v {
         // Fresh values; the rest is as of the last tick.
         m.insert("uptime_s".into(), app.shared.started.elapsed().as_secs_f64().into());
         m.insert("ws_clients".into(), app.shared.ws_clients().into());
+        m.insert("auth".into(), json!({
+            "required": app.auth.required(),
+            "sessions_open": app.auth.sessions_open(),
+            "users": app.cfg.users.len(),
+            "tokens": app.cfg.tokens.len(),
+        }));
+        m.insert("audit".into(), app.audit.status());
     }
-    no_store(Json(h).into_response())
+    no_store(Json(v).into_response())
 }
 
-async fn metrics(State(app): State<AppState>) -> Response {
+async fn metrics(State(app): State<AppState>, h: HeaderMap) -> Response {
+    if let Err(r) = system_only(&app, &h, "/metrics") {
+        return r;
+    }
     let body = app.shared.read().metrics.clone();
     let mut r = body.into_response();
     r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"));
     no_store(r)
 }
 
-async fn live(ws: WebSocketUpgrade, State(app): State<AppState>) -> Response {
-    ws.on_upgrade(move |socket| ws_session(socket, app))
+async fn live(ws: WebSocketUpgrade, State(app): State<AppState>, h: HeaderMap) -> Response {
+    // The handshake is a GET: authenticate it like any other, before the
+    // upgrade, so an anonymous client never reaches the stream.
+    let p = match principal(&app, &h, "/api/live") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    ws.on_upgrade(move |socket| ws_session(socket, app, p))
 }
 
-async fn ws_session(mut socket: WebSocket, app: AppState) {
+/// One broadcast message as `p` may see it, or `None` to withhold it.
+///
+/// Re-filtering per client costs a parse per tick per connection. The
+/// alternative — one pre-serialized message for everybody — is how a
+/// space ends up on a screen that should not have it, so the cost is the
+/// point. An unrestricted admin skips it entirely (see `ws_session`).
+fn filter_live(text: &str, p: &Principal) -> Option<String> {
+    let v: Value = serde_json::from_str(text).ok()?;
+    match v.get("type").and_then(Value::as_str)? {
+        "state" => {
+            let spaces: Vec<Value> =
+                v.get("spaces")?.as_array()?.iter().filter_map(|s| privacy::space_for(s, p)).collect();
+            Some(json!({"type": "state", "t_s": v.get("t_s").cloned().unwrap_or(Value::Null), "spaces": spaces}).to_string())
+        }
+        "event" => privacy::event_for(v.get("event")?, p).map(|e| json!({"type": "event", "event": e}).to_string()),
+        _ => Some(text.to_string()),
+    }
+}
+
+async fn ws_session(mut socket: WebSocket, app: AppState, who: Principal) {
     let shared = app.shared;
     let mut rx = shared.live_tx.subscribe();
     shared.ws_clients.fetch_add(1, Ordering::Relaxed);
-    let hello = json!({"type": "hello", "version": env!("CARGO_PKG_VERSION"), "mode": shared.mode}).to_string();
+    // An admin with no space restriction sees exactly the published
+    // message, so the filter is a no-op and is skipped.
+    let unrestricted = who.role == crate::roles::Role::Admin && who.spaces.is_none();
+    let send = |text: &str| -> Option<String> {
+        if unrestricted {
+            Some(text.to_string())
+        } else {
+            filter_live(text, &who)
+        }
+    };
+    let hello = json!({
+        "type": "hello",
+        "version": env!("CARGO_PKG_VERSION"),
+        "mode": shared.mode,
+        "name": who.name,
+        "role": who.role.as_str(),
+        "can": { "system": who.can_see_system() },
+    })
+    .to_string();
     let first = shared.read().state_msg.clone();
     let mut ok = socket.send(Message::Text(hello.into())).await.is_ok();
     if let (true, Some(state)) = (ok, first) {
-        ok = socket.send(Message::Text(state.as_ref().into())).await.is_ok();
+        if let Some(text) = send(&state) {
+            ok = socket.send(Message::Text(text.into())).await.is_ok();
+        }
     }
     let mut stop = app.stop;
     while ok {
         tokio::select! {
             msg = rx.recv() => match msg {
-                Ok(text) => ok = socket.send(Message::Text(text.as_ref().into())).await.is_ok(),
+                Ok(text) => {
+                    if let Some(out) = send(&text) {
+                        ok = socket.send(Message::Text(out.into())).await.is_ok();
+                    }
+                }
                 // A slow client misses messages rather than slowing the
                 // gateway; the next state message resynchronises it.
                 Err(broadcast::error::RecvError::Lagged(_)) => {}
@@ -217,6 +554,7 @@ async fn ws_session(mut socket: WebSocket, app: AppState) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::roles::Role;
 
     #[test]
     fn since_accepts_unix_seconds_and_iso() {
@@ -225,11 +563,93 @@ mod tests {
         assert_eq!(parse_since("nope"), None);
     }
 
+    /// The dashboard must fetch nothing from the internet: it is served
+    /// from a box in a building that may have no route out, and a
+    /// stylesheet that fails to load is a dashboard nobody can read.
+    ///
+    /// XML namespace URIs are the one exception. `http://www.w3.org/...`
+    /// in `xmlns` or `createElementNS` is an identifier, not an address
+    /// — nothing dereferences it — and SVG cannot be built without it.
+    /// Allowed by name here rather than by assembling the string at
+    /// runtime to slip past the check, which would leave this test
+    /// guarding nothing.
     #[test]
     fn dashboard_has_no_external_urls() {
+        const XML_NS: [&str; 3] =
+            ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"];
+        let mut stripped = DASHBOARD_HTML.to_string();
+        for ns in XML_NS {
+            stripped = stripped.replace(ns, "");
+        }
         for bad in ["http://", "https://", "//cdn", "src=\"//", "@import", "url(http"] {
-            assert!(!DASHBOARD_HTML.contains(bad), "dashboard must stay offline-capable: found {bad:?}");
+            assert!(!stripped.contains(bad), "dashboard must stay offline-capable: found {bad:?}");
+        }
+        // The namespaces that *are* present may only appear as a
+        // namespace argument, never as something to fetch. (A bare
+        // `https:` — the scheme test the WebSocket URL does — is not a
+        // URL and is not matched here.)
+        for scheme in ["http://", "https://"] {
+            for (i, _) in DASHBOARD_HTML.match_indices(scheme) {
+                let rest = &DASHBOARD_HTML[i..];
+                let before = &DASHBOARD_HTML[i.saturating_sub(40)..i];
+                assert!(
+                    XML_NS.iter().any(|ns| rest.starts_with(ns)) && (before.contains("xmlns") || before.contains("createElementNS")),
+                    "unexpected URL at byte {i}: ...{before}{}",
+                    &rest[..rest.len().min(40)]
+                );
+            }
         }
         assert!(DASHBOARD_HTML.contains("not a medical device"));
+    }
+
+    fn p(role: Role, spaces: Option<&[&str]>) -> Principal {
+        Principal { name: "x".into(), role, spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()) }
+    }
+
+    const STATE: &str = r#"{"type":"state","t_s":12.5,"spaces":[
+        {"space_id":"lab","vitals":true,"occupied":true,"breathing":{"bpm":14.0},"alerts":[{"name":"inactivity"}]},
+        {"space_id":"hall","vitals":false,"occupied":false,"alerts":[]}]}"#;
+
+    #[test]
+    fn live_state_is_filtered_per_client() {
+        let full: Value = serde_json::from_str(&filter_live(STATE, &p(Role::Admin, None)).unwrap()).unwrap();
+        assert_eq!(full["spaces"].as_array().map(Vec::len), Some(2));
+        assert_eq!(full["t_s"], json!(12.5));
+        assert_eq!(full["spaces"][0]["breathing"]["bpm"], json!(14.0));
+
+        let ops: Value = serde_json::from_str(&filter_live(STATE, &p(Role::Ops, None)).unwrap()).unwrap();
+        assert!(ops["spaces"][0].get("breathing").is_none(), "ops sees the room, not the person");
+        assert_eq!(ops["spaces"][0]["alerts"], json!([]), "and no health alerts");
+
+        let scoped: Value = serde_json::from_str(&filter_live(STATE, &p(Role::Safety, Some(&["hall"]))).unwrap()).unwrap();
+        assert_eq!(scoped["spaces"].as_array().map(Vec::len), Some(1));
+        assert_eq!(scoped["spaces"][0]["space_id"], "hall");
+    }
+
+    #[test]
+    fn live_events_can_be_withheld_entirely() {
+        let ev = r#"{"type":"event","event":{"space_id":"lab","type":"breathing_pause","duration_s":11.0}}"#;
+        assert!(filter_live(ev, &p(Role::Safety, None)).is_some());
+        assert!(filter_live(ev, &p(Role::Ops, None)).is_none(), "nothing is sent, not an empty event");
+        assert!(filter_live(ev, &p(Role::Safety, Some(&["hall"]))).is_none());
+    }
+
+    /// The only thing that touches this counter is `login`, which no
+    /// unit test calls, so taking every slot here is self-contained.
+    #[test]
+    fn concurrent_logins_are_capped_and_slots_are_returned() {
+        let held: Vec<LoginSlot> = (0..MAX_LOGINS_IN_FLIGHT).map(|_| LoginSlot::take().expect("under the cap")).collect();
+        assert!(LoginSlot::take().is_none(), "the {MAX_LOGINS_IN_FLIGHT}th + 1 attempt is refused");
+        drop(held);
+        assert!(LoginSlot::take().is_some(), "slots are returned on drop");
+    }
+
+    #[test]
+    fn a_message_that_is_not_json_is_dropped_not_forwarded() {
+        assert!(filter_live("{oops", &p(Role::Admin, None)).is_none());
+        assert!(filter_live(r#"{"no_type":1}"#, &p(Role::Admin, None)).is_none());
+        // An unknown message type passes through unchanged: it carries
+        // no space data by construction (`hello`).
+        assert_eq!(filter_live(r#"{"type":"hello","mode":"live"}"#, &p(Role::Ops, None)).as_deref(), Some(r#"{"type":"hello","mode":"live"}"#));
     }
 }

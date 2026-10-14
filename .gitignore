@@ -25,3 +25,4 @@ history.json
 # Secrets live in environment variables, never in files
 .env
 *.env
+edge/dsp/bench/build/

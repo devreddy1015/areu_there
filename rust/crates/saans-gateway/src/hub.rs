@@ -294,6 +294,7 @@ impl Hub {
         let health = self.health_json(t_s, &shared);
         let metrics = self.metrics_text(t_s, &shared);
         let unix_ms = self.wall.unix_ms(t_s, t_s);
+        self.record_history(&shared, t_s, unix_ms);
         if shared.outputs.receiver_count() > 0 {
             shared.emit(crate::outputs::OutputMsg::States { unix_ms, spaces: Arc::new(spaces.clone()) });
             shared.emit(crate::outputs::OutputMsg::System { unix_ms, links: Arc::new(links.clone()), health: Arc::new(health.clone()) });
@@ -308,6 +309,32 @@ impl Hub {
             p.state_msg = Some(state_msg.clone());
         }
         shared.broadcast(state_msg);
+    }
+
+    /// Append this tick to the bounded time series behind
+    /// `/api/history`. The ring decides what to keep: this is called at
+    /// the 0.5 s tick and records at `history.cadence_s`.
+    ///
+    /// Consent is applied here, not at read time — a space without
+    /// `vitals = true` never has a breathing series to leak.
+    fn record_history(&self, shared: &Shared, t_s: f64, unix_ms: i64) {
+        let mut h = shared.history();
+        for sp in &self.engine.spaces {
+            if let Some(sample) = &sp.sample {
+                h.record_space(&sp.config.id, unix_ms, sample, sp.config.vitals);
+            }
+            for r in sp.system.link_report(&sp.fusion, t_s) {
+                h.record_link(&sp.config.id, r.link, crate::history::LinkPoint {
+                    t_s,
+                    unix_ms,
+                    up: r.up,
+                    rate_hz: r.rate_hz as f32,
+                    loss: r.loss as f32,
+                    best_bnr: r.best_bnr as f32,
+                    rssi_dbm: r.rssi_dbm,
+                });
+            }
+        }
     }
 
     /// A space's state for the API: `SpaceState` plus its name, privacy
@@ -409,6 +436,12 @@ impl Hub {
             "events_emitted": self.events_emitted,
             "events_withheld": self.events_withheld,
             "ws_clients": shared.ws_clients(),
+            "series": {
+                "window_s": self.cfg.history.window_s,
+                "cadence_s": self.cfg.history.cadence_s,
+                "points": shared.history().points(),
+                "capacity_per_series": self.cfg.history.capacity(),
+            },
             "notes": &self.notes,
         });
         if let Some(log) = &self.log {

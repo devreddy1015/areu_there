@@ -124,7 +124,32 @@ void run_rx_role() {
     ESP_ERROR_CHECK(net::udp_open());
     ESP_ERROR_CHECK(net::set_channel(cfg::kWifiChannel));
 
-    const bool extractor_ok = configure_extractor();
+    // A MISCONFIGURED EXTRACTOR IS FATAL, NOT SOMETHING TO RUN WITHOUT.
+    //
+    // This node's entire output is "is someone there". An extractor that
+    // cannot be configured emits nothing, and nothing is indistinguishable at
+    // the gateway from a working sensor watching an empty room -- so a silent
+    // inert node reports "empty" forever and no one finds out. The failure
+    // must be loud and it must keep being loud, which means refusing to run
+    // and saying why on a schedule, not one ESP_LOGE at boot that scrolls away.
+    //
+    // Halting rather than rebooting is deliberate: the cause is a compile-time
+    // capacity mismatch, so a reboot loop would just repeat it while making
+    // the serial log unreadable.
+    if (!configure_extractor()) {
+        esp_task_wdt_add(nullptr);
+        for (;;) {
+            ESP_LOGE(kTag, "HALTED: extractor misconfigured, this node is NOT sensing. "
+                           "%u subcarriers @ %.0f Hz does not fit the compiled capacities; "
+                           "rebuild with matching Kconfig.",
+                     static_cast<unsigned>(cfg::kNSubcarriers),
+                     static_cast<double>(cfg::kCsiRateHz));
+            telemetry::log_health();
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(cfg::kTelemetryS * 1000));
+        }
+    }
+
     ESP_ERROR_CHECK(csi::start());
     log_startup_expectations();
 
@@ -135,6 +160,7 @@ void run_rx_role() {
     std::uint32_t captured = 0;
     std::uint32_t emitted = 0;
     std::uint32_t send_failures = 0;
+    std::uint32_t last_overflows = 0;
 
 #if CONFIG_SAANS_RAW_MODE
     std::uint8_t raw[csi::kRawHeaderSize + 2 * cfg::kNSubcarriers];
@@ -154,7 +180,7 @@ void run_rx_role() {
         }
         ++captured;
 
-        if (extractor_ok) {
+        {
             // A view over the queue element — CsiFrame holds non-owning
             // pointers, so nothing is copied here.
             CsiFrame view{};
@@ -232,15 +258,22 @@ void run_rx_role() {
                          static_cast<double>(cfg::kCsiRateHz),
                          static_cast<double>(cfg::kCsiRateHz),
                          static_cast<unsigned long>(g_extractor.arrival_overflows));
-            } else if (g_extractor.arrival_overflows != 0) {
+            } else if (g_extractor.arrival_overflows != last_overflows) {
                 // Below the warning threshold but the ring still evicted:
                 // burstier than the headroom covers. The density is still
                 // right, the span is not.
+                //
+                // The DELTA, not the running total: the counter never resets,
+                // so reporting the total would keep announcing a condition
+                // that had already cleared, which is how a real one stops
+                // being read.
                 ESP_LOGW(kTag,
-                         "link-stats window overflowed %lu time(s): csi_rate_chz and "
-                         "loss_permille are over a shorter span than 10 s",
-                         static_cast<unsigned long>(g_extractor.arrival_overflows));
+                         "link-stats window overflowed %lu time(s) this interval: "
+                         "csi_rate_chz and loss_permille are over a shorter span than 10 s",
+                         static_cast<unsigned long>(g_extractor.arrival_overflows -
+                                                    last_overflows));
             }
+            last_overflows = g_extractor.arrival_overflows;
             telemetry::log_health();
             captured = 0;
             emitted = 0;
