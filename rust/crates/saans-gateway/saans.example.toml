@@ -6,8 +6,10 @@ udp_port = 5566
 # Interface to receive on. Sensors are remote, so all interfaces by default;
 # put the gateway's sensor-VLAN address here to narrow it.
 udp_bind = "0.0.0.0"
-# HTTP API + dashboard. Localhost by default. Binding wider (for example
-# "0.0.0.0:8080") is an explicit choice: the API has no authentication.
+# HTTP API + dashboard. Localhost by default, where every request is
+# treated as a local admin. Binding wider (for example "0.0.0.0:8080")
+# turns authentication on automatically, and the gateway then refuses to
+# start unless a [[user]] or [[token]] exists. See [auth] below.
 http_addr = "127.0.0.1:8080"
 # Event logs (events-YYYY-MM-DD.jsonl) and history.json live here.
 data_dir = "saans-data"
@@ -23,6 +25,34 @@ utc_offset_minutes = 330
 sample_rate_hz = 20.0   # the CSI rate the nodes are driven at
 subcarriers = 0         # 0 = take the count from each node's first datagram
 calibration_s = 30.0    # empty-room calibration; keep the space empty at start
+
+# Bounded in-memory time series behind /api/history, which is what the
+# dashboard's trend charts read. Never written to disk: a minute-by-minute
+# motion trace is exactly the record DPDP retention limits exist for, so
+# the window IS the retention policy and a restart is a delete.
+# Memory is fixed at startup: window_s / cadence_s points per series.
+[history]
+window_s = 3600.0    # how far back the charts can go (max 21600)
+cadence_s = 2.0      # one point per this many seconds (min 0.5)
+
+# Who may see what. `required` is automatic: on by default unless
+# http_addr is a loopback address. Roles are admin / ops / safety /
+# occupancy -- see README. `spaces` limits a principal to named spaces;
+# omit it for all of them.
+#
+#   [auth]
+#   session_hours = 12
+#
+#   [[user]]                       # saans-gateway --hash-password
+#   name = "ana"
+#   role = "safety"
+#   password_hash = "$argon2id$v=19$m=19456,t=2,p=1$...$..."
+#   spaces = ["rest-room-1"]
+#
+#   [[token]]                      # Authorization: Bearer <token>
+#   name = "building-management"
+#   role = "occupancy"
+#   sha256 = "<lowercase hex sha256 of the token>"
 
 # One [[space]] per monitored room. A link is (receiving node, transmitting
 # node); tx = 255 means "an access point / unknown". Each link belongs to at
