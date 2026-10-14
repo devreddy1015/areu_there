@@ -183,9 +183,11 @@ make -C edge/dsp/test check
 | — `saans-health` | 36 passed, unchanged |
 | — `saans-sim` | 21 passed, unchanged |
 | `make -C edge/dsp/test check` | **9 binaries, 845 checks, g++ and clang++, PASS**; missing-vector guard passes for each |
+| `python3 -m unittest discover -s tests` | **459 passed, 0 failed** (259 s), unchanged by this work |
 | `saans-gateway --config saans.example.toml --check` | OK (2 spaces) |
 
-Python reference suite: result recorded at the end of this file.
+There is **no CI in this repository** — no `.github/workflows` — so a
+pull request shows no checks. That is an absence, not a pass.
 
 **Manual verification** (no browser-test framework exists in this tree,
 so this is weaker than a suite and is recorded as such). Against a
