@@ -89,7 +89,7 @@ Under `menuconfig → Saans node`:
 | Node id | 0 | 255 is reserved for "unknown/AP" in `tx_id` |
 | WiFi channel | 6 | TX and RX must agree |
 | TX beacon rate | 50 Hz | Bounds the achievable CSI rate |
-| Subcarriers | 56 | HT20 usable count; sizes the DSP at compile time |
+| Subcarriers | 56 | HT20 usable count; sizes the DSP at compile time. **Unverified on hardware** — see below |
 | CSI rate | 20 Hz | Must be ≥ 10 Hz — the gross-motion band reaches 4 Hz |
 | FeatureFrame rate | 2 Hz | What the gateway receives |
 | Calibration | 30 s | **The space must be EMPTY**, after filter warmup |
@@ -111,6 +111,42 @@ it misbehaves in ways that look like tuning problems and are not:
 
 `calib_age_s` in every FeatureFrame reports how long ago calibration completed,
 and `0xFFFFFFFF` means not calibrated.
+
+### The subcarrier count is an assumption, not yet a measurement
+
+Everything downstream is compiled for `CONFIG_SAANS_N_SUBCARRIERS`
+subcarriers on the assumption that the frames being measured are HT20,
+which carry HT-LTF. Two things have to hold for that, and only one of
+them is in this firmware's gift:
+
+- **The transmitter must send HT frames.** `esp_wifi_set_csi_config`
+  enabling `htltf_en` does not make HT frames appear. `tx_role.cpp` now
+  asks ESP-NOW for HT20 MCS0 via `esp_now_set_peer_rate_config` and logs
+  loudly if that call fails; without it the default is a non-HT rate,
+  which carries only L-LTF, and the RX would be slicing a different set
+  of subcarriers from the one the DSP was sized for.
+- **The driver must deliver what we think it delivers.** On the S3 the
+  PHY mode cannot be read back: `sig_mode`, `cwb` and `rate` are fields
+  of `wifi_pkt_rx_ctrl_t` on the original ESP32 only. What is available
+  is `len`, and the LTF layout determines it, so the RX records the first
+  length it sees and counts departures from it.
+
+Every `kTelemetryS` the RX prints what actually arrived:
+
+```
+capture: len=128 (first 128) -> 64 subcarriers, expecting 56; 2nd_ch=0 first_word_invalid=0 short=0 layout_changed=0 too_short=0
+```
+
+and warns if the radio delivers fewer subcarriers than the DSP expects,
+or if the buffer length changes mid-run. **Read that line on the first
+bench session before trusting any measurement**, because no board has
+run this firmware yet: every number in `NOTES.md` is simulated
+(SAANS_PLAN.md S5).
+
+`first_word_invalid` is a documented hardware limitation on
+`wifi_csi_info_t` — when set, the first four bytes are invalid — and the
+first two subcarriers are now skipped rather than read as signal, where
+the static suppressor would have learned them as part of the room.
 
 ## Verification
 

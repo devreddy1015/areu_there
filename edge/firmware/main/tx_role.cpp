@@ -60,6 +60,32 @@ void run_tx_role() {
     peer.encrypt = false;
     ESP_ERROR_CHECK(esp_now_add_peer(&peer));
 
+    // ASK FOR HT20. Without this an ESP-NOW frame goes out at the non-HT
+    // default, which carries only L-LTF -- and the RX's whole premise is
+    // that it is measuring the HT-LTF subcarriers. Enabling htltf_en on the
+    // receiver does nothing if the transmitter never sends an HT frame, so
+    // the two halves have to agree here, not in a comment.
+    //
+    // MCS0 with a long guard interval is the slowest, most robust HT rate.
+    // Throughput is irrelevant: the payload is 12 bytes and the point of
+    // the frame is to be a channel probe, not to carry data.
+    esp_now_rate_config_t rate{};
+    rate.phymode = WIFI_PHY_MODE_HT20;
+    rate.rate = WIFI_PHY_RATE_MCS0_LGI;
+    rate.ersu = false;
+    rate.dcm = false;
+    const esp_err_t rate_err = esp_now_set_peer_rate_config(peer.peer_addr, &rate);
+    if (rate_err != ESP_OK) {
+        // Not fatal: the link still works at the default rate, the RX will
+        // just be measuring L-LTF. It MUST be loud, because every claim the
+        // DSP makes about subcarrier count depends on it.
+        ESP_LOGE(kTag, "HT20 rate config FAILED (%s): frames will be non-HT and the RX "
+                       "will see L-LTF, not the HT-LTF subcarriers the DSP is sized for",
+                 esp_err_to_name(rate_err));
+    } else {
+        ESP_LOGI(kTag, "ESP-NOW rate: HT20 MCS0 LGI");
+    }
+
     BeaconPayload payload{};
     payload.magic = kBeaconMagic;
     payload.node_id = cfg::kNodeId;

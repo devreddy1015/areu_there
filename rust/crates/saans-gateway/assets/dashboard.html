@@ -20,6 +20,13 @@
   --none: #6b7a90; --none-bg: #1b2231;
   --focus: #6fd7ff;
   --sp: 4px;
+  /* Coverage ramp. Six sampled stops of a perceptually uniform
+     blue-green-yellow scale: monotonic in lightness, and with no red in
+     it at all, so it survives deuteranopia and protanopia and never
+     reads as a red/green pass/fail. Identical in both themes — an
+     ordered scale does not invert with the page. */
+  --cov0: #440154; --cov1: #414487; --cov2: #2a788e;
+  --cov3: #22a884; --cov4: #7ad151; --cov5: #fde725;
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -76,6 +83,14 @@ nav button:hover { color: var(--ink); border-bottom-color: var(--line2); }
 nav button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .banner { margin: 0; padding: 7px 16px; background: var(--warn-bg); color: var(--warn);
   font-size: 12.5px; border-bottom: 1px solid var(--line); }
+/* The synthetic-data strip. It sits above every view, in the document
+   rather than in a panel, so it is on screen in the loading, signed-out,
+   error and empty states too — and so a screenshot of any tab carries
+   it. Deliberately louder than `.banner`: a reader who crops this page
+   must not be able to lose the fact that none of it was measured. */
+.banner.synthetic { background: var(--warn); color: #1a1405; font-size: 13px;
+  padding: 8px 16px; border-bottom: 2px solid var(--bad); }
+.banner.synthetic b { letter-spacing: .13em; }
 main { padding: 16px; max-width: 1280px; margin: 0 auto; }
 [hidden] { display: none !important; }
 
@@ -197,6 +212,59 @@ dialog .content { padding: 15px; overflow: auto; }
 .err { color: var(--bad); font-size: 13px; min-height: 1.2em; }
 footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-align: center; }
 
+/* ------------------------------------------------------------ explorer */
+.simbanner { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  margin: 0 0 14px; padding: 11px 14px; border-radius: 10px;
+  background: var(--warn-bg); border: 1px solid var(--warn); color: var(--warn); font-size: 13px; }
+.simbanner b { font-size: 14px; letter-spacing: .13em; white-space: nowrap; }
+.simbanner span { color: var(--ink2); }
+.explorer { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 11px;
+  padding: 12px 13px 14px; min-width: 0; }
+.panel > h3 { margin: 0 0 3px; font-size: 15.5px; }
+.panel > .meta { color: var(--faint); font-size: 11.5px; margin: 0 0 11px; }
+.room { display: block; width: 100%; height: auto; touch-action: none; margin-bottom: 2px; }
+.room .wall { fill: var(--bg2); stroke: var(--line2); stroke-width: 2; }
+.room .grid-m { stroke: var(--line); stroke-width: .7; }
+.room .cell { shape-rendering: crispEdges; }
+.room .lnk { stroke: var(--accent); stroke-width: 1.7; stroke-dasharray: 5 4; opacity: .9; }
+.room .nd circle { fill: var(--card2); stroke: var(--accent); stroke-width: 2; }
+.room .nd text { fill: var(--ink); font-size: 9.5px; text-anchor: middle; dominant-baseline: central; }
+.room .ax { fill: var(--faint); font-size: 9px; }
+.room .door, .room .barm { stroke: var(--ink2); stroke-width: 3.4; stroke-linecap: round; }
+.person { cursor: grab; }
+.person:active { cursor: grabbing; }
+.person .halo { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .95; }
+/* Not --accent: that token means "signal and measurement" and this
+   marker is neither. A ground-truth input must not wear the colour the
+   rest of the page uses for things the system measured. */
+.person .dot { fill: var(--ink); stroke: var(--bg); stroke-width: 1.6; }
+.person .tag { fill: var(--ink); font-size: 9px; text-anchor: middle; }
+/* The keyboard ring is the halo below, not a box around the group's
+   bounding box, which is what the user agent would otherwise draw. */
+.person:focus, .person:focus-visible { outline: none; }
+.person:focus-visible .halo { stroke: var(--focus); stroke-width: 3; stroke-dasharray: none; }
+.covkey { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 3px 12px; margin-top: 9px; font-size: 11.5px; color: var(--muted); }
+.covkey span { display: flex; align-items: center; gap: 7px; }
+.covkey i { width: 15px; height: 10px; border-radius: 2px; flex: none; }
+.verdict { border-radius: 10px; padding: 11px 12px; margin-bottom: 12px;
+  border-left: 4px solid var(--none); background: var(--none-bg); }
+.verdict[data-k="ok"] { border-left-color: var(--ok); background: var(--ok-bg); }
+.verdict[data-k="warn"] { border-left-color: var(--warn); background: var(--warn-bg); }
+.verdict[data-k="bad"] { border-left-color: var(--bad); background: var(--bad-bg); }
+.verdict strong { display: block; font-size: 16px; line-height: 1.3; margin-bottom: 6px; }
+.verdict[data-k="ok"] strong { color: var(--ok); }
+.verdict[data-k="warn"] strong { color: var(--warn); }
+.verdict[data-k="bad"] strong { color: var(--bad); }
+.verdict p { margin: 3px 0 0; font-size: 13.5px; }
+.verdict p.why { color: var(--muted); font-size: 12.5px; margin-top: 7px; }
+.exbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 11px 0 3px; }
+.hint { color: var(--muted); font-size: 12px; margin: 9px 0 0; }
+.hint kbd { background: var(--bg2); border: 1px solid var(--line2); border-radius: 4px;
+  padding: 0 4px; font: inherit; font-size: 11.5px; }
+
+@media (max-width: 900px) { .explorer { grid-template-columns: 1fr; } }
 @media (max-width: 560px) {
   .grid { grid-template-columns: 1fr; }
   ol.events li { grid-template-columns: 1fr; }
@@ -215,6 +283,10 @@ footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-a
   </div>
   <nav role="tablist" aria-label="Views" id="tabs"></nav>
 </header>
+<p class="banner synthetic" id="synthetic-banner" hidden><b>SIMULATED — SYNTHETIC DATA.</b>
+  This gateway is running its built-in simulator. No radio hardware is connected and no real person
+  is being sensed. Every number, chart, event and alert on every tab below was produced from a
+  synthetic channel.</p>
 <p class="banner">Advisory, <strong>not a medical device</strong>. Alerts never replace existing safety
   procedures: every one says what was observed and how confident it is.</p>
 <p class="sr" aria-live="polite" id="live-status"></p>
@@ -241,6 +313,20 @@ footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-a
     <div class="tiles" id="ov-tiles"></div>
     <h2 class="sec">Spaces</h2>
     <div class="grid" id="ov-grid"></div>
+  </section>
+
+  <section id="view-explorer" role="tabpanel" aria-labelledby="tab-explorer" tabindex="0" hidden>
+    <p class="simbanner">
+      <b>SIMULATED — SYNTHETIC DATA</b>
+      <span>No radio hardware is involved. The room, the person and the channel are produced by the
+        built-in simulator; the right-hand panel is the real signal processing reading that simulated
+        channel. Nothing in this view is a measurement of a real person.</span>
+    </p>
+    <div class="explorer">
+      <div class="panel" id="ex-left"></div>
+      <div class="panel" id="ex-right"></div>
+    </div>
+    <p class="sr" aria-live="polite" id="ex-live"></p>
   </section>
 
   <section id="view-signals" role="tabpanel" aria-labelledby="tab-signals" tabindex="0" hidden>
@@ -314,8 +400,12 @@ function svg(tag, attrs) {
 }
 function add(parent, ...kids) { for (const k of kids) if (k != null) parent.append(k); return parent; }
 
+// `needs` is a key of /api/me's `can`; `mode` is the gateway mode the tab
+// belongs to. Both are filtered in one place, visibleTabs(), so a tab a
+// principal cannot use is never rendered rather than rendered and refused.
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'explorer', label: 'Explorer (simulated)', mode: 'simulated' },
   { id: 'signals', label: 'Signals' },
   { id: 'topology', label: 'Topology' },
   { id: 'events', label: 'Events' },
@@ -416,8 +506,18 @@ function renderShell() {
   // mean sensors are reporting, and a replay is not live however healthy
   // the socket is.
   const mode = (me.mode || '').toUpperCase() || 'UNKNOWN';
-  pills.append(pill(mode, 'mode', false,
-    mode === 'REPLAY' ? 'Replaying a recording — these are not live sensors' : 'Live sensor input'));
+  pills.append(pill(mode, mode === 'SIMULATED' || mode === 'REPLAY' ? 'warn' : 'mode', false,
+    mode === 'REPLAY' ? 'Replaying a recording — these are not live sensors'
+      : mode === 'SIMULATED' ? 'Synthetic data from the built-in simulator — no radio hardware is involved'
+      : 'Live sensor input'));
+
+  // A pill is too quiet to carry this on its own: it is 12 px, it looks
+  // the same as the LIVE pill, and it falls off a cropped screenshot.
+  // The strip is the fact; the pill is a restatement of it.
+  $('#synthetic-banner').hidden = mode !== 'SIMULATED';
+  const wantTitle = mode === 'SIMULATED' ? 'Saans — SIMULATED (synthetic data)'
+    : mode === 'REPLAY' ? 'Saans — REPLAY (recording)' : 'Saans';
+  if (document.title !== wantTitle) document.title = wantTitle;
 
   const connKind = S.conn === 'live' ? 'live' : (S.conn === 'offline' || S.conn === 'signed out') ? 'bad' : 'warn';
   pills.append(pill(S.conn, connKind, true, S.conn === 'signed out'
@@ -459,6 +559,11 @@ let tabsBuilt = '';
 function renderTabs() {
   const nav = $('#tabs');
   const want = visibleTabs();
+  // The `hello` frame can disagree with /api/me — a different mode, or a
+  // role the socket resolved differently. Leave rather than sit on a
+  // panel whose tab has gone. showTab calls back here once, with a tab
+  // that is in `want`, so this does not recurse further.
+  if (S.tab !== 'overview' && !want.some((t) => t.id === S.tab)) { showTab('overview'); return; }
   const key = want.map((t) => t.id).join(',');
   if (key !== tabsBuilt) {
     tabsBuilt = key;
@@ -479,8 +584,9 @@ function renderTabs() {
 }
 
 function visibleTabs() {
-  const can = (S.me && S.me.can) || {};
-  return TABS.filter((t) => !t.needs || can[t.needs]);
+  const me = S.me || {};
+  const can = me.can || {};
+  return TABS.filter((t) => (!t.needs || can[t.needs]) && (!t.mode || me.mode === t.mode));
 }
 
 $('#tabs').addEventListener('keydown', (e) => {
@@ -506,6 +612,7 @@ function showTab(name) {
     if (v) v.hidden = t.id !== name || isLoginShown();
   }
   renderTabs();
+  if (name === 'explorer') { refreshSim(); startSimTimer(); } else { stopSimTimer(); }
   if (name === 'overview') renderOverview();
   if (name === 'signals') { refreshHistory(); }
   if (name === 'topology') { renderTopology(); refreshSystem(); }
@@ -1231,6 +1338,657 @@ function renderSystem(h, links) {
   add(body, dl);
 }
 
+// -------------------------------------------------------------- explorer
+/**
+ * Simulate mode only. Two panels, and the gap between them is the point.
+ *
+ * Left is the simulator's *ground truth*: a room we configured, nodes at
+ * known positions, and a person whose position we set by dragging. That
+ * position is an input. Under it is the coverage map the gateway
+ * computes from the simulator's own Fresnel model — where a breathing
+ * chest would be detectable for this fixed geometry.
+ *
+ * Right is what the DSP recovered from the simulated channel, through
+ * the ordinary ingest path, with nothing positional in it: this hardware
+ * is 1T1R and has no angular resolution at all (docs/CAPABILITY_LIMITS.md).
+ *
+ * The browser models nothing. Every number drawn here is a field of
+ * /api/sim, /api/sim/coverage, or the published state. The only
+ * arithmetic below is turning metres into pixels.
+ */
+/**
+ * Cell size the coverage map is fetched at, in metres.
+ *
+ * This is not a cosmetic choice and it must not be raised for speed. The
+ * field being drawn is Fresnel structure: it goes from a maximum to a
+ * null in a quarter wavelength, about 3 cm at 2.4 GHz. Sampled coarser
+ * than that, the grid is an alias of a field it cannot represent, and
+ * the picture is not merely blurry — it is wrong in both directions.
+ *
+ * Measured against this gateway's own pipeline, with the person parked
+ * in the demo null at (3.00, 3.61) where the DSP reports an empty room:
+ *
+ *   res_m   value the map shows at that null   what the map claims
+ *   0.25    0.79                               "below this room's median"
+ *   0.10    1.26                               brighter than the median
+ *   0.03    0.21                               "effectively blind"  <- true
+ *
+ * At 0.25 m it was worse than useless in the other direction too: of
+ * three cells it painted "effectively blind", two were places the
+ * pipeline saw the person at confidence 1.00 and 0.86. A map that
+ * disagrees with the pipeline it is drawn to explain is the one thing
+ * this view must never ship.
+ *
+ * 0.03 m is 200x167 = 33,400 cells for this room, inside the gateway's
+ * 100,000-cell cap, about 1.3 MB fetched once per page load.
+ */
+const COV_RES_M = 0.03;
+/**
+ * How far the recovered rate may sit from the simulator's input before
+ * the verdict stops calling it a success, in BPM. The pipeline's own
+ * test (`simulate.rs::the_gap_the_explorer_exists_to_show`) asserts
+ * agreement to within 1 BPM, so this is that test's tolerance and not a
+ * looser one chosen to make the demo look better.
+ */
+const BPM_TOL = 1.0;
+/** Above this many cells, per-cell tooltips stop being worth their DOM. */
+const COV_TITLE_MAX_CELLS = 2000;
+const COV_BANDS = [
+  { lo: 0, range: 'below 0.25', short: 'effectively blind' },
+  { lo: 0.25, range: '0.25 to 0.5', short: 'very weak' },
+  { lo: 0.5, range: '0.5 to 1.0', short: 'below this room’s median' },
+  { lo: 1.0, range: '1.0 to 2.0', short: 'around this room’s median' },
+  { lo: 2.0, range: '2.0 to 4.0', short: 'strong' },
+  { lo: 4.0, range: '4.0 and above', short: 'strongest' },
+];
+const SIM = {
+  cfg: null, cov: null, covFailed: false, layer: 'best', person: null, present: true,
+  err: '', postErr: '', built: '', els: null, drag: null, timer: null, said: '',
+};
+const fx = (n) => Math.round(n * 100) / 100;
+const linkKey = (l) => l.rx + '<' + l.tx;
+
+function exAnnounce(msg) { $('#ex-live').textContent = msg; }
+
+function covValues() {
+  const c = SIM.cov;
+  if (!c) return null;
+  if (SIM.layer === 'best') return Array.isArray(c.best) ? c.best : null;
+  const l = (c.links || []).find((x) => linkKey(x) === SIM.layer);
+  return l && Array.isArray(l.values) ? l.values : null;
+}
+function covBandOf(v) {
+  if (v == null || !isFinite(v)) return -1;
+  let i = 0;
+  for (let b = 0; b < COV_BANDS.length; b++) if (v >= COV_BANDS[b].lo) i = b;
+  return i;
+}
+/** Nearest cell of the published grid. A lookup, not an interpolation. */
+function covAt(x_m, y_m) {
+  const c = SIM.cov, vals = covValues();
+  if (!c || !vals || !Array.isArray(c.origin_m)) return null;
+  const ix = Math.round((x_m - c.origin_m[0]) / c.res_m);
+  const iy = Math.round((y_m - c.origin_m[1]) / c.res_m);
+  if (!(ix >= 0 && iy >= 0 && ix < c.w && iy < c.h)) return null;
+  const v = vals[iy * c.w + ix];
+  return v == null || !isFinite(v) ? null : v;
+}
+function stepM() { return SIM.cov && SIM.cov.res_m > 0 ? SIM.cov.res_m : 0.25; }
+
+// ---- transport -------------------------------------------------------
+async function refreshSim() {
+  if (!(S.me && S.me.mode === 'simulated')) return;
+  try {
+    const cfg = await getJSON('/api/sim');
+    SIM.cfg = cfg;
+    SIM.err = '';
+    const t = cfg.truth || {};
+    SIM.present = t.present !== false;
+    // Do not pull the marker out from under a drag or an unacknowledged
+    // move: the pending POST is the newer fact.
+    if (!SIM.drag && !personPending && !personBusy && isFinite(t.x_m) && isFinite(t.y_m)) {
+      SIM.person = { x_m: t.x_m, y_m: t.y_m };
+    }
+    if (!SIM.cov && !SIM.covFailed) {
+      // Computed for the configured geometry, which does not change, so
+      // it is fetched once.
+      SIM.cov = await getJSON('/api/sim/coverage?res_m=' + COV_RES_M).catch(() => { SIM.covFailed = true; return null; });
+    }
+  } catch (e) {
+    if (handleAuthLoss(e)) return;
+    SIM.err = e.status === 404
+      ? 'This gateway is not running in simulate mode, so there is no simulated room to show.'
+      : 'The gateway did not answer /api/sim.';
+  }
+  renderExplorer();
+}
+
+// At most one POST per interval while dragging, and the position the
+// pointer stopped on is always the last one sent.
+const PERSON_POST_MS = 120;
+let personPending = null, personTimer = null, personBusy = false;
+function queuePerson(x_m, y_m) {
+  personPending = { x_m, y_m };
+  if (personTimer || personBusy) return;
+  sendPerson();
+}
+async function sendPerson() {
+  if (!personPending) return;
+  const body = personPending;
+  personPending = null;
+  personBusy = true;
+  personTimer = setTimeout(() => { personTimer = null; if (personPending) sendPerson(); }, PERSON_POST_MS);
+  try {
+    const r = await postJSON('/api/sim/person', body);
+    SIM.postErr = '';
+    // The gateway clamps into the room; show where the person actually
+    // ended up, unless a newer move is already on its way.
+    if (!SIM.drag && !personPending && isFinite(r.x_m) && isFinite(r.y_m)) {
+      SIM.person = { x_m: r.x_m, y_m: r.y_m };
+    }
+  } catch (e) {
+    if (!handleAuthLoss(e)) {
+      SIM.postErr = 'The gateway refused that move (' + (e.status || 'no answer') + '). '
+        + 'The marker shows where you dragged it, not where the simulator put the person.';
+    }
+  } finally {
+    personBusy = false;
+    updateRoom();
+    if (!personTimer && personPending) sendPerson();
+  }
+}
+
+async function togglePresent() {
+  const want = !SIM.present;
+  try {
+    const r = await postJSON('/api/sim/present', { present: want });
+    SIM.present = !!r.present;
+    SIM.postErr = '';
+    exAnnounce(SIM.present ? 'Person put back into the simulated room.'
+      : 'Person removed. The simulated room is empty.');
+  } catch (e) {
+    if (!handleAuthLoss(e)) SIM.postErr = 'The gateway refused that change (' + (e.status || 'no answer') + ').';
+  }
+  updateRoom();
+  renderExplorerRight();
+}
+
+let simTimer = null;
+function startSimTimer() {
+  if (simTimer || !(S.me && S.me.mode === 'simulated')) return;
+  simTimer = setInterval(() => { if (S.tab === 'explorer') refreshSim(); else stopSimTimer(); }, 1000);
+}
+function stopSimTimer() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
+
+// ---- the room --------------------------------------------------------
+const EX_PAD = 28;
+
+function renderExplorer() {
+  if (SIM.err || !SIM.cfg) {
+    SIM.built = ''; SIM.els = null;
+    const box = el('div', { class: 'empty-state' });
+    add(box, el('h3', null, SIM.err ? 'No simulated room' : 'Loading the simulated room…'));
+    if (SIM.err) add(box, el('p', null, SIM.err));
+    $('#ex-left').replaceChildren(box);
+    $('#ex-right').replaceChildren(el('p', { class: 'muted' }, 'Waiting for the simulator.'));
+    return;
+  }
+  buildRoom();
+  updateRoom();
+  renderExplorerRight();
+}
+
+/**
+ * Built once per geometry, then only moved. The person marker is
+ * focusable and the layer <select> is a focusable control the user may
+ * be part-way through: rebuilding this panel on a 1 s timer would throw
+ * both away, the same bug the tab strip and the topology SVG had.
+ */
+function buildRoom() {
+  const cfg = SIM.cfg, room = cfg.room || {};
+  const w = Number(room.w_m) > 0 ? Number(room.w_m) : 1;
+  const h = Number(room.h_m) > 0 ? Number(room.h_m) : 1;
+  const sig = JSON.stringify([w, h, room.door_m, cfg.nodes, cfg.links, cfg.space_id, cfg.scenario,
+    SIM.cov ? [SIM.cov.res_m, SIM.cov.w, SIM.cov.h, (SIM.cov.links || []).map(linkKey)] : null]);
+  if (sig === SIM.built && SIM.els) return;
+  SIM.built = sig;
+
+  const SC = Math.min(600 / w, 420 / h);
+  const VW = w * SC + EX_PAD * 2, VH = h * SC + EX_PAD * 2 + 24;
+  const X = (m) => EX_PAD + m * SC;
+  const Y = (m) => EX_PAD + (h - m) * SC;
+  const host = $('#ex-left');
+  host.replaceChildren();
+
+  add(host, el('h3', null, 'Ground truth — the synthetic room we are simulating'));
+  add(host, el('p', { class: 'meta' },
+    'Everything in this panel is an input we chose, not an inference. The person is where we put them.'));
+
+  const g = svg('svg', {
+    class: 'room', viewBox: '0 0 ' + fx(VW) + ' ' + fx(VH), role: 'group',
+    'aria-label': 'Plan of the simulated room, ' + num(w, 1) + ' by ' + num(h, 1)
+      + ' metres, with ' + ((cfg.nodes || []).length) + ' node(s) and a draggable ground-truth person marker.',
+  });
+
+  // A clip so a coverage grid whose cell count rounds up does not paint
+  // past the wall.
+  const clipId = 'ex-room-clip';
+  const defs = svg('defs');
+  const clip = svg('clipPath', { id: clipId });
+  add(clip, svg('rect', { x: fx(X(0)), y: fx(Y(h)), width: fx(w * SC), height: fx(h * SC) }));
+  add(defs, clip); add(g, defs);
+
+  add(g, svg('rect', { class: 'wall', x: fx(X(0)), y: fx(Y(h)), width: fx(w * SC), height: fx(h * SC), rx: 3 }));
+
+  const heat = svg('g', { 'clip-path': 'url(#' + clipId + ')', 'aria-hidden': 'true' });
+  add(g, heat);
+
+  const grid = svg('g', { 'aria-hidden': 'true' });
+  for (let m = 1; m < w; m++) add(grid, svg('line', { class: 'grid-m', x1: fx(X(m)), x2: fx(X(m)), y1: fx(Y(0)), y2: fx(Y(h)) }));
+  for (let m = 1; m < h; m++) add(grid, svg('line', { class: 'grid-m', x1: fx(X(0)), x2: fx(X(w)), y1: fx(Y(m)), y2: fx(Y(m)) }));
+  add(g, grid);
+
+  // Door, on whichever wall it is nearest.
+  const d = room.door_m;
+  if (Array.isArray(d) && isFinite(d[0]) && isFinite(d[1])) {
+    const dx = Math.min(Math.max(d[0], 0), w), dy = Math.min(Math.max(d[1], 0), h);
+    const near = Math.min(dy, h - dy, dx, w - dx), half = 0.45;
+    const lo = (v, max) => Math.max(0, Math.min(max, v) - half), hi = (v, max) => Math.min(max, Math.max(0, v) + half);
+    let a, b, lx, ly;
+    if (near === dy) { a = [X(lo(dx, w)), Y(0)]; b = [X(hi(dx, w)), Y(0)]; lx = X(dx); ly = Y(0) - 7; }
+    else if (near === h - dy) { a = [X(lo(dx, w)), Y(h)]; b = [X(hi(dx, w)), Y(h)]; lx = X(dx); ly = Y(h) + 13; }
+    else if (near === dx) { a = [X(0), Y(lo(dy, h))]; b = [X(0), Y(hi(dy, h))]; lx = X(0) + 17; ly = Y(dy); }
+    else { a = [X(w), Y(lo(dy, h))]; b = [X(w), Y(hi(dy, h))]; lx = X(w) - 17; ly = Y(dy); }
+    add(g, svg('line', { class: 'door', x1: fx(a[0]), y1: fx(a[1]), x2: fx(b[0]), y2: fx(b[1]) }));
+    const dt = svg('text', { class: 'ax', x: fx(lx), y: fx(ly), 'text-anchor': 'middle' });
+    dt.textContent = 'door';
+    add(g, dt);
+  }
+
+  const byId = new Map((cfg.nodes || []).map((n) => [n.id, n]));
+  const unresolved = [];
+  for (const l of cfg.links || []) {
+    const a = byId.get(l.tx), b = byId.get(l.rx);
+    // A link whose endpoints are not nodes we were given has no position
+    // we know. Say that, rather than guess a line across the room.
+    if (!a || !b) { unresolved.push(linkName(l)); continue; }
+    const ln = svg('line', { class: 'lnk', x1: fx(X(a.x_m)), y1: fx(Y(a.y_m)), x2: fx(X(b.x_m)), y2: fx(Y(b.y_m)) });
+    add(ln, svg('title')).lastChild.textContent =
+      'Link ' + linkName(l) + ': node ' + l.tx + ' transmits, node ' + l.rx + ' receives.';
+    add(g, ln);
+  }
+  for (const n of cfg.nodes || []) {
+    if (!isFinite(n.x_m) || !isFinite(n.y_m)) continue;
+    const grp = svg('g', { class: 'nd' });
+    add(grp, svg('circle', { cx: fx(X(n.x_m)), cy: fx(Y(n.y_m)), r: 12 }));
+    const t = svg('text', { x: fx(X(n.x_m)), y: fx(Y(n.y_m)) });
+    t.textContent = n.id === 255 ? 'AP' : String(n.id);
+    add(grp, t);
+    add(grp, svg('title')).lastChild.textContent =
+      'Node ' + n.id + ' at ' + num(n.x_m, 2) + ' m, ' + num(n.y_m, 2) + ' m (a position we configured).';
+    add(g, grp);
+  }
+
+  const person = svg('g', {
+    class: 'person', tabindex: '0', role: 'application',
+    'aria-roledescription': 'draggable ground-truth position handle',
+  });
+  add(person, svg('circle', { class: 'halo', cx: 0, cy: 0, r: 17 }));
+  add(person, svg('circle', { class: 'dot', cx: 0, cy: 0, r: 8 }));
+  const tag = svg('text', { class: 'tag', x: 0, y: 32 });
+  tag.textContent = 'GROUND TRUTH (we set this) — drag me';
+  add(person, tag);
+  add(g, person);
+
+  // Axes and a scale bar, so the geometry is readable as metres.
+  const ax = svg('g', { 'aria-hidden': 'true' });
+  for (let m = 0; m <= Math.floor(w); m++) {
+    const t = svg('text', { class: 'ax', x: fx(X(m)), y: fx(Y(0) + 14), 'text-anchor': 'middle' });
+    t.textContent = String(m); add(ax, t);
+  }
+  for (let m = 0; m <= Math.floor(h); m++) {
+    const t = svg('text', { class: 'ax', x: fx(X(0) - 7), y: fx(Y(m) + 3), 'text-anchor': 'end' });
+    t.textContent = String(m); add(ax, t);
+  }
+  const sy = Y(0) + 30;
+  add(ax, svg('line', { class: 'barm', x1: fx(X(0)), y1: fx(sy), x2: fx(X(1)), y2: fx(sy) }));
+  const sb = svg('text', { class: 'ax', x: fx(X(1) + 7), y: fx(sy + 3) });
+  sb.textContent = '1 metre'; add(ax, sb);
+  add(g, ax);
+  add(host, g);
+  if (unresolved.length) {
+    add(host, el('p', { class: 'hint' }, 'Not drawn: link(s) ' + unresolved.join(', ')
+      + ' — their endpoints do not match any node /api/sim listed, so this view does not know where they run.'));
+  }
+
+  // Controls.
+  const bar = el('div', { class: 'exbar' });
+  const sel = el('select', { id: 'ex-layer' });
+  add(sel, el('option', { value: 'best' }, 'best of all links'));
+  for (const l of (SIM.cov && SIM.cov.links) || []) {
+    add(sel, el('option', { value: linkKey(l) }, 'link ' + linkName(l) + ' alone'));
+  }
+  if (!(SIM.cov && (SIM.cov.links || []).some((l) => linkKey(l) === SIM.layer))) SIM.layer = 'best';
+  sel.value = SIM.layer;
+  sel.addEventListener('change', () => { SIM.layer = sel.value; paintHeat(); updateRoom(); });
+  const lab = el('label', { class: 'f' }, 'Coverage shown ');
+  lab.append(sel);
+  const pb = el('button', { type: 'button' }, 'Remove the person (empty room)');
+  pb.addEventListener('click', togglePresent);
+  add(bar, lab, pb);
+  add(host, bar);
+
+  const dl = el('dl');
+  const pos = el('dd'), cov = el('dd'), truth = el('dd');
+  add(dl, el('dt', null, 'Person — an input we set'), pos,
+    el('dt', null, 'Simulator predicts here'), cov,
+    el('dt', null, 'Breathing we told it to generate'), truth);
+  add(host, dl);
+
+  const key = el('div', { class: 'covkey' });
+  const legendNote = el('p', { class: 'hint' });
+  add(host, key, legendNote);
+
+  const hint = el('p', { class: 'hint' });
+  add(hint, document.createTextNode('Drag the handle, or click anywhere in the room. With the handle focused, '));
+  add(hint, el('kbd', null, '←↑↓→'), document.createTextNode(' move it by ' + num(stepM(), 2) + ' m and '));
+  add(hint, el('kbd', null, 'Shift'), document.createTextNode(' + arrow by 1 m.'));
+  add(host, hint);
+
+  const errLine = el('p', { class: 'hint', role: 'alert' });
+  add(host, errLine);
+
+  SIM.els = { svg: g, heat, person, tag, pos, cov, truth, present: pb, key, legendNote, err: errLine, X, Y, SC, w, h };
+  attachRoomInput();
+  paintHeat();
+}
+
+/** Repainted on a layer change only — the cells are not interactive. */
+function paintHeat() {
+  const e = SIM.els;
+  if (!e) return;
+  const c = SIM.cov, vals = covValues();
+  e.heat.replaceChildren();
+  e.key.replaceChildren();
+  if (!c || !vals) {
+    e.legendNote.textContent = SIM.covFailed
+      ? 'The gateway did not return a coverage map, so none is drawn. Nothing is substituted for it.'
+      : 'Loading the coverage map…';
+    return;
+  }
+  const r = c.res_m, half = r / 2, side = fx(r * e.SC) + 0.5;
+  const titles = c.w * c.h <= COV_TITLE_MAX_CELLS;
+  let lo = Infinity, hi = -Infinity, drawn = 0;
+  const counts = COV_BANDS.map(() => 0);
+  const frag = document.createDocumentFragment();
+  for (let iy = 0; iy < c.h; iy++) {
+    for (let ix = 0; ix < c.w; ix++) {
+      const v = vals[iy * c.w + ix];
+      const band = covBandOf(v);
+      if (band < 0) continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+      counts[band]++; drawn++;
+      const x = c.origin_m[0] + ix * r, y = c.origin_m[1] + iy * r;
+      const cell = svg('rect', {
+        class: 'cell', x: fx(e.X(x - half)), y: fx(e.Y(y + half)),
+        width: side, height: side, fill: 'var(--cov' + band + ')', opacity: 0.92,
+      });
+      if (titles) {
+        add(cell, svg('title')).lastChild.textContent =
+          num(x, 2) + ' m, ' + num(y, 2) + ' m: ' + num(v, 2) + ' — ' + COV_BANDS[band].short;
+      }
+      frag.append(cell);
+    }
+  }
+  e.heat.append(frag);
+  COV_BANDS.forEach((b, i) => {
+    const item = el('span');
+    const sw = el('i');
+    sw.style.background = 'var(--cov' + i + ')';
+    add(item, sw, document.createTextNode(b.range + ' — ' + b.short
+      + (counts[i] ? ' (' + Math.round((100 * counts[i]) / drawn) + '% of the room)' : '')));
+    e.key.append(item);
+  });
+  const units = c.units || 'relative breathing sensitivity';
+  e.legendNote.textContent = 'SYNTHETIC. This is not a measurement of a room. It is the simulator’s own '
+    + 'Fresnel model, asked at every cell: if a simulated torso stood here and breathed, how strongly '
+    + 'would this link’s best subcarrier move? Scale: ' + units + '. Values run ' + num(lo, 2) + ' to '
+    + num(hi, 2) + ' at ' + num(r, 2) + ' m per cell, '
+    + (SIM.layer === 'best' ? 'taking the best link at each point. ' : 'for one link alone. ')
+    + 'Nothing here was sensed; the map is a prediction for this fixed geometry and does not change as '
+    + 'the person moves. It is drawn at ' + num(r, 2) + ' m because the pattern goes from peak to null '
+    + 'in about 3 cm — a coarser grid aliases it and would disagree with the panel on the right.';
+}
+
+function updateRoom() {
+  const e = SIM.els;
+  if (!e) return;
+  const p = SIM.person || { x_m: 0, y_m: 0 };
+  e.person.setAttribute('transform', 'translate(' + fx(e.X(p.x_m)) + ' ' + fx(e.Y(p.y_m)) + ')');
+  e.person.style.display = SIM.present ? '' : 'none';
+  // Against the bottom wall the label would land on the axis numbers.
+  e.tag.setAttribute('y', p.y_m < 0.8 ? -24 : 32);
+  const where = num(p.x_m, 2) + ' m across, ' + num(p.y_m, 2) + ' m up';
+  e.person.setAttribute('aria-label', 'Ground-truth person position, an input: ' + where
+    + '. Arrow keys move by ' + num(stepM(), 2) + ' metres, Shift and arrow by 1 metre.');
+  e.pos.textContent = SIM.present ? where : 'removed — the simulated room is empty';
+
+  const cv = SIM.present ? covAt(p.x_m, p.y_m) : null;
+  e.cov.textContent = !SIM.present ? '—'
+    : cv == null ? 'no coverage value published for this cell'
+    : num(cv, 2) + ' — ' + COV_BANDS[covBandOf(cv)].short;
+
+  const t = (SIM.cfg && SIM.cfg.truth) || {};
+  e.truth.textContent = !SIM.present ? 'nobody in the room'
+    : t.breathing ? num(t.bpm, 1) + ' BPM' + (t.in_pause ? ', currently in a simulated pause' : '')
+      + (t.still ? ', still' : ', moving')
+    : 'none — we did not give this simulated body breathing motion';
+
+  e.present.textContent = SIM.present ? 'Remove the person (empty room)' : 'Put the person back';
+  e.err.textContent = SIM.postErr;
+}
+
+/** Pointer and keyboard both end in moveTo; nothing else moves the marker. */
+function moveTo(x_m, y_m, src) {
+  const e = SIM.els;
+  if (!e || !SIM.present) return;
+  const x = Math.min(Math.max(x_m, 0), e.w), y = Math.min(Math.max(y_m, 0), e.h);
+  SIM.person = { x_m: x, y_m: y };
+  updateRoom();
+  queuePerson(x, y);
+  if (src === 'key') announcePerson();
+}
+function announcePerson() {
+  const p = SIM.person;
+  if (!p) return;
+  const cv = covAt(p.x_m, p.y_m);
+  exAnnounce('Person at ' + num(p.x_m, 2) + ' metres across, ' + num(p.y_m, 2) + ' metres up'
+    + (cv == null ? '.' : '. Coverage here ' + num(cv, 2) + ', ' + COV_BANDS[covBandOf(cv)].short + '.'));
+}
+
+function attachRoomInput() {
+  const e = SIM.els, g = e.svg;
+  const roomPoint = (ev) => {
+    const m = g.getScreenCTM && g.getScreenCTM();
+    if (!m) return null;
+    let q;
+    if (g.createSVGPoint) { const pt = g.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; q = pt.matrixTransform(m.inverse()); }
+    else { q = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse()); }
+    return { x_m: (q.x - EX_PAD) / e.SC, y_m: e.h - (q.y - EX_PAD) / e.SC };
+  };
+  g.addEventListener('pointerdown', (ev) => {
+    if (!SIM.present) return;
+    const p = roomPoint(ev);
+    const onHandle = e.person.contains(ev.target);
+    // A press in the margin is not a command to teleport the person.
+    if (!p || (!onHandle && !(p.x_m >= -0.15 && p.y_m >= -0.15 && p.x_m <= e.w + 0.15 && p.y_m <= e.h + 0.15))) return;
+    ev.preventDefault();
+    SIM.drag = ev.pointerId;
+    try { g.setPointerCapture(ev.pointerId); } catch (err) { /* capture is an optimisation */ }
+    if (!onHandle) moveTo(p.x_m, p.y_m, 'pointer');
+    e.person.focus({ preventScroll: true });
+  });
+  const end = (ev) => {
+    if (SIM.drag !== ev.pointerId) return;
+    SIM.drag = null;
+    try { g.releasePointerCapture(ev.pointerId); } catch (err) { /* already released */ }
+    // The position the pointer stopped on is always sent, whatever the
+    // throttle was doing when the button came up.
+    if (SIM.person) queuePerson(SIM.person.x_m, SIM.person.y_m);
+    announcePerson();
+  };
+  g.addEventListener('pointermove', (ev) => {
+    if (SIM.drag !== ev.pointerId) return;
+    // A pointerup can be lost — to a tab switch, a dialog, a devtools
+    // pause. Without this the marker would follow the mouse forever.
+    if (ev.buttons === 0) { end(ev); return; }
+    const p = roomPoint(ev);
+    if (p) moveTo(p.x_m, p.y_m, 'pointer');
+  });
+  g.addEventListener('pointerup', end);
+  g.addEventListener('pointercancel', end);
+  e.person.addEventListener('keydown', (ev) => {
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[ev.key];
+    if (!d || !SIM.person) return;
+    ev.preventDefault();
+    const step = ev.shiftKey ? 1 : stepM();
+    moveTo(SIM.person.x_m + d[0] * step, SIM.person.y_m + d[1] * step, 'key');
+  });
+}
+
+// ---- what the system recovers ---------------------------------------
+function renderExplorerRight() {
+  const host = $('#ex-right');
+  if (!SIM.cfg) return;
+  const id = SIM.cfg.space_id;
+  host.replaceChildren();
+  add(host, el('h3', null, 'What the system actually recovers'));
+  add(host, el('p', { class: 'meta' },
+    'The real DSP, fed the simulated CSI through the same ingest path as a sensor. '
+    + 'No position appears here: a one-antenna link cannot measure one.'));
+
+  const s = S.spaces.find((x) => x.space_id === id);
+  if (!s) {
+    add(host, el('p', { class: 'muted' }, 'The gateway has not published a state for “' + id
+      + '” yet, or your account cannot see that space. Nothing is substituted for it.'));
+    return;
+  }
+  add(host, verdictBox(s));
+
+  const badges = el('div', { class: 'badges' });
+  badges.append(s.vitals ? el('span', { class: 'badge', 'data-k': 'ok' }, 'vitals: consented')
+    : el('span', { class: 'badge' }, 'vitals: off for this space'));
+  badges.append(el('span', { class: 'badge', 'data-k': 'warn' }, 'synthetic input'));
+  add(host, badges);
+
+  const kind = stateOf(s);
+  const dl = el('dl');
+  const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
+  row('Occupancy', stateWord(kind) + (kind === 'blind' ? ' — no usable link, which is not “empty”' : ''));
+  if (kind === 'occ' && s.occupied_since_s != null && s.t_s != null) row('Occupied for', dur(s.t_s - s.occupied_since_s));
+  row('Motion index', num(s.motion_index, 2) + ' × the empty-room level');
+  if (kind === 'occ') row('Still for', dur(s.still_for_s));
+  if (!s.vitals) {
+    row('Breathing', 'not consented for this space — nothing is measured, simulated or not');
+  } else if (!('breathing' in s)) {
+    row('Breathing', 'this space has consented, but your role is not permitted to see it');
+  } else if (s.breathing) {
+    row('Breathing', num(s.breathing.bpm, 1) + ' BPM from link ' + linkName(s.breathing.link));
+    row('Confidence', num(s.breathing.confidence, 2));
+  } else {
+    row('Breathing', 'no confident estimate — the estimator abstains rather than guess');
+  }
+  row('Links usable', (s.links_usable ?? 0) + ' of ' + (s.links_total ?? 0));
+  add(host, dl);
+
+  for (const a of s.alerts || []) add(host, alertBox(a, s));
+}
+
+/**
+ * The comparison, in words. This is the point of the view: when the
+ * right-hand column loses a person the left-hand column is still holding,
+ * it has to be unmissable.
+ */
+function verdictBox(s) {
+  const t = (SIM.cfg && SIM.cfg.truth) || {};
+  const here = SIM.present && t.present !== false;
+  const sees = stateOf(s);
+  const vitals = !!s.vitals, shown = ('breathing' in s), b = s.breathing;
+  let kind, head;
+  if (!here) {
+    if (sees === 'occ') { kind = 'bad'; head = 'The system reports someone in an empty room.'; }
+    else if (sees === 'blind') { kind = 'warn'; head = 'The room is empty — and the system cannot see it either way.'; }
+    else { kind = 'ok'; head = 'Empty room, and the system agrees.'; }
+  } else if (sees === 'blind') {
+    kind = 'bad'; head = 'The system has lost the person — it cannot see this space at all.';
+  } else if (sees === 'empty') {
+    kind = 'bad'; head = 'The system has lost the person.';
+  } else if (vitals && shown && t.breathing && !b) {
+    kind = 'warn'; head = 'The system sees someone, but has lost their breathing.';
+  } else if (vitals && shown && b && t.breathing && isFinite(t.bpm) && Math.abs(b.bpm - t.bpm) > BPM_TOL) {
+    // A confident number that is not the right number is the worst of
+    // the three outcomes, and the old headline called it a success. The
+    // comparison is two published rates side by side — the simulator's
+    // input and the DSP's output — not anything this page computed.
+    kind = 'bad'; head = 'The system sees the person, but reports the wrong breathing rate.';
+  } else {
+    kind = 'ok'; head = 'The system sees the person.';
+  }
+
+  const box = el('div', { class: 'verdict', 'data-k': kind });
+  add(box, el('strong', null, head));
+  add(box, el('p', null, 'Ground truth: ' + (here
+    ? 'we placed them at ' + num(t.x_m ?? (SIM.person || {}).x_m, 2) + ' m, ' + num(t.y_m ?? (SIM.person || {}).y_m, 2) + ' m'
+      + (t.breathing ? ', and told the simulator to breathe them at ' + num(t.bpm, 1) + ' BPM'
+          + (t.in_pause ? ' (in a pause right now)' : '')
+        : ', with no breathing motion')
+      + (t.still ? ', still' : ', moving')
+    : 'nobody in the room') + '.'));
+  add(box, el('p', null, 'The system sees: '
+    + (sees === 'occ' ? 'occupied' : sees === 'empty' ? 'empty' : 'cannot see — no usable link')
+    + (!vitals ? ', vital signs not consented for this space'
+      : !shown ? ', breathing not shown to your role'
+      : b ? ', breathing ' + num(b.bpm, 1) + ' BPM at confidence ' + num(b.confidence, 2)
+      : ', no confident breathing estimate') + '.'));
+
+  if (here && (kind === 'bad' || kind === 'warn')) {
+    const p = SIM.person || {};
+    const cv = covAt(p.x_m, p.y_m);
+    const lost = sees !== 'occ' || !b;
+    let why;
+    if (!lost) {
+      why = 'Ground truth is ' + num(t.bpm, 1) + ' BPM; the estimator returned ' + num(b.bpm, 1)
+        + ' BPM at confidence ' + num(b.confidence, 2) + '. A high confidence is a statement about the '
+        + 'signal, not a guarantee of the rate — compare the two columns, never the confidence alone.';
+    } else if (cv == null) {
+      why = 'The simulator publishes no predicted sensitivity for this cell, so this view will not offer '
+        + 'a reason. The system is reporting that it cannot see, rather than guessing — that abstention '
+        + 'is the behaviour this view exists to show.';
+    } else if (covBandOf(cv) <= 1) {
+      why = 'The simulator predicts ' + num(cv, 2) + ' (' + COV_BANDS[covBandOf(cv)].short
+        + ') for a chest at this spot, and the pipeline did indeed lose them. The prediction and the '
+        + 'result agree here. The system is reporting that it cannot see, rather than guessing — that '
+        + 'abstention is the behaviour this view exists to show.';
+    } else {
+      // The map is a model. When it and the pipeline disagree, say so
+      // rather than quoting the map as if it were the explanation.
+      why = 'Note the disagreement: the simulator predicted ' + num(cv, 2) + ' ('
+        + COV_BANDS[covBandOf(cv)].short + ') for a chest at this spot, yet the pipeline lost them '
+        + 'anyway. The map is the simulator’s model of the channel; the right-hand column is what the '
+        + 'DSP actually recovered. Where they differ, the right-hand column is the one that is about '
+        + 'this system’s behaviour.';
+    }
+    add(box, el('p', { class: 'why' }, why));
+  }
+  add(box, el('p', { class: 'why' },
+    'Both columns describe the same instant. The left is what the simulator was told; the right is what '
+    + 'the signal processing got back from it.'));
+
+  if (head !== SIM.said) { SIM.said = head; exAnnounce(head); }
+  return box;
+}
+
 // ------------------------------------------------------------- live feed
 let ws = null, retry = 1000, pollTimer = null, tickTimer = null;
 
@@ -1242,6 +2000,7 @@ function onState(spaces, t_s) {
   S.lastState = Date.now();
   syncSpaceSelectors();
   if (S.tab === 'overview') renderOverview();
+  if (S.tab === 'explorer') renderExplorerRight();
   renderShell();
 }
 
@@ -1293,6 +2052,7 @@ function scheduleReconnect() {
 function stopLive() {
   if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already gone */ } ws = null; }
   stopPolling();
+  stopSimTimer();
   if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
 }
 

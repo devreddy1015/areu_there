@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>How it works — Saans</title>
+<meta name="description" content="The eight stages between a WiFi packet and an occupancy decision, the four signals a link gives and the confidence on each, and why a second link covers the blind spot the first one has.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="how">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how" aria-current="page">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/room-sim" data-page="room-sim">room sim</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label" data-reveal="rise">the pipeline</p>
+  <h1 id="page-title" class="display" data-reveal="rise">how it works</h1>
+  <div class="how-lead" data-reveal="rise" style="--i:1">
+    <p class="lead">A dedicated transmitter gives the receiver a channel to measure. The receiver turns 20 channel snapshots a second into one 68-byte summary, twice a second. The gateway fuses those links into a space and decides what to report, and when to stay silent.</p>
+    <a class="link" href="#signals">skip to the results</a>
+  </div>
+</section>
+
+<section class="section" id="pipeline" aria-label="the pipeline">
+  <div class="wrap run">
+    <div class="run-intro" data-reveal="rise">
+      <div class="flow" aria-label="Where each stage runs">
+        <div class="flow-group">
+          <span class="flow-head"><span>tx node</span><span>esp-now · 50 Hz</span></span>
+          <span class="flow-step" data-step="0">beacon, 12 bytes</span>
+        </div>
+        <div class="flow-group">
+          <span class="flow-head"><span>rx node</span><span>c++ · float32 · no heap</span></span>
+          <span class="flow-step" data-step="0">capture CSI</span>
+          <span class="flow-step" data-step="1">fill the gaps</span>
+          <span class="flow-step" data-step="2">suppress the room</span>
+          <span class="flow-step" data-step="3">fuse subcarriers</span>
+          <span class="flow-step" data-step="4">presence</span>
+          <span class="flow-step" data-step="5">breathing</span>
+          <span class="flow-step" data-step="6">feature frame + consent gate</span>
+          <span class="flow-out">→ 68 B · 2 Hz · UDP</span>
+        </div>
+        <div class="flow-group">
+          <span class="flow-head"><span>gateway</span><span>rust · f64</span></span>
+          <span class="flow-step" data-step="7">fuse links → detectors → events</span>
+        </div>
+      </div>
+      <p class="small muted">The same stages exist three times, in Python, Rust and C++, and all three must agree on the same golden vectors.</p>
+    </div>
+    <ol class="phases">
+      <li data-phase="0" data-reveal="rise"><span class="n">01</span><span class="phase-name">Capture</span><span class="body muted">A TX board broadcasts an ESP-NOW frame 50 times a second. The RX board reads the channel state on every subcarrier, at a rate Saans sets rather than one that depends on other network traffic.</span></li>
+      <li data-phase="1" data-reveal="rise"><span class="n">02</span><span class="phase-name">Fill the gaps</span><span class="body muted">Lost packets are interpolated by sequence number, up to one second. Without this, in simulation, 15% loss made a 15 BPM breather read 17.8 BPM at confidence 0.98.</span></li>
+      <li data-phase="2" data-reveal="rise"><span class="n">03</span><span class="phase-name">Suppress the room</span><span class="body muted">Walls and furniture dominate the signal. A slowly varying baseline is subtracted from each subcarrier, and each one is weighted by how much it actually moves.</span></li>
+      <li data-phase="3" data-reveal="rise"><span class="n">04</span><span class="phase-name">Fuse</span><span class="body muted">A weighted collapse to one signal. Optional BNR selection with sign-flip fusion keeps only the subcarriers that carry breathing.</span></li>
+      <li data-phase="4" data-reveal="rise"><span class="n">05</span><span class="phase-name">Presence</span><span class="body muted">Energy in the 0.1–2 Hz band, compared with a threshold learned from 30 s of empty room, with hysteresis so the state doesn't flicker.</span></li>
+      <li data-phase="5" data-reveal="rise"><span class="n">06</span><span class="phase-name">Breathing</span><span class="body muted">Bandpass 0.1–0.5 Hz, decimate, then a Goertzel scan of only the breathing band. The peak comes with a confidence calibrated against noise. Below 0.4, the result means “I don't know”.</span></li>
+      <li data-phase="6" data-reveal="rise"><span class="n">07</span><span class="phase-name">Feature frame</span><span class="body muted">68 bytes, twice a second, with a CRC-32. The consent gate on the node writes every vital-sign field as zero unless the space opted in.</span></li>
+      <li data-phase="7" data-reveal="rise"><span class="n">08</span><span class="phase-name">Space and detectors</span><span class="body muted">The gateway fuses links (k-of-n presence, best-confidence breathing), runs health and system-health detectors, and logs events that record what was seen and how sure the gateway was.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="wrap section" id="signals" aria-labelledby="signals-title">
+  <p class="label" data-reveal="rise">what it measures</p>
+  <h2 id="signals-title" class="statement" data-reveal="rise" style="margin-top:10px">Four signals from one radio link. Each comes with a confidence, and each may abstain.</h2>
+  <p class="fine" style="margin-top:14px" data-reveal="rise">Every number on this page comes from the simulator. None of it has been measured in a real room.</p>
+  <div class="cards4">
+    <article class="card" data-reveal="rise">
+      <span class="big">98.2%</span><span class="big-label">occupancy accuracy, one link</span>
+      <h3 class="title">Presence, including still people</h3>
+      <p class="small muted">Motion energy measured against an empty-room calibration. A still person read as empty 2.1% of the time on one link and 0.4% on two.</p>
+    </article>
+    <article class="card" data-reveal="rise" style="--i:1">
+      <span class="big breath-text">93.9%</span><span class="big-label">within 1 BPM on one link · 100% on three</span>
+      <h3 class="title">Breathing rate</h3>
+      <p class="small muted">A Goertzel scan of the breathing band, 8–24 BPM at rest, with a confidence that abstains instead of guessing. Only in spaces that opted in.</p>
+    </article>
+    <article class="card" data-reveal="rise" style="--i:2">
+      <span class="big">98.7%</span><span class="big-label">precision · 81.5–89.9% of pauses caught</span>
+      <h3 class="title">Breathing pauses</h3>
+      <p class="small muted">Presence held, no gross motion, and breathing-band energy below its own baseline for at least 10 s. None were reported in 70.6 h of timelines that had none.</p>
+    </article>
+    <article class="card" data-reveal="rise" style="--i:3">
+      <span class="big">2&nbsp;Hz</span><span class="big-label">health report from every link</span>
+      <h3 class="title">The system's own health</h3>
+      <p class="small muted">Rate, loss, calibration age and noise floor. A space with no usable link reports “blind”, never “empty”.</p>
+    </article>
+  </div>
+  <div class="weak" data-reveal="rise">
+    <span class="chip st-off"><span class="dot"></span>off by default</span>
+    <p class="small"><b>Heart rate is the weak output.</b> <span class="muted">CSI amplitude is nonlinear in chest movement, so breathing harmonics and intermodulation can outshine the cardiac peak. Gated on confidence it is right 97% of the time, but it abstains on 39% of scenarios. It stays off until it has been measured against a reference.</span></p>
+  </div>
+  <p class="fine" style="margin-top:16px" data-reveal="rise">Held-out seeds 2–7: 252 runs, 187 simulated hours, thresholds tuned on other seeds. SYNTHETIC. The simulator's body never sways or blocks line of sight, and real ESP32 noise is unmeasured.</p>
+</section>
+
+<section class="wrap section" id="links" aria-labelledby="links-title">
+  <p class="label" data-reveal="rise">link diversity</p>
+  <h2 id="links-title" class="statement" data-reveal="rise" style="margin-top:10px">One link can go blind. <em>Two rarely go blind at the same time.</em></h2>
+  <div class="links-grid">
+    <div class="topo" data-reveal="unveil">
+      <div class="topo-bar">
+        <div class="seg" role="group" aria-label="Links in the space">
+          <button type="button" data-links="1" aria-pressed="false">1 link</button>
+          <button type="button" data-links="2" aria-pressed="true">2 links</button>
+          <button type="button" data-links="3" aria-pressed="false">3 links</button>
+        </div>
+        <span class="fine">sensor topology · not to scale</span>
+      </div>
+      <svg viewBox="0 0 480 300" role="img" aria-labelledby="topo-desc">
+        <desc id="topo-desc">One transmitter and up to three receivers. Each link has an elliptical Fresnel zone; links from different angles cover different parts of the space.</desc>
+        <defs>
+          <linearGradient id="fz" x1="0" x2="1"><stop offset="0" stop-color="#ffb547"/><stop offset="0.5" stop-color="#ff6b3d"/><stop offset="1" stop-color="#ff4f79"/></linearGradient>
+        </defs>
+        <rect x="8" y="8" width="464" height="284" rx="14" fill="none" stroke="#2b2a28" stroke-dasharray="4 6"/>
+        <g data-k="1"><ellipse class="fresnel" cx="240" cy="150" rx="196" ry="30" fill="url(#fz)" fill-opacity="0.13" stroke="url(#fz)" stroke-opacity="0.5"/><line class="link-line" x1="56" y1="150" x2="424" y2="150" stroke="#efebe2" stroke-width="1.5"/></g>
+        <g data-k="2"><ellipse class="fresnel" cx="208" cy="98" rx="172" ry="28" transform="rotate(-18.9 208 98)" fill="url(#fz)" fill-opacity="0.13" stroke="url(#fz)" stroke-opacity="0.5"/><line class="link-line" x1="56" y1="150" x2="360" y2="46" stroke="#efebe2" stroke-width="1.5"/></g>
+        <g data-k="3"><ellipse class="fresnel" cx="208" cy="202" rx="172" ry="28" transform="rotate(18.9 208 202)" fill="url(#fz)" fill-opacity="0.13" stroke="url(#fz)" stroke-opacity="0.5"/><line class="link-line" x1="56" y1="150" x2="360" y2="254" stroke="#efebe2" stroke-width="1.5"/></g>
+        <g font-family="Geist Mono, monospace" font-size="12" fill="#9d9890">
+          <rect x="44" y="138" width="24" height="24" rx="6" fill="#efebe2"/><text x="56" y="182" text-anchor="middle">tx 1</text>
+          <g data-node="1"><rect x="412" y="138" width="24" height="24" rx="6" fill="#131313" stroke="#efebe2" stroke-width="1.5"/><text x="424" y="182" text-anchor="middle">rx 2</text></g>
+          <g data-node="2"><rect x="348" y="34" width="24" height="24" rx="6" fill="#131313" stroke="#efebe2" stroke-width="1.5"/><text x="360" y="78" text-anchor="middle">rx 3</text></g>
+          <g data-node="3"><rect x="348" y="242" width="24" height="24" rx="6" fill="#131313" stroke="#efebe2" stroke-width="1.5"/><text x="392" y="258" text-anchor="start">rx 4</text></g>
+        </g>
+      </svg>
+    </div>
+    <div data-reveal="rise" style="--i:1">
+      <p class="body">At 20 MHz an ESP32 sees a narrow slice of spectrum, so a person at the wrong spot on a Fresnel boundary can null every subcarrier at once. No subcarrier trick escapes that: at whole-band blind spots, breathing accuracy stayed near two thirds for every method tested. A second link from another angle rarely shares the same blind spot.</p>
+      <table class="results" style="margin-top:28px" aria-label="Results by number of links, synthetic">
+        <thead><tr><th scope="col">held out, synthetic</th><th scope="col" data-col="1">1 link</th><th scope="col" data-col="2">2 links</th><th scope="col" data-col="3">3 links</th></tr></thead>
+        <tbody>
+          <tr><td>occupancy accuracy</td><td data-col="1">98.2%</td><td data-col="2">99.5%</td><td data-col="3">98.9%</td></tr>
+          <tr><td>still person read as empty</td><td data-col="1">2.1%</td><td data-col="2">0.4%</td><td data-col="3">1.3%</td></tr>
+          <tr><td>breathing reported, still breather</td><td data-col="1">93.6%</td><td data-col="2">100%</td><td data-col="3">100%</td></tr>
+          <tr><td>… within 1 BPM</td><td data-col="1">93.9%</td><td data-col="2">99.9%</td><td data-col="3">100%</td></tr>
+          <tr><td>breathing pauses caught</td><td data-col="1">81.5%</td><td data-col="2">89.9%</td><td data-col="3">88.7%</td></tr>
+        </tbody>
+      </table>
+      <p class="fine" style="margin-top:12px">More links are not always better: a third link slightly raised false occupancy here. 248 true pauses of 10–40 s were scored, with 98.5–98.7% precision.</p>
+    </div>
+  </div>
+  <div class="position">
+    <div data-reveal="rise">
+      <p class="label">position</p>
+      <h3 class="title" style="margin-top:8px">Where in the room? Not yet.</h3>
+    </div>
+    <div data-reveal="rise" style="--i:1">
+      <p class="body ink-soft">We tested radio tomographic imaging on 4–12 simulated single-antenna nodes. In all 15 configurations it lost to a six-line weighted-link-midpoint estimator (0.71 m median error, synthetic), and it answered only 13–18% of the time. Until a real mesh shows it can do better, Saans reports per space, not per position.</p>
+    </div>
+  </div>
+</section>
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/demo"><b>See it run<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Watch the pipeline work, and watch it fail, on a simulated room.</p></a>
+    <a href="/evidence"><b>Check the numbers<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Every figure on this page, with the scenario count behind it.</p></a>
+    <a href="/hardware"><b>What it runs on<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Two ESP32-S3 boards for a room. Three if breathing matters.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+</body>
+</html>

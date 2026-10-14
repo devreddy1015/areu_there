@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "title": "Material electrical constants for Saans scenes",
+  "source": "ITU-R P.2040 Table 3 (\"Material properties\"), Recommendation ITU-R P.2040: Effects of building materials and structures on radiowave propagation above about 100 MHz. 'drywall' is the table's 'plasterboard'.",
+  "formula": {
+    "relative_permittivity": "epsilon_r' = a * f_GHz^b",
+    "conductivity_s_per_m": "sigma = c * f_GHz^d",
+    "imaginary_permittivity": "epsilon_r'' = sigma / (2 * pi * f_Hz * epsilon_0), epsilon_0 = 8.8541878128e-12 F/m; at f in GHz this is 17.9751036 * sigma / f_GHz",
+    "reflection_normal": "|Gamma| at normal incidence from air onto a half-space: Gamma = (1 - sqrt(eta)) / (1 + sqrt(eta)), eta = epsilon_r' - j*epsilon_r''"
+  },
+  "evaluated_at_ghz": 2.437,
+  "evaluated_at_note": "2.437 GHz is 802.11 channel 6, the carrier the whole repository already uses (SimOptions::default, wifisense/sources/synthetic.py). Values are stored to 9 significant digits so they can be re-derived from a, b, c, d and checked, which both test suites do.",
+  "caveats": [
+    "PROVENANCE. The a, b, c, d coefficients were written down from ITU-R P.2040 Table 3 without the Recommendation open alongside. The derived columns are arithmetic and are checked by both test suites, so an error in a coefficient propagates silently into a correct-looking table. Before anyone quotes these outside this repository, check the six rows against a copy of the Recommendation; 'brick' is the row most worth checking first.",
+    "reflection_normal is a single flat air/material interface, not a slab. A real wall has two interfaces and internal reflections (ITU-R P.2040 section 5.2); for a thin sheet such as drywall the slab response differs substantially and is frequency- and thickness-dependent. Treat the stored number as an order-of-magnitude bridge to the simulator's scalar wall_reflection, not as the reflectivity of a finished wall.",
+    "These are the generic table values. Real concrete varies with moisture and reinforcement by more than the difference between two rows here; reinforcement (rebar) is a conductive grid the table does not model at all.",
+    "Nothing in this file has been checked against a measurement made with this hardware. It is a sourced default, not a calibration."
+  ],
+  "materials": {
+    "concrete": {
+      "itu_p2040": { "a": 5.24, "b": 0.0, "c": 0.0462, "d": 0.7822, "valid_ghz": [1.0, 100.0] },
+      "at_2437_mhz": {
+        "epsilon_r": 5.24,
+        "sigma_s_per_m": 0.0927342941,
+        "epsilon_imag": 0.684000223,
+        "reflection_normal": 0.395021516
+      },
+      "confidence": "high",
+      "note": "0.395 is within 1.3% of the 0.4 the existing simulator already uses for wall_reflection (rust/crates/saans-sim/src/scenario.rs, Room::default). That agreement was not arranged; it is a useful check that the scalar in the simulator is a concrete-like wall."
+    },
+    "brick": {
+      "itu_p2040": { "a": 3.91, "b": 0.0, "c": 0.0238, "d": 0.16, "valid_ghz": [1.0, 10.0] },
+      "at_2437_mhz": {
+        "epsilon_r": 3.91,
+        "sigma_s_per_m": 0.0274456703,
+        "epsilon_imag": 0.202436917,
+        "reflection_normal": 0.328816658
+      },
+      "confidence": "medium",
+      "note": "The exponent d = 0.16 is far flatter than the other rows (0.78-1.34) and it is the coefficient I am least sure I have recalled correctly. The narrower validity range, 1-10 GHz, is also particular to this row. 2.437 GHz is inside it, but check this row against a copy of the Recommendation before quoting it anywhere load-bearing."
+    },
+    "drywall": {
+      "itu_p2040": { "a": 2.73, "b": 0.0, "c": 0.0085, "d": 0.9395, "valid_ghz": [1.0, 100.0] },
+      "at_2437_mhz": {
+        "epsilon_r": 2.73,
+        "sigma_s_per_m": 0.0196277128,
+        "epsilon_imag": 0.144772331,
+        "reflection_normal": 0.246613732
+      },
+      "confidence": "high",
+      "note": "ITU-R P.2040 calls this 'plasterboard'. The slab caveat bites hardest here: a 12.5 mm sheet is a thin layer at 12.3 cm wavelength and its real reflectivity swings with thickness."
+    },
+    "glass": {
+      "itu_p2040": { "a": 6.31, "b": 0.0, "c": 0.0036, "d": 1.3394, "valid_ghz": [0.1, 100.0] },
+      "at_2437_mhz": {
+        "epsilon_r": 6.31,
+        "sigma_s_per_m": 0.0118701661,
+        "epsilon_imag": 0.0875533301,
+        "reflection_normal": 0.430552365
+      },
+      "confidence": "high",
+      "note": "Plain glass. Low-emissivity (coated) glazing carries a metallic film and behaves nothing like this; the Recommendation treats it separately and this table has no row for it."
+    },
+    "wood": {
+      "itu_p2040": { "a": 1.99, "b": 0.0, "c": 0.0047, "d": 1.0718, "valid_ghz": [0.001, 100.0] },
+      "at_2437_mhz": {
+        "epsilon_r": 1.99,
+        "sigma_s_per_m": 0.0122103922,
+        "epsilon_imag": 0.0900628087,
+        "reflection_normal": 0.17097868
+      },
+      "confidence": "high",
+      "note": "Dry wood. Moisture raises both constants sharply and the table does not parameterise it."
+    },
+    "metal": {
+      "itu_p2040": { "a": 1.0, "b": 0.0, "c": 10000000.0, "d": 0.0, "valid_ghz": [1.0, 100.0] },
+      "at_2437_mhz": {
+        "epsilon_r": 1.0,
+        "sigma_s_per_m": 10000000.0,
+        "epsilon_imag": 73759144.8,
+        "reflection_normal": 0.999835346
+      },
+      "confidence": "high",
+      "note": "A conductor: reflects essentially everything, transmits essentially nothing. A steel almirah is an opaque screen in this band, not a lossy dielectric. Object material only; no wall in these scenes is metal."
+    },
+    "fabric": {
+      "itu_p2040": null,
+      "at_2437_mhz": null,
+      "confidence": "none",
+      "note": "ITU-R P.2040 Table 3 has no row for fabric, and I am not confident of a permittivity for upholstery from any source I can cite, so none is given rather than invented. A sofa carries this material as a LABEL for the viewer; any physics layer must refuse it until someone supplies a sourced value. Upholstered furniture is in any case mostly air, foam and a human-scale amount of water, and behaves more like a weak lossy scatterer than like a wall."
+    }
+  }
+}

@@ -31,6 +31,25 @@
 //! `tests/parity.rs` reproduces the Python scene's golden vectors
 //! (`spec/golden/sim_geometric`) to ~1e-13.
 //!
+//! ## Driving it by hand
+//!
+//! A scripted timeline is not the only way to move the body.
+//! [`Simulator::set_position_override`] pins it wherever a caller says and
+//! [`Simulator::set_present`] takes it out of the room altogether, both
+//! mid-run and without disturbing the sequence counters, the RNG streams
+//! or the static channel — so an interactive explorer can drag a person
+//! around a room and the CSI stays continuous across the change.
+//!
+//! Those positions are an *input*, never an inference: the truth reports
+//! what the caller set. Nothing in this crate recovers a position from
+//! CSI, and a single-antenna link cannot (`docs/CAPABILITY_LIMITS.md`).
+//!
+//! [`Simulator::sensitivity_at`] answers what breathing would do to a link
+//! from an arbitrary point, and [`Simulator::coverage`] evaluates that over
+//! a grid of the whole room: the ground-truth map of where a chest is
+//! detectable and where it falls in a Fresnel null. It is an upper bound
+//! computed from the scenario's geometry — no receiver can measure it.
+//!
 //! ## Simplifications (beyond the reference's own: 2-D, no AGC, no CFO)
 //!
 //! - The torso faces every link (spread across *that link's* bisector),
@@ -43,6 +62,18 @@
 //!   people have no postural sway.
 //! - Phases are the clean channel phase (no CFO/SFO), so they are far
 //!   better than what an ESP32 reports. Use amplitudes.
+//!
+//! [`impair`] models the receiver those simplifications are about — AGC,
+//! random per-packet phase, timing slope, static per-device ripple,
+//! int8 I/Q — as a separate stage applied after the clean channel. It is
+//! OFF BY DEFAULT and nothing above changes when it is on: the clean
+//! channel is the contract with the Python and C++ implementations
+//! (`tests/parity.rs`). Its own realism is UNVERIFIED — see the module.
+//!
+//! [`wire`] puts the result in the raw-CSI datagram the firmware emits
+//! and the gateway already parses (`spec/wire.md` §1), so a simulated
+//! node and a bench node feed the gateway through one decoder. It, too,
+//! does nothing unless a caller asks for it.
 //!
 //! ## Use
 //!
@@ -60,15 +91,23 @@
 //! # let _ = events;
 //! ```
 
+pub mod impair;
 pub mod physics;
 mod plan;
 pub mod rng;
 pub mod scenario;
+pub mod scene;
 pub mod scenarios;
 mod sim;
+pub mod wire;
 
+pub use impair::{BinLayout, ImpairConfig, NodeImpairment};
 pub use plan::{
     ARM_OFFSET_M, ARM_SWING_M, BREATHING_AMPLITUDE_M, DEFAULT_BPM, FALL_S, HEART_AMPLITUDE_M, HEART_BPM, MARGIN_M, PAUSE_RAMP_S, SIT_DOWN_DROP_M, SIT_DOWN_S,
 };
 pub use scenario::{Activity, Node, Point, Room, Scatterer, Scenario, Segment, SimOptions, Truth, TruthEvent, TruthKind};
-pub use sim::{LinkFrame, Simulator, Tick, RSSI_REF_DBM};
+pub use scene::{
+    MaterialConstants, ObjectMaterial, ObjectType, Person, Phone, Scene, SceneError, SceneNode, SceneObject, SceneRoom, Wall, WallMaterial, MATERIALS, MATERIAL_REFERENCE_GHZ, SCHEMA_VERSION,
+};
+pub use sim::{Coverage, LinkFrame, Simulator, Tick, MAX_COVERAGE_CELLS, RSSI_REF_DBM};
+pub use wire::{RawNode, RawNodes};

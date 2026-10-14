@@ -1,13 +1,18 @@
-//! `saans-gateway --config saans.toml` (live) or
-//! `saans-gateway --config saans.toml --replay rec.pcap [--speed 0] [--events-out ev.jsonl]`.
+//! `saans-gateway --config saans.toml` (live),
+//! `saans-gateway --config saans.toml --replay rec.pcap [--speed 0] [--events-out ev.jsonl]`,
+//! or `saans-gateway --config saans.toml --simulate` (the sensing
+//! explorer: a SYNTHETIC room through the real pipeline).
 
-use clap::Parser;
-use saans_gateway::{log, ClockMode, Gateway, GatewayConfig, ReplayOptions};
+use clap::{ArgGroup, Parser};
+use saans_gateway::{log, ClockMode, Gateway, GatewayConfig, ReplayOptions, SimGateway, SimulateOptions};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 #[derive(Debug, Parser)]
 #[command(name = "saans-gateway", version, about = "Saans gateway: camera-free WiFi health and safety sensing")]
+// `--speed` paces whichever of the two offline sources is running, so it
+// requires one of them rather than naming just `--replay`.
+#[command(group(ArgGroup::new("source").args(["replay", "simulate"])))]
 struct Args {
     /// Configuration file (TOML; see saans.example.toml).
     #[arg(long, short, default_value = "saans.toml")]
@@ -15,9 +20,17 @@ struct Args {
     /// Replay a pcap recording instead of listening on UDP.
     #[arg(long, value_name = "FILE.pcap")]
     replay: Option<PathBuf>,
-    /// Replay speed: 0 = as fast as possible (deterministic), 1 = real time.
-    #[arg(long, default_value_t = 0.0, requires = "replay")]
-    speed: f64,
+    /// Run the sensing explorer: a SIMULATED room driven through the
+    /// real DSP, fusion and detectors. Serves the API and dashboard the
+    /// way live mode does and binds no UDP port, because there are no
+    /// sensors. Every value it publishes is synthetic.
+    #[arg(long)]
+    simulate: bool,
+    /// Replay / simulate speed: 0 = as fast as possible, 1 = real time,
+    /// 10 = ten times faster. Default: 0 for --replay (deterministic),
+    /// 1 for --simulate.
+    #[arg(long, requires = "source")]
+    speed: Option<f64>,
     /// Also write the replay's events as JSON lines.
     #[arg(long, value_name = "FILE.jsonl", requires = "replay")]
     events_out: Option<PathBuf>,
@@ -54,7 +67,11 @@ fn main() -> ExitCode {
         println!("{}: OK ({} spaces)", args.config.display(), cfg.spaces.len());
         return ExitCode::SUCCESS;
     }
-    if !(args.speed >= 0.0 && args.speed.is_finite()) {
+    // Replay defaults to "as fast as possible" because its output is a
+    // summary; the explorer defaults to real time because its output is
+    // a room someone is watching.
+    let speed = args.speed.unwrap_or(if args.simulate { 1.0 } else { 0.0 });
+    if !(speed >= 0.0 && speed.is_finite()) {
         eprintln!("saans-gateway: --speed must be >= 0");
         return ExitCode::from(2);
     }
@@ -65,9 +82,10 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let result = match args.replay.clone() {
-        Some(pcap) => rt.block_on(run_replay(cfg, args, pcap)),
-        None => rt.block_on(run_live(cfg)),
+    let result = match (args.simulate, args.replay.clone()) {
+        (true, _) => rt.block_on(run_simulate(cfg, speed)),
+        (false, Some(pcap)) => rt.block_on(run_replay(cfg, args, speed, pcap)),
+        (false, None) => rt.block_on(run_live(cfg)),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -128,8 +146,32 @@ async fn run_live(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-async fn run_replay(cfg: GatewayConfig, args: Args, pcap: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let opts = ReplayOptions { pcap, speed: args.speed, events_out: args.events_out, port: args.port };
+/// The sensing explorer. Serving is not optional here the way it is for
+/// a replay: a simulate run with nobody watching has no output at all.
+async fn run_simulate(cfg: GatewayConfig, speed: f64) -> Result<(), Box<dyn std::error::Error>> {
+    let gw = SimGateway::start(cfg, SimulateOptions { speed }).await?;
+    let sc = gw.sim.scenario();
+    log(&format!(
+        "SIMULATED {:?} scenario: a {:.0} m x {:.0} m room, {} nodes, {} link(s), {:.0} Hz CSI. Explorer on http://{}/",
+        sc.name,
+        sc.room.size_m.0,
+        sc.room.size_m.1,
+        sc.nodes.len(),
+        sc.links.len(),
+        sc.sample_rate_hz,
+        gw.http_addr,
+    ));
+    log("every value this mode publishes is SYNTHETIC: nothing here measured a real room, body or node");
+    log("the room starts empty on purpose — the detectors calibrate on an empty room first, so the person appears a couple of minutes in (--speed 10 to hurry it along)");
+    shutdown_signal().await;
+    log("stopping");
+    gw.shutdown().await;
+    log("stopped");
+    Ok(())
+}
+
+async fn run_replay(cfg: GatewayConfig, args: Args, speed: f64, pcap: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let opts = ReplayOptions { pcap, speed, events_out: args.events_out, port: args.port };
     if !args.serve {
         let summary = saans_gateway::replay(cfg, &opts, None).await?;
         print!("{summary}");

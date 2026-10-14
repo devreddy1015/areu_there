@@ -196,9 +196,9 @@ inline bool is_notched(float f, const BandPeakParams& p) {
 /// is breathing here" instead of always reporting whatever the largest bin
 /// happened to be.
 ///
-/// Upstream counts zero crossings instead. That is cheaper, but it is biased by
-/// any residual DC offset, degrades badly once a second periodicity (the
-/// heartbeat) rides on the first, and yields no usable confidence signal.
+/// Counting zero crossings would be cheaper. It is not used here because it is
+/// biased by any residual DC offset, degrades badly once a second periodicity
+/// (the heartbeat) rides on the first, and yields no usable confidence signal.
 ///
 /// SCRATCH. When `p.window` is true the caller must supply `scratch` with room
 /// for `n` floats, which receives the windowed copy of the signal; when it is

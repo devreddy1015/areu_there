@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:saans:scene:1",
+  "title": "Saans scene",
+  "description": "A room as DEFINED, not as measured. Everything in this file is SCENE data: somebody typed it, imported it from a LiDAR scan, or measured it with a tape. None of it comes from WiFi. ESP32 CSI at 20 MHz on a single antenna cannot measure room dimensions and cannot recognise furniture (docs/CAPABILITY_LIMITS.md), so a viewer must label these numbers SCENE and never attribute them to the radio.\n\nAXES. x is width_m, y is depth_m, z is height_m, origin at a floor corner, metres throughout (every field says so in its name). y is the second HORIZONTAL axis of the floor plan; z is ELEVATION. This matters because wifisense.localize.geometry.Room calls its second horizontal axis `height_m`: converting a scene to that type maps scene depth_m -> Room.height_m and drops the scene's elevation. Getting that backwards silently rotates the room, so both loaders do the mapping in one documented place (wifisense/scene.py, rust/crates/saans-sim/src/scene.rs).\n\nThis schema is for external tooling. The repository's own loaders validate by hand so that no package has to be installed, and they check things a schema cannot: that objects and nodes are inside the room, that no two nodes share a point, that a polygon's bounding box matches the stated width and depth.",
+  "type": "object",
+  "required": ["schema_version", "room"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Exactly 1 for this revision. A loader that does not know a version must refuse the file rather than guess at it; a changed meaning for an existing field is what the version exists to catch."
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 120,
+      "description": "Short human name for the scene, e.g. 'Bedroom, 4.2 x 3.6 m'."
+    },
+    "description": {
+      "type": "string",
+      "description": "Free text. Say where the dimensions came from (tape measure, floor plan, RoomPlan scan) and how confident they are."
+    },
+    "room": { "$ref": "#/$defs/room" },
+    "walls": {
+      "type": "array",
+      "description": "Wall segments in plan view. A plain rectangular room needs none: the bounds are room.width_m x room.depth_m either way. List them when the materials differ wall to wall, when there are interior walls, or when a 3-D view should draw real thickness.",
+      "items": { "$ref": "#/$defs/wall" }
+    },
+    "objects": {
+      "type": "array",
+      "description": "Furniture and openings, as upright boxes.",
+      "items": { "$ref": "#/$defs/object" }
+    },
+    "nodes": {
+      "type": "array",
+      "description": "ESP32 sensor nodes at surveyed positions. Positions are an input to localization, never an output of it: nothing in this project can self-locate a node (NOTES-localize.md §1).",
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "people": {
+      "type": "array",
+      "description": "Optional initial positions for simulated people. SIM data, not a measurement, and not part of the room.",
+      "items": { "$ref": "#/$defs/person" }
+    },
+    "phone": {
+      "description": "Optional initial position for the one tracked mobile phone.",
+      "$ref": "#/$defs/phone"
+    }
+  },
+  "$defs": {
+    "point2": {
+      "type": "array",
+      "description": "[x, y] in metres on the floor plan.",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "point3": {
+      "type": "array",
+      "description": "[x, y, z] in metres; z is elevation above the floor.",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "wall_material": {
+      "description": "Wall materials, each with ITU-R P.2040 Table 3 coefficients in scenes/materials.json.",
+      "enum": ["concrete", "brick", "drywall", "glass", "wood"]
+    },
+    "object_material": {
+      "description": "Furniture materials. 'fabric' has no ITU-R P.2040 entry and carries no electrical constants; it is a label for the viewer only (scenes/materials.json).",
+      "enum": ["wood", "metal", "fabric", "glass"]
+    },
+    "room": {
+      "type": "object",
+      "description": "The floor plan's bounds. width_m x depth_m is the footprint; height_m is floor-to-ceiling.",
+      "required": ["width_m", "depth_m", "height_m"],
+      "additionalProperties": false,
+      "properties": {
+        "width_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Extent along x."
+        },
+        "depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Extent along y, the second horizontal axis. Maps to wifisense.localize.geometry.Room.height_m."
+        },
+        "height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Floor to ceiling, i.e. ELEVATION. The 2-D localization types have no field for this and drop it."
+        },
+        "polygon_m": {
+          "type": "array",
+          "description": "Floor outline for a non-rectangular room, counter-clockwise, first vertex not repeated at the end. Its bounding box must be [0, width_m] x [0, depth_m]: width_m and depth_m stay the authority on the bounds so a reader who ignores the polygon still gets the right extent.",
+          "minItems": 3,
+          "items": { "$ref": "#/$defs/point2" }
+        }
+      }
+    },
+    "wall": {
+      "type": "object",
+      "required": ["from_m", "to_m", "material", "thickness_m"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "from_m": { "$ref": "#/$defs/point2" },
+        "to_m": { "$ref": "#/$defs/point2" },
+        "material": { "$ref": "#/$defs/wall_material" },
+        "thickness_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2,
+          "description": "Full thickness, centred on the segment. room.width_m x room.depth_m is the CLEAR INTERIOR floor, so a perimeter wall's centreline runs along the boundary and a viewer should draw its thickness outwards rather than eat into the floor. For an interior partition there is no outward side and the slab is symmetric about the segment."
+        },
+        "height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Elevation of the wall top. Defaults to room.height_m when absent."
+        }
+      }
+    },
+    "object": {
+      "type": "object",
+      "description": "An upright box. size_m is [width, depth, height] in the object's own frame before rotation_deg is applied about the vertical axis.",
+      "required": ["type", "centre_m", "size_m", "material"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "type": {
+          "enum": ["bed", "table", "chair", "almirah", "sofa", "door", "window"],
+          "description": "'almirah' is a free-standing wardrobe. 'door' and 'window' are openings drawn inside the wall they sit in."
+        },
+        "centre_m": {
+          "$ref": "#/$defs/point3",
+          "description": "Centre of the box, including in z: a 2.05 m door sits at z = 1.025, not 0."
+        },
+        "size_m": {
+          "$ref": "#/$defs/point3",
+          "description": "[width, depth, height] in metres, all positive. A double bed is about 1.9 x 1.4 m, a single about 1.9 x 0.9 m, an interior door about 0.8 m wide."
+        },
+        "rotation_deg": {
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360,
+          "description": "Counter-clockwise about the vertical axis, 0 when width runs along x. Defaults to 0."
+        },
+        "material": { "$ref": "#/$defs/object_material" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "pos_m"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "0-255 so it fits the u8 node id the wire format and the simulator already use."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Where it physically is, e.g. 'above the door frame'."
+        },
+        "pos_m": { "$ref": "#/$defs/point3" }
+      }
+    },
+    "person": {
+      "type": "object",
+      "description": "Plan view only: the sensing stack is 2-D and assumes chests at a common height (wifisense/localize/geometry.py).",
+      "required": ["pos_m"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "pos_m": { "$ref": "#/$defs/point2" },
+        "height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2.5,
+          "description": "Standing height, for drawing only. Defaults to 1.7."
+        }
+      }
+    },
+    "phone": {
+      "type": "object",
+      "description": "The one tracked handset. It has a z because a phone in a pocket and a phone on a table are at different heights; the 2-D estimators ignore it.",
+      "required": ["pos_m"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "pos_m": { "$ref": "#/$defs/point3" }
+      }
+    }
+  }
+}

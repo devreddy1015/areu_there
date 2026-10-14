@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "name": "Bedroom, 4.2 x 3.6 m",
+  "description": "A one-bed room with a double bed, an almirah, a study desk and one window. SCENE data: these dimensions are typed in, not sensed. Nothing in this file came from a radio. Furniture sizes are ordinary retail sizes (double bed 1.9 x 1.4 m, interior door 0.8 m wide, almirah 1.2 x 0.6 x 2.0 m); the room itself is a plausible 4.2 x 3.6 m rather than a surveyed one. Nodes sit on the walls at 1.2 m, which is chest height and the common height the 2-D localization stack assumes (wifisense/localize/geometry.py).",
+  "room": {
+    "width_m": 4.2,
+    "depth_m": 3.6,
+    "height_m": 2.7
+  },
+  "walls": [
+    { "id": "south", "from_m": [0.0, 0.0], "to_m": [4.2, 0.0], "material": "brick", "thickness_m": 0.23 },
+    { "id": "east", "from_m": [4.2, 0.0], "to_m": [4.2, 3.6], "material": "brick", "thickness_m": 0.115 },
+    { "id": "north", "from_m": [4.2, 3.6], "to_m": [0.0, 3.6], "material": "brick", "thickness_m": 0.23 },
+    { "id": "west", "from_m": [0.0, 3.6], "to_m": [0.0, 0.0], "material": "brick", "thickness_m": 0.115 }
+  ],
+  "objects": [
+    {
+      "id": "door",
+      "type": "door",
+      "centre_m": [1.0, 0.03, 1.025],
+      "size_m": [0.8, 0.06, 2.05],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "window-north",
+      "type": "window",
+      "centre_m": [2.6, 3.57, 1.5],
+      "size_m": [1.2, 0.06, 1.2],
+      "rotation_deg": 0.0,
+      "material": "glass"
+    },
+    {
+      "id": "bed",
+      "type": "bed",
+      "centre_m": [0.75, 1.9, 0.275],
+      "size_m": [1.9, 1.4, 0.55],
+      "rotation_deg": 90.0,
+      "material": "wood"
+    },
+    {
+      "id": "bedside-table",
+      "type": "table",
+      "centre_m": [0.25, 3.05, 0.275],
+      "size_m": [0.45, 0.4, 0.55],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "almirah",
+      "type": "almirah",
+      "centre_m": [3.88, 1.2, 1.0],
+      "size_m": [1.2, 0.6, 2.0],
+      "rotation_deg": 90.0,
+      "material": "metal"
+    },
+    {
+      "id": "desk",
+      "type": "table",
+      "centre_m": [2.6, 3.2, 0.375],
+      "size_m": [1.1, 0.55, 0.75],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    },
+    {
+      "id": "desk-chair",
+      "type": "chair",
+      "centre_m": [2.6, 2.6, 0.45],
+      "size_m": [0.45, 0.45, 0.9],
+      "rotation_deg": 0.0,
+      "material": "wood"
+    }
+  ],
+  "nodes": [
+    { "id": 0, "label": "west wall, beside the bed", "pos_m": [0.1, 0.9, 1.2] },
+    { "id": 1, "label": "east wall, above the skirting", "pos_m": [4.1, 2.4, 1.2] },
+    { "id": 2, "label": "south wall, right of the door", "pos_m": [1.6, 0.1, 1.2] },
+    { "id": 3, "label": "north wall, beside the window", "pos_m": [3.0, 3.5, 1.2] }
+  ],
+  "people": [
+    { "id": "p1", "pos_m": [2.2, 1.6], "height_m": 1.7 }
+  ],
+  "phone": {
+    "id": "phone",
+    "pos_m": [0.25, 3.05, 0.58]
+  }
+}

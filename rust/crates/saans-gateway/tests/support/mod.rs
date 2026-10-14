@@ -96,6 +96,11 @@ impl TestGw {
         get(self.http(), path).await
     }
 
+    /// For the fonts, which are not text.
+    pub async fn get_bytes(&self, path: &str) -> (u16, Vec<(String, String)>, Vec<u8>) {
+        get_bytes(self.http(), path).await
+    }
+
     pub async fn json(&self, path: &str) -> Value {
         let r = self.get(path).await;
         assert_eq!(r.status, 200, "GET {path}: {}", r.body);
@@ -219,8 +224,11 @@ fn dechunk(mut b: &[u8]) -> Vec<u8> {
     }
 }
 
-/// `GET path` over a fresh connection (`Connection: close`).
-pub async fn get(addr: SocketAddr, path: &str) -> Resp {
+/// `GET path` over a fresh connection, body left as bytes.
+///
+/// The site serves woff2, so not every response is text any more and the
+/// UTF-8 assumption in [`get`] would panic on one.
+pub async fn get_bytes(addr: SocketAddr, path: &str) -> (u16, Vec<(String, String)>, Vec<u8>) {
     let fut = async {
         let mut s = TcpStream::connect(addr).await.expect("connect");
         let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nAccept: */*\r\nConnection: close\r\n\r\n");
@@ -240,9 +248,15 @@ pub async fn get(addr: SocketAddr, path: &str) -> Resp {
         } else {
             rest.to_vec()
         };
-        Resp { status, headers, body: String::from_utf8(body).expect("UTF-8 body") }
+        (status, headers, body)
     };
     timeout(IO_TIMEOUT, fut).await.unwrap_or_else(|_| panic!("GET {path} timed out"))
+}
+
+/// `GET path`, body decoded as text.
+pub async fn get(addr: SocketAddr, path: &str) -> Resp {
+    let (status, headers, body) = get_bytes(addr, path).await;
+    Resp { status, headers, body: String::from_utf8(body).expect("UTF-8 body") }
 }
 
 // -------------------------------------------------------------- WebSocket

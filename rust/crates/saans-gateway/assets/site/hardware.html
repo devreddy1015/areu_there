@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Hardware — Saans</title>
+<meta name="description" content="Two ESP32-S3 boards cover one room for about $12–20. What each tier buys, what a gateway needs, and the campus deployments this was designed for.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="hardware">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/room-sim" data-page="room-sim">room sim</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware" aria-current="page">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label" data-reveal="rise">hardware</p>
+  <h1 id="page-title" class="display" data-reveal="rise">what it runs on</h1>
+  <p class="lead" data-reveal="rise" style="--i:1">Three tiers, from one room to a building, each with what it buys and what it cannot do. Then the campus uses the system was designed for. No tier has been built into a real room yet, so the accuracy figures below come from simulation.</p>
+</section>
+
+<section class="wrap section" id="hardware" aria-labelledby="hardware-title">
+  <div class="split-head">
+    <h2 id="hardware-title" data-reveal="rise">hardware</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Start with two boards, and add links where breathing matters. One gateway core keeps up with about 1,200 links.</p>
+  </div>
+  <div class="tiers">
+    <article class="tier" data-reveal="rise">
+      <div class="tier-top"><span class="label">one room</span><span class="chip st-built"><span class="dot"></span>firmware builds</span></div>
+      <h3 class="title">Two ESP32-S3 boards</h3>
+      <p class="price">$12–20<small>for the pair</small></p>
+      <ul>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>One TX and one RX on the same WiFi channel</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Presence, including people sitting still</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Breathing in spaces that opted in</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Docker-pinned build, nothing else to install</li>
+      </ul>
+      <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/edge/README.md">node guide<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    </article>
+    <article class="tier is-rec" data-reveal="rise" style="--i:1">
+      <span class="rec">where breathing matters</span>
+      <div class="tier-top"><span class="label">robust room</span><span class="chip st-sim"><span class="dot"></span>simulated</span></div>
+      <h3 class="title">Three or four boards, two or three links</h3>
+      <p class="price">$18–40<small>for the room</small></p>
+      <ul>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Breathing reported 94% → 100% of the time</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Missed breathing pauses roughly halved</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>k-of-n presence quorum per space</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Time-slotted transmitters (in progress)</li>
+      </ul>
+      <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/docs/adr/006-link-diversity.md">why links beat tricks<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    </article>
+    <article class="tier" data-reveal="rise" style="--i:2">
+      <div class="tier-top"><span class="label">a building</span><span class="chip st-built"><span class="dot"></span>built · awaits sensors</span></div>
+      <h3 class="title">A gateway and many rooms</h3>
+      <p class="price">Pi 5<small>or any mini-PC</small></p>
+      <ul>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Rust gateway: API, WebSocket, /metrics, dashboard</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>About 1,200 links per core, measured</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Event log with 30-day retention</li>
+        <li><svg width="16" height="16" aria-hidden="true"><use href="#i-check"/></svg>Replay recordings through the same pipeline</li>
+      </ul>
+      <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/SAANS_PLAN.md">architecture<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    </article>
+  </div>
+  <p class="fine" style="margin-top:16px" data-reveal="rise">The percentages in these tiers come from simulation and the link figure from a host benchmark, not from boards in a room. Board prices are for ESP32-S3 devkits; the gateway is any small Linux machine. Consumer laptops expose RSSI only, which is enough for crude motion but not for breathing.</p>
+</section>
+
+<section class="wrap section" id="campus" aria-labelledby="campus-title">
+  <div class="split-head">
+    <h2 id="campus-title" data-reveal="rise"><span>built for a </span>campus without cameras</h2>
+    <p class="body muted" data-reveal="rise" style="--i:1">Each use maps to a tier, and each tier states what it cannot do. T0 is built. The others are research or come from existing campus IT.</p>
+  </div>
+  <div class="uses">
+    <div class="use" data-reveal="rise"><div class="use-top"><h3 class="title">Lights and AC off in empty rooms</h3><span class="tier-tag">T0</span></div><p class="small">Room presence, including still people. The highest value at the lowest risk.</p></div>
+    <div class="use" data-reveal="rise" style="--i:1"><div class="use-top"><h3 class="title">Lab lone-worker safety</h3><span class="tier-tag">T0</span></div><p class="small">No motion for N minutes in a lab raises an advisory alert to the warden. It does not replace procedures.</p></div>
+    <div class="use" data-reveal="rise" style="--i:2"><div class="use-top"><h3 class="title">Hostel corridors at night</h3><span class="tier-tag">T0</span></div><p class="small">Motion only, with no identity and no camera where one would never be acceptable.</p></div>
+    <div class="use" data-reveal="rise"><div class="use-top"><h3 class="title">Classroom headcount</h3><span class="tier-tag">T1 · research</span></div><p class="small">Counts in coarse bins, trained per room. It cannot take attendance because it does not know who anyone is.</p></div>
+    <div class="use" data-reveal="rise" style="--i:1"><div class="use-top"><h3 class="title">Library free seats</h3><span class="tier-tag">T2 · research</span></div><p class="small">Zone level at best. Position needs a mesh, and the first simulation says it is hard.</p></div>
+    <div class="use" data-reveal="rise" style="--i:2"><div class="use-top"><h3 class="title">Evacuation sweep</h3><span class="tier-tag">T4 + T0</span></div><p class="small">Building counts from existing access-point analytics plus per-room occupancy. At the building level it counts devices, not people.</p></div>
+  </div>
+</section>
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/how-it-works"><b>What the boards do<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Which stages run on the sensor and which run on the gateway.</p></a>
+    <a href="/evidence"><b>What to expect<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Measured accuracy, and the limits that no amount of hardware fixes.</p></a>
+    <a href="/start"><b>Flash a node<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Docker build, TX and RX roles, step by step.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+</body>
+</html>

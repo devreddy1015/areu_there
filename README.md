@@ -146,10 +146,12 @@ Lost packets are interpolated across by sequence number (up to
 `--max-gap-s`, default 1 s). Without that, 15% loss compresses the time
 axis and a 15 BPM breather reads 17.8 BPM at confidence 0.98.
 
-### The gateway and its dashboard
+### The gateway, the site and the dashboard
 
 The gateway ingests FeatureFrames (or raw CSI in debug mode), fuses the
-links of each space, runs the health detectors and serves the dashboard.
+links of each space, runs the health detectors, and serves both the
+public site and the operator dashboard from the same binary and the same
+origin.
 
 ```bash
 cd rust
@@ -159,9 +161,35 @@ cp crates/saans-gateway/saans.example.toml saans.toml   # then edit it
 ./target/release/saans-gateway --config saans.toml
 ```
 
-The dashboard is at the `http_addr` in the config, `http://127.0.0.1:8080/`
-by default. It is one self-contained file served from the binary: no
-CDN, no fonts, no build step, nothing fetched from the internet.
+Everything is under the `http_addr` in the config, `http://127.0.0.1:8080`
+by default:
+
+| Path | What it is |
+| --- | --- |
+| `/` | The site: what this is, and who it is not for |
+| `/how-it-works` | The eight stages between a radio packet and a decision |
+| `/demo` | The simulator and the real pipeline, side by side |
+| `/evidence` | Measured numbers, comparisons, and what is not built |
+| `/privacy` | The 68-byte frame, encoded live, with the consent switch |
+| `/hardware` | Boards, cost, and campus deployments |
+| `/start` | Running it, and the API surfaces |
+| `/app` | The operator dashboard |
+| `/api/…`, `/metrics` | The API. Authenticated; see below |
+
+The site and the dashboard are embedded in the binary with
+`include_str!`. There is no build step and no bundler, and nothing is
+fetched from the internet: no CDN, no web font, no remote script. Links
+to the repository are ordinary links a reader may follow — the tests in
+`src/site.rs` draw that distinction explicitly and ban remote
+subresources while permitting anchors.
+
+`/demo` drives the gateway's own simulate mode through `/api/sim`, so it
+shows the real DSP reading a synthetic channel. It needs the gateway to
+be running with `--simulate`; without it the page says so rather than
+drawing a room.
+
+The dashboard answered `/` before the site existed. Old `/#system`-style
+links are forwarded to `/app`.
 
 **See it work without hardware.** Export a simulated night and replay
 it; every view is labelled REPLAY throughout, and the recording is the
@@ -261,8 +289,16 @@ tuning problem when it is not:
 You have none yet, so: the cheapest real CSI path is an **ESP32-S3 or
 ESP32-C6 devkit, about $6–10**. The ESP-IDF API (`esp_wifi_set_csi_config`,
 `esp_wifi_set_csi_rx_cb`) exposes per-subcarrier CSI directly, and the
-Saans node firmware in `edge/firmware` is ready to flash. One node gives presence and breathing; through-wall work and
-multi-person separation need several.
+Saans node firmware in `edge/firmware` is ready to flash. One link gives presence and breathing for one space; more links per space
+buy blind-spot coverage, not new capabilities.
+
+Multi-person separation and through-wall sensing are **not** on this
+roadmap and are not gated on node count. No through-wall respiration
+result exists on single-antenna hardware anywhere in the literature, and
+a link with no range or bearing resolution cannot tell which side of a
+wall the person is on — so through-wall reach is something to measure
+and suppress, not a feature to pursue. See
+[docs/CAPABILITY_LIMITS.md](docs/CAPABILITY_LIMITS.md).
 
 Consumer WiFi laptops give RSSI only — enough for crude motion, not for
 breathing. Research NICs (Intel 5300, Atheros via nexmon on a Raspberry Pi
@@ -280,9 +316,15 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/sources/synthetic.py` | Physics-based CSI generator; `scene="geometric"` models Fresnel-zone blind spots |
 | `wifisense/sources/esp32_udp.py` | ESP32 wire format, UDP listener, sequence-gap filling |
 | `wifisense/sources/recorder.py` | Raw-datagram pcap recorder, replayer, per-node link stats |
+| `scenes/` | Scene files: the room as DEFINED. Schema, the ITU-R P.2040 material table, three example rooms |
+| `wifisense/scene.py` | Scene loader and validator (stdlib only), and the conversion to `localize.geometry` |
+| `wifisense/roomplan_import.py` | Apple RoomPlan scan to scene file. A stub: the mapping table is real, the format assumptions are untested |
+| `rust/crates/saans-sim/src/scene.rs` | The same format in Rust, with its own reader |
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
 | `tests/` | 141 core tests (`test_localize_*` belong to the P0b localization work) |
 | `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |
+| `rust/crates/saans-gateway/assets/site/` | The seven public pages, the stylesheet, the scripts and the fonts |
+| `rust/crates/saans-gateway/src/site.rs` | The route table for those pages, and the offline and link tests |
 | `docs/UI_GAP_ANALYSIS.md` | What the interface can show, what the gateway publishes, and where they disagree |
 | `docs/UI_IMPLEMENTATION_PLAN.md` | The design the dashboard was built to, and the rules it keeps |
 

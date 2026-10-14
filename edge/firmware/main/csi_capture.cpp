@@ -20,6 +20,16 @@ QueueHandle_t s_queue = nullptr;
 std::uint32_t s_sequence = 0;
 std::uint32_t s_dropped = 0;
 std::uint8_t  s_channel = 0;
+// Capture-path observability. Nothing here has run against a radio yet
+// (SAANS_PLAN S5), so the first bench session needs to be able to answer
+// "what is the driver actually handing us?" without a rebuild.
+std::uint32_t s_layout_changed = 0;
+std::uint32_t s_first_word_invalid = 0;
+std::uint32_t s_short_frames = 0;
+std::uint32_t s_dropped_short = 0;
+std::uint16_t s_last_len = 0;
+std::uint16_t s_first_len = 0;
+std::uint8_t  s_secondary_channel = 0xFF;
 
 // Runs in WiFi TASK context — not an ISR. Everything here is O(n_subcarriers)
 // with no allocation, no logging and no blocking send: a slow callback drops
@@ -36,14 +46,58 @@ void csi_callback(void* /*ctx*/, wifi_csi_info_t* info) {
         return;
     }
 
+    // WHICH LTF BLOCK IS THIS? The buffer layout depends on the PHY mode of
+    // the frame that was received, and we do not get to assume it: a non-HT
+    // frame carries only L-LTF, and slicing the first kNSubcarriers pairs
+    // from byte 0 would then hand the DSP a different set of subcarriers
+    // from the one it was sized for.
+    //
+    // On the S3 we cannot ask directly: `wifi_pkt_rx_ctrl_t` carries
+    // sig_mode, cwb and rate only on the original ESP32. What is available
+    // here is `len`, and that is enough, because the LTF layout determines
+    // it -- a change in `len` IS a change in what the subcarrier indices
+    // mean. So record the first length seen and count departures from it.
+    // The first job on real hardware is to find out what the radio does,
+    // not to assume it.
+    s_last_len = static_cast<std::uint16_t>(info->len);
+    s_secondary_channel = static_cast<std::uint8_t>(info->rx_ctrl.secondary_channel);
+    if (s_first_len == 0) {
+        s_first_len = s_last_len;
+    } else if (s_last_len != s_first_len) {
+        ++s_layout_changed;
+    }
+
     // ESP-IDF hands back signed int8 pairs, IMAGINARY FIRST:
     //   buf[2k] = imag, buf[2k+1] = real
     // Amplitude is order-independent, phase is not. atan2(imag, real).
     const auto* iq = reinterpret_cast<const std::int8_t*>(info->buf);
-    const std::size_t available = static_cast<std::size_t>(info->len) / 2U;
+    std::size_t available = static_cast<std::size_t>(info->len) / 2U;
+
+    // Hardware limitation Espressif documents on `wifi_csi_info_t` (NOT on
+    // rx_ctrl): when first_word_invalid is set, the first four bytes -- the
+    // first TWO complex pairs -- are invalid. Reading them as signal puts a
+    // fixed artefact into subcarriers 0 and 1 of every affected frame,
+    // which the static suppressor would then learn as part of the room.
+    const std::size_t skip = info->first_word_invalid ? 2U : 0U;
+    if (skip != 0U) {
+        ++s_first_word_invalid;
+    }
+    if (available <= skip) {
+        ++s_dropped_short;
+        return;
+    }
+    iq += 2U * skip;
+    available -= skip;
+
     const std::size_t n = available < cfg::kNSubcarriers ? available : cfg::kNSubcarriers;
     if (n == 0) {
         return;
+    }
+    if (n < cfg::kNSubcarriers) {
+        // Fewer subcarriers than the DSP was compiled for. The tail of the
+        // frame is left zeroed, which is a real signal the BNR stage will
+        // see; count it rather than let it look like a quiet channel.
+        ++s_short_frames;
     }
 
     Frame frame{};
@@ -104,11 +158,25 @@ esp_err_t start(std::size_t queue_depth) {
     }
 
     wifi_csi_config_t config{};
-    // Both LTF fields: HT-LTF is what gives 56 usable subcarriers on HT20.
+    // Both LTF fields enabled. Note that enabling htltf_en does NOT make
+    // HT frames appear: the transmitter has to send them. tx_role.cpp asks
+    // ESP-NOW for an HT20 MCS rate for exactly that reason, and
+    // capture_stats() reports what actually arrived.
     config.lltf_en = true;
     config.htltf_en = true;
     config.stbc_htltf2_en = false;
-    config.ltf_merge_en = true;
+    // FALSE, deliberately. ESP-IDF: ltf_merge_en "generate htltf data by
+    // averaging lltf and ht_ltf data when receiving HT packet. Otherwise,
+    // use ht_ltf data directly." L-LTF and HT-LTF do not cover the same
+    // subcarriers (+-26 against +-28), so averaging them mixes two
+    // different channel measurements under one set of indices -- and it
+    // flatly contradicts channel_filter_en = false on the next line, which
+    // is set precisely to keep adjacent subcarriers independent.
+    //
+    // This was true until the TX was made to send HT frames, where it was
+    // inert because no HT packet ever arrived. Turning the transmitter on
+    // would have turned this on with it.
+    config.ltf_merge_en = false;
     config.channel_filter_en = false;
     // Phase is left uncorrected on purpose. The DSP works on amplitude, and a
     // 1T1R ESP32 has a free-running PLL whose phase is not usable for ranging
@@ -134,6 +202,11 @@ bool receive(Frame& out, int timeout_ms) {
 }
 
 std::uint32_t dropped() { return s_dropped; }
+
+Stats capture_stats() {
+    return Stats{s_layout_changed, s_first_word_invalid, s_short_frames, s_dropped_short,
+                 s_first_len, s_last_len, s_secondary_channel};
+}
 
 std::size_t serialize_raw(const std::int8_t* iq, std::size_t iq_len, std::uint8_t node_id,
                           std::uint32_t sequence, std::int8_t rssi, std::int8_t noise,

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Room sim — Saans</title>
+<meta name="description" content="A room drawn from a scene file: the walls, the furniture and the node positions are typed in, not sensed. Nothing on this page is measured and nothing is estimated.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="room-sim">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/room-sim" data-page="room-sim" aria-current="page">room sim</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+
+<div class="wrap">
+  <p class="scenebar" role="note">
+    <b>SCENE — READ FROM A FILE</b>
+    <span>Every shape and every number below was typed into a JSON file by a person. No radio
+      measured any of it, no simulator produced any of it, and no hardware has run. There is nothing
+      on this page labelled SIM and nothing labelled LIVE, because there is no simulator and no
+      sensor behind it yet.</span>
+  </p>
+</div>
+
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label">room sim</p>
+  <h1 id="page-title" class="display">a room, drawn from a file</h1>
+  <p class="lead">This is the room as <strong>defined</strong>: the floor outline, the wall materials
+    and thicknesses, every piece of furniture at its real size and angle, and every ESP32 at the
+    height it is declared to be mounted at. It is the input the rest of the system will be measured
+    against — not an output of anything.</p>
+</section>
+
+<section class="wrap section" id="view" aria-labelledby="view-title">
+  <p class="label">the scene</p>
+  <h2 id="view-title" class="statement" style="margin-top:10px">Three rooms. <em>All three typed in.</em></h2>
+
+  <p class="body rs-intro">The two example rectangles are a bedroom and a small office. The third is
+    an L-shaped hall, and it is in the set because its floor is a six-sided polygon inside an
+    8 x 6 m box: a viewer that quietly draws the bounding box would report 48 m&sup2; of floor where
+    there is 35.75 m&sup2;, and a localizer that assumes a convex room goes wrong at the inner
+    corner for the same reason.</p>
+
+  <p class="fine demo-nojs">The room is drawn with WebGL, which needs JavaScript. With JavaScript off
+    nothing is drawn — no picture of a room is substituted for one that could not be built. Every
+    claim on this page, including the dimensions of the three example rooms and the reason WiFi
+    cannot supply them, is in the text below and reads normally. The scene files themselves are
+    linked at the end.</p>
+
+  <div class="rs-cols demo-js">
+    <div class="rs-stagewrap">
+      <div class="rs-stage" id="rs-stage" tabindex="0" role="img"
+           aria-label="A 3D view of the selected scene. Drag to rotate, scroll to zoom. With this view focused, the arrow keys rotate and the plus and minus keys zoom.">
+      </div>
+      <p class="fine rs-hint">Drag to rotate, scroll or pinch to zoom. With the view focused:
+        <kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>&rarr;</kbd> rotate,
+        <kbd>+</kbd> <kbd>&minus;</kbd> zoom. Every object is also in the list in the panel, which is
+        the keyboard way to select one.</p>
+      <p class="fine rs-err" id="rs-err" role="status"></p>
+    </div>
+
+    <aside class="rs-panel" aria-labelledby="rs-panel-title">
+      <div class="rs-mode">
+        <span class="rs-badge">SCENE</span>
+        <span class="fine">defined in a file. not sensed, not simulated.</span>
+      </div>
+
+      <h3 id="rs-panel-title" class="title">the room</h3>
+
+      <div class="rs-ctl" role="group" aria-label="Which scene to draw">
+        <div class="seg" id="rs-pick"></div>
+      </div>
+
+      <div class="rs-ctl" role="group" aria-label="How to draw it">
+        <button type="button" class="demo-btn" id="rs-top" aria-pressed="false">top-down (2D)</button>
+        <button type="button" class="demo-btn" id="rs-dim" aria-pressed="false">dimensions</button>
+        <button type="button" class="demo-btn" id="rs-reset">reset the view</button>
+      </div>
+
+      <p class="fine" id="rs-name"></p>
+      <dl class="rs-dl" id="rs-room"></dl>
+
+      <p class="fine rs-aside">A one-antenna link at 20 MHz cannot measure any of these lengths, and
+        cannot tell a bed from a sofa. They are read from the file, the same file the simulator
+        compiles in. <a class="rs-link" href="#limits">The reason, and the number it turns on</a>,
+        is further down this page.</p>
+
+      <h3 class="title rs-h">what is in it</h3>
+      <p class="fine">Click a box in the view, or pick one here. Sizes are the object's own
+        width&nbsp;&times;&nbsp;depth&nbsp;&times;&nbsp;height before its rotation is applied.</p>
+      <ul class="rs-list" id="rs-list"></ul>
+
+      <div id="rs-sel"></div>
+      <p class="sr-only" aria-live="polite" id="rs-live"></p>
+
+      <h3 class="title rs-h">what it does not draw</h3>
+      <p class="fine">All three of these files carry people — one in the bedroom, two each in the office and
+        the hall — and all three carry a phone. This page draws neither, and
+        there are no estimates, no error circles and no link colours on it either. Nothing in the
+        repository can produce a person's position yet, and an empty room is the true picture at this
+        point. A figure standing in it would be decoration that looks like a measurement.</p>
+    </aside>
+  </div>
+</section>
+
+<section class="wrap section" id="limits" aria-labelledby="limits-title">
+  <p class="label">why the shapes come from a file</p>
+  <h2 id="limits-title" class="statement" style="margin-top:10px">WiFi did not measure this room. <em>It cannot.</em></h2>
+
+  <div class="limits">
+    <div class="rs-prose">
+      <p class="body">The deciding quantity is coherent aperture extent — not antenna count and not
+        bandwidth. In the near field, depth comes from wavefront curvature, and the depth of focus is
+        <code>4&lambda;R&sup2;/L&sup2;</code>. At &lambda;&nbsp;=&nbsp;12.3&nbsp;cm, resolving a wall
+        at R&nbsp;=&nbsp;3.5&nbsp;m to 30&nbsp;cm needs an aperture of
+        <strong>L&nbsp;&asymp;&nbsp;4.5&nbsp;m, larger than the room</strong>.</p>
+      <p class="body">Saans has <strong>L&nbsp;=&nbsp;0</strong>. Two or three ESP32s bolted to walls
+        form no aperture at all, their positions are typed in by a human, and each one's clock runs
+        free with no phase reference to the others. Nothing in that configuration recovers a room
+        outline, a wall position, or the shape of a sofa, and a wider channel does not fix it: the
+        measured span is 56 subcarriers at 312.5&nbsp;kHz, 17.19&nbsp;MHz, so one path-length cell is
+        17.45&nbsp;m and every first-order reflection in an ordinary room lands inside it.</p>
+      <p class="body">That is why a scene is a file. The full argument, with the backup limit and the
+        sources, is in <code>docs/CAPABILITY_LIMITS.md</code>.</p>
+    </div>
+    <ul class="limits-list">
+      <li><b>Room size and wall layout</b><p>No. Needs an aperture larger than the room.</p></li>
+      <li><b>Recognising a bed or a sofa</b><p>No. There is no imaging here at all, so there is
+        nothing to recognise an object in.</p></li>
+      <li><b>Where a node is</b><p>No. One RF chain gives no angle of arrival, and phase
+        sanitization destroys absolute ranging. Node positions are surveyed by hand and typed in;
+        any error in them lands in whatever is computed from them.</p></li>
+      <li><b>What the material of a wall is</b><p>No. The materials named in these files are
+        declarations, and their electrical constants come from a published table, not from this
+        hardware.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="wrap section" id="files" aria-labelledby="files-title">
+  <h2 id="files-title">the files this page reads</h2>
+  <div class="rs-prose">
+    <p class="body">Served from this gateway, same origin, nothing fetched from anywhere else:
+      <a href="/scenes/bedroom.json">bedroom.json</a> (4.2 x 3.6 x 2.7 m),
+      <a href="/scenes/office.json">office.json</a> (6 x 5 x 2.9 m) and
+      <a href="/scenes/hall-l.json">hall-l.json</a> (an L-shaped floor of 35.75 m&sup2; inside an
+      8 x 6 m box). The format is <code>scenes/scene.schema.json</code> in the repository, and the same
+      three files are compiled into the simulator, so a room cannot mean one thing here and another
+      there.</p>
+    <p class="body">Material constants are <a href="/scenes/materials.json">materials.json</a>: ITU-R
+      P.2040 Table 3, evaluated at 2.437 GHz, which is 802.11 channel 6. They are a sourced default and
+      not a calibration — nothing in that file has been checked against a measurement made with this
+      hardware, and <code>fabric</code> has no row at all rather than an invented one.</p>
+    <p class="body">The view is drawn with three.js, committed into the repository and served from this
+      gateway. Nothing on this page is fetched from another origin, because the gateway may be running
+      in a building with no route out. The licence is served beside the code, at
+      <a href="/vendor/three-LICENSE.txt">three-LICENSE.txt</a>.</p>
+  </div>
+
+  <div class="next">
+    <p class="label">next</p>
+    <div class="next-grid">
+      <a href="/demo"><b>the simulated demo<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></b>
+        <p>A simulated person in a simulated room, beside what the signal processing actually
+          recovered from it. That page is labelled SIM throughout; this one is not.</p></a>
+      <a href="/how-it-works"><b>how it works<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></b>
+        <p>What a link can and cannot report, and the pipeline between the two.</p></a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="/privacy">What is not collected</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation. The
+      numbers on this page do not even come from that — they come from a file somebody typed.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+<script type="module" src="/room-sim.js"></script>
+</body>
+</html>

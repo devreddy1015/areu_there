@@ -7,7 +7,8 @@ mod support;
 use saans_dsp::features::{FeatureFrame, FLAG_HEART_VALID};
 use saans_gateway::pcap::PcapWriter;
 use saans_gateway::shared::Shared;
-use saans_gateway::{replay, GatewayConfig, ReplayOptions};
+use saans_gateway::simulate::DEMO_NULL_M;
+use saans_gateway::{replay, GatewayConfig, ReplayOptions, SimGateway, SimulateOptions};
 use serde_json::{json, Value};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::path::Path;
@@ -523,7 +524,8 @@ async fn websocket_streams_state_and_events() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dashboard_is_served_and_self_contained() {
     let g = TestGw::start(config("dashboard", LAB)).await;
-    let r = g.get("/").await;
+    // The dashboard moved to /app when the public site took `/`.
+    let r = g.get("/app").await;
     assert_eq!(r.status, 200);
     assert!(r.header("content-type").unwrap().starts_with("text/html"));
     let csp = r.header("content-security-policy").expect("CSP header");
@@ -554,6 +556,89 @@ async fn dashboard_is_served_and_self_contained() {
     }
     assert!(r.body.contains("not a medical device"));
     assert!(r.body.contains("/api/live"), "the dashboard uses the live feed");
+    g.stop().await;
+}
+
+/// The public site is the other half of the same binary: seven readable
+/// pages and the files they reference, on the same origin as the API so
+/// that `/demo` can call `/api/sim` without anybody inventing CORS.
+///
+/// The offline rule is enforced here with the distinction the dashboard
+/// never needed. A *subresource* — a stylesheet, a script, a font — is
+/// fetched to render the page and must be local, or the gateway in a
+/// building with no route out serves an unreadable page. An `<a href>` to
+/// the repository is somewhere a reader chooses to go, and is the whole
+/// point of publishing the work. The first is banned; the second is
+/// required, and `site::tests` checks both over the embedded bytes.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_site_is_served_from_the_same_origin() {
+    let g = TestGw::start(config("site", LAB)).await;
+
+    for p in saans_gateway::site::PAGES {
+        let r = g.get(p.path).await;
+        assert_eq!(r.status, 200, "GET {}", p.path);
+        assert!(r.header("content-type").unwrap().starts_with("text/html"), "GET {}", p.path);
+        let csp = r.header("content-security-policy").expect("CSP header");
+        // `font-src` is the one the dashboard's policy lacks: without it
+        // the self-hosted Geist files fall through to `default-src
+        // 'none'` and the site renders in a system font.
+        assert!(
+            csp.contains("default-src 'none'") && csp.contains("font-src 'self'"),
+            "{}: {csp}",
+            p.path
+        );
+        assert_eq!(r.header("x-content-type-options"), Some("nosniff"), "GET {}", p.path);
+    }
+
+    let css = g.get("/site.css").await;
+    assert_eq!(css.status, 200);
+    assert!(css.header("content-type").unwrap().starts_with("text/css"));
+    assert!(css.body.contains("--ember"), "the stylesheet is the real one");
+
+    let js = g.get("/site.js").await;
+    assert_eq!(js.status, 200);
+    assert!(js.header("content-type").unwrap().starts_with("text/javascript"));
+
+    // The fonts are why `get_bytes` exists: a woff2 is not text.
+    let (status, headers, bytes) = g.get_bytes("/fonts/geist-latin.woff2").await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        headers.iter().find(|(k, _)| k == "content-type").map(|(_, v)| v.as_str()),
+        Some("font/woff2")
+    );
+    assert_eq!(&bytes[..4], b"wOF2", "served bytes are a real woff2");
+
+    // The licence has to be reachable, not merely present in the tree.
+    assert_eq!(g.get("/fonts/OFL.txt").await.status, 200);
+
+    // three.js is served from this origin, and `three.module.min.js`
+    // imports `./three.core.min.js`: the browser resolves that against
+    // the directory it was served from, so the sibling has to answer on
+    // the same prefix or the import 404s and the page draws nothing.
+    let module = g.get("/vendor/three.module.min.js").await;
+    assert_eq!(module.status, 200);
+    assert!(module.header("content-type").unwrap().starts_with("text/javascript"));
+    assert!(module.body.contains("from\"./three.core.min.js\""), "the vendored module is the real one");
+    let core = g.get("/vendor/three.core.min.js").await;
+    assert_eq!(core.status, 200);
+    assert!(core.header("content-type").unwrap().starts_with("text/javascript"));
+    // MIT asks that the notice travel with the code it covers.
+    let licence = g.get("/vendor/three-LICENSE.txt").await;
+    assert_eq!(licence.status, 200);
+    assert!(licence.body.contains("MIT License"), "the vendored licence is the real one");
+
+    // The scenes are files the page fetches. A scene is typed in: these
+    // dimensions were written by a person, not measured by a radio.
+    let bedroom = g.get("/scenes/bedroom.json").await;
+    assert_eq!(bedroom.status, 200);
+    assert!(bedroom.header("content-type").unwrap().starts_with("application/json"));
+    assert!(bedroom.body.contains("\"width_m\": 4.2"), "the served scene is the one in scenes/");
+    assert_eq!(g.get("/scenes/office.json").await.status, 200);
+    assert_eq!(g.get("/scenes/hall-l.json").await.status, 200);
+
+    // A path the site does not define is still the API's 404, not a page.
+    assert_eq!(g.get("/no-such-page").await.status, 404);
+
     g.stop().await;
 }
 
@@ -624,4 +709,300 @@ async fn events_and_history_survive_a_restart() {
     assert_eq!(downs.len(), 1, "yesterday's events are still listed after a restart");
     assert_eq!(g2.json("/api/health").await["notes"], json!([]));
     g2.stop().await;
+}
+
+
+// ---------------------------------------------------------------- simulate
+//
+// Simulate mode is the sensing explorer: a SYNTHETIC room run through
+// the real DSP, fusion and detectors. These tests drive it over the same
+// real HTTP the dashboard uses.
+
+/// A simulate-mode gateway on an ephemeral port, running the simulator
+/// as fast as the CPU allows so a test can cover minutes of simulated
+/// time in milliseconds. Simulator time is the gateway clock, so speed
+/// changes how long the test takes and nothing about the data.
+struct SimGw {
+    gw: SimGateway,
+}
+
+impl SimGw {
+    async fn start() -> SimGw {
+        let cfg = config("simulate", "");
+        let gw = SimGateway::start(cfg, SimulateOptions { speed: 0.0 }).await.expect("simulate mode starts");
+        SimGw { gw }
+    }
+
+    fn http(&self) -> std::net::SocketAddr {
+        self.gw.http_addr
+    }
+
+    async fn json(&self, path: &str) -> Value {
+        let r = support::get(self.http(), path).await;
+        assert_eq!(r.status, 200, "GET {path}: {}", r.body);
+        r.json()
+    }
+
+    async fn post(&self, path: &str, body: &str) -> (u16, Value) {
+        post(self.http(), path, body).await
+    }
+
+    /// Let the simulator reach `t_s` of its own timeline.
+    async fn run_to(&self, t_s: f64) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        loop {
+            let now = self.json("/api/sim").await["truth"]["t_s"].as_f64().unwrap_or(0.0);
+            if now >= t_s {
+                return;
+            }
+            assert!(std::time::Instant::now() < deadline, "the simulator reached only t_s {now} of {t_s}");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+
+    async fn stop(self) {
+        tokio::time::timeout(Duration::from_secs(15), self.gw.shutdown()).await.expect("simulate mode shuts down");
+    }
+}
+
+/// `POST path` with a JSON body over a fresh connection. The body is
+/// located by its braces rather than by re-implementing `Content-Length`
+/// and chunked framing, which `support::get` already covers.
+async fn post(addr: std::net::SocketAddr, path: &str, body: &str) -> (u16, Value) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let fut = async {
+        let mut s = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let req = format!(
+            "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
+             Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        s.write_all(req.as_bytes()).await.unwrap();
+        let mut raw = Vec::new();
+        s.read_to_end(&mut raw).await.unwrap();
+        let text = String::from_utf8(raw).expect("UTF-8 response");
+        let (head, rest) = text.split_once("\r\n\r\n").expect("response has a header terminator");
+        let status: u16 = head.split(' ').nth(1).and_then(|c| c.parse().ok()).expect("status code");
+        let v = match (rest.find('{'), rest.rfind('}')) {
+            (Some(a), Some(b)) if a < b => serde_json::from_str(&rest[a..=b]).unwrap_or(Value::Null),
+            _ => Value::Null,
+        };
+        (status, v)
+    };
+    tokio::time::timeout(Duration::from_secs(10), fut).await.unwrap_or_else(|_| panic!("POST {path} timed out"))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn simulate_describes_a_synthetic_room() {
+    let g = SimGw::start().await;
+
+    assert_eq!(g.json("/api/me").await["mode"], "simulated", "every reader is told the data is synthetic");
+
+    let v = g.json("/api/sim").await;
+    assert_eq!(v["scenario"], "explorer");
+    assert_eq!(v["space_id"], "sim-room");
+    assert_eq!(v["room"]["w_m"], 6.0);
+    assert_eq!(v["room"]["h_m"], 5.0);
+    assert_eq!(v["room"]["door_m"].as_array().map(Vec::len), Some(2));
+    assert_eq!(v["sample_rate_hz"], 20.0);
+    assert_eq!(v["n_subcarriers"], 56);
+
+    let nodes = v["nodes"].as_array().expect("nodes");
+    assert!(nodes.len() >= 2, "{v}");
+    for n in nodes {
+        assert!(n["id"].as_u64().is_some(), "{n}");
+        assert!(n["x_m"].as_f64().is_some_and(|x| x > 0.0 && x < 6.0), "{n}");
+        assert!(n["y_m"].as_f64().is_some_and(|y| y > 0.0 && y < 5.0), "{n}");
+    }
+    let ids: Vec<u64> = nodes.iter().map(|n| n["id"].as_u64().unwrap()).collect();
+    let links = v["links"].as_array().expect("links");
+    assert!(!links.is_empty());
+    for l in links {
+        assert!(ids.contains(&l["tx"].as_u64().unwrap()), "{l}");
+        assert!(ids.contains(&l["rx"].as_u64().unwrap()), "{l}");
+    }
+    for s in v["scatterers"].as_array().expect("scatterers") {
+        assert!(s["x_m"].as_f64().is_some() && s["y_m"].as_f64().is_some() && s["rcs_m2"].as_f64().is_some(), "{s}");
+    }
+
+    let t = &v["truth"];
+    for key in ["t_s", "present", "still", "breathing", "bpm", "in_pause", "x_m", "y_m"] {
+        assert!(t.get(key).is_some(), "truth is missing {key}: {t}");
+    }
+    assert_eq!(support::get(g.http(), "/api/sim").await.header("cache-control"), Some("no-store"));
+    g.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn simulate_coverage_has_the_advertised_grid() {
+    let g = SimGw::start().await;
+
+    let v = g.json("/api/sim/coverage?res_m=0.25").await;
+    assert_eq!(v["res_m"], 0.25);
+    // w = ceil(6.0 / 0.25), h = ceil(5.0 / 0.25), origin = cell centre.
+    assert_eq!(v["w"], 24);
+    assert_eq!(v["h"], 20);
+    assert_eq!(v["origin_m"], json!([0.125, 0.125]));
+    assert_eq!(v["units"], "relative breathing sensitivity; 1.0 = this room's median");
+    assert_eq!(v["best"].as_array().map(Vec::len), Some(24 * 20));
+    let links = v["links"].as_array().expect("links");
+    assert_eq!(links.len(), g.json("/api/sim").await["links"].as_array().unwrap().len());
+    for l in links {
+        assert!(l["tx"].as_u64().is_some() && l["rx"].as_u64().is_some(), "{l}");
+        assert_eq!(l["values"].as_array().map(Vec::len), Some(24 * 20), "{}", l["tx"]);
+    }
+    // `best` is the per-cell maximum over links.
+    for i in 0..24 * 20 {
+        let want = links.iter().map(|l| l["values"][i].as_f64().unwrap()).fold(f64::MIN, f64::max);
+        assert!((v["best"][i].as_f64().unwrap() - want).abs() < 1e-12, "cell {i}");
+    }
+    // The advertised unit: 1.0 is the room's median for a link.
+    let mut sorted: Vec<f64> = links[0]["values"].as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    sorted.sort_by(f64::total_cmp);
+    let n = sorted.len();
+    let median = 0.5 * (sorted[n / 2 - 1] + sorted[n / 2]);
+    assert!((median - 1.0).abs() < 1e-9, "median should be exactly 1.0, got {median}");
+
+    // The default resolution has to RESOLVE the thing the map is of.
+    // The sensitivity field oscillates with a spatial *period* of half a
+    // wavelength (6.2 cm at 2.437 GHz), so Nyquist wants two samples
+    // inside 6.2 cm — finer than 3.1 cm, not finer than 6.2 cm. Getting
+    // that wrong is not academic: at 0.05 the map called the pinned null
+    // "below this room's median", which reads as *a bit weak* for a cell
+    // where the pipeline cannot see at all.
+    let d = g.json("/api/sim/coverage").await;
+    let res = d["res_m"].as_f64().unwrap();
+    assert!(res <= 0.031, "the default must take two samples per 6.2 cm period, got {res}");
+
+    // The assertion that actually matters, and the reason the number
+    // above is not just a magic constant: at the default resolution the
+    // map must agree with the pipeline about the one cell this whole
+    // demo is built around. `the_gap_the_explorer_exists_to_show` pins
+    // that the DSP loses the person at DEMO_NULL_M; a map that paints
+    // that spot as ordinary is worse than no map at all.
+    let (w, h) = (d["w"].as_u64().unwrap() as usize, d["h"].as_u64().unwrap() as usize);
+    let ox = d["origin_m"][0].as_f64().unwrap();
+    let oy = d["origin_m"][1].as_f64().unwrap();
+    let (nx, ny) = saans_gateway::simulate::DEMO_NULL_M;
+    let ix = (((nx - ox) / res).round() as usize).min(w - 1);
+    let iy = (((ny - oy) / res).round() as usize).min(h - 1);
+    let at_null = d["best"][iy * w + ix].as_f64().unwrap();
+    assert!(
+        at_null < 0.25,
+        "the default map must call the demo null blind, as the pipeline does; it reads {at_null:.3} \
+         x the room median at res_m = {res}"
+    );
+
+    // Every rejected `res_m` comes back as the API's own `{"error": ...}`,
+    // including one that is not a number at all: typed as an `f64`, the
+    // query extractor would refuse `res_m=abc` first, with a plain-text
+    // axum message a client reading `.error` cannot parse.
+    for bad in ["res_m=0", "res_m=-1", "res_m=0.0001", "res_m=1e400", "res_m=abc", "res_m="] {
+        let r = support::get(g.http(), &format!("/api/sim/coverage?{bad}")).await;
+        assert_eq!(r.status, 400, "{bad} should be refused: {}", r.body);
+        let v: serde_json::Value = serde_json::from_str(&r.body)
+            .unwrap_or_else(|e| panic!("{bad} should be refused as JSON, got {:?}: {e}", r.body));
+        assert!(v["error"].is_string(), "{bad} should carry an error string: {}", r.body);
+    }
+    g.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn simulate_person_is_an_input_that_the_truth_follows() {
+    let g = SimGw::start().await;
+
+    let (status, v) = g.post("/api/sim/person", r#"{"x_m": 1.25, "y_m": 4.0}"#).await;
+    assert_eq!(status, 200, "{v}");
+    assert_eq!(v, json!({ "ok": true, "x_m": 1.25, "y_m": 4.0 }));
+    let truth = g.json("/api/sim").await["truth"].clone();
+    assert_eq!((truth["x_m"].as_f64(), truth["y_m"].as_f64()), (Some(1.25), Some(4.0)));
+
+    // Outside the room: clamped into the walkable area, and said so.
+    let (status, v) = g.post("/api/sim/person", r#"{"x_m": 99.0, "y_m": -99.0}"#).await;
+    assert_eq!(status, 200, "{v}");
+    assert_eq!(v, json!({ "ok": true, "x_m": 5.6, "y_m": 0.4 }));
+    assert_eq!(g.json("/api/sim").await["truth"]["x_m"], 5.6);
+
+    for bad in [r#"{"x_m": 1.0}"#, r#"{"y_m": 1.0}"#, r#"{"x_m": "3", "y_m": 1.0}"#, r#"{"x_m": null, "y_m": 1.0}"#, "{}", "not json", "[]"] {
+        let (status, v) = g.post("/api/sim/person", bad).await;
+        assert_eq!(status, 400, "{bad} should be refused");
+        assert!(v["error"].is_string(), "{bad}: {v}");
+    }
+    // A non-finite coordinate: JSON has no NaN literal, so the way to
+    // write one is an exponent no f64 can hold.
+    let (status, _) = g.post("/api/sim/person", r#"{"x_m": 1e400, "y_m": 1.0}"#).await;
+    assert_eq!(status, 400);
+    // The last good value stands: a rejected request changes nothing.
+    assert_eq!(g.json("/api/sim").await["truth"]["x_m"], 5.6);
+
+    let (status, v) = g.post("/api/sim/present", r#"{"present": false}"#).await;
+    assert_eq!(status, 200, "{v}");
+    assert_eq!(v, json!({ "ok": true, "present": false }));
+    for bad in [r#"{"present": "no"}"#, "{}", r#"{"present": 0}"#] {
+        assert_eq!(g.post("/api/sim/present", bad).await.0, 400, "{bad}");
+    }
+    g.stop().await;
+}
+
+/// The proof that simulate mode is not a drawing: the synthetic CSI goes
+/// through the node DSP, `Hub::ingest`, fusion and the detectors, and
+/// comes out of `/api/spaces` like any other room. Then the explorer's
+/// whole argument, over HTTP: the same person, half a metre away, in a
+/// whole-band null — the truth still has them seated, the system reports
+/// an empty room.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn simulate_frames_reach_the_real_pipeline_and_the_null_blinds_it() {
+    let g = SimGw::start().await;
+    g.run_to(260.0).await;
+
+    let spaces = g.json("/api/spaces").await;
+    let s = &spaces[0];
+    assert_eq!(s["space_id"], "sim-room");
+    assert_eq!(s["occupied"], true, "the simulated person is detected by the real pipeline: {s}");
+    assert_eq!(s["links_total"], 1);
+    assert_eq!(s["links_usable"], 1, "{s}");
+    let bpm = s["breathing"]["bpm"].as_f64().unwrap_or(0.0);
+    assert!((bpm - 15.0).abs() < 1.0, "breathing recovered at ~15 BPM, got {bpm}: {s}");
+    assert_eq!(g.json("/api/sim").await["truth"]["present"], true);
+
+    // The health counters agree that frames really went through ingest.
+    let health = g.json("/api/health").await;
+    assert_eq!(health["mode"], "simulated");
+    assert!(health["datagrams_total"].as_u64().unwrap_or(0) > 100, "{}", health["datagrams_total"]);
+    assert_eq!(health["decode_errors_total"], 0);
+    assert!(has_type(&g.json("/api/spaces/sim-room").await["events"], "occupancy_started"));
+
+    // Now the moment the explorer exists for.
+    let (status, _) = g.post("/api/sim/person", &format!(r#"{{"x_m": {}, "y_m": {}}}"#, DEMO_NULL_M.0, DEMO_NULL_M.1)).await;
+    assert_eq!(status, 200);
+    let now = g.json("/api/sim").await["truth"]["t_s"].as_f64().unwrap();
+    g.run_to(now + 200.0).await;
+
+    let truth = g.json("/api/sim").await["truth"].clone();
+    assert_eq!(truth["present"], true, "the person is still in the room");
+    assert_eq!(truth["breathing"], true, "and still breathing");
+    assert_eq!(truth["x_m"], DEMO_NULL_M.0);
+
+    let s = g.json("/api/spaces").await[0].clone();
+    assert_eq!(s["occupied"], false, "but the single link cannot see them in the null: {s}");
+    assert!(s["breathing"].is_null(), "{s}");
+    g.stop().await;
+}
+
+/// The sim routes exist in simulate mode and nowhere else: a live
+/// gateway must not answer questions about a room that does not exist.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sim_routes_are_absent_outside_simulate_mode() {
+    let g = TestGw::start(config("nosim", LAB)).await;
+    for path in ["/api/sim", "/api/sim/coverage", "/api/sim/coverage?res_m=0.25", "/api/sim/person", "/api/sim/present"] {
+        let r = g.get(path).await;
+        assert_eq!(r.status, 404, "GET {path}");
+        assert!(r.json()["error"].is_string(), "{path}: {}", r.body);
+    }
+    for path in ["/api/sim/person", "/api/sim/present"] {
+        let (status, v) = post(g.http(), path, r#"{"x_m": 1.0, "y_m": 1.0, "present": true}"#).await;
+        assert_eq!(status, 404, "POST {path}: {v}");
+    }
+    assert_eq!(g.json("/api/me").await["mode"], "live");
+    g.stop().await;
 }

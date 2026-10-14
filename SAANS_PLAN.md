@@ -167,7 +167,7 @@ See `spec/wire.md`. Two datagram types share the sensor port:
 
 **Status (2026-10-14):** S0 done. S1 done (Rust, 672/672 frames
 byte-identical, 15x language / 144x total vs Python). S2 done (C++ float32:
-669 golden checks, firmware builds for esp32s3, 26k frames/s host). S3
+845 golden checks, firmware builds for esp32s3, 26k frames/s host). S3
 done in simulation (NOTES.md §8: held-out results, three bugs found and
 fixed). S4 done (gateway: API, WebSocket, /metrics, replay, dashboard;
 36 tests). S6 prep in progress (node memory, TDMA, reciprocal links).

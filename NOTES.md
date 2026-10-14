@@ -499,3 +499,108 @@ before either was edited by hand.
 - `best_bnr` is now optional (0 = not computed): its row store is half a
   node's per-link memory and nothing reads it but system health. With it
   off, every other field is bit-identical.
+
+## 9. The ESP32 receiver layer, and what it costs (Oct 2026)
+
+`saans-sim` produced a clean complex channel. A real node does not: it
+applies automatic gain control, a random per-packet phase, a timing
+offset that tilts phase across subcarriers, a static per-device ripple,
+and quantizes to int8. `src/impair.rs` models that; `src/wire.rs` puts
+the result in the raw-CSI datagram the firmware already emits, so a
+simulated node and a bench node reach the gateway through one decoder.
+
+It is a stage **after** the clean channel and **off by default**. The
+clean channel is the contract with the Python and C++ implementations;
+`tests/parity.rs` still reproduces the golden vectors at a max relative
+error of 9.3e-15 against a 1e-9 tolerance.
+
+**Its constants are guesses.** Nothing here has touched a radio. The
+numbers come from published descriptions of ESP32 CSI, not from a
+measurement taken in this project.
+
+### What it costs, measured
+
+`cargo run --release -p saans-sim --example impairment_cost`. Four arms,
+same scenario and seed, 5 room seeds, 1 link x 56 subcarriers at 20 Hz.
+`no-agc` is the full model with `agc_step_db = 0` — one term off, no
+constant changed. The clean channel is bit-identical across arms.
+
+| seated, 14 BPM | clean | int8 | no-agc | esp32 |
+|---|---|---|---|---|
+| breathing BNR, best subcarrier, dB | -0.49 | -0.45 | -0.72 | **-2.11** |
+| motion energy, empty room | 0.129 | 0.129 | 0.152 | **1.018** |
+| motion energy, person seated | 0.351 | 0.352 | 0.356 | 0.882 |
+| calibrated presence threshold | 0.185 | 0.185 | 0.213 | **2.251** |
+| frames reporting occupied, % | 100 | 100 | 100 | **0** |
+| breathing BPM (truth 14.0) | 14.00 | 14.00 | 14.00 | **none** |
+
+Three findings, in order of how much they are believed.
+
+1. **int8 quantization costs nothing measurable.** Every metric in the
+   table is within 0.04 dB of the clean arm, and the presence figures
+   match it to three decimals. At a mean of ~38 counts the
+   quantizer's error sits far below the scenario's own channel noise.
+   Going in, this was the term expected to hurt. It does not.
+2. **Static ripple, per-packet phase and receiver noise cost little.**
+   Amplitude CV 0.054 to 0.061; breathing BNR 0.23 dB worse; breathing
+   still recovered at 14.00 BPM with 100% of frames.
+3. **The AGC is the whole effect, and it does not break what was
+   expected.** Breathing BNR loses 1.4 dB against the no-AGC arm, 1.6 dB
+   against clean — the breathing signal is still there. What breaks is the *presence* detector's ambient
+   calibration: gain steps are impulses in the 0.1–2 Hz presence band,
+   so the empty-room threshold inflates 12x, and the empty room ends up
+   reporting *more* motion energy than the seated person. The contrast
+   does not shrink, it inverts. Vitals are then suppressed because the
+   pipeline believes the room is empty. **A lost BPM here is a lost
+   person, not a lost signal** — which is only visible because presence
+   is reported beside it.
+
+### What that result actually rests on
+
+One uncalibrated constant, `agc_dither_prob` — how often a converged
+loop moves anyway. Sweeping it, nothing else changed:
+
+| `agc_dither_prob` | gain moves, % | empty | seated | threshold | occupied, % |
+|---|---|---|---|---|---|
+| 0.000 | 0.02 | 0.148 | 0.245 | 0.210 | 100.0 |
+| 0.002 | 0.18 | 0.185 | 0.329 | 0.959 | 0.0 |
+| 0.005 | 0.57 | 0.465 | 0.433 | 1.203 | 0.0 |
+| 0.020 (committed) | 2.43 | 1.018 | 0.882 | 2.251 | 0.0 |
+
+With no dither the model costs the detectors essentially nothing. So the
+honest claim is **not** "an ESP32 breaks presence". It is:
+
+> Presence survives a gain that moves about once every four minutes
+> (the 0.000 row: 0.02% of packets at 20 Hz). It fails completely at
+> once every twenty-eight seconds (0.002: 0.18%). The sweep brackets the
+> breakpoint between those two and does not locate it any more finely.
+
+An earlier draft of this section put the breakpoint at "once every nine
+seconds". That is the 0.005 row, which already reports 0% occupied — it
+is inside the failing region, not at its edge. Narrowing the bracket is
+a matter of adding rows between 0.000 and 0.002 to the sweep, which is
+a one-line change to the example and still answers nothing a bench
+recording would not answer better.
+
+That is a bench question with a cheap answer: log `agc_gain` on an idle
+node in an empty room for ten minutes and count the moves. It is the
+single most valuable number in the first recording, and until someone
+takes it the table above ranks nothing.
+
+Deliberately **not** acted on: a per-packet common-mode gain is
+something the DSP could normalise away, and the static suppressor
+cannot. Changing the detectors on the strength of an uncalibrated model
+is the opposite of what this layer is for.
+
+### Known gaps in the layer itself
+
+- `first_word_invalid` is not modelled. Its real effect is a two-bin
+  index shift on affected frames, not garbage, so a consumer of
+  simulated raw CSI never sees the one thing the flag does.
+- Which 56 bins the firmware actually hands over is unresolved. The
+  simulator's 56 are the idealised occupied set; by ESP-IDF's
+  documentation the firmware's first 56 pairs may be a different 56
+  entirely. `BinLayout` can produce either once a bench session says
+  which. A subcarrier index may not mean the same thing on both sides.
+- No cross-subcarrier smoothing or LTF merge, deliberately: our capture
+  path disables both.

@@ -54,6 +54,29 @@ esp_err_t start(std::size_t queue_depth = 32);
 // Blocks until a frame is available or the timeout expires.
 bool receive(Frame& out, int timeout_ms);
 
+// What the radio is actually delivering, for the first bench session.
+//
+// The DSP is compiled for a fixed subcarrier count on the assumption that
+// the frames being measured are HT20. Nothing in the firmware can enforce
+// that -- it depends on what the transmitter sends and what the driver
+// reports -- so this says what arrived instead of assuming.
+// `sig_mode`, `cwb` and `rate` exist in `wifi_pkt_rx_ctrl_t` only on the
+// original ESP32, not on the S3, so the PHY mode cannot be read directly
+// here. `len` stands in for it: the LTF layout determines the buffer
+// length, so a change in length is a change in what a subcarrier index
+// means.
+struct Stats {
+    std::uint32_t layout_changed;     // frames whose len differed from the first seen
+    std::uint32_t first_word_invalid; // frames where subcarriers 0-1 were dropped
+    std::uint32_t short_frames;       // fewer subcarriers than the DSP expects
+    std::uint32_t dropped_short;      // too short to use at all
+    std::uint16_t first_len;          // bytes in the first CSI buffer seen
+    std::uint16_t last_len;           // bytes in the most recent one
+    std::uint8_t  secondary_channel;  // 0 none, 1 above, 2 below -- 40 MHz tells here
+};
+
+Stats capture_stats();
+
 // Frames the capture path dropped because the queue was full. This is a real
 // health signal: a climbing count means the DSP is not keeping up with the
 // radio, which shows up at the gateway as a falling csi_rate_chz.

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131313">
+<meta name="color-scheme" content="dark">
+<title>Privacy — Saans</title>
+<meta name="description" content="What a Saans sensor actually sends: 68 bytes, encoded in the page as you watch, with a consent switch that zeroes the vitals fields exactly as the node does.">
+<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body data-page="privacy">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 26 26"><rect width="26" height="26" rx="7" fill="#efebe2"/><path d="M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5" fill="none" stroke="#141413" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap sitenav" id="top">
+  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <nav class="sitenav-links" aria-label="Pages">
+    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/demo" data-page="demo">demo</a>
+    <a href="/room-sim" data-page="room-sim">room sim</a>
+    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/privacy" data-page="privacy" aria-current="page">privacy</a>
+    <a href="/hardware" data-page="hardware">hardware</a>
+    <a href="/start" data-page="start">get started</a>
+  </nav>
+  <div class="sitenav-end">
+    <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="button button-sm" href="/app">open the dashboard</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="wrap pagehead" aria-labelledby="page-title">
+  <p class="label" data-reveal="rise">privacy</p>
+  <h1 id="page-title" class="display" data-reveal="rise">what leaves the room</h1>
+  <p class="lead" data-reveal="rise" style="--i:1">A sensor sends 68 bytes twice a second and nothing else. This page encodes that frame in your browser from the field layout the firmware uses, so you can see every byte of it. The consent switch zeroes the vital-sign fields exactly as the node does.</p>
+</section>
+
+<section class="wrap section" id="privacy" aria-labelledby="privacy-title">
+  <h2 id="privacy-title" class="statement" data-reveal="rise" style="margin-top:10px">Privacy is not a setting here. <em>It is a 68-byte message format.</em></h2>
+
+  <div class="paper-block" data-reveal="unveil">
+    <div class="frame-top">
+      <div>
+        <h3>This is everything a sensor sends, twice a second.</h3>
+        <p class="fine" style="margin-top:6px">FeatureFrame v1, little-endian, encoded in the page as you watch, exactly as <code>spec/wire.md</code> defines it, including the CRC-32. The field values are examples made up in the page, not a reading from a room. Hover a byte to see its field.</p>
+      </div>
+      <label class="switch"><input type="checkbox" id="consent"><span class="track" aria-hidden="true"></span><span>space opted in to vitals</span></label>
+    </div>
+    <div class="bytes" id="bytes" role="img" aria-label="68 bytes of one feature frame"></div>
+    <p class="frame-readout" id="readout"></p>
+    <p class="sr-only" aria-live="polite" id="frame-live"></p>
+    <!-- The field table is the wire format itself: static reference data, so it
+         is static markup. spec/wire.md §2 is the source; site.js only adds the
+         tab stops and the highlight. -->
+    <ul class="fields" id="fields" aria-label="FeatureFrame v1 fields">
+      <li class="g-head" data-field="magic"><span class="sw" aria-hidden="true"></span><code>magic</code><span>0 · u32</span></li>
+      <li class="g-head" data-field="version"><span class="sw" aria-hidden="true"></span><code>version</code><span>4 · u8</span></li>
+      <li class="g-head" data-field="node_id"><span class="sw" aria-hidden="true"></span><code>node_id</code><span>5 · u8</span></li>
+      <li class="g-head" data-field="tx_id"><span class="sw" aria-hidden="true"></span><code>tx_id</code><span>6 · u8</span></li>
+      <li class="g-head" data-field="flags"><span class="sw" aria-hidden="true"></span><code>flags</code><span>7 · u8</span></li>
+      <li class="g-head" data-field="seq"><span class="sw" aria-hidden="true"></span><code>seq</code><span>8 · u32</span></li>
+      <li class="g-head" data-field="uptime_ms"><span class="sw" aria-hidden="true"></span><code>uptime_ms</code><span>12 · u32</span></li>
+      <li class="g-link" data-field="csi_rate_chz"><span class="sw" aria-hidden="true"></span><code>csi_rate_chz</code><span>16 · u16</span></li>
+      <li class="g-link" data-field="loss_permille"><span class="sw" aria-hidden="true"></span><code>loss_permille</code><span>18 · u16</span></li>
+      <li class="g-presence" data-field="motion_energy"><span class="sw" aria-hidden="true"></span><code>motion_energy</code><span>20 · f32</span></li>
+      <li class="g-presence" data-field="presence_threshold"><span class="sw" aria-hidden="true"></span><code>presence_threshold</code><span>24 · f32</span></li>
+      <li class="g-presence" data-field="gross_motion"><span class="sw" aria-hidden="true"></span><code>gross_motion</code><span>28 · f32</span></li>
+      <li class="g-vitals is-gated" data-field="breath_rms"><span class="sw" aria-hidden="true"></span><code>breath_rms</code><span>32 · f32</span></li>
+      <li class="g-vitals is-gated" data-field="breathing_bpm"><span class="sw" aria-hidden="true"></span><code>breathing_bpm</code><span>36 · f32</span></li>
+      <li class="g-vitals is-gated" data-field="breathing_conf"><span class="sw" aria-hidden="true"></span><code>breathing_conf</code><span>40 · f32</span></li>
+      <li class="g-heart is-gated" data-field="heart_bpm"><span class="sw" aria-hidden="true"></span><code>heart_bpm</code><span>44 · f32</span></li>
+      <li class="g-heart is-gated" data-field="heart_conf"><span class="sw" aria-hidden="true"></span><code>heart_conf</code><span>48 · f32</span></li>
+      <li class="g-quality" data-field="best_bnr"><span class="sw" aria-hidden="true"></span><code>best_bnr</code><span>52 · f32</span></li>
+      <li class="g-quality" data-field="calib_age_s"><span class="sw" aria-hidden="true"></span><code>calib_age_s</code><span>56 · u32</span></li>
+      <li class="g-quality" data-field="rssi_dbm"><span class="sw" aria-hidden="true"></span><code>rssi_dbm</code><span>60 · i8</span></li>
+      <li class="g-quality" data-field="noise_floor_dbm"><span class="sw" aria-hidden="true"></span><code>noise_floor_dbm</code><span>61 · i8</span></li>
+      <li class="g-quality" data-field="n_subcarriers"><span class="sw" aria-hidden="true"></span><code>n_subcarriers</code><span>62 · u8</span></li>
+      <li class="g-quality" data-field="reserved"><span class="sw" aria-hidden="true"></span><code>reserved</code><span>63 · u8</span></li>
+      <li class="g-crc" data-field="crc32"><span class="sw" aria-hidden="true"></span><code>crc32</code><span>64 · u32</span></li>
+    </ul>
+    <noscript><p class="fine">Turn on JavaScript to see the encoded frame.</p></noscript>
+  </div>
+
+  <div class="cards3">
+    <div data-reveal="rise"><h3 class="title">Raw radio stays on the sensor</h3><p class="small muted">Features leave the node. Raw CSI leaves only in a debug mode, and that mode is flagged in every frame (ADR-001).</p></div>
+    <div data-reveal="rise" style="--i:1"><h3 class="title">Vitals are opt-in, per space</h3><p class="small muted">Off by default. The consent gate is a single function on the node, short enough to audit in a few minutes. Heart rate needs a second switch.</p></div>
+    <div data-reveal="rise" style="--i:2"><h3 class="title">No identities, ever</h3><p class="small muted">No names, faces, devices or tracks. Saans reports spaces, not people (ADR-005).</p></div>
+    <div data-reveal="rise"><h3 class="title">Roles see less</h3><p class="small muted">Admin, ops, safety and occupancy roles, each optionally limited to certain spaces. Facilities staff see occupied or empty, never vitals. Machines use tokens, people log in, and login is required whenever the API is reachable beyond the gateway itself.</p></div>
+    <div data-reveal="rise" style="--i:1"><h3 class="title">Health reads are audited</h3><p class="small muted">Every response that contains vital signs or alert evidence is appended to an audit log.</p></div>
+    <div data-reveal="rise" style="--i:2"><h3 class="title">Retention has an end</h3><p class="small muted">Event logs are deleted after 30 days. The gateway runs on the campus network and calls no cloud.</p></div>
+  </div>
+  <div class="badges" data-reveal="rise">
+    <span class="chip">DPDP Act 2023</span><span class="chip">consent per space</span><span class="chip">audit log</span><span class="chip">offline-capable</span><span class="chip st-off">not a medical device</span>
+  </div>
+</section>
+<section class="wrap next" aria-labelledby="next-title">
+  <p class="label" id="next-title">keep reading</p>
+  <div class="next-grid">
+    <a href="/how-it-works"><b>Where those bytes come from<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The eight stages that turn a radio packet into a feature frame.</p></a>
+    <a href="/evidence"><b>What is built<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Including the detectors that ship switched off, and why.</p></a>
+    <a href="/start"><b>Read the spec<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The wire format is written down before it is implemented.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap sitefoot">
+  <nav class="foot-cols" aria-label="Footer">
+    <div><p class="label">the system</p><ul>
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
+      <li><a href="/hardware">Hardware</a></li>
+      <li><a href="/app">Dashboard</a></li>
+    </ul></div>
+    <div><p class="label">the evidence</p><ul>
+      <li><a href="/evidence">What is proven</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES.md">Engineering notes</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/NOTES-localize.md">Localization study</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/tree/main/docs/adr">Decision records</a></li>
+    </ul></div>
+    <div><p class="label">the code</p><ul>
+      <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/README.md">README</a></li>
+      <li><a href="https://github.com/devreddy1015/areu_there/blob/main/spec/wire.md">Wire format</a></li>
+      <li><a href="/start">Run it yourself</a></li>
+    </ul></div>
+  </nav>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
+  <div class="legal">
+    <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
+    <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>
+  </div>
+</footer>
+
+<script src="/site.js" defer></script>
+</body>
+</html>

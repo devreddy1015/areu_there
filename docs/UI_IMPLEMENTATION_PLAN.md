@@ -162,7 +162,36 @@ driving it. See `COMPLETION_REPORT.md` for exactly what was run.
   that does nothing is worse than no button.
 - **Raw CSI heatmap.** FeatureFrames are not subcarrier data and must
   not be drawn as if they were.
-- **Floor plan, person position, 3D room.** No coordinates exist, and
-  localisation is a published negative result.
+- **An *inferred* floor plan, person position or 3D room.** No
+  coordinates can be recovered from CSI on this hardware, and
+  localisation is a published negative result
+  ([`CAPABILITY_LIMITS.md`](CAPABILITY_LIMITS.md) §1).
+
+  The Explorer view (simulate mode only) does draw a room plan with a
+  person in it, and that is not an exception to this rule — it is the
+  rule stated the other way round. Every coordinate on that plan is an
+  **input**: the nodes are configured, and the person is where the
+  operator dragged them. The panel that shows what the system
+  *recovered* is beside it and contains no position at all, because a
+  1T1R link cannot measure one. Anything that would blur those two
+  panels together — drawing an estimated position, tinting the plan with
+  live signal, letting the right-hand panel place a marker — is still
+  forbidden.
+
+  Two labelling rules fall out of this and must not be relaxed:
+
+  1. **The synthetic-data strip (`#synthetic-banner`) is page-level, not
+     view-level.** It sits above every tab, outside `<main>`, so it is on
+     screen in the signed-out, loading, empty and error states too. A
+     cropped screenshot of *any* tab in simulate mode has to carry the
+     fact that nothing on it was measured. The mode pill is a
+     restatement, never the only marker.
+  2. **The coverage map's resolution is a correctness constraint.**
+     `COV_RES_M` samples a field that swings from peak to null in about
+     3 cm. Drawn coarser it aliases, and a map that disagrees with the
+     DSP beside it is worse than no map: at 0.25 m it painted the demo
+     null as mid-range and painted cells "effectively blind" where the
+     pipeline saw the person at confidence 1.00. The constant carries
+     the measurements; do not raise it for render speed.
 - **Client-side synthesis of any kind.** If the series is empty the view
   says so.
