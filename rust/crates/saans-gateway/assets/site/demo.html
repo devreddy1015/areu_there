@@ -31,7 +31,7 @@
   <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
   <nav class="sitenav-links" aria-label="Pages">
     <a href="/how-it-works" data-page="how">how it works</a>
-    <a href="/demo" data-page="demo">demo</a>
+    <a href="/demo" data-page="demo" aria-current="page">demo</a>
     <a href="/evidence" data-page="evidence">evidence</a>
     <a href="/privacy" data-page="privacy">privacy</a>
     <a href="/hardware" data-page="hardware">hardware</a>
@@ -105,12 +105,19 @@
           <button type="button" class="demo-btn" data-x="3.50" data-y="3.61">seen again · 3.50, 3.61</button>
           <button type="button" class="demo-btn" id="ex-present">empty the room</button>
         </div>
-        <p class="fine">Those three points are asserted by a Rust test,
-          <code>the_gap_the_explorer_exists_to_show</code>, so they cannot rot into coordinates that no
-          longer demonstrate anything. Drag the handle, or click anywhere in the room. With the handle
+      </div>
+
+      <!-- Static: what this says about the Rust test is true whether or not
+           anything was fetched, so it is not inside a JS-only wrapper. -->
+      <p class="fine">Those three points are asserted by a Rust test,
+        <code>the_gap_the_explorer_exists_to_show</code>, so they cannot rot into coordinates that no
+        longer demonstrate anything.</p>
+
+      <div class="demo-js">
+        <p class="fine">Drag the handle, or click anywhere in the room. With the handle
           focused, <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> move it by one map cell and
           <kbd>Shift</kbd> and an arrow by 1 m.</p>
-        <p class="fine demo-err" id="ex-err" role="alert"></p>
+        <p class="fine demo-err" id="ex-err" role="status"></p>
       </div>
 
       <p class="fine" style="margin-top:16px">The map is fetched at 0.03 m per cell and that is not a
@@ -136,10 +143,13 @@
         <div class="badges" id="sys-badges"></div>
         <dl class="demo-dl" id="sys-dl"></dl>
         <div id="sys-alerts"></div>
-        <p class="fine" style="margin-top:16px">Occupancy, motion, stillness and breathing are the
-          whole published vocabulary for a space. There is no position field anywhere in the gateway,
-          and nothing in it could produce one.</p>
       </div>
+
+      <!-- Static: the central claim of this page depends on nothing that is
+           fetched, so it is readable with JavaScript off. -->
+      <p class="fine" style="margin-top:16px">Occupancy, motion, stillness and breathing are the
+        whole published vocabulary for a space. There is no position field anywhere in the gateway,
+        and nothing in it could produce one.</p>
     </div>
 
   </div>
@@ -197,7 +207,7 @@
     the person appears two minutes in. <code>--speed 10</code> skips that lead-in.</p>
   <div class="extra" style="margin-top:20px">
     <a class="link" href="https://github.com/devreddy1015/areu_there">the source on GitHub<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
-    <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/rust/crates/saans-gateway/src/simulate.rs">the scenario, in one file<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
+    <a class="link" href="https://github.com/devreddy1015/areu_there/blob/main/rust/crates/saans-sim/src/lib.rs">the simulator, and what it does not model<svg class="icon" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg></a>
     <a class="link" href="/app">the operator's view of the same room</a>
   </div>
 </section>
@@ -207,7 +217,7 @@
   <div class="next-grid">
     <a href="/how-it-works"><b>How it works<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The eight stages between a radio packet and the word “occupied”.</p></a>
     <a href="/evidence"><b>What is proven<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>The measured numbers, the comparisons, and the parts that are not built yet.</p></a>
-    <a href="/privacy"><b>What leaves the room<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Sixty-eight bytes, encoded live on the page, with the consent switch wired up.</p></a>
+    <a href="/privacy"><b>What leaves the room<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Sixty-eight bytes, encoded in the page as you watch, with the consent switch wired up.</p></a>
     <a href="/hardware"><b>What it runs on<svg class="icon" width="17" height="17" aria-hidden="true"><use href="#i-out"/></svg></b><p>Two boards on opposite walls, and what a second link buys you.</p></a>
   </div>
 </section>
@@ -235,7 +245,7 @@
       <li><a href="/start">Run it yourself</a></li>
     </ul></div>
   </nav>
-  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
   <div class="legal">
     <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
     <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>

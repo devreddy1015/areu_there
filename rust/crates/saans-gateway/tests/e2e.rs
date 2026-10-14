@@ -839,17 +839,33 @@ async fn simulate_coverage_has_the_advertised_grid() {
     assert!((median - 1.0).abs() < 1e-9, "median should be exactly 1.0, got {median}");
 
     // The default resolution has to RESOLVE the thing the map is of.
-    // The sensitivity field oscillates on a half wavelength (6.2 cm at
-    // 2.437 GHz), so a default coarser than that samples one arbitrary
-    // point of a field that swings by 10x within the cell — which can
-    // paint a null as ordinary, the one error that makes the map worse
-    // than no map at all.
+    // The sensitivity field oscillates with a spatial *period* of half a
+    // wavelength (6.2 cm at 2.437 GHz), so Nyquist wants two samples
+    // inside 6.2 cm — finer than 3.1 cm, not finer than 6.2 cm. Getting
+    // that wrong is not academic: at 0.05 the map called the pinned null
+    // "below this room's median", which reads as *a bit weak* for a cell
+    // where the pipeline cannot see at all.
     let d = g.json("/api/sim/coverage").await;
-    assert_eq!(d["res_m"], 0.05);
-    assert_eq!((d["w"].as_u64(), d["h"].as_u64()), (Some(120), Some(100)));
+    let res = d["res_m"].as_f64().unwrap();
+    assert!(res <= 0.031, "the default must take two samples per 6.2 cm period, got {res}");
+
+    // The assertion that actually matters, and the reason the number
+    // above is not just a magic constant: at the default resolution the
+    // map must agree with the pipeline about the one cell this whole
+    // demo is built around. `the_gap_the_explorer_exists_to_show` pins
+    // that the DSP loses the person at DEMO_NULL_M; a map that paints
+    // that spot as ordinary is worse than no map at all.
+    let (w, h) = (d["w"].as_u64().unwrap() as usize, d["h"].as_u64().unwrap() as usize);
+    let ox = d["origin_m"][0].as_f64().unwrap();
+    let oy = d["origin_m"][1].as_f64().unwrap();
+    let (nx, ny) = saans_gateway::simulate::DEMO_NULL_M;
+    let ix = (((nx - ox) / res).round() as usize).min(w - 1);
+    let iy = (((ny - oy) / res).round() as usize).min(h - 1);
+    let at_null = d["best"][iy * w + ix].as_f64().unwrap();
     assert!(
-        d["res_m"].as_f64().unwrap() <= 0.062,
-        "the default must be finer than a half wavelength or the map aliases"
+        at_null < 0.25,
+        "the default map must call the demo null blind, as the pipeline does; it reads {at_null:.3} \
+         x the room median at res_m = {res}"
     );
 
     // Every rejected `res_m` comes back as the API's own `{"error": ...}`,

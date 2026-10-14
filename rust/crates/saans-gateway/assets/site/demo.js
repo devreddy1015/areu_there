@@ -104,6 +104,16 @@
     return parent;
   }
   const announce = (msg) => { $("#ex-live").textContent = msg; };
+  /**
+   * Writes only when the string actually changes.
+   *
+   * Several of these nodes are role="status" regions, and a poll that runs
+   * once a second — or a pointermove that runs dozens of times a second —
+   * would otherwise reassign an identical sentence and have it announced
+   * again each time. An unchanged fact is not news.
+   */
+  const setText = (node, s) => { if (node.textContent !== s) node.textContent = s; };
+  const setAttr = (node, k, v) => { if (node.getAttribute(k) !== v) node.setAttribute(k, v); };
 
   // ----------------------------------------------------------- transport
   class HttpError extends Error {
@@ -280,34 +290,45 @@
   }
 
   // ------------------------------------------------------------- the room
+  /** The failure currently written into #plan-note, or "" for none. */
+  let noteSaid = "";
+
   function render() {
     const note = $("#plan-note");
     if (SIM.err || !SIM.cfg) {
       SIM.built = ""; SIM.els = null;
       PLAN.replaceChildren();
       PLAN.hidden = true;
-      note.replaceChildren(el("b", null, SIM.err ? "No simulated room is being drawn." : "Loading the simulated room…"));
-      if (SIM.err) {
-        add(note, document.createTextNode(" " + SIM.err));
-        if (SIM.errKind === "404") {
-          add(note, document.createTextNode(" Start one with "),
-            el("code", null, "saans-gateway --config saans.toml --simulate --speed 10"),
-            document.createTextNode(" — the same command is under “run this yourself” below."));
-        } else if (SIM.errKind === "401") {
-          const a = el("a", { class: "link", href: "/app" }, "sign in at the dashboard");
-          add(note, document.createTextNode(" You can "), a, document.createTextNode("."));
-        } else {
-          add(note, document.createTextNode(" Nothing is substituted for it."));
+      // #plan-note is a role="status" region and the poll keeps running
+      // while the gateway is unreachable, so the same sentence would be
+      // re-announced every second. Written only when it changes.
+      const sig = SIM.err ? SIM.errKind + "\u0000" + SIM.err : "\u0000loading";
+      if (sig !== noteSaid) {
+        noteSaid = sig;
+        note.replaceChildren(el("b", null, SIM.err ? "No simulated room is being drawn." : "Loading the simulated room…"));
+        if (SIM.err) {
+          add(note, document.createTextNode(" " + SIM.err));
+          if (SIM.errKind === "404") {
+            add(note, document.createTextNode(" Start one with "),
+              el("code", null, "saans-gateway --config saans.toml --simulate --speed 10"),
+              document.createTextNode(" — the same command is under “run this yourself” below."));
+          } else if (SIM.errKind === "401") {
+            const a = el("a", { class: "link", href: "/app" }, "sign in at the dashboard");
+            add(note, document.createTextNode(" You can "), a, document.createTextNode("."));
+          } else {
+            add(note, document.createTextNode(" Nothing is substituted for it."));
+          }
         }
       }
-      $("#t-pos").textContent = "—";
-      $("#t-cov").textContent = "—";
-      $("#t-breath").textContent = "—";
+      setText($("#t-pos"), "—");
+      setText($("#t-cov"), "—");
+      setText($("#t-breath"), "—");
       renderRight();
       return;
     }
     PLAN.hidden = false;
-    note.textContent = "";
+    noteSaid = "";
+    setText(note, "");
     buildRoom();
     updateRoom();
     renderRight();
@@ -401,10 +422,23 @@
       add(PLAN, grp);
     }
 
+    // role="img", not "application" and not "slider". "application" drops
+    // a screen reader out of browse mode for a handle with no interior to
+    // browse. "slider" would be the adjustable role, but a slider carries
+    // one value and this handle carries two — x and y — so it could only
+    // be given an aria-valuenow this page would have to invent, which is
+    // the one thing this page must not do with a position. "img" keeps
+    // browse mode, invents nothing, and the handle is still tabbable and
+    // still takes arrow keys; the whole position is in the aria-label,
+    // which updateRoom() rewrites on every move, and the live region
+    // below announces each keyboard move.
     const person = svgEl("g", {
-      class: "person", tabindex: "0", role: "application",
+      class: "person", tabindex: "0", role: "img",
       "aria-roledescription": "draggable ground-truth position handle",
     });
+    // Two concentric rings, dark beneath amber, so the focus
+    // indicator stays visible over both ends of the heat scale.
+    add(person, svgEl("circle", { class: "halo-outer", cx: 0, cy: 0, r: 17 }));
     add(person, svgEl("circle", { class: "halo", cx: 0, cy: 0, r: 17 }));
     add(person, svgEl("circle", { class: "dot", cx: 0, cy: 0, r: 8 }));
     const tag = svgEl("text", { class: "tag", x: 0, y: 32 });
@@ -519,29 +553,32 @@
     // Against the bottom wall the label would land on the axis numbers.
     e.tag.setAttribute("y", p.y_m < 0.8 ? -24 : 32);
     const where = num(p.x_m, 2) + " m across, " + num(p.y_m, 2) + " m up";
-    e.person.setAttribute("aria-label", "Ground-truth person position, an input: " + where
+    setAttr(e.person, "aria-label", "Ground-truth person position, an input: " + where
       + ". Arrow keys move by " + num(stepM(), 2) + " metres, Shift and arrow by 1 metre.");
-    e.pos.textContent = SIM.present ? where : "removed — the simulated room is empty";
+    setText(e.pos, SIM.present ? where : "removed — the simulated room is empty");
 
     const cv = SIM.present ? covAt(p.x_m, p.y_m) : null;
-    e.cov.textContent = !SIM.present ? "—"
+    setText(e.cov, !SIM.present ? "—"
       : cv == null ? "no coverage value published for this cell"
-        : num(cv, 2) + " — " + COV_BANDS[covBandOf(cv)].short;
+        : num(cv, 2) + " — " + COV_BANDS[covBandOf(cv)].short);
 
     const t = (SIM.cfg && SIM.cfg.truth) || {};
-    e.truth.textContent = !SIM.present ? "nobody in the room"
+    setText(e.truth, !SIM.present ? "nobody in the room"
       : t.breathing ? num(t.bpm, 1) + " BPM" + (t.in_pause ? ", currently in a simulated pause" : "")
         + (t.still ? ", still" : ", moving")
-        : "none — we did not give this simulated body breathing motion";
+        : "none — we did not give this simulated body breathing motion");
 
-    e.present.textContent = SIM.present ? "empty the room" : "put the person back";
+    setText(e.present, SIM.present ? "empty the room" : "put the person back");
     let err = SIM.postErr;
     if (e.unresolved.length) {
       err += (err ? " " : "") + "Not drawn: link(s) " + e.unresolved.join(", ")
         + " — their endpoints do not match any node /api/sim listed, so this view does not know where "
         + "they run.";
     }
-    e.err.textContent = err;
+    // updateRoom() runs on every pointermove of a drag. #ex-err is a
+    // role="status" region, so writing the same refusal into it again is
+    // the same sentence announced again, dozens of times a second.
+    setText(e.err, err);
   }
 
   function attachRoomInput() {
@@ -599,50 +636,117 @@
   }
 
   // ------------------------------------------- what the pipeline recovers
+  //
+  // This column is updated in place, never torn down and rebuilt. The poll
+  // runs once a second and most of what it publishes is unchanged from the
+  // second before; replacing the nodes anyway would throw away a screen
+  // reader's virtual cursor, and the focus of anything it contained, once
+  // a second for no new fact.
+
+  /** Row key → the <dt>/<dd> pair holding it. Built once each. */
+  const ROWS = new Map();
+  /** What is currently rendered, so an identical render writes nothing. */
+  let rowOrder = "", badgeSaid = "", verdictSaid = "", alertSaid = "";
+
+  function clearRight(host, box, badges, alerts) {
+    if (rowOrder) { rowOrder = ""; ROWS.clear(); host.replaceChildren(); }
+    if (verdictSaid) { verdictSaid = ""; box.replaceChildren(); }
+    if (badgeSaid) { badgeSaid = ""; badges.replaceChildren(); }
+    if (alertSaid) { alertSaid = ""; alerts.replaceChildren(); }
+  }
+
+  /**
+   * Updates every row's text in place. The <dl> itself is only rewritten
+   * when the set of rows changes — occupancy arriving adds "Occupied for",
+   * consent being withdrawn removes "Confidence" — and then the same
+   * cells are re-appended in the new order rather than rebuilt.
+   */
+  function renderRows(host, rows) {
+    for (const r of rows) {
+      let cell = ROWS.get(r[0]);
+      if (!cell) { cell = { dt: el("dt"), dd: el("dd") }; ROWS.set(r[0], cell); }
+      setText(cell.dt, r[1]);
+      setText(cell.dd, r[2]);
+    }
+    const order = rows.map((r) => r[0]).join("\u0000");
+    if (order === rowOrder) return;
+    rowOrder = order;
+    host.replaceChildren();
+    for (const r of rows) { const c = ROWS.get(r[0]); add(host, c.dt, c.dd); }
+  }
+
+  /**
+   * The verdict is rebuilt only when what it says changes. Its headline is
+   * not enough of a key: the coordinates it quotes and the two rates it
+   * compares are in the same box, so the whole rendered text is the key.
+   * (verdictBox() still runs every time — it owns the SIM.said check that
+   * announces a changed headline.)
+   */
+  function renderVerdict(box, s) {
+    const vb = verdictBox(s);
+    const sig = vb.getAttribute("data-k") + "\u0000" + vb.textContent;
+    if (sig === verdictSaid) return;
+    verdictSaid = sig;
+    box.replaceChildren(vb);
+  }
+
+  function renderAlerts(host, s) {
+    const boxes = (s.alerts || []).map((a) => alertBox(a, s));
+    const sig = boxes.map((b) => b.getAttribute("data-sev") + "\u0000" + b.textContent).join("\u001e");
+    if (sig === alertSaid) return;
+    alertSaid = sig;
+    host.replaceChildren(...boxes);
+  }
+
   function renderRight() {
     const host = $("#sys-dl"), box = $("#verdict"), badges = $("#sys-badges"),
       alerts = $("#sys-alerts"), note = $("#sys-note");
-    host.replaceChildren(); box.replaceChildren(); badges.replaceChildren(); alerts.replaceChildren();
 
-    if (!SIM.cfg) {
-      note.textContent = SIM.err
-        ? "No room is being simulated, so the gateway publishes no state for one."
-        : "Waiting for the simulator.";
-      return;
-    }
-    const s = SIM.space;
+    const s = SIM.cfg ? SIM.space : null;
     if (!s) {
-      note.textContent = SIM.spaceErr || "Waiting for the gateway to publish a state.";
+      clearRight(host, box, badges, alerts);
+      setText(note, !SIM.cfg
+        ? (SIM.err
+          ? "No room is being simulated, so the gateway publishes no state for one."
+          : "Waiting for the simulator.")
+        : (SIM.spaceErr || "Waiting for the gateway to publish a state."));
       return;
     }
-    note.textContent = "";
+    setText(note, "");
 
-    box.append(verdictBox(s));
+    renderVerdict(box, s);
 
-    badges.append(s.vitals
-      ? el("span", { class: "chip st-ok" }, "vitals: consented")
-      : el("span", { class: "chip" }, "vitals: off for this space"));
-    badges.append(el("span", { class: "chip st-sim" }, "synthetic input"));
+    const badgeSig = s.vitals ? "consented" : "off";
+    if (badgeSig !== badgeSaid) {
+      badgeSaid = badgeSig;
+      badges.replaceChildren(
+        s.vitals
+          ? el("span", { class: "chip st-ok" }, "vitals: consented")
+          : el("span", { class: "chip" }, "vitals: off for this space"),
+        el("span", { class: "chip st-sim" }, "synthetic input"));
+    }
 
     const kind = stateOf(s);
-    const row = (k, v) => add(host, el("dt", null, k), el("dd", null, v));
-    row("Occupancy", stateWord(kind) + (kind === "blind" ? " — no usable link, which is not “empty”" : ""));
-    if (kind === "occ" && s.occupied_since_s != null && s.t_s != null) row("Occupied for", dur(s.t_s - s.occupied_since_s));
-    row("Motion index", num(s.motion_index, 2) + " × the empty-room level");
-    if (kind === "occ") row("Still for", dur(s.still_for_s));
+    const rows = [];
+    const row = (key, k, v) => rows.push([key, k, v]);
+    row("state", "Occupancy", stateWord(kind) + (kind === "blind" ? " — no usable link, which is not “empty”" : ""));
+    if (kind === "occ" && s.occupied_since_s != null && s.t_s != null) row("since", "Occupied for", dur(s.t_s - s.occupied_since_s));
+    row("motion", "Motion index", num(s.motion_index, 2) + " × the empty-room level");
+    if (kind === "occ") row("still", "Still for", dur(s.still_for_s));
     if (!s.vitals) {
-      row("Breathing", "not consented for this space — nothing is measured, simulated or not");
+      row("breathing", "Breathing", "not consented for this space — nothing is measured, simulated or not");
     } else if (!("breathing" in s)) {
-      row("Breathing", "this space has consented, but your role is not permitted to see it");
+      row("breathing", "Breathing", "this space has consented, but your role is not permitted to see it");
     } else if (s.breathing) {
-      row("Breathing", num(s.breathing.bpm, 1) + " BPM from link " + linkName(s.breathing.link));
-      row("Confidence", num(s.breathing.confidence, 2));
+      row("breathing", "Breathing", num(s.breathing.bpm, 1) + " BPM from link " + linkName(s.breathing.link));
+      row("confidence", "Confidence", num(s.breathing.confidence, 2));
     } else {
-      row("Breathing", "no confident estimate — the estimator abstains rather than guess");
+      row("breathing", "Breathing", "no confident estimate — the estimator abstains rather than guess");
     }
-    row("Links usable", (s.links_usable ?? 0) + " of " + (s.links_total ?? 0));
+    row("links", "Links usable", (s.links_usable ?? 0) + " of " + (s.links_total ?? 0));
+    renderRows(host, rows);
 
-    for (const a of s.alerts || []) alerts.append(alertBox(a, s));
+    renderAlerts(alerts, s);
   }
 
   const ALERT_LABEL = {
@@ -707,34 +811,49 @@
           : b ? ", breathing " + num(b.bpm, 1) + " BPM at confidence " + num(b.confidence, 2)
             : ", no confident breathing estimate") + "."));
 
-    if (here && (kind === "bad" || kind === "warn")) {
+    if (here) {
       const p = SIM.person || {};
       const cv = covAt(p.x_m, p.y_m);
       const lost = sees !== "occ" || !b;
-      let why;
-      if (!lost) {
-        why = "Ground truth is " + num(t.bpm, 1) + " BPM; the estimator returned " + num(b.bpm, 1)
-          + " BPM at confidence " + num(b.confidence, 2) + ". A high confidence is a statement about the "
-          + "signal, not a guarantee of the rate — compare the two columns, never the confidence alone.";
-      } else if (cv == null) {
-        why = "The simulator publishes no predicted sensitivity for this cell, so this view will not offer "
-          + "a reason. The system is reporting that it cannot see, rather than guessing — that abstention "
-          + "is the behaviour this view exists to show.";
-      } else if (covBandOf(cv) <= 1) {
-        why = "The simulator predicts " + num(cv, 2) + " (" + COV_BANDS[covBandOf(cv)].short
-          + ") for a chest at this spot, and the pipeline did indeed lose them. The prediction and the "
-          + "result agree here. The system is reporting that it cannot see, rather than guessing — that "
-          + "abstention is the behaviour this view exists to show.";
-      } else {
-        // The map is a model. When it and the pipeline disagree, say so
-        // rather than quoting the map as if it were the explanation.
-        why = "Note the disagreement: the simulator predicted " + num(cv, 2) + " ("
-          + COV_BANDS[covBandOf(cv)].short + ") for a chest at this spot, yet the pipeline lost them "
-          + "anyway. The map is the simulator’s model of the channel; the right-hand column is what the "
-          + "DSP actually recovered. Where they differ, the right-hand column is the one that is about "
-          + "this system’s behaviour.";
+      let why = null;
+      if (kind === "ok") {
+        // A success is worth a note only when the map said it should not
+        // have been one. Checking the map against the pipeline in the
+        // failing direction alone would mean the map is only ever audited
+        // when the system looks bad — which flatters both of them.
+        if (cv != null && covBandOf(cv) <= 1) {
+          why = "Note the disagreement: the simulator predicted " + num(cv, 2) + " ("
+            + COV_BANDS[covBandOf(cv)].short + ") for a chest at this spot, yet the pipeline recovered "
+            + "them anyway. The map is the simulator\u2019s model of the channel; the right-hand column is "
+            + "what the DSP actually got back. Where they differ, the right-hand column is the one that is "
+            + "about this system\u2019s behaviour \u2014 and a map that is wrong in this direction is the "
+            + "kind that talks an operator out of a node position that would have worked.";
+        }
+      } else if (kind === "bad" || kind === "warn") {
+        if (!lost) {
+          why = "Ground truth is " + num(t.bpm, 1) + " BPM; the estimator returned " + num(b.bpm, 1)
+            + " BPM at confidence " + num(b.confidence, 2) + ". A high confidence is a statement about the "
+            + "signal, not a guarantee of the rate \u2014 compare the two columns, never the confidence alone.";
+        } else if (cv == null) {
+          why = "The simulator publishes no predicted sensitivity for this cell, so this view will not offer "
+            + "a reason. The system is reporting that it cannot see, rather than guessing \u2014 that abstention "
+            + "is the behaviour this view exists to show.";
+        } else if (covBandOf(cv) <= 1) {
+          why = "The simulator predicts " + num(cv, 2) + " (" + COV_BANDS[covBandOf(cv)].short
+            + ") for a chest at this spot, and the pipeline did indeed lose them. The prediction and the "
+            + "result agree here. The system is reporting that it cannot see, rather than guessing \u2014 that "
+            + "abstention is the behaviour this view exists to show.";
+        } else {
+          // The map is a model. When it and the pipeline disagree, say so
+          // rather than quoting the map as if it were the explanation.
+          why = "Note the disagreement: the simulator predicted " + num(cv, 2) + " ("
+            + COV_BANDS[covBandOf(cv)].short + ") for a chest at this spot, yet the pipeline lost them "
+            + "anyway. The map is the simulator\u2019s model of the channel; the right-hand column is what the "
+            + "DSP actually recovered. Where they differ, the right-hand column is the one that is about "
+            + "this system\u2019s behaviour.";
+        }
       }
-      add(box, el("p", { class: "why" }, why));
+      if (why) add(box, el("p", { class: "why" }, why));
     }
     add(box, el("p", { class: "why" },
       "Both columns describe the same instant. The left is what the simulator was told; the right is what "

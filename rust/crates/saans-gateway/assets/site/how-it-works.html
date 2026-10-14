@@ -30,7 +30,7 @@
 <header class="wrap sitenav" id="top">
   <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
   <nav class="sitenav-links" aria-label="Pages">
-    <a href="/how-it-works" data-page="how">how it works</a>
+    <a href="/how-it-works" data-page="how" aria-current="page">how it works</a>
     <a href="/demo" data-page="demo">demo</a>
     <a href="/evidence" data-page="evidence">evidence</a>
     <a href="/privacy" data-page="privacy">privacy</a>
@@ -81,7 +81,7 @@
     </div>
     <ol class="phases">
       <li data-phase="0" data-reveal="rise"><span class="n">01</span><span class="phase-name">Capture</span><span class="body muted">A TX board broadcasts an ESP-NOW frame 50 times a second. The RX board reads the channel state on every subcarrier, at a rate Saans sets rather than one that depends on other network traffic.</span></li>
-      <li data-phase="1" data-reveal="rise"><span class="n">02</span><span class="phase-name">Fill the gaps</span><span class="body muted">Lost packets are interpolated by sequence number, up to one second. Without this, 15% loss made a 15 BPM breather read 17.8 BPM at confidence 0.98.</span></li>
+      <li data-phase="1" data-reveal="rise"><span class="n">02</span><span class="phase-name">Fill the gaps</span><span class="body muted">Lost packets are interpolated by sequence number, up to one second. Without this, in simulation, 15% loss made a 15 BPM breather read 17.8 BPM at confidence 0.98.</span></li>
       <li data-phase="2" data-reveal="rise"><span class="n">03</span><span class="phase-name">Suppress the room</span><span class="body muted">Walls and furniture dominate the signal. A slowly varying baseline is subtracted from each subcarrier, and each one is weighted by how much it actually moves.</span></li>
       <li data-phase="3" data-reveal="rise"><span class="n">04</span><span class="phase-name">Fuse</span><span class="body muted">A weighted collapse to one signal. Optional BNR selection with sign-flip fusion keeps only the subcarriers that carry breathing.</span></li>
       <li data-phase="4" data-reveal="rise"><span class="n">05</span><span class="phase-name">Presence</span><span class="body muted">Energy in the 0.1–2 Hz band, compared with a threshold learned from 30 s of empty room, with hysteresis so the state doesn't flicker.</span></li>
@@ -95,7 +95,7 @@
 <section class="wrap section" id="signals" aria-labelledby="signals-title">
   <p class="label" data-reveal="rise">what it measures</p>
   <h2 id="signals-title" class="statement" data-reveal="rise" style="margin-top:10px">Four signals from one radio link. Each comes with a confidence, and each may abstain.</h2>
-  <p class="fine" style="margin-top:14px" data-reveal="rise">Every percentage in this section comes from the simulator. None of it has been measured in a real room.</p>
+  <p class="fine" style="margin-top:14px" data-reveal="rise">Every number on this page comes from the simulator. None of it has been measured in a real room.</p>
   <div class="cards4">
     <article class="card" data-reveal="rise">
       <span class="big">98.2%</span><span class="big-label">occupancy accuracy, one link</span>
@@ -195,7 +195,7 @@
   <nav class="foot-cols" aria-label="Footer">
     <div><p class="label">the system</p><ul>
       <li><a href="/how-it-works">How it works</a></li>
-      <li><a href="/demo">Live demo</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
       <li><a href="/hardware">Hardware</a></li>
       <li><a href="/app">Dashboard</a></li>
     </ul></div>
@@ -212,7 +212,7 @@
       <li><a href="/start">Run it yourself</a></li>
     </ul></div>
   </nav>
-  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
   <div class="legal">
     <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
     <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>

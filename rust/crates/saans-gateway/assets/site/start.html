@@ -35,7 +35,7 @@
     <a href="/evidence" data-page="evidence">evidence</a>
     <a href="/privacy" data-page="privacy">privacy</a>
     <a href="/hardware" data-page="hardware">hardware</a>
-    <a href="/start" data-page="start">get started</a>
+    <a href="/start" data-page="start" aria-current="page">get started</a>
   </nav>
   <div class="sitenav-end">
     <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
@@ -60,13 +60,17 @@
       <li><b>HTTP API</b><span class="chip st-built"><span class="dot"></span>built</span><p>Spaces, events, links and gateway health, as JSON.</p></li>
       <li><b>WebSocket</b><span class="chip st-built"><span class="dot"></span>built</span><p>State every 0.5 s, plus events as they happen.</p></li>
       <li><b>Prometheus /metrics</b><span class="chip st-built"><span class="dot"></span>built</span><p>Sensor and gateway health for Grafana.</p></li>
-      <li><b>Event log and replay</b><span class="chip st-built"><span class="dot"></span>built</span><p>Daily JSONL with retention. Recorded pcaps replay with the same readings as live.</p></li>
+      <li><b>Event log and replay</b><span class="chip st-built"><span class="dot"></span>built</span><p>Daily JSONL with retention. Recorded pcaps replay through the same pipeline, producing the same readings as the ingest path.</p></li>
       <li><b>MQTT and Home Assistant</b><span class="chip st-plan"><span class="dot"></span>planned</span><p>Retained occupancy per space, so lights and AC can follow it with no custom code.</p></li>
       <li><b>Telegram and webhook alerts</b><span class="chip st-plan"><span class="dot"></span>planned</span><p>Acknowledge, resolve and escalate. By default no health numbers leave campus.</p></li>
     </ul>
     <div class="code" data-reveal="unveil" style="--i:1">
       <div class="code-bar">
-        <div class="tabs" role="tablist" aria-label="Examples">
+        <!-- The four panels below are static reference text: they ship visible
+             and stacked, each under its own heading. The tab bar cannot do
+             anything until site.js runs, so it ships hidden and site.js
+             reveals it, hides the headings and collapses the panels into tabs. -->
+        <div class="tabs" role="tablist" aria-label="Examples" hidden>
           <button type="button" role="tab" id="tab-run" aria-controls="p-run" aria-selected="true">run it</button>
           <button type="button" role="tab" id="tab-api" aria-controls="p-api" aria-selected="false" tabindex="-1">http api</button>
           <button type="button" role="tab" id="tab-live" aria-controls="p-live" aria-selected="false" tabindex="-1">live</button>
@@ -74,6 +78,7 @@
         </div>
         <button type="button" class="copy" id="copy"><svg width="14" height="14" aria-hidden="true"><use href="#i-copy"/></svg><span>copy</span></button>
       </div>
+      <h3 class="code-h label">run it</h3>
 <pre role="tabpanel" id="p-run" aria-labelledby="tab-run" tabindex="0"><span class="c"># no hardware: the synthetic source models the radio physics</span>
 python3 -m wifisense demo
 
@@ -88,7 +93,8 @@ cargo run --release -p saans-gateway -- --config saans.toml
 
 <span class="c"># replay a recording through the same pipeline</span>
 python3 -m wifisense replay run.pcap --node <span class="n">3</span></pre>
-<pre role="tabpanel" id="p-api" aria-labelledby="tab-api" tabindex="0" hidden><span class="k">GET</span>  /api/spaces             <span class="c"># every space: state, name, privacy, alerts</span>
+      <h3 class="code-h label">http api</h3>
+<pre role="tabpanel" id="p-api" aria-labelledby="tab-api" tabindex="0"><span class="k">GET</span>  /api/spaces             <span class="c"># every space: state, name, privacy, alerts</span>
 <span class="k">GET</span>  /api/spaces/{id}        <span class="c"># one space and its last 50 events</span>
 <span class="k">GET</span>  /api/events?space=&amp;since=&amp;limit=
 <span class="k">GET</span>  /api/links              <span class="c"># rate, loss, calibration per link</span>
@@ -99,14 +105,16 @@ python3 -m wifisense replay run.pcap --node <span class="n">3</span></pre>
 <span class="c"># machines carry a token; what comes back depends on its role</span>
 curl -H <span class="s">"Authorization: Bearer $SAANS_TOKEN"</span> \
      http://gateway:8080/api/spaces</pre>
-<pre role="tabpanel" id="p-live" aria-labelledby="tab-live" tabindex="0" hidden><span class="k">const</span> ws = <span class="k">new</span> WebSocket(<span class="s">"ws://gateway:8080/api/live"</span>);
+      <h3 class="code-h label">live</h3>
+<pre role="tabpanel" id="p-live" aria-labelledby="tab-live" tabindex="0"><span class="k">const</span> ws = <span class="k">new</span> WebSocket(<span class="s">"ws://gateway:8080/api/live"</span>);
 
 ws.onmessage = (e) =&gt; {
   <span class="k">const</span> msg = JSON.parse(e.data);
   <span class="k">if</span> (msg.type === <span class="s">"state"</span>) render(msg);   <span class="c">// every 0.5 s</span>
   <span class="k">if</span> (msg.type === <span class="s">"event"</span>) log(msg);      <span class="c">// as they happen</span>
 };</pre>
-<pre role="tabpanel" id="p-json" aria-labelledby="tab-json" tabindex="0" hidden><span class="c">// one space's state, as the API returns it (illustrative values)</span>
+      <h3 class="code-h label">a space</h3>
+<pre role="tabpanel" id="p-json" aria-labelledby="tab-json" tabindex="0"><span class="c">// one space's state, as the API returns it (illustrative values)</span>
 {
   <span class="s">"space_id"</span>: <span class="s">"lab-214"</span>,
   <span class="s">"occupied"</span>: <span class="k">true</span>,            <span class="c">// null = can't tell</span>
@@ -166,7 +174,7 @@ ws.onmessage = (e) =&gt; {
   <nav class="foot-cols" aria-label="Footer">
     <div><p class="label">the system</p><ul>
       <li><a href="/how-it-works">How it works</a></li>
-      <li><a href="/demo">Live demo</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
       <li><a href="/hardware">Hardware</a></li>
       <li><a href="/app">Dashboard</a></li>
     </ul></div>
@@ -183,7 +191,7 @@ ws.onmessage = (e) =&gt; {
       <li><a href="/start">Run it yourself</a></li>
     </ul></div>
   </nav>
-  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
   <div class="legal">
     <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
     <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>

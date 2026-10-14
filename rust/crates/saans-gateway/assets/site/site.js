@@ -97,23 +97,51 @@
     }
   }
 
+  /* ---------- what just changed, for the two filter controls ----------
+     Both controls change what is on the page without moving focus, so
+     nothing is spoken. The polite region is built here rather than written
+     into the markup because it only has a job while this file is running:
+     with script off neither control filters anything. */
+  const srLive = (anchor, id) => {
+    if (!anchor) return null;
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("p");
+      el.id = id;
+      el.className = "sr-only";
+      el.setAttribute("aria-live", "polite");
+      anchor.after(el);
+    }
+    return el;
+  };
+  const liveAfter = (btns, id) => (btns.length ? srLive(btns[0].closest(".seg") || btns[0].parentElement, id) : null);
+
   /* ---------- link diversity toggle ---------- */
   const linkButtons = $$("[data-links]");
+  const linksLive = liveAfter(linkButtons, "links-live");
   const setLinks = (n) => {
     linkButtons.forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.links === n)));
     $$("#links [data-k]").forEach((g) => g.classList.toggle("is-off", +g.dataset.k > n));
     $$("#links [data-node]").forEach((g) => (g.style.opacity = +g.dataset.node > n ? "0.25" : "1"));
     $$("#links [data-col]").forEach((c) => c.classList.toggle("is-sel", +c.dataset.col === n));
   };
-  linkButtons.forEach((b) => b.addEventListener("click", () => setLinks(+b.dataset.links)));
+  linkButtons.forEach((b) => b.addEventListener("click", () => {
+    const n = +b.dataset.links;
+    setLinks(n);
+    // only on a press: the initial state is already spoken by aria-pressed
+    if (linksLive) linksLive.textContent = `${n} link${n === 1 ? "" : "s"} selected`;
+  }));
   if (linkButtons.length) setLinks(2);
 
   /* ---------- detector filter ---------- */
   const filterButtons = $$("[data-filter]");
+  const detLive = liveAfter(filterButtons, "det-live");
   filterButtons.forEach((b) => b.addEventListener("click", () => {
     const f = b.dataset.filter;
     filterButtons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    $$("#det-grid .det").forEach((d) => (d.hidden = f !== "all" && d.dataset.cat !== f));
+    const dets = $$("#det-grid .det");
+    dets.forEach((d) => (d.hidden = f !== "all" && d.dataset.cat !== f));
+    if (detLive) detLive.textContent = `showing ${dets.filter((d) => !d.hidden).length} of ${dets.length} detectors`;
   }));
 
   /* ---------- FeatureFrame v1, encoded per spec/wire.md §2 ---------- */
@@ -149,6 +177,7 @@
   const bytesEl = $("#bytes");
   const fieldsEl = $("#fields");
   const readout = $("#readout");
+  const frameLive = $("#frame-live");
   const consent = $("#consent");
   if (bytesEl && fieldsEl && readout && consent) {
     const buf = new ArrayBuffer(68);
@@ -169,14 +198,16 @@
       bytesEl.append(c);
       cells.push(c);
     }
-    for (const f of FIELDS) {
-      const li = document.createElement("li");
-      li.className = `g-${f.g}`;
-      li.dataset.field = f.name;
-      if (f.g === "vitals" || f.g === "heart") li.classList.add("is-gated");
-      li.innerHTML = `<span class="sw"></span><code>${f.name}</code><span>${f.off} · ${f.type}</span>`;
-      fieldsEl.append(li);
+    // The 24 field rows are static markup: they are the wire format, they
+    // never change, and they have to be readable with this file switched
+    // off. Script adds the tab stops, because script is what gives a row
+    // something to say when you reach it.
+    const rows = new Map();
+    for (const li of $$("li[data-field]", fieldsEl)) {
+      li.tabIndex = 0;
+      rows.set(li.dataset.field, li);
     }
+    const byName = (name) => FIELDS.find((f) => f.name === name);
 
     const gatedNote = (f) =>
       f.g === "heart" ? "zeroed on the node: heart rate needs its own switch, off by default"
@@ -199,23 +230,55 @@
       const note = gatedNote(f);
       readout.innerHTML = `offset ${f.off} · ${f.type} · <b>${f.name}</b> = <b>${fmt(f)}</b>${note ? ` · ${note}` : ""}`;
     };
+    // #readout is rewritten twice a second, so it must never be a live
+    // region. The inspected field is announced here instead, and only when
+    // the field — or what the gate does to it — actually changes.
+    let said = "";
+    const announce = (f) => {
+      if (!frameLive) return;
+      const note = f ? gatedNote(f) : "";
+      const key = f ? `${f.name}|${note}` : "";
+      if (key === said) return;
+      said = key;
+      frameLive.textContent = f ? `${f.name}, offset ${f.off}, ${f.type}, ${fmt(f)}${note ? `, ${note}` : ""}` : "";
+    };
     const highlight = (f) => {
       hovered = f;
       bytesEl.classList.toggle("is-hovering", !!f);
       cells.forEach((c, i) => c.classList.toggle("is-hl", !!f && fieldOf[i] === f));
-      $$("li", fieldsEl).forEach((li) => li.classList.toggle("is-hl", !!f && li.dataset.field === f.name));
+      rows.forEach((li, name) => li.classList.toggle("is-hl", !!f && name === f.name));
       f ? showField(f) : showIdle();
+      announce(f);
+    };
+    // A pointer leaving must not steal the row the keyboard is sitting on.
+    const focusedField = () => {
+      const li = fieldsEl.contains(document.activeElement) && document.activeElement.closest("li[data-field]");
+      return li ? byName(li.dataset.field) : null;
     };
     bytesEl.addEventListener("pointerover", (e) => { const i = e.target.dataset?.i; if (i != null) highlight(fieldOf[+i]); });
-    bytesEl.addEventListener("pointerleave", () => highlight(null));
+    bytesEl.addEventListener("pointerleave", () => highlight(focusedField()));
     fieldsEl.addEventListener("pointerover", (e) => {
-      const li = e.target.closest("li");
-      if (li) highlight(FIELDS.find((f) => f.name === li.dataset.field));
+      const li = e.target.closest("li[data-field]");
+      if (li) highlight(byName(li.dataset.field));
     });
-    fieldsEl.addEventListener("pointerleave", () => highlight(null));
+    fieldsEl.addEventListener("pointerleave", () => highlight(focusedField()));
+    fieldsEl.addEventListener("focusin", (e) => {
+      const li = e.target.closest("li[data-field]");
+      if (li) highlight(byName(li.dataset.field));
+    });
+    fieldsEl.addEventListener("focusout", (e) => {
+      if (!fieldsEl.contains(e.relatedTarget)) highlight(null);
+    });
 
     const encode = () => {
       const vit = consent.checked;
+      // The gated marker is state, not markup. The rows ship with it set
+      // because that is what an unconsented node sends, which is the
+      // honest default for a reader with no JavaScript; from here on the
+      // switch owns it, or the list would contradict the bytes beside it.
+      for (const li of fieldsEl.children) {
+        if (li.classList.contains("g-vitals")) li.classList.toggle("is-gated", !vit);
+      }
       Object.assign(values, {
         magic: 0x534e4153, version: 1, node_id: 2, tx_id: 1,
         // calibrated | occupied | vitals_enabled | breathing_valid
@@ -248,7 +311,7 @@
         }
       });
       prev = u8.slice();
-      hovered ? showField(hovered) : showIdle();
+      if (hovered) { showField(hovered); announce(hovered); } else showIdle();
     };
     const tick = () => {
       st.seq = (st.seq + 1) >>> 0;
@@ -283,9 +346,21 @@
       if (d) { e.preventDefault(); selectTab(tabs[(i + d + tabs.length) % tabs.length], true); }
     });
   });
+  // Collapsing the panels is this script's job, not the markup's. The
+  // page ships all four visible so that someone with no JavaScript can
+  // read all four; the tab strip is the enhancement, so the enhancement
+  // is what hides three of them.
+  if (tabs.length) {
+    // The bar does nothing without script, and the headings are what
+    // stand in for it, so the two swap over exactly here.
+    $('[role="tablist"]')?.removeAttribute("hidden");
+    $$(".code-h").forEach((h) => (h.hidden = true));
+    selectTab(tabs.find((t) => t.getAttribute("aria-selected") === "true") || tabs[0]);
+  }
   const copy = $("#copy");
   copy?.addEventListener("click", async () => {
     const pane = $('.code pre:not([hidden])');
+    if (!pane) return;
     const text = pane.textContent;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {

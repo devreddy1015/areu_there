@@ -32,7 +32,7 @@
   <nav class="sitenav-links" aria-label="Pages">
     <a href="/how-it-works" data-page="how">how it works</a>
     <a href="/demo" data-page="demo">demo</a>
-    <a href="/evidence" data-page="evidence">evidence</a>
+    <a href="/evidence" data-page="evidence" aria-current="page">evidence</a>
     <a href="/privacy" data-page="privacy">privacy</a>
     <a href="/hardware" data-page="hardware">hardware</a>
     <a href="/start" data-page="start">get started</a>
@@ -59,18 +59,18 @@
     <table class="compare">
       <thead><tr><th scope="col"></th><th scope="col" class="us">saans · wifi</th><th scope="col">camera</th><th scope="col">mmWave radar</th><th scope="col">PIR</th><th scope="col">wearable</th></tr></thead>
       <tbody>
-        <tr><td>Captures no images or audio</td><td class="us"><i class="mk mk-yes" title="yes">✓</i></td><td><i class="mk mk-no" title="no">✕</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td></tr>
-        <tr><td>Notices a person sitting still</td><td class="us"><i class="mk mk-yes">✓</i><small>breathing band</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i><small>needs movement</small></td><td><i class="mk mk-some">~</i><small>if worn</small></td></tr>
-        <tr><td>Works in the dark</td><td class="us"><i class="mk mk-yes">✓</i></td><td><i class="mk mk-some">~</i><small>with IR</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td></tr>
-        <tr><td>Breathing rate without contact</td><td class="us"><i class="mk mk-yes">✓</i><small>opt-in per space</small></td><td><i class="mk mk-some">~</i><small>research</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td><td><i class="mk mk-no">✕</i><small>contact sensor</small></td></tr>
-        <tr><td>Nothing to wear, carry or charge</td><td class="us"><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td></tr>
-        <tr><td>Cannot tell who someone is</td><td class="us"><i class="mk mk-yes">✓</i><small>by design</small></td><td><i class="mk mk-no">✕</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td></tr>
-        <tr><td>Position within the room</td><td class="us"><i class="mk mk-no">✕</i><small>not yet</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-no">✕</i></td><td><i class="mk mk-some">~</i><small>with UWB anchors</small></td></tr>
-        <tr><td>Hardware for one room</td><td class="us">two ~$6–10 boards</td><td>camera + storage</td><td>one radar module</td><td>one sensor</td><td>one per person</td></tr>
-        <tr><td>Measured in real rooms</td><td class="us"><i class="mk mk-no">✕</i><small>not yet · phase S5</small></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td><td><i class="mk mk-yes">✓</i></td></tr>
+        <tr><th scope="row">Captures no images or audio</th><td class="us"><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td></tr>
+        <tr><th scope="row">Notices a person sitting still</th><td class="us"><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span><small>breathing band</small></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span><small>needs movement</small></td><td><i class="mk mk-some" aria-hidden="true">~</i><span class="sr-only">with caveats</span><small>if worn</small></td></tr>
+        <tr><th scope="row">Works in the dark</th><td class="us"><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-some" aria-hidden="true">~</i><span class="sr-only">with caveats</span><small>with IR</small></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td></tr>
+        <tr><th scope="row">Breathing rate without contact</th><td class="us"><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span><small>opt-in per space</small></td><td><i class="mk mk-some" aria-hidden="true">~</i><span class="sr-only">with caveats</span><small>research</small></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span><small>contact sensor</small></td></tr>
+        <tr><th scope="row">Nothing to wear, carry or charge</th><td class="us"><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span></td></tr>
+        <tr><th scope="row">Cannot tell who someone is</th><td class="us"><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span><small>by design</small></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span></td></tr>
+        <tr><th scope="row">Position within the room</th><td class="us"><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span><small>not yet</small></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span></td><td><i class="mk mk-some" aria-hidden="true">~</i><span class="sr-only">with caveats</span><small>with UWB anchors</small></td></tr>
+        <tr><th scope="row">Hardware for one room</th><td class="us">two ~$6–10 boards</td><td>camera + storage</td><td>one radar module</td><td>one sensor</td><td>one per person</td></tr>
+        <tr><th scope="row">Measured in real rooms</th><td class="us"><i class="mk mk-no" aria-hidden="true">✕</i><span class="sr-only">no</span><small>not yet · phase S5</small></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td><td><i class="mk mk-yes" aria-hidden="true">✓</i><span class="sr-only">strong fit</span></td></tr>
       </tbody>
     </table>
-    <div class="legend"><span><i class="mk mk-yes">✓</i>strong fit</span><span><i class="mk mk-some">~</i>with caveats</span><span><i class="mk mk-no">✕</i>no</span></div>
+    <div class="legend"><span><i class="mk mk-yes" aria-hidden="true">✓</i>strong fit</span><span><i class="mk mk-some" aria-hidden="true">~</i>with caveats</span><span><i class="mk mk-no" aria-hidden="true">✕</i>no</span></div>
   </div>
   <div class="notfor">
     <div data-reveal="rise">
@@ -145,7 +145,7 @@
 
   <div class="steps">
     <div class="steps-panel" data-reveal="unveil">
-      <h2>Every number is measured, including the bad ones.</h2>
+      <h2>Every number is measured in simulation, including the bad ones.</h2>
       <p class="body ink-soft">Unit tests passed. The evaluation on scripted timelines still found three bugs. Each fix went into the Python reference first, the golden vectors were regenerated, and those vectors caught the same bug in both the Rust and the C++ ports before either was edited by hand.</p>
     </div>
     <div>
@@ -188,7 +188,7 @@
   <nav class="foot-cols" aria-label="Footer">
     <div><p class="label">the system</p><ul>
       <li><a href="/how-it-works">How it works</a></li>
-      <li><a href="/demo">Live demo</a></li>
+      <li><a href="/demo">Simulated demo</a></li>
       <li><a href="/hardware">Hardware</a></li>
       <li><a href="/app">Dashboard</a></li>
     </ul></div>
@@ -205,7 +205,7 @@
       <li><a href="/start">Run it yourself</a></li>
     </ul></div>
   </nav>
-  <span class="wordmark" aria-hidden="true">saans<span class="dev">साँस</span></span>
+  <span class="wordmark" aria-hidden="true">saans<span class="dev" lang="hi">साँस</span></span>
   <div class="legal">
     <p>MIT licence. Third-party notices are in <a href="https://github.com/devreddy1015/areu_there/blob/main/NOTICE">NOTICE</a>.</p>
     <p>Not a medical device. Pre-hardware: every number on this site comes from simulation.</p>

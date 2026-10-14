@@ -63,13 +63,38 @@ use tokio::task::JoinHandle;
 /// The one scenario `--simulate` offers (hence no `--sim-scenario`).
 /// Default cell size for `/api/sim/coverage`.
 ///
-/// The sensitivity field oscillates on a half wavelength — 6.2 cm at
-/// 2.437 GHz — so the grid has to be finer than that or it aliases: a
-/// 25 cm cell samples one arbitrary point of a field that swings by 10x
-/// within it, and can paint a null as ordinary. 5 cm samples the
-/// fringes. In the 6x5 m explorer room that is 120x100 = 12,000 cells,
-/// well inside saans-sim's cap and sub-second to compute.
-pub const DEFAULT_COVERAGE_RES_M: f64 = 0.05;
+/// The sensitivity field oscillates with a spatial *period* of half a
+/// wavelength — 6.2 cm at 2.437 GHz. The grid therefore has to be finer
+/// than **half of that**, not finer than 6.2 cm: sampling a 6.2 cm
+/// period at 5 cm is barely one sample per cycle, and aliases.
+///
+/// This was 0.05 on the reasoning that 5 cm "samples the fringes". It
+/// does not. Measured against the two positions `the_gap_the_explorer
+/// _exists_to_show` pins — (3.00, 3.61), where the pipeline loses the
+/// person completely, and (3.00, 3.10), where it sees them at
+/// confidence > 0.9:
+///
+/// | res_m | cells  | at the null         | at the seat      |
+/// |-------|--------|---------------------|------------------|
+/// | 0.25  |    480 | 0.79 below median   | 1.33 around      |
+/// | 0.10  |  3,000 | 1.26 around median  | 0.29 very weak   |
+/// | 0.05  | 12,000 | 0.65 below median   | 1.19 around      |
+/// | 0.04  | 18,750 | 0.45 very weak      | 1.24 around      |
+/// | 0.03  | 33,400 | 0.21 **blind**      | 1.26 around      |
+/// | 0.02  | 75,000 | 0.09 blind          | 1.13 around      |
+///
+/// Only at 0.03 and below does the map call the null what the pipeline
+/// calls it. At 0.05 it reads "below this room's median", which a
+/// reader takes as *a bit weak* for a cell where the system cannot see
+/// at all; at 0.10 it is wrong in the opposite direction at both
+/// points. A map that disagrees with the pipeline it is drawn to
+/// explain is worse than no map.
+///
+/// 0.03 m is also where Nyquist lands — two samples per 6.2 cm period —
+/// so the measurement and the theory agree, which is the only reason to
+/// trust either. 200x167 = 33,400 cells in the 6x5 m explorer room,
+/// inside saans-sim's 100,000 cap and still sub-second to compute.
+pub const DEFAULT_COVERAGE_RES_M: f64 = 0.03;
 
 pub const SCENARIO: &str = "explorer";
 /// The space the simulated room is published as.
