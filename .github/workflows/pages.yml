@@ -37,7 +37,8 @@ jobs:
       # Nothing is published if they fail.
       - name: Site tests
         working-directory: rust
-        run: cargo test --locked -p saans-gateway --lib site::
+        # Quoted: a trailing `::` is YAML for "this is a key".
+        run: "cargo test --locked -p saans-gateway --lib site::"
       - name: Export the site
         working-directory: rust
         run: cargo run --locked -p saans-gateway -- --export-site "$RUNNER_TEMP/site"
