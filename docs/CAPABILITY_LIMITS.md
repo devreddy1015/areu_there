@@ -37,6 +37,48 @@ architecture recovers an axis whose measurement has one sample.
 A standing human is roughly one tenth of a single range bin at this
 bandwidth. Doppler yields velocity, not limb position.
 
+### Zero angular bits is not, by itself, the whole argument
+
+A reviewer pushed back on an earlier draft of this section, correctly:
+"the angular axis carries zero bits" closes **angle-of-arrival**, and
+AoA is only one route to pose. You could in principle try to learn pose
+from temporal and Doppler structure without measuring angle at all. So
+that half has to be argued separately, and here it is.
+
+A 1T1R link measures `h(f, t)` — one complex number per subcarrier per
+sample. Everything it knows about a body arrives on three axes, and all
+three are exhausted:
+
+- **Angular: zero bits.** As above.
+- **Delay:** one range cell covers 3.75–7.5 m. Every limb, the torso
+  and the head sit inside the same cell. No depth separation exists to
+  attribute anything to a body part.
+- **Doppler:** the *aggregate* radial velocity spectrum, summed over
+  every scatterer on the body, with nothing that attributes a velocity
+  to the limb that produced it.
+
+So the forward map from pose to measurement is **many-to-one by
+construction**: an unbounded set of joint configurations produces the
+same aggregate Doppler at the same unresolved range. A skeleton
+recovered from that is not being measured; it is being supplied by a
+learned prior over human bodies, conditioned weakly on the radio.
+
+That is not a theoretical worry — it is the exact failure mode already
+on record. It predicts a model that looks excellent in its training room
+and collapses elsewhere, because the prior is doing the work and the
+prior was fit to that room. Which is what the cross-environment numbers
+above show (197 mm in-domain against ~370 mm cross-environment), and
+what the upstream maintainer described as keypoints "synthesized from
+CSI signal features".
+
+**This is falsifiable, and stating it that way is the point.** If a 1×1
+pose result appears that holds up against held-out *subjects* and
+held-out *rooms* — not a random split of one dataset — then this section
+is wrong and should be rewritten. The claim is not "no one has managed
+it yet". The claim is that the measurement does not contain the answer,
+so anything that appears to recover it is reporting its prior. Check the
+cross-domain split before believing any result that says otherwise.
+
 **[sourced]** Every published WiFi pose system uses **≥ 3 receive
 antennas** — MM-Fi and MetaFi at 1 TX × 3 RX; Person-in-WiFi and
 DensePose-from-WiFi at 3×3; WiPose and Person-in-WiFi-3D at 3 receivers
