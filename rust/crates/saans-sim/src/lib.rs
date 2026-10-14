@@ -63,6 +63,18 @@
 //! - Phases are the clean channel phase (no CFO/SFO), so they are far
 //!   better than what an ESP32 reports. Use amplitudes.
 //!
+//! [`impair`] models the receiver those simplifications are about — AGC,
+//! random per-packet phase, timing slope, static per-device ripple,
+//! int8 I/Q — as a separate stage applied after the clean channel. It is
+//! OFF BY DEFAULT and nothing above changes when it is on: the clean
+//! channel is the contract with the Python and C++ implementations
+//! (`tests/parity.rs`). Its own realism is UNVERIFIED — see the module.
+//!
+//! [`wire`] puts the result in the raw-CSI datagram the firmware emits
+//! and the gateway already parses (`spec/wire.md` §1), so a simulated
+//! node and a bench node feed the gateway through one decoder. It, too,
+//! does nothing unless a caller asks for it.
+//!
 //! ## Use
 //!
 //! ```
@@ -79,15 +91,19 @@
 //! # let _ = events;
 //! ```
 
+pub mod impair;
 pub mod physics;
 mod plan;
 pub mod rng;
 pub mod scenario;
 pub mod scenarios;
 mod sim;
+pub mod wire;
 
+pub use impair::{BinLayout, ImpairConfig, NodeImpairment};
 pub use plan::{
     ARM_OFFSET_M, ARM_SWING_M, BREATHING_AMPLITUDE_M, DEFAULT_BPM, FALL_S, HEART_AMPLITUDE_M, HEART_BPM, MARGIN_M, PAUSE_RAMP_S, SIT_DOWN_DROP_M, SIT_DOWN_S,
 };
 pub use scenario::{Activity, Node, Point, Room, Scatterer, Scenario, Segment, SimOptions, Truth, TruthEvent, TruthKind};
 pub use sim::{Coverage, LinkFrame, Simulator, Tick, MAX_COVERAGE_CELLS, RSSI_REF_DBM};
+pub use wire::{RawNode, RawNodes};
