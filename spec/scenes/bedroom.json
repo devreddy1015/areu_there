@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "bedroom-4.2x3.6",
+  "room": {
+    "w_m": 4.2,
+    "d_m": 3.6,
+    "h_m": 2.7
+  },
+  "walls": [
+    { "from": [0.0, 0.0], "to": [4.2, 0.0], "material": "brick", "thickness_m": 0.23 },
+    { "from": [4.2, 0.0], "to": [4.2, 3.6], "material": "brick", "thickness_m": 0.23 },
+    { "from": [4.2, 3.6], "to": [0.0, 3.6], "material": "brick", "thickness_m": 0.23 },
+    { "from": [0.0, 3.6], "to": [0.0, 0.0], "material": "drywall", "thickness_m": 0.1 }
+  ],
+  "objects": [
+    { "type": "bed", "id": "bed", "pos": [1.1, 2.6, 0.25], "size": [1.9, 1.4, 0.5], "yaw_deg": 0.0, "material": "fabric" },
+    { "type": "almirah", "id": "almirah", "pos": [3.5, 0.4, 1.05], "size": [1.2, 0.6, 2.1], "yaw_deg": 0.0, "material": "wood" },
+    { "type": "table", "id": "study-table", "pos": [1.0, 0.45, 0.375], "size": [1.2, 0.6, 0.75], "yaw_deg": 0.0, "material": "wood" },
+    { "type": "chair", "id": "chair", "pos": [1.0, 1.1, 0.45], "size": [0.45, 0.45, 0.9], "yaw_deg": 0.0, "material": "wood" },
+    { "type": "door", "id": "door", "pos": [0.6, 0.115, 1.05], "size": [0.9, 0.23, 2.1], "yaw_deg": 0.0, "material": "wood" },
+    { "type": "window", "id": "window", "pos": [3.0, 3.485, 1.5], "size": [1.2, 0.23, 1.2], "yaw_deg": 0.0, "material": "glass" }
+  ],
+  "nodes": [
+    { "id": 0, "pos": [0.15, 0.15, 1.2] },
+    { "id": 1, "pos": [4.05, 0.15, 1.2] },
+    { "id": 2, "pos": [4.05, 3.45, 1.2] },
+    { "id": 3, "pos": [0.15, 3.45, 1.2] }
+  ],
+  "people": [
+    { "id": "sleeper", "start": [1.1, 2.6] }
+  ],
+  "phone": { "id": "phone", "start": [1.1, 2.6] }
+}

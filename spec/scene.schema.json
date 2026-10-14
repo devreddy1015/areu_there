@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/devreddy1015/areu_there/spec/scene.schema.json",
+  "title": "Saans scene",
+  "description": "Declared room geometry: the shell, walls and their materials, furniture, ESP32 node positions, and optionally where people and one tracked phone start. Everything here is DECLARED (labelled SCENE), never inferred from WiFi. Metres throughout, right-handed with +z up, origin at a room corner; the floor plane (x, y) matches saans_sim::scenario::Point. Angles are degrees counter-clockwise about +z from +x.",
+  "type": "object",
+  "required": ["schema_version", "name", "room", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Format version. Readers reject a version they do not know.",
+      "type": "integer",
+      "const": 1
+    },
+    "name": {
+      "description": "How this scene is named in reports and in the demo.",
+      "type": "string",
+      "minLength": 1
+    },
+    "room": { "$ref": "#/$defs/room" },
+    "walls": {
+      "description": "Wall segments. May be omitted: the room footprint already implies four walls. Listing them is how you give walls materials, thicknesses or a shape the footprint does not have.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/wall" },
+      "default": []
+    },
+    "objects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/object" },
+      "default": []
+    },
+    "nodes": {
+      "description": "ESP32 nodes. A scene with none cannot drive anything, so at least one is required.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/node" },
+      "minItems": 1
+    },
+    "people": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/person" },
+      "default": []
+    },
+    "phone": { "$ref": "#/$defs/phone" }
+  },
+  "$defs": {
+    "point2": {
+      "description": "A point on the floor plane, metres: [x, y].",
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "point3": {
+      "description": "A point in the room, metres: [x, y, z], z measured up from the floor.",
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "room": {
+      "type": "object",
+      "required": ["w_m", "d_m", "h_m"],
+      "additionalProperties": false,
+      "properties": {
+        "w_m": { "description": "Extent along x, metres.", "type": "number", "exclusiveMinimum": 0 },
+        "d_m": { "description": "Extent along y (depth), metres.", "type": "number", "exclusiveMinimum": 0 },
+        "h_m": { "description": "Floor-to-ceiling height, metres.", "type": "number", "exclusiveMinimum": 0 },
+        "polygon": {
+          "description": "Floor outline for a non-rectangular room (an L-shaped hall). A simple polygon whose bounding box must be exactly (0, 0)..(w_m, d_m), so w_m and d_m stay truthful. Absent means the footprint is that whole rectangle.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/point2" },
+          "minItems": 3
+        }
+      }
+    },
+    "wall": {
+      "type": "object",
+      "required": ["from", "to", "material", "thickness_m"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "$ref": "#/$defs/point2" },
+        "to": { "$ref": "#/$defs/point2" },
+        "material": {
+          "description": "Bulk wall material. Names a material; the electrical constants belong to the propagation model, not to this file.",
+          "enum": ["concrete", "brick", "drywall", "glass", "wood"]
+        },
+        "thickness_m": {
+          "description": "Wall thickness, metres. Capped at 1 m because a thicker wall is usually centimetres typed as metres.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1.0
+        },
+        "height_m": {
+          "description": "Height of this wall, metres. Defaults to the room height; a lower value is a half-wall or parapet.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "object": {
+      "type": "object",
+      "required": ["type", "pos", "size", "material"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "description": "Doors and windows are objects rather than wall attributes because the demo draws them and the simulator treats them as a different obstacle from the wall they sit in.",
+          "enum": ["bed", "table", "chair", "almirah", "sofa", "door", "window"]
+        },
+        "id": { "description": "Optional stable name, useful for clicking an object in the demo.", "type": "string" },
+        "pos": {
+          "description": "Centre of the box, metres. pos[2] is the centre's height above the floor, so a 0.75 m table sits at z = 0.375.",
+          "$ref": "#/$defs/point3"
+        },
+        "size": {
+          "description": "Extent along the object's own x, y and z before rotation, metres. Every extent must be greater than zero.",
+          "$ref": "#/$defs/point3"
+        },
+        "yaw_deg": {
+          "description": "Rotation about +z, degrees counter-clockwise from +x.",
+          "type": "number",
+          "default": 0
+        },
+        "material": { "enum": ["wood", "metal", "fabric", "glass"] }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "pos"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Node id, matching saans_sim::scenario::Node::id, so a scene drives the simulator without a lookup table. Unique within a scene: links are addressed as (tx, rx).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "pos": {
+          "description": "Position, metres. Must be strictly inside the footprint: saans-sim requires 0 < x < w and 0 < y < d.",
+          "$ref": "#/$defs/point3"
+        }
+      }
+    },
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "start": {
+          "description": "Where they start, metres on the floor plane. Absent means the timeline decides, which for the simulator means the door.",
+          "$ref": "#/$defs/point2"
+        }
+      }
+    },
+    "phone": {
+      "type": "object",
+      "required": ["start"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "start": { "$ref": "#/$defs/point2" }
+      }
+    }
+  }
+}
