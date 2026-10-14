@@ -21,7 +21,7 @@
 // POWER, NOT MAGNITUDE. DO NOT "SIMPLIFY" THIS.
 // ---------------------------------------------------------------------------
 // The ratio is of |X|^2 sums, not |X| sums. This was a real bug in this
-// project's history, fixed upstream, and it is worth stating why the magnitude
+// project's history, fixed in the Python reference, and it is worth stating why the magnitude
 // version looks fine and is not: the denominator runs over ~51 out-of-band bins
 // against ~13 in-band ones, so with magnitudes the denominator is dominated by
 // the BIN COUNT rather than by the energy, and the ratio reports the shape of

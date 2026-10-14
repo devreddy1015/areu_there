@@ -67,9 +67,7 @@ That is not a theoretical worry — it is the exact failure mode already
 on record. It predicts a model that looks excellent in its training room
 and collapses elsewhere, because the prior is doing the work and the
 prior was fit to that room. Which is what the cross-environment numbers
-above show (197 mm in-domain against ~370 mm cross-environment), and
-what the upstream maintainer described as keypoints "synthesized from
-CSI signal features".
+above show: 197 mm in-domain against ~370 mm cross-environment.
 
 **This is falsifiable, and stating it that way is the point.** If a 1×1
 pose result appears that holds up against held-out *subjects* and
@@ -100,11 +98,12 @@ falls** and also fired on **100% of sit-downs, 92% of readers walking in,
 and 97% of fidgeting nights**, because amplitude-only 2-D WiFi cannot
 see height. It ships off by default and should stay off.
 
-**[verified here]** Do not inherit skeleton code or keypoint-accuracy
-claims from the upstream project this one started from. **[sourced]** Its
-maintainer states in issue #299 that the skeleton keypoints are
-"synthesized from CSI signal features", are "not detected by a neural
-network", and that the 3D skeleton in its UI is a visualisation.
+**Do not inherit skeleton code or keypoint-accuracy claims from any
+project that has not published a held-out-room evaluation.** A
+demonstration that reports only a random split cannot distinguish a
+model that measured something from one that is drawing its prior, and
+those look identical in a video. That is the test to apply, to anyone's
+work including ours — it needs no argument about who built what.
 
 ---
 
