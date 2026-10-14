@@ -2,13 +2,45 @@
 //! channels, one tick at a time.
 
 use crate::physics::{point_path, BodyPoint, LinkChannel, BODY_RCS_M2};
-use crate::plan::Plan;
+use crate::plan::{BodyState, Bounds, Plan};
 use crate::rng::Rng;
 use crate::scenario::{Point, Scenario, SimOptions, Truth, TruthEvent};
 use saans_dsp::CsiFrame;
 
 /// RSSI of a link whose mean |h| is the unattenuated-LoS 40.
 pub const RSSI_REF_DBM: f64 = -45.0;
+
+/// Upper bound on the cells in one [`Coverage`] grid.
+///
+/// The map exists to show Fresnel structure, whose finest feature is a
+/// half wavelength: 6.2 cm at 2.437 GHz, so ~3 cm cells already sample it
+/// at Nyquist. 100k cells is 1.7 cm resolution in a 6 m x 5 m room —
+/// twice oversampled — and costs ~100k x n_subcarriers x body_points
+/// flops, a fraction of a second. Anything finer buys no physics and
+/// turns a GET into a stall, so it is rejected rather than served slowly.
+pub const MAX_COVERAGE_CELLS: usize = 100_000;
+
+/// A grid of ground-truth breathing sensitivity over the room for one
+/// link, row-major with `index = iy * w + ix` and `iy` ascending with y.
+/// SYNTHETIC, and an upper bound no receiver can measure: it is computed
+/// from the scenario's own geometry, not from any CSI.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Coverage {
+    pub res_m: f64,
+    pub w: usize,
+    pub h: usize,
+    /// Centre of cell (0, 0), i.e. `(res_m / 2, res_m / 2)`. Cell
+    /// `(ix, iy)` is centred at `origin_m + (ix, iy) * res_m`.
+    pub origin_m: Point,
+    /// The raw (un-normalised) median this grid was divided by, in the
+    /// [0, 1] units of [`Simulator::sensitivity`]. Each link's grid is
+    /// normalised by its *own* median, so comparing levels across links
+    /// means re-multiplying by this first.
+    pub median_raw: f64,
+    /// Relative breathing sensitivity; 1.0 is this room's median for this
+    /// link. `values[iy * w + ix]`.
+    pub values: Vec<f64>,
+}
 
 /// Everything produced at one tick: the truth at the tick time and the
 /// frames that survived packet loss (in link order).
@@ -54,9 +86,33 @@ pub struct Simulator {
     tick: u64,
     /// Time of the last tick produced (0 before the first).
     now_s: f64,
+    /// Walkable area (MARGIN_M from every wall); clamps a manual position.
+    bounds: Bounds,
+    /// When set, the body sits here instead of where the plan puts it.
+    pos_override: Option<Point>,
+    /// When false, there is no body at all: an empty room.
+    present: bool,
     pts: Vec<BodyPoint>,
     re: Vec<f64>,
     im: Vec<f64>,
+}
+
+/// Apply the manual overrides to one instant of the plan's body.
+///
+/// The override moves the body *rigidly*: the arm keeps its offset from
+/// the centre and whatever swing the plan gave it, so dragging the person
+/// never fabricates limb motion. When not present there is no body at
+/// all, and no chest displacement to go with it.
+fn overridden(mut b: BodyState, pos_override: Option<Point>, present: bool) -> BodyState {
+    if let Some(p) = pos_override {
+        b.arm = (b.arm.0 + p.0 - b.centre.0, b.arm.1 + p.1 - b.centre.1);
+        b.centre = p;
+    }
+    b.present &= present;
+    if !b.present {
+        b.disp = 0.0;
+    }
+    b
 }
 
 // Stream ids for the seed-derived generators.
@@ -143,6 +199,9 @@ impl Simulator {
             n_ticks,
             tick: 0,
             now_s: 0.0,
+            bounds: Bounds::new(s.room.size_m),
+            pos_override: None,
+            present: true,
             pts: Vec::with_capacity(s.body_points.max(1)),
             re: vec![0.0; s.n_subcarriers],
             im: vec![0.0; s.n_subcarriers],
@@ -184,8 +243,9 @@ impl Simulator {
         }
         let fs = self.sc.sample_rate_hz;
         let t = self.tick as f64 / fs;
-        let truth = self.plan.truth(t);
-        let Self { sc, opts, plan, links, pts, re, im, .. } = self;
+        let truth = self.truth_at(t);
+        let Self { sc, opts, plan, links, pts, re, im, pos_override, present, .. } = self;
+        let (pos_override, present) = (*pos_override, *present);
         let mut frames = Vec::with_capacity(links.len());
         for link in links.iter_mut() {
             // Always draw jitter and loss, so noise realisations do not
@@ -198,7 +258,7 @@ impl Simulator {
                 continue;
             }
             let tl = t + jitter;
-            let body = plan.body_at(tl);
+            let body = overridden(plan.body_at(tl), pos_override, present);
             re.copy_from_slice(&link.ch.static_re);
             im.copy_from_slice(&link.ch.static_im);
             if body.present {
@@ -251,9 +311,68 @@ impl Simulator {
         self.plan.events().to_vec()
     }
 
-    /// Ground truth at an arbitrary time (what a tick at `t_s` would report).
+    /// Ground truth at an arbitrary time (what a tick at `t_s` would
+    /// report), with any manual overrides applied.
     pub fn truth_at(&self, t_s: f64) -> Truth {
-        self.plan.truth(t_s)
+        let mut tr = self.plan.truth(t_s);
+        if let Some(p) = self.pos_override {
+            tr.position = p;
+        }
+        if !self.present {
+            // An empty room: nothing is still, breathing, paused or
+            // bursting, because there is nobody to be any of those.
+            // `position` stays, like the plan's own `Absent` truth, as
+            // where the person last was.
+            tr.present = false;
+            tr.still = false;
+            tr.breathing = false;
+            tr.bpm = 0.0;
+            tr.in_pause = false;
+            tr.in_burst = false;
+        }
+        tr
+    }
+
+    /// Pin the body at `p` for every following tick, ignoring the plan's
+    /// scripted path; `None` hands it back to the plan. The point is
+    /// clamped into the walkable area (`MARGIN_M` from every wall), which
+    /// is what [`Simulator::position_override`] then reports.
+    ///
+    /// This does not touch the sequence counters, the RNG streams or the
+    /// channel, so the CSI stays continuous across the call: a position
+    /// that is still before and after is still *through* the change. It
+    /// is a teleport, though — set it between ticks, or a single-tick jump
+    /// will read downstream as motion.
+    pub fn set_position_override(&mut self, p: Option<Point>) {
+        self.pos_override = p.map(|p| self.bounds.clamp(p));
+    }
+
+    /// The manual position in force (already clamped), or `None` when the
+    /// plan is driving.
+    pub fn position_override(&self) -> Option<Point> {
+        self.pos_override
+    }
+
+    /// Put a body in the room, or take it out entirely. With `false` the
+    /// tick is the static channel plus noise — no torso, no arm, no chest
+    /// motion — and the truth says `present: false`. Jitter, loss and
+    /// noise draws are unchanged, so toggling this does not shift the
+    /// random streams.
+    pub fn set_present(&mut self, present: bool) {
+        self.present = present;
+    }
+
+    /// Whether a body is in the room at all. False does not mean the plan
+    /// says "absent": it means this simulator has been told there is
+    /// nobody, which overrides the plan.
+    pub fn present(&self) -> bool {
+        self.present
+    }
+
+    /// Body centre in force at `t_s`: the manual override if set, else the
+    /// plan's. Never derived from CSI.
+    pub fn position_at(&self, t_s: f64) -> Point {
+        self.pos_override.unwrap_or_else(|| self.plan.position(t_s))
     }
 
     /// Ground-truth first-order breathing sensitivity |d|h|/dx| per
@@ -265,17 +384,93 @@ impl Simulator {
     /// # Panics
     /// If `link` is not one of the scenario's (tx, rx) links.
     pub fn sensitivity(&self, link: (u8, u8)) -> Vec<f64> {
+        self.sensitivity_at(link, self.position_at(self.now_s))
+    }
+
+    /// [`Simulator::sensitivity`] for a body standing at `centre` instead
+    /// of where it actually is: what breathing *would* do to this link
+    /// from that point. The one physics path both methods use, so the two
+    /// agree bit for bit when `centre` is the current position.
+    ///
+    /// Independent of [`Simulator::present`]: this is a what-if map, not a
+    /// statement that anyone is there.
+    ///
+    /// # Panics
+    /// If `link` is not one of the scenario's (tx, rx) links.
+    pub fn sensitivity_at(&self, link: (u8, u8), centre: Point) -> Vec<f64> {
         let l = self
             .links
             .iter()
             .find(|l| (l.tx, l.rx) == link)
             .unwrap_or_else(|| panic!("sensitivity: link {link:?} is not in scenario {:?}", self.sc.name));
-        let centre = self.plan.position(self.now_s);
         let mut pts = Vec::with_capacity(self.sc.body_points.max(1));
         l.ch.torso(centre, self.sc.body_points, self.sc.body_width_m, BODY_RCS_M2, &mut pts);
         let extra: Vec<(f64, f64)> =
             if self.opts.arm_rcs_m2 > 0.0 { vec![point_path(l.ch.tx, l.ch.rx, self.plan.arm_rest(centre), self.opts.arm_rcs_m2)] } else { Vec::new() };
         l.ch.sensitivity(&pts, &extra)
+    }
+
+    /// Breathing sensitivity over the whole room for one link, on a
+    /// `res_m` grid. See [`Coverage`]. Panics on a link that is not in the
+    /// scenario or a `res_m` [`Simulator::try_coverage`] rejects.
+    pub fn coverage(&self, link: (u8, u8), res_m: f64) -> Coverage {
+        self.try_coverage(link, res_m).unwrap_or_else(|e| panic!("coverage: {e}"))
+    }
+
+    /// [`Simulator::coverage`], saying what is wrong with `res_m` instead
+    /// of panicking (a caller serving this over HTTP wants a 400, not an
+    /// unwound thread). Still panics on an unknown link, like
+    /// [`Simulator::sensitivity`].
+    pub fn try_coverage(&self, link: (u8, u8), res_m: f64) -> Result<Coverage, String> {
+        if !(res_m > 0.0 && res_m.is_finite()) {
+            return Err(format!("res_m {res_m} must be finite and positive"));
+        }
+        let (room_w, room_h) = self.sc.room.size_m;
+        let w = (room_w / res_m).ceil().max(1.0) as usize;
+        let h = (room_h / res_m).ceil().max(1.0) as usize;
+        let cells = w.saturating_mul(h);
+        if cells > MAX_COVERAGE_CELLS {
+            return Err(format!("res_m {res_m} gives {w}x{h} = {cells} cells, over the {MAX_COVERAGE_CELLS} cap"));
+        }
+        let origin_m = (res_m / 2.0, res_m / 2.0);
+
+        // Summary across subcarriers: the MAXIMUM, not the mean.
+        //
+        // The DSP does not average the band, it picks the best of it:
+        // `subcarrier_bnr` scores every subcarrier and `best_bnr` keeps
+        // the largest (saans-dsp features.rs), and ADR-006 then fuses
+        // links by taking the most confident one. A mean would call a
+        // link blind when it is blind on 55 subcarriers and excellent on
+        // one -- but that one is the subcarrier the pipeline would use,
+        // so the person IS detectable there. The max matches what the
+        // system can actually do with the cell, and it is the same
+        // summary `examples/scan_seats.rs` already uses to call a seat a
+        // whole-band blind spot.
+        let mut raw: Vec<f64> = Vec::with_capacity(cells);
+        for iy in 0..h {
+            for ix in 0..w {
+                let c = (origin_m.0 + ix as f64 * res_m, origin_m.1 + iy as f64 * res_m);
+                raw.push(self.sensitivity_at(link, c).into_iter().fold(0.0, f64::max));
+            }
+        }
+
+        // Normalise by this room's median so the units are the relative
+        // ones the UI advertises ("1.0 = this room's median"): the raw
+        // [0, 1] number is a ratio to a best case nothing in a real room
+        // reaches, which would paint every map uniformly dark. The median
+        // is the robust choice -- a null or a hot fringe is a few percent
+        // of cells and must not move the reference.
+        let mut sorted: Vec<f64> = raw.iter().copied().filter(|v| v.is_finite()).collect();
+        sorted.sort_by(f64::total_cmp);
+        let median_raw = match sorted.len() {
+            0 => 0.0,
+            n if n % 2 == 1 => sorted[n / 2],
+            n => 0.5 * (sorted[n / 2 - 1] + sorted[n / 2]),
+        };
+        // A room whose median sensitivity is zero has no scale to be
+        // relative to; serve the raw [0, 1] values rather than 0/0.
+        let values = if median_raw > 0.0 { raw.iter().map(|v| v / median_raw).collect() } else { raw };
+        Ok(Coverage { res_m, w, h, origin_m, median_raw, values })
     }
 }
 

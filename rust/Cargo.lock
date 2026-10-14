@@ -1994,6 +1994,7 @@ dependencies = [
  "rumqttd",
  "saans-dsp",
  "saans-health",
+ "saans-sim",
  "serde",
  "serde_json",
  "sha2",

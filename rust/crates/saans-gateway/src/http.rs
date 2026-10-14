@@ -15,6 +15,16 @@
 //! | `GET /metrics` | Prometheus text format | ops |
 //! | `GET /api/live` | WebSocket: `{"type":"state"}` every 0.5 s, `{"type":"event"}` as they happen | in scope |
 //!
+//! Simulate mode (`--simulate`) adds four more. They exist only in that
+//! mode, and everything they return is SYNTHETIC ([`crate::simulate`]).
+//!
+//! | Route | Returns | Who |
+//! |---|---|---|
+//! | `GET /api/sim` | the simulated room's geometry and ground truth | anyone |
+//! | `GET /api/sim/coverage?res_m=` | ground-truth breathing sensitivity per cell, per link | anyone |
+//! | `POST /api/sim/person` | `{x_m, y_m}` → moves the simulated person | in scope |
+//! | `POST /api/sim/present` | `{present}` → puts a body in the room or takes it out | in scope |
+//!
 //! **Two locks on every byte of data.** The hub redacts by *consent*
 //! before publishing, so a space with `vitals = false` has no breathing
 //! data in the snapshot at all ([`crate::privacy`]). Handlers here apply
@@ -58,6 +68,9 @@ pub struct HttpDeps {
     pub alerts: Option<Arc<crate::alerts::AlertService>>,
     pub auth: Arc<Auth>,
     pub audit: Arc<AuditLog>,
+    /// `Some` only in simulate mode, which is the only mode where the
+    /// `/api/sim` routes exist at all.
+    pub sim: Option<Arc<crate::simulate::SimState>>,
 }
 
 impl HttpDeps {
@@ -70,12 +83,19 @@ impl HttpDeps {
         let auth = Arc::new(Auth::new(&cfg));
         let dir = (!cfg.data_dir.as_os_str().is_empty()).then(|| cfg.data_dir.clone());
         let audit = Arc::new(AuditLog::new(dir.as_deref(), cfg.utc_offset_minutes));
-        Self { shared, stop, cfg, alerts, auth, audit }
+        Self { shared, stop, cfg, alerts, auth, audit, sim: None }
     }
 
     /// For tests and the replay server, which want no audit file.
     pub fn without_audit(mut self) -> Self {
         self.audit = Arc::new(AuditLog::new(None, self.cfg.utc_offset_minutes));
+        self
+    }
+
+    /// Turn on simulate mode's own routes. Nothing else registers them,
+    /// so a live or replay gateway answers 404 for every `/api/sim` path.
+    pub fn with_sim(mut self, sim: Arc<crate::simulate::SimState>) -> Self {
+        self.sim = Some(sim);
         self
     }
 }
@@ -88,11 +108,12 @@ pub struct AppState {
     pub alerts: Option<Arc<crate::alerts::AlertService>>,
     pub auth: Arc<Auth>,
     pub audit: Arc<AuditLog>,
+    pub sim: Option<Arc<crate::simulate::SimState>>,
 }
 
 pub fn router(deps: HttpDeps) -> Router {
-    let HttpDeps { shared, stop, cfg, alerts, auth, audit } = deps;
-    Router::new()
+    let HttpDeps { shared, stop, cfg, alerts, auth, audit, sim } = deps;
+    let mut r = Router::new()
         .route("/", get(dashboard))
         .route("/api/me", get(me))
         .route("/api/login", post(login))
@@ -104,9 +125,19 @@ pub fn router(deps: HttpDeps) -> Router {
         .route("/api/links", get(links))
         .route("/api/health", get(health))
         .route("/metrics", get(metrics))
-        .route("/api/live", get(live))
-        .fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
-        .with_state(AppState { shared, stop, cfg, alerts, auth, audit })
+        .route("/api/live", get(live));
+    // Registered only in simulate mode: in any other mode these paths
+    // fall through to the 404, because there is no simulated room to
+    // describe and nothing should suggest there is.
+    if sim.is_some() {
+        r = r
+            .route("/api/sim", get(sim_describe))
+            .route("/api/sim/coverage", get(sim_coverage))
+            .route("/api/sim/person", post(sim_person))
+            .route("/api/sim/present", post(sim_present));
+    }
+    r.fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
+        .with_state(AppState { shared, stop, cfg, alerts, auth, audit, sim })
 }
 
 fn error(status: StatusCode, msg: &str) -> Response {
@@ -456,6 +487,164 @@ async fn metrics(State(app): State<AppState>, h: HeaderMap) -> Response {
     let mut r = body.into_response();
     r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"));
     no_store(r)
+}
+
+
+// ------------------------------------------------------------- simulate
+//
+// Every value these four return is SYNTHETIC: it comes from `saans-sim`
+// (geometry, ground truth, coverage) or it is a position the caller
+// themselves set. None of it is an inference from CSI, and nothing in
+// the gateway can produce a position from CSI (`docs/CAPABILITY_LIMITS.md`).
+
+/// The simulated room, or the 404 any other mode gives this path.
+fn sim_state(app: &AppState) -> Result<Arc<crate::simulate::SimState>, Response> {
+    app.sim.clone().ok_or_else(|| error(StatusCode::NOT_FOUND, "no such endpoint"))
+}
+
+/// Moving the simulated person writes to the simulated space, so the
+/// principal has to be allowed to see that space — the same scope check
+/// every other space answers to. On a loopback gateway with no users
+/// configured everyone is the local admin, so the demo just works.
+fn sim_writer(app: &AppState, h: &HeaderMap, path: &str, sim: &crate::simulate::SimState) -> Result<Principal, Response> {
+    let p = principal(app, h, path)?;
+    if !p.can_see_space(sim.space_id()) {
+        return Err(error(StatusCode::FORBIDDEN, "the simulated space is not in your scope"));
+    }
+    Ok(p)
+}
+
+/// Reading the simulated room. 404 rather than 403, matching
+/// `/api/spaces/{id}`: a space outside a principal's scope is
+/// indistinguishable from one that does not exist, because the scope
+/// list is not a directory of the building.
+fn sim_reader(app: &AppState, h: &HeaderMap, path: &str, sim: &crate::simulate::SimState) -> Result<Principal, Response> {
+    let p = principal(app, h, path)?;
+    if !p.can_see_space(sim.space_id()) {
+        return Err(error(StatusCode::NOT_FOUND, "no such space"));
+    }
+    Ok(p)
+}
+
+/// The request body as a JSON object. Parsed here rather than with the
+/// `Json` extractor so that a missing or non-numeric field is the 400
+/// the API promises, in the same `{"error": ...}` shape as every other
+/// failure, instead of an extractor rejection in a different format.
+fn sim_body(body: &str) -> Result<Value, Response> {
+    match serde_json::from_str::<Value>(body) {
+        Ok(v) if v.is_object() => Ok(v),
+        _ => Err(error(StatusCode::BAD_REQUEST, "body must be a JSON object")),
+    }
+}
+
+fn sim_f64(v: &Value, key: &str) -> Result<f64, Response> {
+    match v.get(key).and_then(Value::as_f64) {
+        Some(x) if x.is_finite() => Ok(x),
+        _ => Err(error(StatusCode::BAD_REQUEST, &format!("{key} must be a finite number"))),
+    }
+}
+
+async fn sim_describe(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let sim = match sim_state(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    // The same scope check the POSTs beside this one make. /api/sim
+    // carries the ground-truth position of the simulated occupant, so it
+    // answers to the space's scope like any other space-level read — a
+    // principal scoped away from sim-room gets 404 here, exactly as
+    // /api/spaces/{id} would give them.
+    if let Err(r) = sim_reader(&app, &h, "/api/sim", &sim) {
+        return r;
+    }
+    no_store(Json(sim.describe()).into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CoverageQuery {
+    /// Cell size in metres. Defaults to
+    /// [`crate::simulate::DEFAULT_COVERAGE_RES_M`], which is small
+    /// enough to sample the half-wavelength structure the map is of
+    /// rather than alias it.
+    ///
+    /// Taken as a string and parsed here rather than as an `f64`, so that
+    /// `res_m=abc` is rejected by this route in the same
+    /// `{"error": ...}` shape as every other bad `res_m`. Typed straight
+    /// as `f64`, the extractor rejects it first, with a plain-text axum
+    /// message a client parsing `.error` cannot read.
+    pub res_m: Option<String>,
+}
+
+async fn sim_coverage(State(app): State<AppState>, h: HeaderMap, Query(q): Query<CoverageQuery>) -> Response {
+    let sim = match sim_state(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    if let Err(r) = sim_reader(&app, &h, "/api/sim/coverage", &sim) {
+        return r;
+    }
+    // A map may be up to 100k cells x 56 subcarriers x 3 torso points.
+    // That is sub-second, but it is sub-second of solid arithmetic on a
+    // two-worker runtime, so it runs where blocking work belongs —
+    // the same reason `login` does.
+    let res_m = match q.res_m.as_deref() {
+        // DEFAULT_COVERAGE_RES_M, not a round number. The field this map
+        // draws oscillates on a half wavelength, 6.2 cm at 2.437 GHz, so
+        // a 25 cm grid is a point sample of something that changes
+        // completely between cells: it can paint a null as ordinary and
+        // an ordinary cell as a null, which is the one error that makes
+        // the map worse than no map. 5 cm samples the fringes rather
+        // than aliasing them, and in a 6x5 m room costs 120x100 cells
+        // -- well inside saans-sim's 100k cap, and still sub-second.
+        None => crate::simulate::DEFAULT_COVERAGE_RES_M,
+        Some(raw) => match raw.trim().parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => return error(StatusCode::BAD_REQUEST, &format!("res_m {raw} must be finite and positive")),
+        },
+    };
+    match tokio::task::spawn_blocking(move || sim.coverage(res_m)).await {
+        Ok(Ok(v)) => no_store(Json(v).into_response()),
+        Ok(Err(e)) => error(StatusCode::BAD_REQUEST, &e),
+        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "the coverage map could not be computed"),
+    }
+}
+
+async fn sim_person(State(app): State<AppState>, h: HeaderMap, body: String) -> Response {
+    let sim = match sim_state(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    if let Err(r) = sim_writer(&app, &h, "/api/sim/person", &sim) {
+        return r;
+    }
+    let v = match sim_body(&body) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    let (x, y) = match (sim_f64(&v, "x_m"), sim_f64(&v, "y_m")) {
+        (Ok(x), Ok(y)) => (x, y),
+        (Err(r), _) | (_, Err(r)) => return r,
+    };
+    let (x_m, y_m) = sim.set_person((x, y));
+    no_store(Json(json!({ "ok": true, "x_m": x_m, "y_m": y_m })).into_response())
+}
+
+async fn sim_present(State(app): State<AppState>, h: HeaderMap, body: String) -> Response {
+    let sim = match sim_state(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    if let Err(r) = sim_writer(&app, &h, "/api/sim/present", &sim) {
+        return r;
+    }
+    let v = match sim_body(&body) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    let Some(want) = v.get("present").and_then(Value::as_bool) else {
+        return error(StatusCode::BAD_REQUEST, "present must be true or false");
+    };
+    no_store(Json(json!({ "ok": true, "present": sim.set_present(want) })).into_response())
 }
 
 async fn live(ws: WebSocketUpgrade, State(app): State<AppState>, h: HeaderMap) -> Response {

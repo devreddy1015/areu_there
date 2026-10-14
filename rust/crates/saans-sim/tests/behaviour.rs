@@ -328,3 +328,201 @@ fn body_on_top_of_a_node_stays_finite() {
         assert!(sim.sensitivity(l).iter().all(|s| s.is_finite()));
     }
 }
+
+// ------------------------------------------------- explorer: manual body
+
+/// Seated at `CHAIR` from t = 0, one link, no packet loss. Short, because
+/// these tests only need a handful of ticks.
+fn explorer_scenario(seed: u64) -> Scenario {
+    quiet(scenarios::scenario("explorer", scenarios::room_clear_los(), scenarios::one_link(), vec![seated(20.0)], seed))
+}
+
+fn nth_tick(sim: &mut Simulator, n: usize) -> saans_sim::Tick {
+    sim.nth(n - 1).expect("scenario is long enough")
+}
+
+#[test]
+fn position_override_moves_the_body_and_clearing_it_returns_to_the_plan() {
+    let sc = explorer_scenario(7);
+    let plan_tick = nth_tick(&mut Simulator::new(&sc), 100);
+    assert_close(plan_tick.truth.position.0, CHAIR.0, "plan x");
+    assert_close(plan_tick.truth.position.1, CHAIR.1, "plan y");
+
+    // Pinned somewhere else: the truth says so and the CSI changes.
+    let mut moved = Simulator::new(&sc);
+    moved.set_position_override(Some(DESK));
+    assert_eq!(moved.position_override(), Some(DESK));
+    let moved_tick = nth_tick(&mut moved, 100);
+    assert_eq!(moved_tick.truth.position, DESK, "truth follows the override");
+    assert!(
+        moved_tick.frames[0].frame.amplitudes.iter().zip(&plan_tick.frames[0].frame.amplitudes).any(|(a, b)| (a - b).abs() > 1e-9),
+        "moving the body must change the channel"
+    );
+
+    // Cleared mid-run: back on the plan, and bit-identical to never having
+    // touched it -- the override takes no RNG draws and no sequence numbers.
+    let mut cleared = Simulator::new(&sc);
+    cleared.set_position_override(Some(DESK));
+    let _ = nth_tick(&mut cleared, 50);
+    cleared.set_position_override(None);
+    assert_eq!(cleared.position_override(), None);
+    let after = nth_tick(&mut cleared, 50);
+    assert_eq!(after.truth, plan_tick.truth, "truth is the plan's again");
+    assert_eq!(after.frames, plan_tick.frames, "CSI is the plan's again, exactly");
+}
+
+#[test]
+fn position_override_is_clamped_into_the_walkable_area() {
+    let sc = explorer_scenario(7);
+    let (w, h) = sc.room.size_m;
+    let mut sim = Simulator::new(&sc);
+    for p in [(1e6, -1e6), (-3.0, 400.0), (f64::NAN, 2.0)] {
+        sim.set_position_override(Some(p));
+        let got = sim.position_override().expect("still set");
+        assert!(
+            got.0 >= MARGIN_M - 1e-9 && got.0 <= w - MARGIN_M + 1e-9 && got.1 >= MARGIN_M - 1e-9 && got.1 <= h - MARGIN_M + 1e-9,
+            "{p:?} clamped to {got:?}, outside the walkable area"
+        );
+    }
+    sim.set_position_override(Some((1e6, -1e6)));
+    assert_eq!(sim.position_override(), Some((w - MARGIN_M, MARGIN_M)));
+}
+
+#[test]
+fn an_absent_body_leaves_exactly_the_empty_room() {
+    let sc = explorer_scenario(5);
+    assert!(Simulator::new(&sc).present(), "a new simulator has a body in it");
+
+    let present = nth_tick(&mut Simulator::new(&sc), 60);
+    let mut empty = Simulator::new(&sc);
+    empty.set_present(false);
+    assert!(!empty.present());
+    let gone = nth_tick(&mut empty, 60);
+
+    assert!(present.truth.present && present.truth.breathing);
+    assert!(!gone.truth.present, "truth must say nobody is there");
+    assert!(!gone.truth.breathing && !gone.truth.still && !gone.truth.in_pause && !gone.truth.in_burst);
+    assert_eq!(gone.truth.bpm, 0.0);
+    assert!(
+        gone.frames[0].frame.amplitudes.iter().zip(&present.frames[0].frame.amplitudes).any(|(a, b)| (a - b).abs() > 1e-9),
+        "removing the body must change the amplitudes"
+    );
+
+    // The stronger claim: it is the SAME CSI as a scenario in which nobody
+    // ever entered -- static channel plus the same noise draws, with no
+    // torso, arm or chest motion left over anywhere.
+    let mut never = Simulator::new(&quiet(scenarios::scenario("empty", scenarios::room_clear_los(), scenarios::one_link(), scenarios::empty(0.1), 5)));
+    let unoccupied = nth_tick(&mut never, 60);
+    assert_eq!(gone.frames, unoccupied.frames, "an emptied room must be indistinguishable from an empty one");
+
+    // And the body comes back when asked.
+    empty.set_present(true);
+    let back = empty.step().expect("more ticks");
+    assert!(back.truth.present && back.truth.breathing);
+}
+
+#[test]
+fn sensitivity_at_the_current_position_is_sensitivity() {
+    let sc = quiet(scenarios::scenario("sens", scenarios::room_rich_nlos(), scenarios::three_links(), vec![seated(20.0)], 3));
+    let mut sim = Simulator::new(&sc);
+    let tick = nth_tick(&mut sim, 40);
+    for &l in &sc.links {
+        // Same physics path, so bit-identical, not merely close.
+        assert_eq!(sim.sensitivity(l), sim.sensitivity_at(l, tick.truth.position), "link {l:?} at the plan's position");
+    }
+    sim.set_position_override(Some(DESK));
+    let _ = sim.step().expect("more ticks");
+    for &l in &sc.links {
+        assert_eq!(sim.sensitivity(l), sim.sensitivity_at(l, DESK), "link {l:?} under an override");
+    }
+    // It is a what-if map: taking the body away does not change it.
+    let before: Vec<Vec<f64>> = sc.links.iter().map(|&l| sim.sensitivity(l)).collect();
+    sim.set_present(false);
+    let after: Vec<Vec<f64>> = sc.links.iter().map(|&l| sim.sensitivity(l)).collect();
+    assert_eq!(before, after);
+}
+
+#[test]
+fn coverage_has_the_advertised_shape_and_units() {
+    let sc = explorer_scenario(7);
+    let (room_w, room_h) = sc.room.size_m;
+    for res_m in [0.25, 0.4, 1.0] {
+        let cov = Simulator::new(&sc).coverage((0, 1), res_m);
+        let (w, h) = ((room_w / res_m).ceil() as usize, (room_h / res_m).ceil() as usize);
+        assert_eq!((cov.w, cov.h), (w, h), "res {res_m}");
+        assert_eq!(cov.res_m, res_m);
+        assert_eq!(cov.origin_m, (res_m / 2.0, res_m / 2.0));
+        assert_eq!(cov.values.len(), w * h, "row-major, w*h values");
+        assert!(cov.values.iter().all(|v| v.is_finite() && *v >= 0.0), "res {res_m}: non-finite or negative cell");
+        assert!(cov.median_raw > 0.0 && cov.median_raw <= 1.0, "raw median {} is outside sensitivity's [0, 1]", cov.median_raw);
+        // "1.0 = this room's median" is the advertised unit.
+        let mut sorted = cov.values.clone();
+        sorted.sort_by(f64::total_cmp);
+        let n = sorted.len();
+        let median = if n % 2 == 1 { sorted[n / 2] } else { 0.5 * (sorted[n / 2 - 1] + sorted[n / 2]) };
+        assert!((median - 1.0).abs() < 1e-12, "res {res_m}: median is {median}, not 1.0");
+    }
+    // Coverage of the room, not of the walkable area: the first cell is
+    // half a cell in from the corner.
+    let cov = Simulator::new(&sc).coverage((0, 1), 0.25);
+    assert_eq!(cov.origin_m, (0.125, 0.125));
+    assert!(cov.origin_m.0 + (cov.w - 1) as f64 * cov.res_m <= room_w);
+    assert!(cov.origin_m.1 + (cov.h - 1) as f64 * cov.res_m <= room_h);
+}
+
+#[test]
+fn coverage_rejects_a_bad_resolution() {
+    let sim = Simulator::new(&explorer_scenario(7));
+    for bad in [0.0, -0.25, f64::NAN, f64::INFINITY] {
+        assert!(sim.try_coverage((0, 1), bad).is_err(), "res_m {bad} must be rejected");
+    }
+    // 6 m x 5 m at 1 mm is 30 million cells.
+    assert!(sim.try_coverage((0, 1), 0.001).is_err(), "an absurd grid must be rejected");
+    assert!(sim.try_coverage((0, 1), 0.05).is_ok(), "a sane fine grid must be served");
+}
+
+#[test]
+fn coverage_shows_fresnel_nulls_not_a_distance_falloff() {
+    // A vertical cut at x = 3.0 m, from 0.4 m off the line of sight
+    // (nodes are at y = 2.5) to the far wall, and more than 1.5 m from
+    // either antenna. Along it every distance-only quantity -- range to
+    // each node, total path, their product -- varies smoothly and
+    // monotonically, so a smooth falloff model can cross a threshold at
+    // most once. Interference does not: the body's echo walks through
+    // the static channel's phase, nulling and peaking every half
+    // wavelength (6.2 cm at 2.437 GHz).
+    let res_m = 0.05;
+    let (cut_x, y_lo, y_hi) = (3.0, 2.9, 4.6);
+    let (lo, hi) = (0.5, 0.9);
+    for seed in 0..8u64 {
+        let sc = explorer_scenario(seed);
+        let cov = Simulator::new(&sc).coverage((0, 1), res_m);
+        let ix = ((cut_x - cov.origin_m.0) / cov.res_m).round() as usize;
+        let cut: Vec<f64> = (0..cov.h)
+            .map(|iy| (cov.origin_m.1 + iy as f64 * cov.res_m, cov.values[iy * cov.w + ix]))
+            .filter(|(y, _)| (y_lo..=y_hi).contains(y))
+            .map(|(_, v)| v)
+            .collect();
+        assert!(cut.len() > 30, "seed {seed}: the cut is too short to say anything");
+
+        let (mn, mx) = (cut.iter().copied().fold(f64::INFINITY, f64::min), cut.iter().copied().fold(0.0, f64::max));
+        assert!(mn <= 0.4, "seed {seed}: faintest cell on the cut is {mn:.3} of the median -- no null");
+        assert!(mx >= 1.0, "seed {seed}: brightest cell on the cut is only {mx:.3} of the median");
+
+        // Adjacent cells 5 cm apart differing several-fold is the thing a
+        // distance falloff cannot do at all.
+        let adjacent = cut.windows(2).map(|w| w[0].max(w[1]) / w[0].min(w[1]).max(1e-12)).fold(0.0, f64::max);
+        assert!(adjacent >= 3.0, "seed {seed}: neighbouring cells differ by at most {adjacent:.1}x -- the map is smooth");
+
+        // Count full swings between "dark" and "bright" along the cut.
+        let (mut crossings, mut state) = (0, 0i32);
+        for &v in &cut {
+            let s = if v < lo { -1 } else if v > hi { 1 } else { 0 };
+            if s != 0 && s != state {
+                crossings += i32::from(state != 0);
+                state = s;
+            }
+        }
+        assert!(crossings >= 5, "seed {seed}: only {crossings} dark/bright swings along a {:.1} m cut", y_hi - y_lo);
+    }
+}

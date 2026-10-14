@@ -9,7 +9,8 @@
 //!
 //! - [`engine`]: deterministic core, no I/O, caller supplies time.
 //! - [`hub`]: side effects (logs, history, retention, publishing).
-//! - [`live`]: sockets, the 0.5 s tick, shutdown; [`replay`]: pcap input.
+//! - [`live`]: sockets, the 0.5 s tick, shutdown; [`replay`]: pcap input;
+//!   [`simulate`]: a SYNTHETIC room through the same pipeline.
 //! - [`privacy`]: the consent gate every outbound value passes through.
 //! - [`history`]: a bounded in-memory time series for the trend charts.
 //! - [`roles`], [`auth`], [`audit`]: who may see what, and the record of it.
@@ -32,6 +33,7 @@ pub mod raw;
 pub mod replay;
 pub mod roles;
 pub mod shared;
+pub mod simulate;
 pub mod store;
 pub mod timefmt;
 
@@ -39,6 +41,7 @@ pub use config::GatewayConfig;
 pub use engine::Engine;
 pub use live::{ClockMode, Gateway};
 pub use replay::{replay, ReplayOptions, ReplaySummary};
+pub use simulate::{SimGateway, SimulateOptions};
 
 /// One log line on stderr, wall-clock stamped (UTC).
 pub fn log(msg: &str) {

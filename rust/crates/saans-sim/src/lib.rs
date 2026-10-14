@@ -31,6 +31,25 @@
 //! `tests/parity.rs` reproduces the Python scene's golden vectors
 //! (`spec/golden/sim_geometric`) to ~1e-13.
 //!
+//! ## Driving it by hand
+//!
+//! A scripted timeline is not the only way to move the body.
+//! [`Simulator::set_position_override`] pins it wherever a caller says and
+//! [`Simulator::set_present`] takes it out of the room altogether, both
+//! mid-run and without disturbing the sequence counters, the RNG streams
+//! or the static channel — so an interactive explorer can drag a person
+//! around a room and the CSI stays continuous across the change.
+//!
+//! Those positions are an *input*, never an inference: the truth reports
+//! what the caller set. Nothing in this crate recovers a position from
+//! CSI, and a single-antenna link cannot (`docs/CAPABILITY_LIMITS.md`).
+//!
+//! [`Simulator::sensitivity_at`] answers what breathing would do to a link
+//! from an arbitrary point, and [`Simulator::coverage`] evaluates that over
+//! a grid of the whole room: the ground-truth map of where a chest is
+//! detectable and where it falls in a Fresnel null. It is an upper bound
+//! computed from the scenario's geometry — no receiver can measure it.
+//!
 //! ## Simplifications (beyond the reference's own: 2-D, no AGC, no CFO)
 //!
 //! - The torso faces every link (spread across *that link's* bisector),
@@ -71,4 +90,4 @@ pub use plan::{
     ARM_OFFSET_M, ARM_SWING_M, BREATHING_AMPLITUDE_M, DEFAULT_BPM, FALL_S, HEART_AMPLITUDE_M, HEART_BPM, MARGIN_M, PAUSE_RAMP_S, SIT_DOWN_DROP_M, SIT_DOWN_S,
 };
 pub use scenario::{Activity, Node, Point, Room, Scatterer, Scenario, Segment, SimOptions, Truth, TruthEvent, TruthKind};
-pub use sim::{LinkFrame, Simulator, Tick, RSSI_REF_DBM};
+pub use sim::{Coverage, LinkFrame, Simulator, Tick, MAX_COVERAGE_CELLS, RSSI_REF_DBM};
