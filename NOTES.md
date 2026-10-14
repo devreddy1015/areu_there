@@ -536,16 +536,17 @@ constant changed. The clean channel is bit-identical across arms.
 
 Three findings, in order of how much they are believed.
 
-1. **int8 quantization costs nothing measurable.** Every metric matches
-   the clean arm to three decimals. At a mean of ~38 counts the
+1. **int8 quantization costs nothing measurable.** Every metric in the
+   table is within 0.04 dB of the clean arm, and the presence figures
+   match it to three decimals. At a mean of ~38 counts the
    quantizer's error sits far below the scenario's own channel noise.
    Going in, this was the term expected to hurt. It does not.
 2. **Static ripple, per-packet phase and receiver noise cost little.**
    Amplitude CV 0.054 to 0.061; breathing BNR 0.23 dB worse; breathing
    still recovered at 14.00 BPM with 100% of frames.
 3. **The AGC is the whole effect, and it does not break what was
-   expected.** Breathing BNR loses 1.3 dB — the breathing signal is
-   still there. What breaks is the *presence* detector's ambient
+   expected.** Breathing BNR loses 1.4 dB against the no-AGC arm, 1.6 dB
+   against clean — the breathing signal is still there. What breaks is the *presence* detector's ambient
    calibration: gain steps are impulses in the 0.1–2 Hz presence band,
    so the empty-room threshold inflates 12x, and the empty room ends up
    reporting *more* motion energy than the seated person. The contrast
@@ -569,9 +570,17 @@ loop moves anyway. Sweeping it, nothing else changed:
 With no dither the model costs the detectors essentially nothing. So the
 honest claim is **not** "an ESP32 breaks presence". It is:
 
-> If a real node's gain moves more often than about once every nine
-> seconds in a still, empty room, presence as currently calibrated will
-> not survive it.
+> Presence survives a gain that moves about once every four minutes
+> (the 0.000 row: 0.02% of packets at 20 Hz). It fails completely at
+> once every twenty-eight seconds (0.002: 0.18%). The sweep brackets the
+> breakpoint between those two and does not locate it any more finely.
+
+An earlier draft of this section put the breakpoint at "once every nine
+seconds". That is the 0.005 row, which already reports 0% occupied — it
+is inside the failing region, not at its edge. Narrowing the bracket is
+a matter of adding rows between 0.000 and 0.002 to the sweep, which is
+a one-line change to the example and still answers nothing a bench
+recording would not answer better.
 
 That is a bench question with a cheap answer: log `agc_gain` on an idle
 node in an empty room for ten minutes and count the moves. It is the

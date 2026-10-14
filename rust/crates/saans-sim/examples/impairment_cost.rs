@@ -5,7 +5,7 @@
 //! any hardware.
 //! `cargo run --release -p saans-sim --example impairment_cost`
 //!
-//! Three arms, because "impairments on or off" does not say whether it is
+//! Four arms, because "impairments on or off" does not say whether it is
 //! the quantizer or the AGC that matters:
 //!
 //! - `clean`: the simulator's own amplitudes, what every number in this
@@ -401,7 +401,7 @@ fn main() {
         sens.push(sim.sensitivity(sc.links[0]).into_iter().fold(0.0, f64::max));
 
         // The bin the pipeline would choose, chosen once on the clean arm
-        // so all three arms are compared on the same subcarrier.
+        // so all four arms are compared on the same subcarrier.
         let clean = run(&sc, Arm::Clean);
         let seated_from = (scenarios::LEAD_IN_S * fs) as usize;
         let k = best_subcarrier(&clean.rows()[seated_from..], fs);

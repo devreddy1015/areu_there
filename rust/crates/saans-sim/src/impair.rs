@@ -216,8 +216,11 @@ pub struct ImpairConfig {
     /// as a coarse discrete control rather than a continuous one, and
     /// the model this implements specifies steps of at least 0.2 dB;
     /// 0.5 dB is a plausible value in that region. The number matters
-    /// less than the fact that it dwarfs the signal: a chest moves |h|
-    /// by well under 1%, and one 0.5 dB step is a ~6% jump.
+    /// less than the fact that it dwarfs the signal: `impairment_cost`
+    /// measures the breathing band at 1.6% of that bin's mean |h| on
+    /// the BEST subcarrier of a clean channel, and one 0.5 dB step is a
+    /// 5.9% jump — nearly four times the signal, where the signal is
+    /// strongest. On a typical bin the ratio is worse.
     pub agc_step_db: f64,
     /// Error the loop tolerates before it moves, dB. Hysteresis is why
     /// the gain is piecewise constant instead of chasing every packet.
