@@ -30,10 +30,19 @@ struct Args {
     /// Validate the configuration and exit.
     #[arg(long)]
     check: bool,
+    /// Print an Argon2id PHC string for a password, to paste into
+    /// `[[user]].password_hash`, and exit. The password is read from
+    /// stdin so it never reaches the shell history or the process list.
+    #[arg(long)]
+    hash_password: bool,
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
+    // Before the config: hashing a password is what you do *to write* one.
+    if args.hash_password {
+        return hash_password();
+    }
     let cfg = match GatewayConfig::load(&args.config) {
         Ok(c) => c,
         Err(e) => {
@@ -69,6 +78,39 @@ fn main() -> ExitCode {
     }
 }
 
+/// `saans-gateway --hash-password`, the command `config.rs` names when it
+/// rejects a plaintext password. Reads one line from stdin and prints the
+/// PHC string; the salt is 16 bytes from the OS, not a seeded PRNG.
+fn hash_password() -> ExitCode {
+    use argon2::password_hash::{PasswordHasher, SaltString};
+    use std::io::BufRead;
+    eprint!("password: ");
+    let mut line = String::new();
+    if std::io::stdin().lock().read_line(&mut line).is_err() || line.trim().is_empty() {
+        eprintln!("saans-gateway: no password on stdin");
+        return ExitCode::from(2);
+    }
+    let mut salt = [0u8; 16];
+    if getrandom::getrandom(&mut salt).is_err() {
+        eprintln!("saans-gateway: no entropy available");
+        return ExitCode::FAILURE;
+    }
+    let Ok(salt) = SaltString::encode_b64(&salt) else {
+        eprintln!("saans-gateway: cannot encode salt");
+        return ExitCode::FAILURE;
+    };
+    match argon2::Argon2::default().hash_password(line.trim_end_matches(['\n', '\r']).as_bytes(), &salt) {
+        Ok(h) => {
+            println!("{h}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("saans-gateway: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 async fn run_live(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error>> {
     let spaces = cfg.spaces.len();
     let data_dir = cfg.data_dir.clone();
@@ -94,7 +136,7 @@ async fn run_replay(cfg: GatewayConfig, args: Args, pcap: PathBuf) -> Result<(),
         return Ok(());
     }
     // Serve while replaying: the HTTP side reads what the replay publishes.
-    let shared = saans_gateway::shared::Shared::new("replay");
+    let shared = saans_gateway::shared::Shared::with_history("replay", cfg.history);
     let http_addr = cfg.http_socket_addr()?;
     let listener = tokio::net::TcpListener::bind(http_addr)
         .await

@@ -81,7 +81,7 @@ impl Gateway {
         let listener = TcpListener::bind(http_bind).await.map_err(|e| in_use("HTTP", http_bind, e))?;
         let (udp_addr, http_addr) = (sock.local_addr()?, listener.local_addr()?);
 
-        let shared = Shared::new("live");
+        let shared = Shared::with_history("live", cfg.history);
         let cfg_arc = Arc::new(cfg.clone());
         let alerts = if cfg.alert_routes.is_empty() {
             None
