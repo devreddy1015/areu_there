@@ -208,11 +208,57 @@ pub struct LoginBody {
     pub password: String,
 }
 
+/// Logins in flight. Argon2 is deliberately expensive and the failure
+/// path deliberately sleeps, so an unauthenticated flood of them is a
+/// denial-of-service vector against a safety system. Four at a time is
+/// more than any real operator needs and bounds the blocking pool.
+const MAX_LOGINS_IN_FLIGHT: usize = 4;
+static LOGINS_IN_FLIGHT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Decrements on drop, so an early return or a panic cannot leak a slot.
+struct LoginSlot;
+
+impl LoginSlot {
+    fn take() -> Option<Self> {
+        let prev = LOGINS_IN_FLIGHT.fetch_add(1, Ordering::AcqRel);
+        if prev >= MAX_LOGINS_IN_FLIGHT {
+            LOGINS_IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+            return None;
+        }
+        Some(Self)
+    }
+}
+
+impl Drop for LoginSlot {
+    fn drop(&mut self) {
+        LOGINS_IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 async fn login(State(app): State<AppState>, h: HeaderMap, Json(body): Json<LoginBody>) -> Response {
     if !app.auth.required() {
         return error(StatusCode::BAD_REQUEST, "this gateway does not use authentication (loopback http_addr)");
     }
-    let Some((id, p)) = app.auth.login(&body.user, &body.password) else {
+    let Some(slot) = LoginSlot::take() else {
+        return error(StatusCode::TOO_MANY_REQUESTS, "too many sign-ins at once; try again in a moment");
+    };
+    // Argon2 verification and the fixed failure delay are both blocking,
+    // and this runtime has two worker threads. Running them inline would
+    // let a handful of sign-in attempts stall ingest.
+    let auth = app.auth.clone();
+    let user = body.user.clone();
+    let password = body.password;
+    let attempt = tokio::task::spawn_blocking(move || {
+        let r = auth.login(&user, &password);
+        drop(slot);
+        r
+    })
+    .await;
+    let attempt = match attempt {
+        Ok(r) => r,
+        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "sign-in could not be completed"),
+    };
+    let Some((id, p)) = attempt else {
         app.audit.record(now_unix_ms(), Action::LoginFailed, &body.user, None, json!({}));
         // Deliberately the same answer for a wrong password and an
         // unknown user.
@@ -586,6 +632,16 @@ mod tests {
         assert!(filter_live(ev, &p(Role::Safety, None)).is_some());
         assert!(filter_live(ev, &p(Role::Ops, None)).is_none(), "nothing is sent, not an empty event");
         assert!(filter_live(ev, &p(Role::Safety, Some(&["hall"]))).is_none());
+    }
+
+    /// The only thing that touches this counter is `login`, which no
+    /// unit test calls, so taking every slot here is self-contained.
+    #[test]
+    fn concurrent_logins_are_capped_and_slots_are_returned() {
+        let held: Vec<LoginSlot> = (0..MAX_LOGINS_IN_FLIGHT).map(|_| LoginSlot::take().expect("under the cap")).collect();
+        assert!(LoginSlot::take().is_none(), "the {MAX_LOGINS_IN_FLIGHT}th + 1 attempt is refused");
+        drop(held);
+        assert!(LoginSlot::take().is_some(), "slots are returned on drop");
     }
 
     #[test]
