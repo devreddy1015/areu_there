@@ -7,8 +7,8 @@
 <meta name="color-scheme" content="dark">
 <title>Room sim — Saans</title>
 <meta name="description" content="A room drawn from a scene file: the walls, the furniture and the node positions are typed in, not sensed. Nothing on this page is measured and nothing is estimated.">
-<link rel="preload" href="/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/site.css">
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="site.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%23efebe2'/%3E%3Cpath d='M4 13c2.2 0 2.6-5 4.5-5s2.4 10 4.5 10 2.6-10 4.5-10 2.3 5 4.5 5' fill='none' stroke='%23141413' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>document.documentElement.classList.add('js')</script>
 </head>
@@ -23,19 +23,19 @@
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="wrap sitenav" id="top">
-  <a class="sitenav-home" href="/"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
+  <a class="sitenav-home" href="./"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg>saans</a>
   <nav class="sitenav-links" aria-label="Pages">
-    <a href="/how-it-works" data-page="how">how it works</a>
-    <a href="/demo" data-page="demo">demo</a>
-    <a href="/room-sim" data-page="room-sim" aria-current="page">room sim</a>
-    <a href="/evidence" data-page="evidence">evidence</a>
-    <a href="/privacy" data-page="privacy">privacy</a>
-    <a href="/hardware" data-page="hardware">hardware</a>
-    <a href="/start" data-page="start">get started</a>
+    <a href="how-it-works" data-page="how">how it works</a>
+    <a href="demo" data-page="demo">demo</a>
+    <a href="room-sim" data-page="room-sim" aria-current="page">room sim</a>
+    <a href="evidence" data-page="evidence">evidence</a>
+    <a href="privacy" data-page="privacy">privacy</a>
+    <a href="hardware" data-page="hardware">hardware</a>
+    <a href="start" data-page="start">get started</a>
   </nav>
   <div class="sitenav-end">
     <a class="link" href="https://github.com/devreddy1015/areu_there">GitHub<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></a>
-    <a class="button button-sm" href="/app">open the dashboard</a>
+    <a class="button button-sm" href="app">open the dashboard</a>
   </div>
 </header>
 
@@ -170,29 +170,29 @@
   <h2 id="files-title">the files this page reads</h2>
   <div class="rs-prose">
     <p class="body">Served from this gateway, same origin, nothing fetched from anywhere else:
-      <a href="/scenes/bedroom.json">bedroom.json</a> (4.2 x 3.6 x 2.7 m),
-      <a href="/scenes/office.json">office.json</a> (6 x 5 x 2.9 m) and
-      <a href="/scenes/hall-l.json">hall-l.json</a> (an L-shaped floor of 35.75 m&sup2; inside an
+      <a href="scenes/bedroom.json">bedroom.json</a> (4.2 x 3.6 x 2.7 m),
+      <a href="scenes/office.json">office.json</a> (6 x 5 x 2.9 m) and
+      <a href="scenes/hall-l.json">hall-l.json</a> (an L-shaped floor of 35.75 m&sup2; inside an
       8 x 6 m box). The format is <code>scenes/scene.schema.json</code> in the repository, and the same
       three files are compiled into the simulator, so a room cannot mean one thing here and another
       there.</p>
-    <p class="body">Material constants are <a href="/scenes/materials.json">materials.json</a>: ITU-R
+    <p class="body">Material constants are <a href="scenes/materials.json">materials.json</a>: ITU-R
       P.2040 Table 3, evaluated at 2.437 GHz, which is 802.11 channel 6. They are a sourced default and
       not a calibration — nothing in that file has been checked against a measurement made with this
       hardware, and <code>fabric</code> has no row at all rather than an invented one.</p>
     <p class="body">The view is drawn with three.js, committed into the repository and served from this
       gateway. Nothing on this page is fetched from another origin, because the gateway may be running
       in a building with no route out. The licence is served beside the code, at
-      <a href="/vendor/three-LICENSE.txt">three-LICENSE.txt</a>.</p>
+      <a href="vendor/three-LICENSE.txt">three-LICENSE.txt</a>.</p>
   </div>
 
   <div class="next">
     <p class="label">next</p>
     <div class="next-grid">
-      <a href="/demo"><b>the simulated demo<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></b>
+      <a href="demo"><b>the simulated demo<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></b>
         <p>A simulated person in a simulated room, beside what the signal processing actually
           recovered from it. That page is labelled SIM throughout; this one is not.</p></a>
-      <a href="/how-it-works"><b>how it works<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></b>
+      <a href="how-it-works"><b>how it works<svg class="icon" width="15" height="15" aria-hidden="true"><use href="#i-out"/></svg></b>
         <p>What a link can and cannot report, and the pipeline between the two.</p></a>
     </div>
   </div>
@@ -202,15 +202,15 @@
 <footer class="wrap sitefoot">
   <nav class="foot-cols" aria-label="Footer">
     <div><p class="label">the system</p><ul>
-      <li><a href="/how-it-works">How it works</a></li>
-      <li><a href="/demo">Simulated demo</a></li>
-      <li><a href="/hardware">Hardware</a></li>
-      <li><a href="/app">Dashboard</a></li>
+      <li><a href="how-it-works">How it works</a></li>
+      <li><a href="demo">Simulated demo</a></li>
+      <li><a href="hardware">Hardware</a></li>
+      <li><a href="app">Dashboard</a></li>
     </ul></div>
     <div><p class="label">the evidence</p><ul>
-      <li><a href="/evidence">What is proven</a></li>
-      <li><a href="/privacy">What is not collected</a></li>
-      <li><a href="/start">Run it yourself</a></li>
+      <li><a href="evidence">What is proven</a></li>
+      <li><a href="privacy">What is not collected</a></li>
+      <li><a href="start">Run it yourself</a></li>
     </ul></div>
     <div><p class="label">the code</p><ul>
       <li><a href="https://github.com/devreddy1015/areu_there">GitHub repository</a></li>
@@ -225,7 +225,7 @@
   </div>
 </footer>
 
-<script src="/site.js" defer></script>
-<script type="module" src="/room-sim.js"></script>
+<script src="site.js" defer></script>
+<script type="module" src="room-sim.js"></script>
 </body>
 </html>

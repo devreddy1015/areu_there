@@ -73,11 +73,14 @@
      The dashboard used to live at `/`, so bookmarks and anything that was
      pasted into a chat look like `/#system`. Those hashes now name a tab
      inside `/app`. Forward them rather than landing someone on a home
-     page with a fragment that means nothing here. */
-  if (location.pathname === "/" && location.hash.length > 1) {
+     page with a fragment that means nothing here. The home page is found
+     by its marker, not by `location.pathname === "/"`, because the static
+     copy of the site lives under a path prefix, and `app#…` is relative
+     for the same reason. */
+  if (document.body.dataset.page === "home" && location.hash.length > 1) {
     const TABS = ["overview", "explorer", "signals", "topology", "events", "system"];
     const want = location.hash.slice(1);
-    if (TABS.includes(want)) location.replace("/app#" + want);
+    if (TABS.includes(want)) location.replace("app#" + want);
   }
 
   /* ---------- pipeline: follow the phase at the centre ---------- */

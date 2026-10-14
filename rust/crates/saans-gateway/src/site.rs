@@ -16,9 +16,15 @@
 //! The dashboard moved from `/` to `/app` to make room for the landing
 //! page. `assets/site/site.js` forwards the old tab fragments, so a
 //! `/#system` link someone saved still arrives where it meant to.
+//!
+//! The same bytes are also published as a static copy ([`export`]) on a
+//! host that serves files under a path prefix, which is why every in-site
+//! URL in them is relative: `site.css`, not `/site.css`. That works only
+//! because every route is one segment deep, and the tests hold both.
 
 use axum::http::{header, HeaderValue};
 use axum::response::{IntoResponse, Response};
+use std::path::{Path, PathBuf};
 
 /// The dashboard's policy, plus the three things a multi-file site needs
 /// that a single inlined document did not.
@@ -63,6 +69,15 @@ pub const PAGES: &[Page] = &[
     Page { path: "/hardware", html: include_str!("../assets/site/hardware.html") },
     Page { path: "/start", html: include_str!("../assets/site/start.html") },
 ];
+
+/// Pages that exist only in the static copy, standing where the gateway
+/// would answer with something it computes. The router never serves
+/// these: on a gateway, `/app` is the dashboard.
+///
+/// A file host has no dashboard and no sign-in, and the pages link to
+/// `app` from every footer. Without this a reader would follow that link
+/// to the host's own 404, which says nothing about why.
+pub const STATIC_ONLY: &[Page] = &[Page { path: "/app", html: include_str!("../assets/site/static/app.html") }];
 
 /// A file the pages reference. Text and binary both, because the fonts
 /// are the reason `font-src` exists in [`SITE_CSP`] at all.
@@ -242,6 +257,50 @@ pub fn asset_response(a: &'static Asset) -> Response {
     harden(r, SITE_CSP, a.cache)
 }
 
+/// The file a route is stored as in the static copy: `/` is `index.html`
+/// and `/demo` is `demo.html`. GitHub Pages answers `/demo` from
+/// `demo.html`, so the addresses people share are the gateway's.
+pub fn export_name(route: &str) -> String {
+    match route.trim_start_matches('/') {
+        "" => "index.html".to_string(),
+        r => format!("{r}.html"),
+    }
+}
+
+/// Writes the site into `dir` as plain files for a host that serves files
+/// and nothing else: every page in [`PAGES`] and [`STATIC_ONLY`] under
+/// [`export_name`], every asset at its own path. The bytes are the ones the
+/// gateway serves, from the same table, so the two cannot drift.
+///
+/// What a file host cannot carry is anything the gateway computes:
+/// `/demo` finds no `/api/sim` and says so, and `/app` is the
+/// [`STATIC_ONLY`] page. Headers do not travel either, so the copy is
+/// served without [`SITE_CSP`].
+///
+/// `dir` is created if it is missing and refused if it holds anything, so
+/// an export never overwrites files, or leaves stale ones beside new.
+pub fn export(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    std::fs::create_dir_all(dir)?;
+    if std::fs::read_dir(dir)?.next().is_some() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!("{} is not empty", dir.display()),
+        ));
+    }
+    let mut written = Vec::new();
+    let pages = PAGES.iter().chain(STATIC_ONLY).map(|p| (export_name(p.path), p.html.as_bytes()));
+    let assets = ASSETS.iter().map(|a| (a.path.trim_start_matches('/').to_string(), a.bytes));
+    for (name, bytes) in pages.chain(assets) {
+        let file = dir.join(name);
+        if let Some(parent) = file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&file, bytes)?;
+        written.push(file);
+    }
+    Ok(written)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,7 +320,7 @@ mod tests {
     fn pages_fetch_nothing_remote() {
         const SUBRESOURCE: [&str; 6] =
             ["src=\"http", "src=\"//", "@import", "url(http", "url(\"http", "url('http"];
-        for p in PAGES {
+        for p in PAGES.iter().chain(STATIC_ONLY) {
             for bad in SUBRESOURCE {
                 assert!(!p.html.contains(bad), "{}: remote subresource {bad:?}", p.path);
             }
@@ -427,17 +486,39 @@ mod tests {
         }
     }
 
+    /// Every in-site `href` and `src` in a page, as the route or asset
+    /// path it names: `demo` is `/demo`, `./` is `/`, `fonts/x.woff2` is
+    /// `/fonts/x.woff2`. Fragments, other sites and `data:` URLs are not
+    /// in the site and are skipped.
+    ///
+    /// Reading a relative URL as if it were rooted is exact only because
+    /// every page sits one segment deep, so a page's directory is the
+    /// site's root. `routes_are_one_segment_deep` holds that.
+    fn in_site_refs(html: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        for attr in ["href=\"", "src=\""] {
+            for (i, _) in html.match_indices(attr) {
+                let rest = &html[i + attr.len()..];
+                let v = &rest[..rest.find('"').expect("closing quote")];
+                if v.starts_with('#') || v.starts_with("//") || v.contains(':') {
+                    continue;
+                }
+                let v = v.split(['#', '?']).next().unwrap_or("");
+                // An absolute one is reported by the relative-URL test;
+                // passed through here, it still names the right file.
+                out.push(if v.starts_with('/') { v.to_string() } else { format!("/{}", v.trim_start_matches("./")) });
+            }
+        }
+        out
+    }
+
     /// Every asset a page asks for is an asset the router serves. A 404
     /// on the stylesheet is a site that looks broken in exactly the
     /// deployment where nobody is watching the logs.
     #[test]
     fn every_referenced_asset_exists() {
-        for p in PAGES {
-            for (i, _) in p.html.match_indices("href=\"/").chain(p.html.match_indices("src=\"/")) {
-                let rest = &p.html[i..];
-                let start = rest.find('"').expect("attribute quote") + 1;
-                let end = start + rest[start..].find('"').expect("closing quote");
-                let target = &rest[start..end];
+        for p in PAGES.iter().chain(STATIC_ONLY) {
+            for target in in_site_refs(p.html) {
                 // Pages are checked by the route table; only files are
                 // our business here.
                 if !target.contains('.') {
@@ -456,12 +537,8 @@ mod tests {
     /// is the one kind of breakage a reader blames on the product.
     #[test]
     fn internal_links_resolve() {
-        for p in PAGES {
-            for (i, _) in p.html.match_indices("href=\"/") {
-                let rest = &p.html[i..];
-                let start = rest.find('"').expect("attribute quote") + 1;
-                let end = start + rest[start..].find('"').expect("closing quote");
-                let target = rest[start..end].split('#').next().unwrap_or("/");
+        for p in PAGES.iter().chain(STATIC_ONLY) {
+            for target in in_site_refs(p.html) {
                 if target.contains('.') || target == "/app" {
                     continue; // assets are checked above; /app is the dashboard
                 }
@@ -474,12 +551,92 @@ mod tests {
         }
     }
 
+    /// The static copy is served under a path prefix — `/areu_there/` on
+    /// GitHub Pages — where `/site.css` is the host's root and not ours.
+    /// So the site names its own files relatively, and an absolute in-site
+    /// URL is a page that works on the gateway and is unstyled, or
+    /// missing its scene, on the copy anyone can open.
+    ///
+    /// Pages: no `href="/` or `src="/`. Our stylesheets: no `url(/`. Our
+    /// scripts: no string that opens with `/` and a letter, which is how
+    /// a fetch, an import or a link target is spelled. Backticks are not
+    /// checked: the comments use them to quote paths like `/app`. Vendored
+    /// files keep their own relative imports, checked elsewhere.
+    #[test]
+    fn the_site_names_no_absolute_paths() {
+        fn quoted_root_path(s: &str) -> Option<usize> {
+            s.as_bytes()
+                .windows(3)
+                .position(|w| (w[0] == b'"' || w[0] == b'\'') && w[1] == b'/' && w[2].is_ascii_alphabetic())
+        }
+        let line = |s: &str, at: usize| s[..at].lines().count();
+        for p in PAGES.iter().chain(STATIC_ONLY) {
+            for bad in ["href=\"/", "src=\"/"] {
+                assert!(!p.html.contains(bad), "{}: absolute in-site URL {bad:?}", p.path);
+            }
+            if let Some(at) = quoted_root_path(p.html) {
+                panic!("{}:{}: absolute in-site path", p.path, line(p.html, at));
+            }
+        }
+        for a in ASSETS.iter().filter(|a| !a.vendored) {
+            let s = match std::str::from_utf8(a.bytes) {
+                Ok(s) if a.content_type.starts_with("text/css") || a.content_type.starts_with("text/javascript") => s,
+                _ => continue,
+            };
+            let flat = normalise(s);
+            assert!(!flat.contains("url(\"/") && !flat.contains("url(/"), "{}: absolute url()", a.path);
+            if let Some(at) = quoted_root_path(s) {
+                panic!("{}:{}: absolute in-site path", a.path, line(s, at));
+            }
+        }
+    }
+
+    /// The reason relative URLs are exact: from a page one segment deep,
+    /// `demo` and `/demo` name the same thing on the gateway, and `demo`
+    /// still names the right thing under a prefix. A page at `/a/b` would
+    /// resolve `site.css` to `/a/site.css`.
+    #[test]
+    fn routes_are_one_segment_deep() {
+        for p in PAGES.iter().chain(STATIC_ONLY) {
+            assert!(p.path.starts_with('/') && !p.path[1..].contains('/'), "{}: nested route", p.path);
+        }
+    }
+
+    /// The copy is the gateway's site and nothing else: the same bytes,
+    /// a file for every page and asset, and nothing a page links to that
+    /// the copy cannot answer — including `app`, which on a file host is
+    /// the [`STATIC_ONLY`] page rather than the dashboard.
+    #[test]
+    fn the_static_copy_is_complete() {
+        let dir = std::env::temp_dir().join(format!("saans-site-export-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let written = export(&dir).expect("export");
+        let unique: std::collections::HashSet<_> = written.iter().collect();
+        assert_eq!(unique.len(), PAGES.len() + STATIC_ONLY.len() + ASSETS.len(), "two entries share a file");
+
+        for p in PAGES.iter().chain(STATIC_ONLY) {
+            let file = dir.join(export_name(p.path));
+            assert_eq!(std::fs::read_to_string(&file).expect("page written"), p.html, "{}", p.path);
+            for target in in_site_refs(p.html) {
+                let name = if target.contains('.') { target[1..].to_string() } else { export_name(&target) };
+                assert!(dir.join(&name).is_file(), "{} links to {target}, and the copy has no {name}", p.path);
+            }
+        }
+        for a in ASSETS {
+            assert_eq!(std::fs::read(dir.join(&a.path[1..])).expect("asset written"), a.bytes, "{}", a.path);
+        }
+
+        // Never into a directory that already holds something.
+        assert_eq!(export(&dir).expect_err("second export").kind(), std::io::ErrorKind::AlreadyExists);
+        std::fs::remove_dir_all(&dir).expect("clean up");
+    }
+
     /// The disclaimer is not decoration. Every page carries a number that
     /// came out of a simulator, so every page says so where it can be
     /// read, not only in a footer somebody scrolled past.
     #[test]
     fn every_page_says_the_numbers_are_simulated() {
-        for p in PAGES {
+        for p in PAGES.iter().chain(STATIC_ONLY) {
             let t = p.html.to_ascii_lowercase();
             assert!(
                 t.contains("simulat") || t.contains("synthetic"),
@@ -494,7 +651,7 @@ mod tests {
     /// is what puts the underline under the right word.
     #[test]
     fn every_page_identifies_itself() {
-        for p in PAGES {
+        for p in PAGES.iter().chain(STATIC_ONLY) {
             assert!(p.html.contains("<body data-page=\""), "{}: no data-page on <body>", p.path);
             assert!(p.html.contains("<main id=\"main\">"), "{}: no <main id=main> for the skip link", p.path);
         }

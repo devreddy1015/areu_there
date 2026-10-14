@@ -69,7 +69,7 @@
 
   const SIM = {
     cfg: null, cov: null, covFailed: false, person: null, present: true,
-    err: "", errKind: "", space: null, spaceErr: "", postErr: "",
+    err: "", errKind: "", static: false, space: null, spaceErr: "", postErr: "",
     built: "", els: null, drag: null, said: "",
   };
 
@@ -133,6 +133,15 @@
     if (!r.ok) { const e = new HttpError(r.status, path); e.data = data; throw e; }
     return data;
   }
+  /** False only when the server says it has no /api/health at all. */
+  async function gatewayAnswers() {
+    try {
+      const r = await fetch("api/health", { cache: "no-store", credentials: "same-origin" });
+      return r.status !== 404;
+    } catch {
+      return true; // unreachable is not the same as absent; say nothing new
+    }
+  }
 
   // ------------------------------------------------------ coverage lookup
   function covValues() {
@@ -163,7 +172,7 @@
 
   async function refreshSim() {
     try {
-      const cfg = await getJSON("/api/sim");
+      const cfg = await getJSON("api/sim");
       SIM.cfg = cfg;
       SIM.err = ""; SIM.errKind = "";
       const t = cfg.truth || {};
@@ -176,11 +185,23 @@
       if (!SIM.cov && !SIM.covFailed) {
         // Computed for the configured geometry, which does not change, so
         // it is fetched once.
-        SIM.cov = await getJSON("/api/sim/coverage?res_m=" + COV_RES_M)
+        SIM.cov = await getJSON("api/sim/coverage?res_m=" + COV_RES_M)
           .catch(() => { SIM.covFailed = true; return null; });
       }
     } catch (e) {
       SIM.cfg = null;
+      // A 404 means one of two things, and they need different sentences:
+      // a gateway that is not in simulate mode, or no gateway at all —
+      // the static copy of this site on a plain file host. Every gateway
+      // routes /api/health whatever its mode (it may refuse, never 404),
+      // so asking it tells the two apart.
+      if (e.status === 404 && !(await gatewayAnswers())) {
+        SIM.static = true;
+        SIM.errKind = "static";
+        SIM.err = "There is no gateway behind this address: this is a static copy of the site, "
+          + "and nothing here can run the simulator or the pipeline.";
+        return;
+      }
       SIM.errKind = e instanceof HttpError ? String(e.status) : "fetch";
       SIM.err = e.status === 404
         ? "This gateway is not running in simulate mode, so there is no simulated room to show."
@@ -194,7 +215,7 @@
     const id = SIM.cfg && SIM.cfg.space_id;
     if (!id) { SIM.space = null; return; }
     try {
-      const list = await getJSON("/api/spaces");
+      const list = await getJSON("api/spaces");
       SIM.spaceErr = "";
       SIM.space = (Array.isArray(list) ? list : []).find((x) => x.space_id === id) || null;
       if (!SIM.space) {
@@ -213,13 +234,15 @@
   async function refresh() {
     if (document.hidden) return;
     await refreshSim();
+    // A file host does not grow a gateway between polls: stop asking.
+    if (SIM.static) { stopPolling(); render(); return; }
     await refreshSpaces();
     render();
   }
 
   let timer = null;
   function startPolling() {
-    if (timer || document.hidden) return;
+    if (timer || document.hidden || SIM.static) return;
     refresh();
     timer = setInterval(refresh, POLL_MS);
   }
@@ -239,7 +262,7 @@
     personBusy = true;
     personTimer = setTimeout(() => { personTimer = null; if (personPending) sendPerson(); }, PERSON_POST_MS);
     try {
-      const r = await postJSON("/api/sim/person", body);
+      const r = await postJSON("api/sim/person", body);
       SIM.postErr = "";
       // The gateway clamps into the room; show where the person actually
       // ended up, unless a newer move is already on its way.
@@ -259,7 +282,7 @@
   async function togglePresent() {
     const want = !SIM.present;
     try {
-      const r = await postJSON("/api/sim/present", { present: want });
+      const r = await postJSON("api/sim/present", { present: want });
       SIM.present = !!r.present;
       SIM.postErr = "";
       announce(SIM.present ? "Person put back into the simulated room."
@@ -308,12 +331,16 @@
         note.replaceChildren(el("b", null, SIM.err ? "No simulated room is being drawn." : "Loading the simulated room…"));
         if (SIM.err) {
           add(note, document.createTextNode(" " + SIM.err));
-          if (SIM.errKind === "404") {
+          if (SIM.errKind === "static") {
+            add(note, document.createTextNode(" The same page works on a gateway on your own machine: start one with "),
+              el("code", null, "saans-gateway --config saans.toml --simulate --speed 10"),
+              document.createTextNode(" and open its demo page. The command is also under “run this yourself” below."));
+          } else if (SIM.errKind === "404") {
             add(note, document.createTextNode(" Start one with "),
               el("code", null, "saans-gateway --config saans.toml --simulate --speed 10"),
               document.createTextNode(" — the same command is under “run this yourself” below."));
           } else if (SIM.errKind === "401") {
-            const a = el("a", { class: "link", href: "/app" }, "sign in at the dashboard");
+            const a = el("a", { class: "link", href: "app" }, "sign in at the dashboard");
             add(note, document.createTextNode(" You can "), a, document.createTextNode("."));
           } else {
             add(note, document.createTextNode(" Nothing is substituted for it."));

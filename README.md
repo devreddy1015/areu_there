@@ -49,6 +49,11 @@ space has opted in), and a Rust gateway fuses links, runs advisory health
 detectors and serves a dashboard. Plan: [SAANS_PLAN.md](SAANS_PLAN.md);
 decisions: [docs/adr/](docs/adr/); wire format: [spec/wire.md](spec/wire.md).
 
+**Read the site without running anything:**
+<https://devreddy1015.github.io/areu_there/>. It is a static copy, so
+the live demo and the dashboard need a gateway on your own machine, and
+the copy says so on those pages.
+
 | Part | Where | Checked by |
 |---|---|---|
 | Reference DSP + FeatureFrame | `wifisense/` (Python) | `python3 -m unittest discover -s tests` |
@@ -187,6 +192,15 @@ subresources while permitting anchors.
 shows the real DSP reading a synthetic channel. It needs the gateway to
 be running with `--simulate`; without it the page says so rather than
 drawing a room.
+
+The same site is published as static files on GitHub Pages by
+`.github/workflows/pages.yml` on every push to `main` that touches it.
+`saans-gateway --export-site DIR` writes the copy from the table the
+router walks, so the two cannot drift; that is also why every in-site URL
+is relative (`site.css`, not `/site.css`): Pages serves the project under
+`/areu_there/`. On the copy, `/demo` finds no gateway and says so, and
+`/app` is a page that says the dashboard is not there.
+[ADR-009](docs/adr/009-static-copy.md) has the reasoning.
 
 The dashboard answered `/` before the site existed. Old `/#system`-style
 links are forwarded to `/app`.
