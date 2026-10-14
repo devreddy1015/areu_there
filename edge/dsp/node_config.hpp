@@ -255,7 +255,9 @@ constexpr std::uint32_t arrival_peak(double arrival_rate_hz, float window_s) {
 /// exactly nominal. Measured peak occupancy at 20 Hz over 40,000 arrivals,
 /// against a nominal 202: +3 at +-10% inter-arrival jitter, +6 at +-20%
 /// (which is the golden recording's own shape), +18 at +-50%. At 25% the
-/// margin is 50 slots, 600 bytes a link, and covers all three with room.
+/// margin is 50 slots — 616 bytes a link on the S3, measured — and covers all
+/// three with room. `test_node_config.cpp` drives the +-20% case and requires
+/// zero evictions, so the figure is checked rather than argued.
 ///
 /// WHAT IT DOES NOT COVER: a radio delivering at a different rate from the one
 /// the DSP was configured for. That is not jitter, it is a misconfiguration —

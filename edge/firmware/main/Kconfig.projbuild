@@ -162,7 +162,7 @@ config SAANS_HEART_ENABLED
         breathing is not; see NOTES.md. Enabling it is a separate decision.
 
 config SAANS_RAW_MODE
-    bool "Also stream raw ADR-018 CSI (debug)"
+    bool "Also stream raw CSI (debug)"
     default n
     help
         Debug and data collection only. The raw_mode flag is set in every
