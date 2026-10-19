@@ -123,16 +123,21 @@ jobs:
       # ADR-002: Python is the spec. If regenerating the golden vectors
       # changes them, then either the Python DSP moved without the vectors
       # being regenerated, or the vectors were hand-edited. Both are the same
-      # bug -- the Rust and C++ ports are now being checked against something
-      # that is not the reference -- and both show up here as a dirty tree.
-      - name: regenerate
-        run: python3 spec/golden/generate.py
-
-      # --exit-code makes a non-empty diff a failure. --stat keeps the log
-      # readable; the next step prints the real diff only when it matters.
-      - name: check for drift
-        run: git diff --stat --exit-code -- spec/golden/
-
-      - name: show the drift
-        if: failure()
-        run: git diff -- spec/golden/
+      # bug: the Rust and C++ ports are now being checked against something
+      # that is not the reference.
+      #
+      # This was `git diff --exit-code` for exactly one push, and it failed
+      # on a clean checkout. Regenerating here produces three sim_geometric
+      # files byte-different from the committed ones, which were generated
+      # on a different distribution and CPython. What moved is everything
+      # downstream of math.sin and math.cos -- the platform's libm, which is
+      # not required to be correctly rounded. The Mersenne Twister files did
+      # not move, because that generator is reproducible by specification.
+      #
+      # Byte-equality was never ADR-002's contract; 1e-9 relative for Rust
+      # is. check_drift.py asks that question instead, at 1e-11, and prints
+      # the observed worst case every run so the margin stays visible. It
+      # restores the committed vectors before exiting, pass or fail, so a
+      # red job does not also leave a dirty checkout.
+      - name: regenerate and compare
+        run: python3 spec/golden/check_drift.py
