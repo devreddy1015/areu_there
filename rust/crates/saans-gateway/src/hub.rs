@@ -18,7 +18,7 @@ use crate::engine::{Engine, Ingested, TICK_S};
 use crate::privacy;
 use crate::shared::Shared;
 use crate::store::{self, EventLog};
-use crate::timefmt::{iso8601, now_unix_ms};
+use crate::timefmt::{iso8601, local_day, now_unix_ms};
 use saans_health::{LinkId, Severity};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -163,9 +163,25 @@ impl Hub {
                 dir.display()
             )),
         }
-        let (history, err) = store::load_history(&dir);
+        let (mut history, err) = store::load_history(&dir);
         if let Some(e) = err {
             self.notes.push(e);
+        }
+        // Before anything reads it: a file written by an older build, or
+        // by a gateway that was off for a year, can hold summaries past
+        // their retention. Dropping them here means they are never
+        // imported, never shown and never written back.
+        let today = local_day(
+            self.wall.unix_ms(self.t_start, self.t_start),
+            self.cfg.utc_offset_minutes,
+        );
+        let dropped = store::prune_history(&mut history, self.cfg.history_retention_days, today);
+        if dropped > 0 {
+            self.notes.push(format!(
+                "retention: dropped {dropped} day summar{} older than {} days from history.json",
+                if dropped == 1 { "y" } else { "ies" },
+                self.cfg.history_retention_days
+            ));
         }
         for (id, h) in history {
             match self.engine.space_index(&id) {
@@ -290,13 +306,22 @@ impl Hub {
 
     pub fn save_history(&mut self, t_s: f64) {
         self.history_saved_t = Some(t_s);
-        let history: BTreeMap<String, _> = self
+        let mut history: BTreeMap<String, _> = self
             .engine
             .spaces
             .iter()
             .map(|s| (s.config.id.clone(), s.monitor.export_history()))
             .collect();
-        let time = iso8601(self.wall.unix_ms(t_s, t_s), self.cfg.utc_offset_minutes);
+        // The monitor's own cap is `HISTORY_MAX_DAYS` entries, which
+        // bounds memory but not age. Age is enforced here, at the one
+        // place the data becomes a file that outlives the process.
+        let unix_ms = self.wall.unix_ms(t_s, t_s);
+        store::prune_history(
+            &mut history,
+            self.cfg.history_retention_days,
+            local_day(unix_ms, self.cfg.utc_offset_minutes),
+        );
+        let time = iso8601(unix_ms, self.cfg.utc_offset_minutes);
         if let Err(e) = store::save_history(&self.cfg.data_dir, &history, &time) {
             self.history_errors += 1;
             self.history_last_error = Some(e.to_string());
@@ -886,6 +911,89 @@ mod tests {
         p.sample("x_total", &[("a", "q\"b\\n")], 1.5);
         p.sample("x_total", &[], f64::INFINITY);
         assert_eq!(p.out, "# HELP x_total Help.\n# TYPE x_total counter\nx_total{a=\"q\\\"b\\\\n\"} 1.5\nx_total +Inf\n");
+    }
+
+    #[test]
+    fn a_gateway_drops_out_of_retention_history_on_load_and_does_not_write_it_back() {
+        // The wiring test. `store::prune_history` having correct
+        // arithmetic is worth nothing if nobody calls it, and the shape of
+        // this change -- a pure function plus two call sites -- is exactly
+        // the shape where that goes unnoticed.
+        use saans_health::detectors::DailySummary;
+        let dir = std::env::temp_dir().join(format!("saans-hub-ret-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let unix_ms = 1_760_000_000_000i64;
+        let offset = 330;
+        let today = crate::timefmt::local_day(unix_ms, offset);
+        let summary = |day: i64| DailySummary {
+            day,
+            resting_bpm_median: Some(14.0),
+            resting_samples: 10,
+            occupied_s: 60.0,
+            motion_bouts: 1,
+            pauses: 0,
+        };
+        // Two summaries inside 90 days, one well outside it.
+        let on_disk = BTreeMap::from([(
+            "lab".to_string(),
+            vec![
+                summary(today - 400),
+                summary(today - 10),
+                summary(today - 1),
+            ],
+        )]);
+        store::save_history(&dir, &on_disk, "seeded").unwrap();
+
+        let mut cfg = GatewayConfig {
+            data_dir: dir.clone(),
+            utc_offset_minutes: offset,
+            ..GatewayConfig::default()
+        };
+        cfg.spaces = vec![saans_health::SpaceConfig {
+            id: "lab".into(),
+            name: "Lab".into(),
+            ..Default::default()
+        }];
+        assert_eq!(cfg.history_retention_days, 90);
+
+        // t_start is the local epoch in seconds, as live.rs sets it, so
+        // the day index the hub computes matches the one in the file.
+        let t0 = local_epoch_s(unix_ms, offset);
+        let mut hub = Hub::new(
+            cfg,
+            None,
+            true,
+            Wall::Anchored {
+                t0,
+                unix_ms_at_t0: unix_ms,
+            },
+            t0,
+        );
+        assert!(
+            hub.notes
+                .iter()
+                .any(|n| n.contains("retention") && n.contains("history.json")),
+            "the drop must be reported, not silent; notes were {:?}",
+            hub.notes
+        );
+
+        // And it must not come back on the next write.
+        hub.save_history(t0);
+        let (after, err) = store::load_history(&dir);
+        assert!(err.is_none(), "{err:?}");
+        let days: Vec<i64> = after["lab"].iter().map(|s| s.day).collect();
+        assert!(
+            !days.contains(&(today - 400)),
+            "the 400-day-old summary was written back: {days:?}"
+        );
+        assert_eq!(
+            days.len(),
+            2,
+            "both in-retention summaries must survive: {days:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

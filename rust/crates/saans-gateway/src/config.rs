@@ -29,6 +29,18 @@ pub struct GatewayConfig {
     pub data_dir: PathBuf,
     /// Delete an event log once every event in it is older than this.
     pub event_retention_days: u32,
+    /// Drop a day's summary from `history.json` once it is older than
+    /// this. Aggregates are normally kept longer than the raw events they
+    /// came from -- `SAANS_PLAN.md` §8 says "events 30 days raw, then
+    /// 15-minute aggregates" -- but that is a preference and not enforced
+    /// here: refusing to start over it would take a monitoring system
+    /// down for a setting whose error points at keeping *less* data.
+    ///
+    /// `HISTORY_MAX_DAYS` in `saans-health` already caps the list at 90
+    /// entries, but that is a memory bound and counts entries, not days:
+    /// a gateway that runs one day a month keeps ninety summaries
+    /// spanning seven years. Retention is about age, so it lives here.
+    pub history_retention_days: u32,
     /// Offset of local time from UTC, in minutes (IST = 330). Sets the day
     /// boundary of the event logs and the offset printed in timestamps.
     pub utc_offset_minutes: i32,
@@ -206,6 +218,7 @@ impl Default for GatewayConfig {
             http_addr: "127.0.0.1:8080".into(),
             data_dir: PathBuf::from("saans-data"),
             event_retention_days: 30,
+            history_retention_days: 90,
             utc_offset_minutes: 0,
             raw: RawConfig::default(),
             spaces: Vec::new(),
@@ -277,6 +290,9 @@ impl GatewayConfig {
     pub fn validate(&self) -> Result<(), ConfigError> {
         if self.event_retention_days == 0 {
             return err("event_retention_days must be at least 1");
+        }
+        if self.history_retention_days == 0 {
+            return err("history_retention_days must be at least 1");
         }
         if !(-1440..=1440).contains(&self.utc_offset_minutes) {
             return err("utc_offset_minutes must be within +-1440");

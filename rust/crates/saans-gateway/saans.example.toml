@@ -15,6 +15,15 @@ http_addr = "127.0.0.1:8080"
 data_dir = "saans-data"
 # DPDP retention: an event log is deleted once all its events are older.
 event_retention_days = 30
+# history.json holds one summary per space per day -- occupied seconds,
+# motion bouts, pauses, and for consented spaces a resting breathing
+# median. Aggregates are normally kept longer than the raw events they
+# summarise, so this is usually >= event_retention_days -- but nothing
+# enforces that, because a gateway refusing to start over a setting that
+# keeps *less* data would be the worse failure. It bounds age;
+# saans-health caps the same list at 90 entries, which bounds memory and
+# is not the same thing.
+history_retention_days = 90
 # Local time offset from UTC in minutes (India: 330). Sets the day
 # boundary of event logs and daily summaries.
 utc_offset_minutes = 330

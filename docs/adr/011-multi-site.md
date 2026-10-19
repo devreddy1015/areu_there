@@ -18,17 +18,29 @@ window IS the retention policy and a restart is a delete". But
 `history.json` is a different file: one `DailySummary` per space per day,
 holding `resting_bpm_median`, `occupied_s`, `motion_bouts` and `pauses`
 (`saans-health/src/detectors.rs:234-243`), written atomically every ten
-minutes and on shutdown (`store.rs:211-231`, `hub.rs:32`), read back at
-startup, and kept even for spaces that have since been removed from the
-config (`hub.rs:173-175`). `resting_bpm_median` is derived from consented
-vitals. There is no retention key for any of it and `prune_logs` does not
-touch it.
+minutes and on shutdown (`store.rs:211-231`, `hub.rs:32`) and read back at
+startup. `resting_bpm_median` is derived from consented vitals.
 
-That is worth stating plainly in an ADR about not creating stores of
-health data: one already exists, on every gateway, with no deletion
-policy. It is small and it is per-space rather than per-person, but it is
-the same kind of object as the thing this ADR goes on to rule out, and it
-is not covered by ADR-010 either.
+An earlier draft of this ADR said that file had no retention policy at
+all. That was wrong, and the correction is worth keeping because the
+distinction it turns on is the useful part. `HISTORY_MAX_DAYS`
+(`detectors.rs:227`) has always capped the list at ninety *entries*. That
+is a memory bound, and it bounds age only for a gateway that runs every
+day: one that runs a day a month keeps ninety summaries spanning seven
+and a half years, every one of them inside the cap.
+
+Age is now bounded too, by `history_retention_days` (default 90), applied
+where the data becomes a file that outlives the process -- on load, so an
+old file is cleaned before anything reads it, and on save, so nothing
+still in memory is written back. A count cap and an age cap are different
+promises, and only the second is what a retention policy means.
+
+The point this paragraph was making survives the correction, in weaker
+form: a per-space store of health-derived aggregates exists on every
+gateway, it is the same kind of object this ADR goes on to rule out
+centralising, and it shipped in the same commit as everything else
+(`56ef547`) with a memory bound standing in for a retention decision that
+nobody had made.
 
 Someone running six buildings wants one page showing all six. That is a
 real need, not a vanity one: six sites is six logins, and the person who

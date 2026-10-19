@@ -71,6 +71,14 @@ access logs under the DPDP Act 2023, and this ADR does not claim one.]
 No figure here is a measurement; they are configuration constants read
 out of the files named above.
 
+## What this does not cover
+
+`history.json` is the third file in `data_dir` and is not an audit
+question, so it is decided separately: `history_retention_days`, default
+90, applied on load and on save (`store::prune_history`). ADR-011 records
+why the two were easy to confuse -- the daily summaries had a ninety
+*entry* memory cap that looked like a retention policy and is not one.
+
 ## Consequences
 - After a year, "who read rest-room-1 last March" has no answer. That is
   the cost, accepted deliberately: the alternative is a file that never
