@@ -1,0 +1,138 @@
+# Tests, lints and golden-vector drift.
+#
+# The repository had CodeQL and Pages but nothing that ran a test, so a pull
+# request could go green while the suite was red. These four jobs are the
+# commands README.md already tells a reader to run, so CI and a laptop agree
+# by construction rather than by someone remembering to keep them in step.
+#
+# The slow Python sweeps (`evaluate.py`) are deliberately NOT here. They take
+# minutes, they are a measurement rather than a check, and their output is a
+# table someone reads -- a red X would not tell you anything you could act on.
+# They stay a thing you run when you have changed the DSP.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push to the same branch makes the first one's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # A failed build should not also cost a minute of backtrace formatting.
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust:
+    name: rust (fmt, clippy, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml picks the channel and pulls in rustfmt and clippy.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      # Formatting first: it compiles nothing and fails in about three
+      # seconds, so a misformatted branch does not pay for a full build.
+      - name: cargo fmt --check
+        working-directory: rust
+        run: cargo fmt --check
+
+      - name: cargo clippy -D warnings
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # --locked so a dependency cannot be resolved differently here than it
+      # was on the machine that wrote Cargo.lock.
+      - name: cargo test
+        working-directory: rust
+        run: cargo test --workspace --locked
+
+  python:
+    name: python (reference implementation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          # No `cache: pip`: there is no requirements.txt or pyproject.toml to
+          # hash, and setup-python errors out when it cannot find one. The
+          # package is standard library only, by design (ADR-002), so there is
+          # nothing to install and nothing to cache.
+
+      # Run from the repository root: the suite imports the `wifisense`
+      # package from the working directory.
+      - name: unittest
+        run: python3 -m unittest discover -s tests
+
+  edge:
+    name: edge (C++ firmware DSP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Makefile's `check` target is already `all-compilers`, which loops
+      # over g++ and clang++ with a clean between them, so both compilers are
+      # covered by the one invocation. ubuntu-latest ships g++; clang is not
+      # guaranteed, so it is installed explicitly.
+      - name: install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: compiler versions
+        run: |
+          g++ --version
+          clang++ --version
+
+      # Measured at about 140 s locally, of which roughly 60 s is the
+      # benchmark driving a 3,267-frame recording.
+      - name: make check
+        run: make -C edge/dsp/test check
+
+  golden:
+    name: golden-vector drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ADR-002: Python is the spec. If regenerating the golden vectors
+      # changes them, then either the Python DSP moved without the vectors
+      # being regenerated, or the vectors were hand-edited. Both are the same
+      # bug -- the Rust and C++ ports are now being checked against something
+      # that is not the reference -- and both show up here as a dirty tree.
+      - name: regenerate
+        run: python3 spec/golden/generate.py
+
+      # --exit-code makes a non-empty diff a failure. --stat keeps the log
+      # readable; the next step prints the real diff only when it matters.
+      - name: check for drift
+        run: git diff --stat --exit-code -- spec/golden/
+
+      - name: show the drift
+        if: failure()
+        run: git diff -- spec/golden/

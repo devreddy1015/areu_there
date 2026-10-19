@@ -1,0 +1,9 @@
+# Revisions that changed formatting and nothing else. Tell git to skip
+# them when attributing a line:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub and GitLab both read this file by name without being asked.
+
+# rust: format the tree with rustfmt defaults
+13acc2da78d10164c097ec868be7bdbef8fb3894
