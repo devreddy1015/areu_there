@@ -20,9 +20,15 @@ impl BiquadBandpass {
     /// Panics on an invalid band, like the reference raises ValueError:
     /// a misconfigured filter is a programming error, not a runtime state.
     pub fn new(f_low: f64, f_high: f64, sample_rate_hz: f64) -> Self {
-        assert!(0.0 < f_low && f_low < f_high, "need 0 < f_low < f_high, got {f_low}, {f_high}");
+        assert!(
+            0.0 < f_low && f_low < f_high,
+            "need 0 < f_low < f_high, got {f_low}, {f_high}"
+        );
         let nyquist = sample_rate_hz / 2.0;
-        assert!(f_high < nyquist, "f_high ({f_high} Hz) must be below Nyquist ({nyquist} Hz)");
+        assert!(
+            f_high < nyquist,
+            "f_high ({f_high} Hz) must be below Nyquist ({nyquist} Hz)"
+        );
         let f0 = (f_low * f_high).sqrt();
         let q = f0 / (f_high - f_low);
         let w0 = 2.0 * PI * f0 / sample_rate_hz;

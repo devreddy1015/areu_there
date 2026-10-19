@@ -5,12 +5,18 @@
 //! `saans-gateway --export-site DIR` writes the public site as static files.
 
 use clap::{ArgGroup, Parser};
-use saans_gateway::{log, ClockMode, Gateway, GatewayConfig, ReplayOptions, SimGateway, SimulateOptions};
+use saans_gateway::{
+    log, ClockMode, Gateway, GatewayConfig, ReplayOptions, SimGateway, SimulateOptions,
+};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 #[derive(Debug, Parser)]
-#[command(name = "saans-gateway", version, about = "Saans gateway: camera-free WiFi health and safety sensing")]
+#[command(
+    name = "saans-gateway",
+    version,
+    about = "Saans gateway: camera-free WiFi health and safety sensing"
+)]
 // `--speed` paces whichever of the two offline sources is running, so it
 // requires one of them rather than naming just `--replay`.
 #[command(group(ArgGroup::new("source").args(["replay", "simulate"])))]
@@ -83,7 +89,11 @@ fn main() -> ExitCode {
         }
     };
     if args.check {
-        println!("{}: OK ({} spaces)", args.config.display(), cfg.spaces.len());
+        println!(
+            "{}: OK ({} spaces)",
+            args.config.display(),
+            cfg.spaces.len()
+        );
         return ExitCode::SUCCESS;
     }
     // Replay defaults to "as fast as possible" because its output is a
@@ -94,7 +104,11 @@ fn main() -> ExitCode {
         eprintln!("saans-gateway: --speed must be >= 0");
         return ExitCode::from(2);
     }
-    let rt = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() {
+    let rt = match tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt,
         Err(e) => {
             eprintln!("saans-gateway: cannot start runtime: {e}");
@@ -136,7 +150,9 @@ fn hash_password() -> ExitCode {
         eprintln!("saans-gateway: cannot encode salt");
         return ExitCode::FAILURE;
     };
-    match argon2::Argon2::default().hash_password(line.trim_end_matches(['\n', '\r']).as_bytes(), &salt) {
+    match argon2::Argon2::default()
+        .hash_password(line.trim_end_matches(['\n', '\r']).as_bytes(), &salt)
+    {
         Ok(h) => {
             println!("{h}");
             ExitCode::SUCCESS
@@ -189,8 +205,18 @@ async fn run_simulate(cfg: GatewayConfig, speed: f64) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-async fn run_replay(cfg: GatewayConfig, args: Args, speed: f64, pcap: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let opts = ReplayOptions { pcap, speed, events_out: args.events_out, port: args.port };
+async fn run_replay(
+    cfg: GatewayConfig,
+    args: Args,
+    speed: f64,
+    pcap: PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let opts = ReplayOptions {
+        pcap,
+        speed,
+        events_out: args.events_out,
+        port: args.port,
+    };
     if !args.serve {
         let summary = saans_gateway::replay(cfg, &opts, None).await?;
         print!("{summary}");
@@ -202,7 +228,10 @@ async fn run_replay(cfg: GatewayConfig, args: Args, speed: f64, pcap: PathBuf) -
     let listener = tokio::net::TcpListener::bind(http_addr)
         .await
         .map_err(|e| std::io::Error::new(e.kind(), format!("cannot bind HTTP {http_addr}: {e}")))?;
-    log(&format!("replay dashboard on http://{}/", listener.local_addr()?));
+    log(&format!(
+        "replay dashboard on http://{}/",
+        listener.local_addr()?
+    ));
     let (stop, stop_rx) = tokio::sync::watch::channel(false);
     // Replay serving shows the recording's state; alerts and MQTT stay off.
     let app = saans_gateway::http::router(saans_gateway::http::HttpDeps::new(
@@ -213,10 +242,11 @@ async fn run_replay(cfg: GatewayConfig, args: Args, speed: f64, pcap: PathBuf) -
     ));
     let mut http_stop = stop_rx;
     let server = tokio::spawn(async move {
-        let _ = axum::serve(listener, app).with_graceful_shutdown(async move {
-            let _ = http_stop.wait_for(|s| *s).await;
-        })
-        .await;
+        let _ = axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                let _ = http_stop.wait_for(|s| *s).await;
+            })
+            .await;
     });
     let summary = tokio::select! {
         r = saans_gateway::replay(cfg, &opts, Some(shared)) => Some(r?),

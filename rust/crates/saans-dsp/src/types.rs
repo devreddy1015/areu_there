@@ -36,7 +36,11 @@ pub struct VitalEstimate {
 
 impl VitalEstimate {
     pub fn unavailable() -> Self {
-        Self { value_bpm: 0.0, confidence: 0.0, status: VitalStatus::Unavailable }
+        Self {
+            value_bpm: 0.0,
+            confidence: 0.0,
+            status: VitalStatus::Unavailable,
+        }
     }
 
     /// Grade by spectral confidence: >= 0.70 valid, >= 0.40 degraded,
@@ -49,7 +53,11 @@ impl VitalEstimate {
         } else {
             VitalStatus::Unreliable
         };
-        Self { value_bpm: bpm, confidence, status }
+        Self {
+            value_bpm: bpm,
+            confidence,
+            status,
+        }
     }
 }
 
@@ -67,7 +75,14 @@ pub struct CsiFrame {
 impl CsiFrame {
     pub fn new(amplitudes: Vec<f64>, sample_index: u64, sample_rate_hz: f64) -> Self {
         let n = amplitudes.len();
-        Self { amplitudes, phases: vec![0.0; n], sample_index, sample_rate_hz, rssi_dbm: 0, node_id: 0 }
+        Self {
+            amplitudes,
+            phases: vec![0.0; n],
+            sample_index,
+            sample_rate_hz,
+            rssi_dbm: 0,
+            node_id: 0,
+        }
     }
 
     pub fn n_subcarriers(&self) -> usize {
@@ -76,10 +91,29 @@ impl CsiFrame {
 
     /// Build from ESP-IDF (imaginary, real) int pairs. Imaginary first:
     /// getting this backwards leaves amplitude right and mirrors phase.
-    pub fn from_iq(iq: &[(i8, i8)], sample_index: u64, sample_rate_hz: f64, rssi_dbm: i32, node_id: u8) -> Self {
-        let amplitudes = iq.iter().map(|&(im, re)| (im as f64).hypot(re as f64)).collect();
-        let phases = iq.iter().map(|&(im, re)| (im as f64).atan2(re as f64)).collect();
-        Self { amplitudes, phases, sample_index, sample_rate_hz, rssi_dbm, node_id }
+    pub fn from_iq(
+        iq: &[(i8, i8)],
+        sample_index: u64,
+        sample_rate_hz: f64,
+        rssi_dbm: i32,
+        node_id: u8,
+    ) -> Self {
+        let amplitudes = iq
+            .iter()
+            .map(|&(im, re)| (im as f64).hypot(re as f64))
+            .collect();
+        let phases = iq
+            .iter()
+            .map(|&(im, re)| (im as f64).atan2(re as f64))
+            .collect();
+        Self {
+            amplitudes,
+            phases,
+            sample_index,
+            sample_rate_hz,
+            rssi_dbm,
+            node_id,
+        }
     }
 }
 

@@ -82,14 +82,23 @@ pub enum Activity {
     /// Walk from wherever the person is to `to`, then stand still.
     WalkTo { to: Point, speed_mps: f64 },
     /// Still, breathing at `bpm` (linearly drifting to `bpm_end` if given).
-    Seated { at: Point, bpm: f64, bpm_end: Option<f64> },
+    Seated {
+        at: Point,
+        bpm: f64,
+        bpm_end: Option<f64>,
+    },
     /// Still, breathing stopped (chest motion ramps to zero over ~1 s,
     /// and back over ~1 s after the segment ends). The heart keeps beating.
     BreathingPause { at: Point },
     /// Seated and breathing, plus limb-motion bursts of `burst_s` every
     /// `every_s` seconds on average (Poisson starts; a burst never
     /// straddles the segment end).
-    Fidget { at: Point, bpm: f64, every_s: f64, burst_s: f64 },
+    Fidget {
+        at: Point,
+        bpm: f64,
+        every_s: f64,
+        burst_s: f64,
+    },
     /// A fast fall: the body moves from its current position to `to` in
     /// 0.8 s (arm flailing), then lies still breathing at `bpm` for the
     /// rest of the segment's `duration_s`.
@@ -145,7 +154,12 @@ pub struct SimOptions {
 
 impl Default for SimOptions {
     fn default() -> Self {
-        Self { carrier_hz: 2.437e9, subcarrier_spacing_hz: 312_500.0, jitter_s: 0.002, arm_rcs_m2: 0.05 }
+        Self {
+            carrier_hz: 2.437e9,
+            subcarrier_spacing_hz: 312_500.0,
+            jitter_s: 0.002,
+            arm_rcs_m2: 0.05,
+        }
     }
 }
 

@@ -46,9 +46,13 @@ pub enum RawError {
 impl fmt::Display for RawError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RawError::Short(n) => write!(f, "short frame: {n} bytes, need at least {CSI_HEADER_SIZE}"),
+            RawError::Short(n) => {
+                write!(f, "short frame: {n} bytes, need at least {CSI_HEADER_SIZE}")
+            }
             RawError::Magic(m) => write!(f, "bad magic 0x{m:08X}, expected 0x{CSI_MAGIC:08X}"),
-            RawError::Truncated { have, need } => write!(f, "truncated payload: {have} bytes, expected {need}"),
+            RawError::Truncated { have, need } => {
+                write!(f, "truncated payload: {have} bytes, expected {need}")
+            }
         }
     }
 }
@@ -69,7 +73,10 @@ pub fn parse(data: &[u8]) -> Result<Esp32Frame, RawError> {
     let payload = &data[CSI_HEADER_SIZE..];
     let need = n_subcarriers as usize * n_antennas as usize * 2;
     if payload.len() < need {
-        return Err(RawError::Truncated { have: payload.len(), need });
+        return Err(RawError::Truncated {
+            have: payload.len(),
+            need,
+        });
     }
     // Imaginary first: swapping these keeps amplitude right and mirrors
     // every phase, which survives amplitude-only testing.
@@ -95,7 +102,13 @@ pub fn parse(data: &[u8]) -> Result<Esp32Frame, RawError> {
 }
 
 /// Encode a datagram (single antenna), as `build_esp32_frame` does.
-pub fn build(iq: &[(i8, i8)], node_id: u8, sequence: u32, rssi_dbm: i8, noise_floor_dbm: i8) -> Vec<u8> {
+pub fn build(
+    iq: &[(i8, i8)],
+    node_id: u8,
+    sequence: u32,
+    rssi_dbm: i8,
+    noise_floor_dbm: i8,
+) -> Vec<u8> {
     let mut b = Vec::with_capacity(CSI_HEADER_SIZE + 2 * iq.len());
     b.extend_from_slice(&CSI_MAGIC.to_le_bytes());
     b.push(node_id);
@@ -127,7 +140,10 @@ mod tests {
         assert_eq!(d[20], 3, "imaginary byte comes first");
         let f = parse(&d).unwrap();
         assert_eq!(f.iq, iq);
-        assert_eq!((f.node_id, f.sequence, f.rssi_dbm, f.noise_floor_dbm), (7, 0xDEAD_BEEF, -45, -92));
+        assert_eq!(
+            (f.node_id, f.sequence, f.rssi_dbm, f.noise_floor_dbm),
+            (7, 0xDEAD_BEEF, -45, -92)
+        );
         assert_eq!(f.n_subcarriers, 3);
     }
 
@@ -136,7 +152,10 @@ mod tests {
         assert_eq!(parse(&[0u8; 5]), Err(RawError::Short(5)));
         let mut d = build(&[(1, 1); 4], 1, 0, 0, 0);
         d.truncate(25);
-        assert!(matches!(parse(&d), Err(RawError::Truncated { have: 5, need: 8 })));
+        assert!(matches!(
+            parse(&d),
+            Err(RawError::Truncated { have: 5, need: 8 })
+        ));
         d[0] = 0;
         assert!(matches!(parse(&d), Err(RawError::Magic(_))));
     }

@@ -60,14 +60,38 @@ pub struct Page {
 /// adding a line here and a file beside the others — there is no second
 /// place to register it and therefore no second place to forget.
 pub const PAGES: &[Page] = &[
-    Page { path: "/", html: include_str!("../assets/site/index.html") },
-    Page { path: "/how-it-works", html: include_str!("../assets/site/how-it-works.html") },
-    Page { path: "/demo", html: include_str!("../assets/site/demo.html") },
-    Page { path: "/room-sim", html: include_str!("../assets/site/room-sim.html") },
-    Page { path: "/evidence", html: include_str!("../assets/site/evidence.html") },
-    Page { path: "/privacy", html: include_str!("../assets/site/privacy.html") },
-    Page { path: "/hardware", html: include_str!("../assets/site/hardware.html") },
-    Page { path: "/start", html: include_str!("../assets/site/start.html") },
+    Page {
+        path: "/",
+        html: include_str!("../assets/site/index.html"),
+    },
+    Page {
+        path: "/how-it-works",
+        html: include_str!("../assets/site/how-it-works.html"),
+    },
+    Page {
+        path: "/demo",
+        html: include_str!("../assets/site/demo.html"),
+    },
+    Page {
+        path: "/room-sim",
+        html: include_str!("../assets/site/room-sim.html"),
+    },
+    Page {
+        path: "/evidence",
+        html: include_str!("../assets/site/evidence.html"),
+    },
+    Page {
+        path: "/privacy",
+        html: include_str!("../assets/site/privacy.html"),
+    },
+    Page {
+        path: "/hardware",
+        html: include_str!("../assets/site/hardware.html"),
+    },
+    Page {
+        path: "/start",
+        html: include_str!("../assets/site/start.html"),
+    },
 ];
 
 /// Pages that exist only in the static copy, standing where the gateway
@@ -77,7 +101,10 @@ pub const PAGES: &[Page] = &[
 /// A file host has no dashboard and no sign-in, and the pages link to
 /// `app` from every footer. Without this a reader would follow that link
 /// to the host's own 404, which says nothing about why.
-pub const STATIC_ONLY: &[Page] = &[Page { path: "/app", html: include_str!("../assets/site/static/app.html") }];
+pub const STATIC_ONLY: &[Page] = &[Page {
+    path: "/app",
+    html: include_str!("../assets/site/static/app.html"),
+}];
 
 /// A file the pages reference. Text and binary both, because the fonts
 /// are the reason `font-src` exists in [`SITE_CSP`] at all.
@@ -238,22 +265,37 @@ pub const ASSETS: &[Asset] = &[
 /// same number of lines with one more place to pass the wrong one.
 fn harden(mut r: Response, csp: &'static str, cache: &'static str) -> Response {
     let h = r.headers_mut();
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp));
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(csp),
+    );
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
     r
 }
 
 pub fn page_response(html: &'static str) -> Response {
     let mut r = html.into_response();
-    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
+    r.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
     harden(r, SITE_CSP, "no-cache")
 }
 
 pub fn asset_response(a: &'static Asset) -> Response {
     let mut r = a.bytes.into_response();
-    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(a.content_type));
+    r.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static(a.content_type),
+    );
     harden(r, SITE_CSP, a.cache)
 }
 
@@ -288,8 +330,13 @@ pub fn export(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
         ));
     }
     let mut written = Vec::new();
-    let pages = PAGES.iter().chain(STATIC_ONLY).map(|p| (export_name(p.path), p.html.as_bytes()));
-    let assets = ASSETS.iter().map(|a| (a.path.trim_start_matches('/').to_string(), a.bytes));
+    let pages = PAGES
+        .iter()
+        .chain(STATIC_ONLY)
+        .map(|p| (export_name(p.path), p.html.as_bytes()));
+    let assets = ASSETS
+        .iter()
+        .map(|a| (a.path.trim_start_matches('/').to_string(), a.bytes));
     for (name, bytes) in pages.chain(assets) {
         let file = dir.join(name);
         if let Some(parent) = file.parent() {
@@ -318,11 +365,21 @@ mod tests {
     /// wrong thing.
     #[test]
     fn pages_fetch_nothing_remote() {
-        const SUBRESOURCE: [&str; 6] =
-            ["src=\"http", "src=\"//", "@import", "url(http", "url(\"http", "url('http"];
+        const SUBRESOURCE: [&str; 6] = [
+            "src=\"http",
+            "src=\"//",
+            "@import",
+            "url(http",
+            "url(\"http",
+            "url('http",
+        ];
         for p in PAGES.iter().chain(STATIC_ONLY) {
             for bad in SUBRESOURCE {
-                assert!(!p.html.contains(bad), "{}: remote subresource {bad:?}", p.path);
+                assert!(
+                    !p.html.contains(bad),
+                    "{}: remote subresource {bad:?}",
+                    p.path
+                );
             }
             // A page can fetch too: /room-sim carries an inline script,
             // and ASSETS never sees it. Same normalised patterns as the
@@ -330,7 +387,11 @@ mod tests {
             // slip through the gap between the two tests.
             let flat = normalise(p.html);
             for bad in FETCHES {
-                assert!(!flat.contains(bad), "{}: fetches from elsewhere, {bad:?}", p.path);
+                assert!(
+                    !flat.contains(bad),
+                    "{}: fetches from elsewhere, {bad:?}",
+                    p.path
+                );
             }
             // `<link rel=stylesheet href=...>` is a subresource even
             // though it spells its address `href`. Check every <link>
@@ -381,8 +442,17 @@ mod tests {
     /// vendored files are where the bare-URL backstop is switched off.
     /// [`normalise`] removes the spacing and collapses the three quote
     /// characters, so each form below needs exactly one spelling.
-    const FETCHES: [&str; 9] =
-        ["from\"http", "import(\"http", "fetch(\"http", "newurl(\"http", "src=\"http", "src=\"//", "@import", "url(\"http", "//cdn"];
+    const FETCHES: [&str; 9] = [
+        "from\"http",
+        "import(\"http",
+        "fetch(\"http",
+        "newurl(\"http",
+        "src=\"http",
+        "src=\"//",
+        "@import",
+        "url(\"http",
+        "//cdn",
+    ];
 
     /// Lower-cases, drops whitespace, and turns `'` and a backtick into
     /// `"`, so one pattern matches every way a fetch can be written.
@@ -403,13 +473,19 @@ mod tests {
         for a in ASSETS {
             // JSON counts: the scene files are fetched at runtime by the
             // Room Sim page, so they can carry a URL like anything else.
-            if !a.content_type.starts_with("text/") && !a.content_type.starts_with("application/json") {
+            if !a.content_type.starts_with("text/")
+                && !a.content_type.starts_with("application/json")
+            {
                 continue;
             }
             let s = std::str::from_utf8(a.bytes).expect("text asset is utf-8");
             let flat = normalise(s);
             for bad in FETCHES {
-                assert!(!flat.contains(bad), "{}: fetches from elsewhere, {bad:?}", a.path);
+                assert!(
+                    !flat.contains(bad),
+                    "{}: fetches from elsewhere, {bad:?}",
+                    a.path
+                );
             }
             let ours_and_executable = !a.vendored
                 && (a.content_type.starts_with("text/css")
@@ -432,14 +508,28 @@ mod tests {
     #[test]
     fn vendored_assets_are_served() {
         let vendored: Vec<&'static Asset> = ASSETS.iter().filter(|a| a.vendored).collect();
-        assert!(!vendored.is_empty(), "nothing is vendored: the bare-URL allowance has no subject");
+        assert!(
+            !vendored.is_empty(),
+            "nothing is vendored: the bare-URL allowance has no subject"
+        );
         for a in vendored {
-            assert!(a.path.starts_with("/vendor/"), "{}: vendored but not under /vendor/", a.path);
+            assert!(
+                a.path.starts_with("/vendor/"),
+                "{}: vendored but not under /vendor/",
+                a.path
+            );
             assert!(!a.bytes.is_empty(), "{}: vendored and empty", a.path);
             let r = asset_response(a);
-            assert_eq!(r.status(), axum::http::StatusCode::OK, "{}: not served", a.path);
             assert_eq!(
-                r.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()),
+                r.status(),
+                axum::http::StatusCode::OK,
+                "{}: not served",
+                a.path
+            );
+            assert_eq!(
+                r.headers()
+                    .get(header::CONTENT_TYPE)
+                    .and_then(|v| v.to_str().ok()),
                 Some(a.content_type),
                 "{}: served as something else",
                 a.path
@@ -460,10 +550,20 @@ mod tests {
     /// page fails with nothing in the log but a missing file.
     #[test]
     fn vendored_relative_imports_resolve() {
-        for a in ASSETS.iter().filter(|a| a.vendored && a.content_type.starts_with("text/javascript")) {
+        for a in ASSETS
+            .iter()
+            .filter(|a| a.vendored && a.content_type.starts_with("text/javascript"))
+        {
             let s = std::str::from_utf8(a.bytes).expect("text asset is utf-8");
             let dir = &a.path[..=a.path.rfind('/').expect("asset paths are absolute")];
-            for pat in ["from\"", "from '", "from \"", "from'", "import(\"", "import('"] {
+            for pat in [
+                "from\"",
+                "from '",
+                "from \"",
+                "from'",
+                "import(\"",
+                "import('",
+            ] {
                 let quote = pat.chars().last().expect("pattern ends in a quote");
                 for (i, _) in s.match_indices(pat) {
                     let rest = &s[i + pat.len()..];
@@ -506,7 +606,11 @@ mod tests {
                 let v = v.split(['#', '?']).next().unwrap_or("");
                 // An absolute one is reported by the relative-URL test;
                 // passed through here, it still names the right file.
-                out.push(if v.starts_with('/') { v.to_string() } else { format!("/{}", v.trim_start_matches("./")) });
+                out.push(if v.starts_with('/') {
+                    v.to_string()
+                } else {
+                    format!("/{}", v.trim_start_matches("./"))
+                });
             }
         }
         out
@@ -565,14 +669,18 @@ mod tests {
     #[test]
     fn the_site_names_no_absolute_paths() {
         fn quoted_root_path(s: &str) -> Option<usize> {
-            s.as_bytes()
-                .windows(3)
-                .position(|w| (w[0] == b'"' || w[0] == b'\'') && w[1] == b'/' && w[2].is_ascii_alphabetic())
+            s.as_bytes().windows(3).position(|w| {
+                (w[0] == b'"' || w[0] == b'\'') && w[1] == b'/' && w[2].is_ascii_alphabetic()
+            })
         }
         let line = |s: &str, at: usize| s[..at].lines().count();
         for p in PAGES.iter().chain(STATIC_ONLY) {
             for bad in ["href=\"/", "src=\"/"] {
-                assert!(!p.html.contains(bad), "{}: absolute in-site URL {bad:?}", p.path);
+                assert!(
+                    !p.html.contains(bad),
+                    "{}: absolute in-site URL {bad:?}",
+                    p.path
+                );
             }
             if let Some(at) = quoted_root_path(p.html) {
                 panic!("{}:{}: absolute in-site path", p.path, line(p.html, at));
@@ -580,11 +688,20 @@ mod tests {
         }
         for a in ASSETS.iter().filter(|a| !a.vendored) {
             let s = match std::str::from_utf8(a.bytes) {
-                Ok(s) if a.content_type.starts_with("text/css") || a.content_type.starts_with("text/javascript") => s,
+                Ok(s)
+                    if a.content_type.starts_with("text/css")
+                        || a.content_type.starts_with("text/javascript") =>
+                {
+                    s
+                }
                 _ => continue,
             };
             let flat = normalise(s);
-            assert!(!flat.contains("url(\"/") && !flat.contains("url(/"), "{}: absolute url()", a.path);
+            assert!(
+                !flat.contains("url(\"/") && !flat.contains("url(/"),
+                "{}: absolute url()",
+                a.path
+            );
             if let Some(at) = quoted_root_path(s) {
                 panic!("{}:{}: absolute in-site path", a.path, line(s, at));
             }
@@ -598,7 +715,11 @@ mod tests {
     #[test]
     fn routes_are_one_segment_deep() {
         for p in PAGES.iter().chain(STATIC_ONLY) {
-            assert!(p.path.starts_with('/') && !p.path[1..].contains('/'), "{}: nested route", p.path);
+            assert!(
+                p.path.starts_with('/') && !p.path[1..].contains('/'),
+                "{}: nested route",
+                p.path
+            );
         }
     }
 
@@ -612,22 +733,47 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let written = export(&dir).expect("export");
         let unique: std::collections::HashSet<_> = written.iter().collect();
-        assert_eq!(unique.len(), PAGES.len() + STATIC_ONLY.len() + ASSETS.len(), "two entries share a file");
+        assert_eq!(
+            unique.len(),
+            PAGES.len() + STATIC_ONLY.len() + ASSETS.len(),
+            "two entries share a file"
+        );
 
         for p in PAGES.iter().chain(STATIC_ONLY) {
             let file = dir.join(export_name(p.path));
-            assert_eq!(std::fs::read_to_string(&file).expect("page written"), p.html, "{}", p.path);
+            assert_eq!(
+                std::fs::read_to_string(&file).expect("page written"),
+                p.html,
+                "{}",
+                p.path
+            );
             for target in in_site_refs(p.html) {
-                let name = if target.contains('.') { target[1..].to_string() } else { export_name(&target) };
-                assert!(dir.join(&name).is_file(), "{} links to {target}, and the copy has no {name}", p.path);
+                let name = if target.contains('.') {
+                    target[1..].to_string()
+                } else {
+                    export_name(&target)
+                };
+                assert!(
+                    dir.join(&name).is_file(),
+                    "{} links to {target}, and the copy has no {name}",
+                    p.path
+                );
             }
         }
         for a in ASSETS {
-            assert_eq!(std::fs::read(dir.join(&a.path[1..])).expect("asset written"), a.bytes, "{}", a.path);
+            assert_eq!(
+                std::fs::read(dir.join(&a.path[1..])).expect("asset written"),
+                a.bytes,
+                "{}",
+                a.path
+            );
         }
 
         // Never into a directory that already holds something.
-        assert_eq!(export(&dir).expect_err("second export").kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(
+            export(&dir).expect_err("second export").kind(),
+            std::io::ErrorKind::AlreadyExists
+        );
         std::fs::remove_dir_all(&dir).expect("clean up");
     }
 
@@ -643,7 +789,11 @@ mod tests {
                 "{}: no visible word about where its numbers come from",
                 p.path
             );
-            assert!(p.html.contains("Not a medical device"), "{}: missing the medical-device line", p.path);
+            assert!(
+                p.html.contains("Not a medical device"),
+                "{}: missing the medical-device line",
+                p.path
+            );
         }
     }
 
@@ -652,8 +802,16 @@ mod tests {
     #[test]
     fn every_page_identifies_itself() {
         for p in PAGES.iter().chain(STATIC_ONLY) {
-            assert!(p.html.contains("<body data-page=\""), "{}: no data-page on <body>", p.path);
-            assert!(p.html.contains("<main id=\"main\">"), "{}: no <main id=main> for the skip link", p.path);
+            assert!(
+                p.html.contains("<body data-page=\""),
+                "{}: no data-page on <body>",
+                p.path
+            );
+            assert!(
+                p.html.contains("<main id=\"main\">"),
+                "{}: no <main id=main> for the skip link",
+                p.path
+            );
         }
     }
 }

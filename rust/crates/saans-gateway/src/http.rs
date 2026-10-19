@@ -60,7 +60,8 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, watch};
 
 pub const DASHBOARD_HTML: &str = include_str!("../assets/dashboard.html");
-const CSP: &str = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; \
+const CSP: &str =
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; \
                    connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 /// Everything the HTTP side needs. Built by `live.rs` / `main.rs` via
@@ -89,7 +90,15 @@ impl HttpDeps {
         let auth = Arc::new(Auth::new(&cfg));
         let dir = (!cfg.data_dir.as_os_str().is_empty()).then(|| cfg.data_dir.clone());
         let audit = Arc::new(AuditLog::new(dir.as_deref(), cfg.utc_offset_minutes));
-        Self { shared, stop, cfg, alerts, auth, audit, sim: None }
+        Self {
+            shared,
+            stop,
+            cfg,
+            alerts,
+            auth,
+            audit,
+            sim: None,
+        }
     }
 
     /// For tests and the replay server, which want no audit file.
@@ -118,7 +127,15 @@ pub struct AppState {
 }
 
 pub fn router(deps: HttpDeps) -> Router {
-    let HttpDeps { shared, stop, cfg, alerts, auth, audit, sim } = deps;
+    let HttpDeps {
+        shared,
+        stop,
+        cfg,
+        alerts,
+        auth,
+        audit,
+        sim,
+    } = deps;
     let mut r = Router::new()
         .route("/app", get(dashboard))
         .route("/api/me", get(me))
@@ -146,13 +163,27 @@ pub fn router(deps: HttpDeps) -> Router {
     // than listed again here, so a page cannot exist as a file and be
     // unreachable, or be routed and not exist.
     for p in crate::site::PAGES {
-        r = r.route(p.path, get(move || async move { crate::site::page_response(p.html) }));
+        r = r.route(
+            p.path,
+            get(move || async move { crate::site::page_response(p.html) }),
+        );
     }
     for a in crate::site::ASSETS {
-        r = r.route(a.path, get(move || async move { crate::site::asset_response(a) }));
+        r = r.route(
+            a.path,
+            get(move || async move { crate::site::asset_response(a) }),
+        );
     }
     r.fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
-        .with_state(AppState { shared, stop, cfg, alerts, auth, audit, sim })
+        .with_state(AppState {
+            shared,
+            stop,
+            cfg,
+            alerts,
+            auth,
+            audit,
+            sim,
+        })
 }
 
 fn error(status: StatusCode, msg: &str) -> Response {
@@ -160,14 +191,18 @@ fn error(status: StatusCode, msg: &str) -> Response {
 }
 
 fn no_store(mut r: Response) -> Response {
-    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
 
 /// 401 with the challenge, so a machine client knows what to present.
 fn unauthorized() -> Response {
     let mut r = error(StatusCode::UNAUTHORIZED, "authentication required");
-    r.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer realm=\"saans\""));
+    r.headers_mut().insert(
+        header::WWW_AUTHENTICATE,
+        HeaderValue::from_static("Bearer realm=\"saans\""),
+    );
     r
 }
 
@@ -180,7 +215,8 @@ fn header_str(h: &HeaderMap, name: header::HeaderName) -> Option<&str> {
 /// the reverse proxy's word for it; without the header the cookie would
 /// be dropped by the browser on a plain-HTTP LAN deployment.
 fn is_https(h: &HeaderMap) -> bool {
-    header_str(h, header::HeaderName::from_static("x-forwarded-proto")).is_some_and(|v| v.eq_ignore_ascii_case("https"))
+    header_str(h, header::HeaderName::from_static("x-forwarded-proto"))
+        .is_some_and(|v| v.eq_ignore_ascii_case("https"))
 }
 
 /// The principal for a request, or a 401. Denials are audited: a stream
@@ -193,7 +229,13 @@ fn principal(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Res
             Denied::Missing => "no credential",
             Denied::Invalid => "credential rejected",
         };
-        app.audit.record(now_unix_ms(), Action::Denied, "-", None, json!({ "path": path, "why": why }));
+        app.audit.record(
+            now_unix_ms(),
+            Action::Denied,
+            "-",
+            None,
+            json!({ "path": path, "why": why }),
+        );
         unauthorized()
     })
 }
@@ -202,7 +244,10 @@ fn principal(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Res
 fn system_only(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Response> {
     let p = principal(app, h, path)?;
     if !p.can_see_system() {
-        return Err(error(StatusCode::FORBIDDEN, "this endpoint needs the admin or ops role"));
+        return Err(error(
+            StatusCode::FORBIDDEN,
+            "this endpoint needs the admin or ops role",
+        ));
     }
     Ok(p)
 }
@@ -210,10 +255,22 @@ fn system_only(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, R
 async fn dashboard() -> Response {
     let mut r = DASHBOARD_HTML.into_response();
     let h = r.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(CSP),
+    );
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
     no_store(r)
 }
 
@@ -222,7 +279,10 @@ async fn dashboard() -> Response {
 /// Answers for anonymous callers too — otherwise the login form could
 /// never find out that it is needed.
 async fn me(State(app): State<AppState>, h: HeaderMap) -> Response {
-    let who = app.auth.principal(header_str(&h, header::AUTHORIZATION), header_str(&h, header::COOKIE));
+    let who = app.auth.principal(
+        header_str(&h, header::AUTHORIZATION),
+        header_str(&h, header::COOKIE),
+    );
     let base = json!({
         "auth_required": app.auth.required(),
         "version": env!("CARGO_PKG_VERSION"),
@@ -283,10 +343,16 @@ impl Drop for LoginSlot {
 
 async fn login(State(app): State<AppState>, h: HeaderMap, Json(body): Json<LoginBody>) -> Response {
     if !app.auth.required() {
-        return error(StatusCode::BAD_REQUEST, "this gateway does not use authentication (loopback http_addr)");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "this gateway does not use authentication (loopback http_addr)",
+        );
     }
     let Some(slot) = LoginSlot::take() else {
-        return error(StatusCode::TOO_MANY_REQUESTS, "too many sign-ins at once; try again in a moment");
+        return error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "too many sign-ins at once; try again in a moment",
+        );
     };
     // Argon2 verification and the fixed failure delay are both blocking,
     // and this runtime has two worker threads. Running them inline would
@@ -302,18 +368,38 @@ async fn login(State(app): State<AppState>, h: HeaderMap, Json(body): Json<Login
     .await;
     let attempt = match attempt {
         Ok(r) => r,
-        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "sign-in could not be completed"),
+        Err(_) => {
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "sign-in could not be completed",
+            )
+        }
     };
     let Some((id, p)) = attempt else {
-        app.audit.record(now_unix_ms(), Action::LoginFailed, &body.user, None, json!({}));
+        app.audit.record(
+            now_unix_ms(),
+            Action::LoginFailed,
+            &body.user,
+            None,
+            json!({}),
+        );
         // Deliberately the same answer for a wrong password and an
         // unknown user.
         return error(StatusCode::UNAUTHORIZED, "wrong user or password");
     };
-    app.audit.record(now_unix_ms(), Action::Login, &p.name, Some(p.role.as_str()), json!({}));
+    app.audit.record(
+        now_unix_ms(),
+        Action::Login,
+        &p.name,
+        Some(p.role.as_str()),
+        json!({}),
+    );
     let max_age = (app.cfg.auth.session_hours * 3600.0) as u64;
     let cookie = auth::session_cookie(&id, max_age, is_https(&h));
-    let mut r = Json(json!({ "name": p.name, "role": p.role.as_str(), "can": { "system": p.can_see_system() } })).into_response();
+    let mut r = Json(
+        json!({ "name": p.name, "role": p.role.as_str(), "can": { "system": p.can_see_system() } }),
+    )
+    .into_response();
     if let Ok(v) = HeaderValue::from_str(&cookie) {
         r.headers_mut().insert(header::SET_COOKIE, v);
     }
@@ -321,10 +407,19 @@ async fn login(State(app): State<AppState>, h: HeaderMap, Json(body): Json<Login
 }
 
 async fn logout(State(app): State<AppState>, h: HeaderMap) -> Response {
-    let who = app.auth.principal(header_str(&h, header::AUTHORIZATION), header_str(&h, header::COOKIE));
+    let who = app.auth.principal(
+        header_str(&h, header::AUTHORIZATION),
+        header_str(&h, header::COOKIE),
+    );
     app.auth.logout(header_str(&h, header::COOKIE));
     if let Ok(p) = who {
-        app.audit.record(now_unix_ms(), Action::Logout, &p.name, Some(p.role.as_str()), json!({}));
+        app.audit.record(
+            now_unix_ms(),
+            Action::Logout,
+            &p.name,
+            Some(p.role.as_str()),
+            json!({}),
+        );
     }
     let mut r = Json(json!({ "ok": true })).into_response();
     if let Ok(v) = HeaderValue::from_str(&auth::clear_cookie(is_https(&h))) {
@@ -353,7 +448,10 @@ async fn spaces(State(app): State<AppState>, h: HeaderMap) -> Response {
     };
     let list: Vec<Value> = {
         let pub_ = app.shared.read();
-        pub_.spaces.iter().filter_map(|(_, v)| privacy::space_for(v, &p)).collect()
+        pub_.spaces
+            .iter()
+            .filter_map(|(_, v)| privacy::space_for(v, &p))
+            .collect()
     };
     for v in &list {
         note_vitals(&app, &p, v);
@@ -368,7 +466,10 @@ async fn space(State(app): State<AppState>, h: HeaderMap, Path(id): Path<String>
     };
     let state = {
         let pub_ = app.shared.read();
-        pub_.spaces.iter().find(|(sid, _)| *sid == id).and_then(|(_, v)| privacy::space_for(v, &p))
+        pub_.spaces
+            .iter()
+            .find(|(sid, _)| *sid == id)
+            .and_then(|(_, v)| privacy::space_for(v, &p))
     };
     // A space out of scope is indistinguishable from one that does not
     // exist: the scope list is not a directory of the building.
@@ -376,8 +477,12 @@ async fn space(State(app): State<AppState>, h: HeaderMap, Path(id): Path<String>
         return error(StatusCode::NOT_FOUND, "no such space");
     };
     note_vitals(&app, &p, &state);
-    let events: Vec<Value> =
-        app.shared.query_events(Some(&id), None, 50).iter().filter_map(|e| privacy::event_for(e, &p)).collect();
+    let events: Vec<Value> = app
+        .shared
+        .query_events(Some(&id), None, 50)
+        .iter()
+        .filter_map(|e| privacy::event_for(e, &p))
+        .collect();
     no_store(Json(json!({ "state": state, "events": events })).into_response())
 }
 
@@ -398,7 +503,11 @@ pub fn parse_since(s: &str) -> Option<i64> {
     parse_iso8601(s)
 }
 
-async fn events(State(app): State<AppState>, h: HeaderMap, Query(q): Query<EventsQuery>) -> Response {
+async fn events(
+    State(app): State<AppState>,
+    h: HeaderMap,
+    Query(q): Query<EventsQuery>,
+) -> Response {
     let p = match principal(&app, &h, "/api/events") {
         Ok(p) => p,
         Err(r) => return r,
@@ -407,15 +516,24 @@ async fn events(State(app): State<AppState>, h: HeaderMap, Query(q): Query<Event
         None => None,
         Some(s) => match parse_since(s) {
             Some(ms) => Some(ms),
-            None => return error(StatusCode::BAD_REQUEST, "since must be Unix seconds or ISO 8601 (2026-10-13T08:00:00+05:30)"),
+            None => {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "since must be Unix seconds or ISO 8601 (2026-10-13T08:00:00+05:30)",
+                )
+            }
         },
     };
     let limit = q.limit.unwrap_or(100).clamp(1, 1000);
     let space = q.space.as_deref().filter(|s| !s.is_empty());
     // Filter after the ring query, so `limit` is a limit on what the
     // caller receives rather than on what they were eligible for.
-    let found: Vec<Value> =
-        app.shared.query_events(space, since, limit).iter().filter_map(|e| privacy::event_for(e, &p)).collect();
+    let found: Vec<Value> = app
+        .shared
+        .query_events(space, since, limit)
+        .iter()
+        .filter_map(|e| privacy::event_for(e, &p))
+        .collect();
     no_store(Json(found).into_response())
 }
 
@@ -428,7 +546,11 @@ pub struct HistoryQuery {
     pub max_points: Option<usize>,
 }
 
-async fn history(State(app): State<AppState>, h: HeaderMap, Query(q): Query<HistoryQuery>) -> Response {
+async fn history(
+    State(app): State<AppState>,
+    h: HeaderMap,
+    Query(q): Query<HistoryQuery>,
+) -> Response {
     let p = match principal(&app, &h, "/api/history") {
         Ok(p) => p,
         Err(r) => return r,
@@ -437,21 +559,26 @@ async fn history(State(app): State<AppState>, h: HeaderMap, Query(q): Query<Hist
     // Capped: a client cannot ask for more points than the ring holds,
     // and cannot ask for an unbounded response by omitting the limit.
     let cap = app.cfg.history.capacity();
-    let max_points = q.max_points.map_or(cap, |n| if n == 0 { cap } else { n.min(cap) });
+    let max_points = q
+        .max_points
+        .map_or(cap, |n| if n == 0 { cap } else { n.min(cap) });
     let consented = |id: &str| app.cfg.spaces.iter().any(|s| s.id == id && s.vitals);
     let named = |id: &str| {
-        app.cfg
-            .spaces
-            .iter()
-            .find(|s| s.id == id)
-            .map_or_else(|| id.to_string(), |s| crate::config::GatewayConfig::space_name(s).to_string())
+        app.cfg.spaces.iter().find(|s| s.id == id).map_or_else(
+            || id.to_string(),
+            |s| crate::config::GatewayConfig::space_name(s).to_string(),
+        )
     };
     let since = q.since.filter(|x| x.is_finite());
-    let v = app.shared.history().to_json(&p, &consented, &named, space, since, max_points);
+    let v = app
+        .shared
+        .history()
+        .to_json(&p, &consented, &named, space, since, max_points);
     if app.audit.enabled() {
         for s in v["spaces"].as_array().into_iter().flatten() {
             if s.get("breathing_bpm").is_some() {
-                app.audit.vitals_read(now_unix_ms(), &p, s["space_id"].as_str().unwrap_or(""));
+                app.audit
+                    .vitals_read(now_unix_ms(), &p, s["space_id"].as_str().unwrap_or(""));
             }
         }
     }
@@ -481,14 +608,20 @@ async fn health(State(app): State<AppState>, h: HeaderMap) -> Response {
     let mut v = app.shared.read().health.clone();
     if let Value::Object(m) = &mut v {
         // Fresh values; the rest is as of the last tick.
-        m.insert("uptime_s".into(), app.shared.started.elapsed().as_secs_f64().into());
+        m.insert(
+            "uptime_s".into(),
+            app.shared.started.elapsed().as_secs_f64().into(),
+        );
         m.insert("ws_clients".into(), app.shared.ws_clients().into());
-        m.insert("auth".into(), json!({
-            "required": app.auth.required(),
-            "sessions_open": app.auth.sessions_open(),
-            "users": app.cfg.users.len(),
-            "tokens": app.cfg.tokens.len(),
-        }));
+        m.insert(
+            "auth".into(),
+            json!({
+                "required": app.auth.required(),
+                "sessions_open": app.auth.sessions_open(),
+                "users": app.cfg.users.len(),
+                "tokens": app.cfg.tokens.len(),
+            }),
+        );
         m.insert("audit".into(), app.audit.status());
     }
     no_store(Json(v).into_response())
@@ -500,10 +633,12 @@ async fn metrics(State(app): State<AppState>, h: HeaderMap) -> Response {
     }
     let body = app.shared.read().metrics.clone();
     let mut r = body.into_response();
-    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"));
+    r.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
+    );
     no_store(r)
 }
-
 
 // ------------------------------------------------------------- simulate
 //
@@ -514,17 +649,27 @@ async fn metrics(State(app): State<AppState>, h: HeaderMap) -> Response {
 
 /// The simulated room, or the 404 any other mode gives this path.
 fn sim_state(app: &AppState) -> Result<Arc<crate::simulate::SimState>, Response> {
-    app.sim.clone().ok_or_else(|| error(StatusCode::NOT_FOUND, "no such endpoint"))
+    app.sim
+        .clone()
+        .ok_or_else(|| error(StatusCode::NOT_FOUND, "no such endpoint"))
 }
 
 /// Moving the simulated person writes to the simulated space, so the
 /// principal has to be allowed to see that space — the same scope check
 /// every other space answers to. On a loopback gateway with no users
 /// configured everyone is the local admin, so the demo just works.
-fn sim_writer(app: &AppState, h: &HeaderMap, path: &str, sim: &crate::simulate::SimState) -> Result<Principal, Response> {
+fn sim_writer(
+    app: &AppState,
+    h: &HeaderMap,
+    path: &str,
+    sim: &crate::simulate::SimState,
+) -> Result<Principal, Response> {
     let p = principal(app, h, path)?;
     if !p.can_see_space(sim.space_id()) {
-        return Err(error(StatusCode::FORBIDDEN, "the simulated space is not in your scope"));
+        return Err(error(
+            StatusCode::FORBIDDEN,
+            "the simulated space is not in your scope",
+        ));
     }
     Ok(p)
 }
@@ -533,7 +678,12 @@ fn sim_writer(app: &AppState, h: &HeaderMap, path: &str, sim: &crate::simulate::
 /// `/api/spaces/{id}`: a space outside a principal's scope is
 /// indistinguishable from one that does not exist, because the scope
 /// list is not a directory of the building.
-fn sim_reader(app: &AppState, h: &HeaderMap, path: &str, sim: &crate::simulate::SimState) -> Result<Principal, Response> {
+fn sim_reader(
+    app: &AppState,
+    h: &HeaderMap,
+    path: &str,
+    sim: &crate::simulate::SimState,
+) -> Result<Principal, Response> {
     let p = principal(app, h, path)?;
     if !p.can_see_space(sim.space_id()) {
         return Err(error(StatusCode::NOT_FOUND, "no such space"));
@@ -555,7 +705,10 @@ fn sim_body(body: &str) -> Result<Value, Response> {
 fn sim_f64(v: &Value, key: &str) -> Result<f64, Response> {
     match v.get(key).and_then(Value::as_f64) {
         Some(x) if x.is_finite() => Ok(x),
-        _ => Err(error(StatusCode::BAD_REQUEST, &format!("{key} must be a finite number"))),
+        _ => Err(error(
+            StatusCode::BAD_REQUEST,
+            &format!("{key} must be a finite number"),
+        )),
     }
 }
 
@@ -590,7 +743,11 @@ pub struct CoverageQuery {
     pub res_m: Option<String>,
 }
 
-async fn sim_coverage(State(app): State<AppState>, h: HeaderMap, Query(q): Query<CoverageQuery>) -> Response {
+async fn sim_coverage(
+    State(app): State<AppState>,
+    h: HeaderMap,
+    Query(q): Query<CoverageQuery>,
+) -> Response {
     let sim = match sim_state(&app) {
         Ok(s) => s,
         Err(r) => return r,
@@ -614,13 +771,21 @@ async fn sim_coverage(State(app): State<AppState>, h: HeaderMap, Query(q): Query
         None => crate::simulate::DEFAULT_COVERAGE_RES_M,
         Some(raw) => match raw.trim().parse::<f64>() {
             Ok(v) => v,
-            Err(_) => return error(StatusCode::BAD_REQUEST, &format!("res_m {raw} must be finite and positive")),
+            Err(_) => {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    &format!("res_m {raw} must be finite and positive"),
+                )
+            }
         },
     };
     match tokio::task::spawn_blocking(move || sim.coverage(res_m)).await {
         Ok(Ok(v)) => no_store(Json(v).into_response()),
         Ok(Err(e)) => error(StatusCode::BAD_REQUEST, &e),
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "the coverage map could not be computed"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "the coverage map could not be computed",
+        ),
     }
 }
 
@@ -682,11 +847,16 @@ fn filter_live(text: &str, p: &Principal) -> Option<String> {
     let v: Value = serde_json::from_str(text).ok()?;
     match v.get("type").and_then(Value::as_str)? {
         "state" => {
-            let spaces: Vec<Value> =
-                v.get("spaces")?.as_array()?.iter().filter_map(|s| privacy::space_for(s, p)).collect();
+            let spaces: Vec<Value> = v
+                .get("spaces")?
+                .as_array()?
+                .iter()
+                .filter_map(|s| privacy::space_for(s, p))
+                .collect();
             Some(json!({"type": "state", "t_s": v.get("t_s").cloned().unwrap_or(Value::Null), "spaces": spaces}).to_string())
         }
-        "event" => privacy::event_for(v.get("event")?, p).map(|e| json!({"type": "event", "event": e}).to_string()),
+        "event" => privacy::event_for(v.get("event")?, p)
+            .map(|e| json!({"type": "event", "event": e}).to_string()),
         _ => Some(text.to_string()),
     }
 }
@@ -779,14 +949,22 @@ mod tests {
     /// guarding nothing.
     #[test]
     fn dashboard_has_no_external_urls() {
-        const XML_NS: [&str; 3] =
-            ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"];
+        const XML_NS: [&str; 3] = [
+            "http://www.w3.org/2000/svg",
+            "http://www.w3.org/1999/xhtml",
+            "http://www.w3.org/1999/xlink",
+        ];
         let mut stripped = DASHBOARD_HTML.to_string();
         for ns in XML_NS {
             stripped = stripped.replace(ns, "");
         }
-        for bad in ["http://", "https://", "//cdn", "src=\"//", "@import", "url(http"] {
-            assert!(!stripped.contains(bad), "dashboard must stay offline-capable: found {bad:?}");
+        for bad in [
+            "http://", "https://", "//cdn", "src=\"//", "@import", "url(http",
+        ] {
+            assert!(
+                !stripped.contains(bad),
+                "dashboard must stay offline-capable: found {bad:?}"
+            );
         }
         // The namespaces that *are* present may only appear as a
         // namespace argument, never as something to fetch. (A bare
@@ -797,7 +975,8 @@ mod tests {
                 let rest = &DASHBOARD_HTML[i..];
                 let before = &DASHBOARD_HTML[i.saturating_sub(40)..i];
                 assert!(
-                    XML_NS.iter().any(|ns| rest.starts_with(ns)) && (before.contains("xmlns") || before.contains("createElementNS")),
+                    XML_NS.iter().any(|ns| rest.starts_with(ns))
+                        && (before.contains("xmlns") || before.contains("createElementNS")),
                     "unexpected URL at byte {i}: ...{before}{}",
                     &rest[..rest.len().min(40)]
                 );
@@ -807,7 +986,11 @@ mod tests {
     }
 
     fn p(role: Role, spaces: Option<&[&str]>) -> Principal {
-        Principal { name: "x".into(), role, spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()) }
+        Principal {
+            name: "x".into(),
+            role,
+            spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()),
+        }
     }
 
     const STATE: &str = r#"{"type":"state","t_s":12.5,"spaces":[
@@ -816,16 +999,27 @@ mod tests {
 
     #[test]
     fn live_state_is_filtered_per_client() {
-        let full: Value = serde_json::from_str(&filter_live(STATE, &p(Role::Admin, None)).unwrap()).unwrap();
+        let full: Value =
+            serde_json::from_str(&filter_live(STATE, &p(Role::Admin, None)).unwrap()).unwrap();
         assert_eq!(full["spaces"].as_array().map(Vec::len), Some(2));
         assert_eq!(full["t_s"], json!(12.5));
         assert_eq!(full["spaces"][0]["breathing"]["bpm"], json!(14.0));
 
-        let ops: Value = serde_json::from_str(&filter_live(STATE, &p(Role::Ops, None)).unwrap()).unwrap();
-        assert!(ops["spaces"][0].get("breathing").is_none(), "ops sees the room, not the person");
-        assert_eq!(ops["spaces"][0]["alerts"], json!([]), "and no health alerts");
+        let ops: Value =
+            serde_json::from_str(&filter_live(STATE, &p(Role::Ops, None)).unwrap()).unwrap();
+        assert!(
+            ops["spaces"][0].get("breathing").is_none(),
+            "ops sees the room, not the person"
+        );
+        assert_eq!(
+            ops["spaces"][0]["alerts"],
+            json!([]),
+            "and no health alerts"
+        );
 
-        let scoped: Value = serde_json::from_str(&filter_live(STATE, &p(Role::Safety, Some(&["hall"]))).unwrap()).unwrap();
+        let scoped: Value =
+            serde_json::from_str(&filter_live(STATE, &p(Role::Safety, Some(&["hall"]))).unwrap())
+                .unwrap();
         assert_eq!(scoped["spaces"].as_array().map(Vec::len), Some(1));
         assert_eq!(scoped["spaces"][0]["space_id"], "hall");
     }
@@ -834,7 +1028,10 @@ mod tests {
     fn live_events_can_be_withheld_entirely() {
         let ev = r#"{"type":"event","event":{"space_id":"lab","type":"breathing_pause","duration_s":11.0}}"#;
         assert!(filter_live(ev, &p(Role::Safety, None)).is_some());
-        assert!(filter_live(ev, &p(Role::Ops, None)).is_none(), "nothing is sent, not an empty event");
+        assert!(
+            filter_live(ev, &p(Role::Ops, None)).is_none(),
+            "nothing is sent, not an empty event"
+        );
         assert!(filter_live(ev, &p(Role::Safety, Some(&["hall"]))).is_none());
     }
 
@@ -842,8 +1039,13 @@ mod tests {
     /// unit test calls, so taking every slot here is self-contained.
     #[test]
     fn concurrent_logins_are_capped_and_slots_are_returned() {
-        let held: Vec<LoginSlot> = (0..MAX_LOGINS_IN_FLIGHT).map(|_| LoginSlot::take().expect("under the cap")).collect();
-        assert!(LoginSlot::take().is_none(), "the {MAX_LOGINS_IN_FLIGHT}th + 1 attempt is refused");
+        let held: Vec<LoginSlot> = (0..MAX_LOGINS_IN_FLIGHT)
+            .map(|_| LoginSlot::take().expect("under the cap"))
+            .collect();
+        assert!(
+            LoginSlot::take().is_none(),
+            "the {MAX_LOGINS_IN_FLIGHT}th + 1 attempt is refused"
+        );
         drop(held);
         assert!(LoginSlot::take().is_some(), "slots are returned on drop");
     }
@@ -854,6 +1056,9 @@ mod tests {
         assert!(filter_live(r#"{"no_type":1}"#, &p(Role::Admin, None)).is_none());
         // An unknown message type passes through unchanged: it carries
         // no space data by construction (`hello`).
-        assert_eq!(filter_live(r#"{"type":"hello","mode":"live"}"#, &p(Role::Ops, None)).as_deref(), Some(r#"{"type":"hello","mode":"live"}"#));
+        assert_eq!(
+            filter_live(r#"{"type":"hello","mode":"live"}"#, &p(Role::Ops, None)).as_deref(),
+            Some(r#"{"type":"hello","mode":"live"}"#)
+        );
     }
 }

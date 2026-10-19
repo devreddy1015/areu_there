@@ -119,21 +119,62 @@ pub enum Severity {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventKind {
     OccupancyStarted,
-    OccupancyEnded { dwell_s: f64 },
-    BreathingPause { duration_s: f64, ongoing: bool },
-    RateHigh { median_bpm: f64, over_s: f64 },
-    RateLow { median_bpm: f64, over_s: f64 },
-    Inactivity { still_min: f64, breathing_detected: bool },
-    PossibleCollapse { burst_index: f64, still_s: f64 },
+    OccupancyEnded {
+        dwell_s: f64,
+    },
+    BreathingPause {
+        duration_s: f64,
+        ongoing: bool,
+    },
+    RateHigh {
+        median_bpm: f64,
+        over_s: f64,
+    },
+    RateLow {
+        median_bpm: f64,
+        over_s: f64,
+    },
+    Inactivity {
+        still_min: f64,
+        breathing_detected: bool,
+    },
+    PossibleCollapse {
+        burst_index: f64,
+        still_s: f64,
+    },
     RestStarted,
-    RestEnded { duration_min: f64, motion_bouts: u32, mean_bpm: Option<f64>, bpm_iqr: Option<f64>, pauses: u32 },
-    TrendDeviation { metric: String, value: f64, baseline: f64, mad: f64 },
+    RestEnded {
+        duration_min: f64,
+        motion_bouts: u32,
+        mean_bpm: Option<f64>,
+        bpm_iqr: Option<f64>,
+        pauses: u32,
+    },
+    TrendDeviation {
+        metric: String,
+        value: f64,
+        baseline: f64,
+        mad: f64,
+    },
     // -- system health --
-    LinkDown { link: LinkId, silent_s: f64 },
-    LinkUp { link: LinkId },
-    LinkDegraded { link: LinkId, reason: String },
-    CalibrationStale { link: LinkId, age_h: f64 },
-    RawModeActive { link: LinkId },
+    LinkDown {
+        link: LinkId,
+        silent_s: f64,
+    },
+    LinkUp {
+        link: LinkId,
+    },
+    LinkDegraded {
+        link: LinkId,
+        reason: String,
+    },
+    CalibrationStale {
+        link: LinkId,
+        age_h: f64,
+    },
+    RawModeActive {
+        link: LinkId,
+    },
     SpaceBlind,
     SpaceVisible,
 }

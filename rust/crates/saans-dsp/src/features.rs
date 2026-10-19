@@ -41,7 +41,11 @@ pub fn crc32(data: &[u8]) -> u32 {
         for (i, slot) in t.iter_mut().enumerate() {
             let mut c = i as u32;
             for _ in 0..8 {
-                c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+                c = if c & 1 != 0 {
+                    0xEDB8_8320 ^ (c >> 1)
+                } else {
+                    c >> 1
+                };
             }
             *slot = c;
         }
@@ -118,7 +122,10 @@ pub enum DecodeError {
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecodeError::Size(n) => write!(f, "FeatureFrame must be {FEATURE_FRAME_SIZE} bytes, got {n}"),
+            DecodeError::Size(n) => write!(
+                f,
+                "FeatureFrame must be {FEATURE_FRAME_SIZE} bytes, got {n}"
+            ),
             DecodeError::Crc => write!(f, "FeatureFrame CRC mismatch"),
             DecodeError::Magic(m) => write!(f, "bad magic 0x{m:08X}"),
             DecodeError::Version(v) => write!(f, "unsupported FeatureFrame version {v}"),
@@ -227,7 +234,10 @@ struct RollingRms {
 
 impl RollingRms {
     fn new(n: usize) -> Self {
-        Self { sq: VecDeque::with_capacity(n.max(1)), cap: n.max(1) }
+        Self {
+            sq: VecDeque::with_capacity(n.max(1)),
+            cap: n.max(1),
+        }
     }
     fn push(&mut self, x: f64) {
         if self.sq.len() == self.cap {
@@ -330,8 +340,14 @@ fn gate(value: f64, allowed: bool) -> f32 {
 impl FeatureExtractor {
     pub fn new(config: FeatureExtractorConfig) -> Self {
         let fs = config.sample_rate_hz;
-        assert!(fs >= 10.0, "FeatureFrame needs >= 10 Hz CSI (got {fs}): the gross-motion band reaches 4 Hz");
-        assert!(config.frame_rate_hz > 0.0 && config.frame_rate_hz <= fs, "frame_rate_hz must be in (0, fs]");
+        assert!(
+            fs >= 10.0,
+            "FeatureFrame needs >= 10 Hz CSI (got {fs}): the gross-motion band reaches 4 Hz"
+        );
+        assert!(
+            config.frame_rate_hz > 0.0 && config.frame_rate_hz <= fs,
+            "frame_rate_hz must be in (0, fs]"
+        );
         let pipeline = SensingPipeline::new(PipelineConfig {
             n_subcarriers: config.n_subcarriers,
             sample_rate_hz: fs,
@@ -344,7 +360,9 @@ impl FeatureExtractor {
         Self {
             gaps: SequenceGapFiller::new((config.max_gap_s * fs) as u64),
             breath_filter: BiquadBandpass::new(BREATH_BAND_HZ.0, BREATH_BAND_HZ.1, fs),
-            motion_filters: (0..GROSS_MOTION_SECTIONS).map(|_| BiquadBandpass::new(GROSS_MOTION_BAND_HZ.0, GROSS_MOTION_BAND_HZ.1, fs)).collect(),
+            motion_filters: (0..GROSS_MOTION_SECTIONS)
+                .map(|_| BiquadBandpass::new(GROSS_MOTION_BAND_HZ.0, GROSS_MOTION_BAND_HZ.1, fs))
+                .collect(),
             breath_rms: RollingRms::new(py_round(fs * BREATH_RMS_WINDOW_S) as usize),
             motion_rms: RollingRms::new(py_round(fs * GROSS_MOTION_WINDOW_S) as usize),
             every: (py_round(fs / config.frame_rate_hz) as u64).max(1),
@@ -372,7 +390,13 @@ impl FeatureExtractor {
     }
 
     /// Feed one *received* CSI frame. Returns the FeatureFrames due.
-    pub fn push(&mut self, frame: CsiFrame, sequence: Option<u64>, t_s: Option<f64>, noise_floor_dbm: Option<i32>) -> Vec<FeatureFrame> {
+    pub fn push(
+        &mut self,
+        frame: CsiFrame,
+        sequence: Option<u64>,
+        t_s: Option<f64>,
+        noise_floor_dbm: Option<i32>,
+    ) -> Vec<FeatureFrame> {
         let seq = sequence.unwrap_or(frame.sample_index);
         let t = t_s.unwrap_or(self.processed as f64 / self.config.sample_rate_hz);
         if self.t0.is_none() {
@@ -425,7 +449,11 @@ impl FeatureExtractor {
     }
 
     fn bnr_step(&mut self) {
-        let n = self.pipeline.last_residuals.len().min(self.config.n_subcarriers);
+        let n = self
+            .pipeline
+            .last_residuals
+            .len()
+            .min(self.config.n_subcarriers);
         for k in 0..n {
             let r = self.pipeline.last_residuals[k];
             self.bnr_acc[k] += if r.is_finite() { r } else { 0.0 };
@@ -443,7 +471,12 @@ impl FeatureExtractor {
         if self.processed.is_multiple_of(self.bnr_every) && self.bnr_rows.len() == self.bnr_cap {
             let rows: Vec<Vec<f64>> = self.bnr_rows.iter().cloned().collect();
             let (bnr, _) = subcarrier_bnr(&rows, self.bnr_rate, BREATH_BAND_HZ.0, BREATH_BAND_HZ.1);
-            self.best_bnr = bnr.iter().copied().filter(|b| b.is_finite()).fold(None, |a: Option<f64>, b| Some(a.map_or(b, |a| a.max(b)))).unwrap_or(0.0);
+            self.best_bnr = bnr
+                .iter()
+                .copied()
+                .filter(|b| b.is_finite())
+                .fold(None, |a: Option<f64>, b| Some(a.map_or(b, |a| a.max(b))))
+                .unwrap_or(0.0);
         }
     }
 
@@ -454,12 +487,23 @@ impl FeatureExtractor {
         let (t_first, s_first) = *self.arrivals.front().unwrap();
         let (t_last, s_last) = *self.arrivals.back().unwrap();
         let span = t_last - t_first;
-        let rate = if span > 0.0 { (self.arrivals.len() - 1) as f64 / span } else { 0.0 };
+        let rate = if span > 0.0 {
+            (self.arrivals.len() - 1) as f64 / span
+        } else {
+            0.0
+        };
         let expected = ((s_last + (1u64 << 32) - s_first) % (1u64 << 32)) + 1;
         let received = self.arrivals.len() as u64;
-        let loss = if expected >= received { (1.0 - received as f64 / expected as f64).max(0.0) } else { 0.0 };
+        let loss = if expected >= received {
+            (1.0 - received as f64 / expected as f64).max(0.0)
+        } else {
+            0.0
+        };
         let clamp = |x: f64| x.clamp(0.0, 65535.0) as u16;
-        (clamp(py_round(rate * 100.0)), clamp(py_round(loss * 1000.0)))
+        (
+            clamp(py_round(rate * 100.0)),
+            clamp(py_round(loss * 1000.0)),
+        )
     }
 
     fn emit(&mut self, t: f64) -> FeatureFrame {
@@ -483,7 +527,8 @@ impl FeatureExtractor {
             flags |= FLAG_DISCONTINUITY;
             self.discontinuities_seen = self.gaps.discontinuities;
         }
-        let breathing_ok = c.vitals_enabled && reading.occupied && reading.respiratory_rate.status.usable();
+        let breathing_ok =
+            c.vitals_enabled && reading.occupied && reading.respiratory_rate.status.usable();
         let heart_ok = breathing_ok && c.heart_enabled && reading.heart_rate.status.usable();
         if breathing_ok {
             flags |= FLAG_BREATHING_VALID;
@@ -504,7 +549,11 @@ impl FeatureExtractor {
             csi_rate_chz: rate_chz,
             loss_permille: loss_pm,
             motion_energy: reading.motion_energy as f32,
-            presence_threshold: if calibrated { self.pipeline.presence.threshold() as f32 } else { 0.0 },
+            presence_threshold: if calibrated {
+                self.pipeline.presence.threshold() as f32
+            } else {
+                0.0
+            },
             gross_motion: self.motion_rms.value() as f32,
             breath_rms: gate(self.breath_rms.value(), vit),
             breathing_bpm: gate(reading.respiratory_rate.value_bpm, vit),
@@ -516,7 +565,11 @@ impl FeatureExtractor {
                 Some(at) => ((self.processed - at) as f64 / c.sample_rate_hz) as u32,
                 None => NOT_CALIBRATED,
             },
-            rssi_dbm: if self.rssi_n > 0 { py_round(self.rssi_sum as f64 / self.rssi_n as f64).clamp(-128.0, 127.0) as i8 } else { 0 },
+            rssi_dbm: if self.rssi_n > 0 {
+                py_round(self.rssi_sum as f64 / self.rssi_n as f64).clamp(-128.0, 127.0) as i8
+            } else {
+                0
+            },
             noise_floor_dbm: if self.noise_n > 0 {
                 py_round(self.noise_sum as f64 / self.noise_n as f64).clamp(-128.0, 127.0) as i8
             } else {

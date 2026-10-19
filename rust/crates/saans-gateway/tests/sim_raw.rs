@@ -29,10 +29,26 @@ use support::*;
 /// honestly, by `saans-sim/examples/impairment_cost.rs`.
 fn scenario(seconds: f64) -> Scenario {
     let timeline = vec![
-        Segment { duration_s: 10.0, activity: Activity::Absent },
-        Segment { duration_s: seconds - 10.0, activity: Activity::Seated { at: CHAIR, bpm: 14.0, bpm_end: None } },
+        Segment {
+            duration_s: 10.0,
+            activity: Activity::Absent,
+        },
+        Segment {
+            duration_s: seconds - 10.0,
+            activity: Activity::Seated {
+                at: CHAIR,
+                bpm: 14.0,
+                bpm_end: None,
+            },
+        },
     ];
-    let mut sc = scenarios::scenario("raw-wire", scenarios::room_clear_los(), scenarios::one_link(), timeline, 7);
+    let mut sc = scenarios::scenario(
+        "raw-wire",
+        scenarios::room_clear_los(),
+        scenarios::one_link(),
+        timeline,
+        7,
+    );
     // No air loss: this is a test of the wire and the ingest path, and a
     // dropped packet would make the datagram counts depend on the RNG.
     sc.loss_prob = 0.0;
@@ -59,7 +75,11 @@ fn a_simulated_datagram_is_what_the_gateways_parser_expects() {
     assert_eq!(f.freq_mhz, 2437, "the default 2.437 GHz carrier");
     assert_eq!(f.sequence, 0, "first datagram of this node's boot");
     assert_eq!(f.rssi_dbm as i32, lf.frame.rssi_dbm);
-    assert_eq!(f.noise_floor_dbm, i8::MIN, "not modelled, and the format says so");
+    assert_eq!(
+        f.noise_floor_dbm,
+        i8::MIN,
+        "not modelled, and the format says so"
+    );
     assert_eq!(d.len(), RAW_HEADER_SIZE + 2 * sc.n_subcarriers);
 
     // The values that went in are the values that came out, pair by pair,
@@ -75,7 +95,10 @@ fn a_simulated_datagram_is_what_the_gateways_parser_expects() {
     // which is what this scenario has, so the two encoders must agree
     // byte for byte. If they ever stop agreeing, one of them has drifted
     // from `spec/wire.md`.
-    assert_eq!(d, &raw::build(&f.iq, f.node_id, f.sequence, f.rssi_dbm, f.noise_floor_dbm));
+    assert_eq!(
+        d,
+        &raw::build(&f.iq, f.node_id, f.sequence, f.rssi_dbm, f.noise_floor_dbm)
+    );
 }
 
 #[test]
@@ -95,16 +118,25 @@ fn flipping_the_pair_order_changes_what_the_gateway_reads() {
     }
     let good = raw::parse(&d).unwrap();
     let bad = raw::parse(&flipped).unwrap();
-    assert_ne!(good.iq, bad.iq, "a swapped payload must not parse to the same channel");
+    assert_ne!(
+        good.iq, bad.iq,
+        "a swapped payload must not parse to the same channel"
+    );
 
     let a = CsiFrame::from_iq(&good.iq, 0, 20.0, -50, 1);
     let b = CsiFrame::from_iq(&bad.iq, 0, 20.0, -50, 1);
-    assert_eq!(a.amplitudes, b.amplitudes, "amplitude cannot tell the two orders apart");
+    assert_eq!(
+        a.amplitudes, b.amplitudes,
+        "amplitude cannot tell the two orders apart"
+    );
     for k in 0..sc.n_subcarriers {
         // atan2(re, im) = pi/2 - atan2(im, re), wrapped. Equivalently the
         // phases differ unless the pair happens to be symmetric.
         if good.iq[k].0 != good.iq[k].1 {
-            assert_ne!(a.phases[k], b.phases[k], "subcarrier {k} phase is unchanged by the swap");
+            assert_ne!(
+                a.phases[k], b.phases[k],
+                "subcarrier {k} phase is unchanged by the swap"
+            );
         }
     }
 }
@@ -114,7 +146,8 @@ async fn simulated_raw_csi_drives_the_gateways_raw_mode_path() {
     // The same space configuration a bench node in raw mode needs: raw
     // CSI carries no transmitter id, so the gateway routes every raw
     // datagram to `(rx, 0xFF)`.
-    const RAW: &str = "[raw]\ncalibration_s = 2.0\n[[space]]\nid = \"lab\"\nlinks = [{ rx = 1, tx = 255 }]\n";
+    const RAW: &str =
+        "[raw]\ncalibration_s = 2.0\n[[space]]\nid = \"lab\"\nlinks = [{ rx = 1, tx = 255 }]\n";
     let seconds = 45.0;
     let sc = scenario(seconds);
     let mut sim = Simulator::new(&sc);
@@ -137,7 +170,10 @@ async fn simulated_raw_csi_drives_the_gateways_raw_mode_path() {
 
     let h = g.json("/api/health").await;
     assert_eq!(h["ingest"]["raw_datagrams"], sent, "{h}");
-    assert_eq!(h["ingest"]["feature_frames"], 0, "nothing here is a FeatureFrame datagram");
+    assert_eq!(
+        h["ingest"]["feature_frames"], 0,
+        "nothing here is a FeatureFrame datagram"
+    );
     assert_eq!(h["ingest"]["errors"]["raw_malformed"], 0);
     assert_eq!(h["ingest"]["errors"]["raw_subcarrier_mismatch"], 0);
     assert_eq!(h["ingest"]["errors"]["unknown_type"], 0);
@@ -158,7 +194,10 @@ async fn simulated_raw_csi_drives_the_gateways_raw_mode_path() {
     assert!(l["rate_hz"].as_f64().unwrap() > 15.0, "{l}");
     // The RSSI the node reported, which the AGC does not touch; and no
     // noise floor, because the simulator has no measurement to report.
-    assert!((-90.0..-20.0).contains(&l["rssi_dbm"].as_f64().unwrap()), "{l}");
+    assert!(
+        (-90.0..-20.0).contains(&l["rssi_dbm"].as_f64().unwrap()),
+        "{l}"
+    );
     assert_eq!(l["noise_floor_dbm"], -128);
     // The link-quality score the DSP computed from the int8 pairs. Only
     // that it exists: a 30 s BNR window filled and produced a finite

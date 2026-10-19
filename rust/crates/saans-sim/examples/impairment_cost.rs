@@ -68,12 +68,18 @@ impl Arm {
         match self {
             // Never used: the clean arm does not go through a receiver.
             Arm::Clean => ImpairConfig::identity(),
-            Arm::Int8 => ImpairConfig { quantize: true, ..ImpairConfig::identity() },
+            Arm::Int8 => ImpairConfig {
+                quantize: true,
+                ..ImpairConfig::identity()
+            },
             // Everything the model has except the gain control: the
             // static ripple, the per-packet phase, the receiver noise and
             // the quantizer. Not a different calibration — one term
             // switched off, to attribute what the others cannot explain.
-            Arm::NoAgc => ImpairConfig { agc_step_db: 0.0, ..ImpairConfig::esp32_s3() },
+            Arm::NoAgc => ImpairConfig {
+                agc_step_db: 0.0,
+                ..ImpairConfig::esp32_s3()
+            },
             Arm::Esp32 => ImpairConfig::esp32_s3(),
         }
     }
@@ -114,7 +120,9 @@ fn run_arm(sc: &Scenario, arm: Arm, cfg: ImpairConfig) -> Run {
     let mut last_gain = f64::NAN;
     let mut buf = Vec::new();
     while let Some(tick) = sim.step() {
-        let Some(lf) = tick.frames.iter().find(|f| (f.tx, f.rx) == sc.links[0]) else { continue };
+        let Some(lf) = tick.frames.iter().find(|f| (f.tx, f.rx) == sc.links[0]) else {
+            continue;
+        };
         clean.push(lf.frame.amplitudes.clone());
         if arm == Arm::Clean {
             frames.push(lf.frame.clone());
@@ -125,15 +133,28 @@ fn run_arm(sc: &Scenario, arm: Arm, cfg: ImpairConfig) -> Run {
         // Through the wire pairs, by the same call the gateway makes on a
         // parsed datagram (`engine.rs`): amplitude is hypot(imaginary,
         // real) and phase is atan2 of the pair, nothing else.
-        let iq: Vec<(i8, i8)> = (0..sc.n_subcarriers).map(|k| (node.iq()[2 * k], node.iq()[2 * k + 1])).collect();
-        frames.push(CsiFrame::from_iq(&iq, lf.seq as u64, sc.sample_rate_hz, lf.frame.rssi_dbm, lf.rx));
+        let iq: Vec<(i8, i8)> = (0..sc.n_subcarriers)
+            .map(|k| (node.iq()[2 * k], node.iq()[2 * k + 1]))
+            .collect();
+        frames.push(CsiFrame::from_iq(
+            &iq,
+            lf.seq as u64,
+            sc.sample_rate_hz,
+            lf.frame.rssi_dbm,
+            lf.rx,
+        ));
         let g = node.impairment().gain_db();
         if last_gain.is_finite() && g != last_gain {
             steps.push(g - last_gain);
         }
         last_gain = g;
     }
-    Run { frames, clean, agc_moves: steps.len(), agc_steps_db: steps }
+    Run {
+        frames,
+        clean,
+        agc_moves: steps.len(),
+        agc_steps_db: steps,
+    }
 }
 
 /// One emitted FeatureFrame, reduced to what this comparison needs.
@@ -207,8 +228,14 @@ fn cv(rows: &[Vec<f64>]) -> Vec<f64> {
 /// Packet-to-packet change in band-mean power, dB. The AGC's signature:
 /// a gain step moves every subcarrier of a packet by the same factor.
 fn power_jumps_db(rows: &[Vec<f64>]) -> Vec<f64> {
-    let p: Vec<f64> = rows.iter().map(|r| r.iter().map(|a| a * a).sum::<f64>() / r.len() as f64).collect();
-    p.windows(2).filter(|w| w[0] > 0.0 && w[1] > 0.0).map(|w| 10.0 * (w[1] / w[0]).log10()).collect()
+    let p: Vec<f64> = rows
+        .iter()
+        .map(|r| r.iter().map(|a| a * a).sum::<f64>() / r.len() as f64)
+        .collect();
+    p.windows(2)
+        .filter(|w| w[0] > 0.0 && w[1] > 0.0)
+        .map(|w| 10.0 * (w[1] / w[0]).log10())
+        .collect()
 }
 
 fn mean(xs: &[f64]) -> f64 {
@@ -220,7 +247,11 @@ fn mean(xs: &[f64]) -> f64 {
 fn decimate(rows: &[Vec<f64>], fs: f64) -> Vec<Vec<f64>> {
     let dec = (fs / BNR_RATE_HZ).round().max(1.0) as usize;
     rows.chunks_exact(dec)
-        .map(|c| (0..c[0].len()).map(|k| c.iter().map(|r| r[k]).sum::<f64>() / c.len() as f64).collect())
+        .map(|c| {
+            (0..c[0].len())
+                .map(|k| c.iter().map(|r| r[k]).sum::<f64>() / c.len() as f64)
+                .collect()
+        })
         .collect()
 }
 
@@ -261,14 +292,32 @@ fn band_rms(rows: &[Vec<f64>], k: usize, fs: f64) -> f64 {
 fn best_subcarrier(rows: &[Vec<f64>], fs: f64) -> usize {
     let d = decimate(rows, fs);
     let w = (BNR_WINDOW_S * BNR_RATE_HZ) as usize;
-    let chunk = if d.len() >= w { &d[d.len() - w..] } else { &d[..] };
+    let chunk = if d.len() >= w {
+        &d[d.len() - w..]
+    } else {
+        &d[..]
+    };
     let (bnr, _) = subcarrier_bnr(chunk, BNR_RATE_HZ, BAND_HZ.0, BAND_HZ.1);
-    bnr.iter().enumerate().filter(|(_, b)| b.is_finite()).max_by(|a, b| a.1.total_cmp(b.1)).map(|(i, _)| i).unwrap_or(0)
+    bnr.iter()
+        .enumerate()
+        .filter(|(_, b)| b.is_finite())
+        .max_by(|a, b| a.1.total_cmp(b.1))
+        .map(|(i, _)| i)
+        .unwrap_or(0)
 }
 
 fn empty_scenario(seed: u64, seconds: f64) -> Scenario {
-    let tl = vec![Segment { duration_s: seconds, activity: Activity::Absent }];
-    let mut sc = scenarios::scenario("empty", scenarios::room_clear_los(), scenarios::one_link(), tl, seed);
+    let tl = vec![Segment {
+        duration_s: seconds,
+        activity: Activity::Absent,
+    }];
+    let mut sc = scenarios::scenario(
+        "empty",
+        scenarios::room_clear_los(),
+        scenarios::one_link(),
+        tl,
+        seed,
+    );
     // No packet loss: a missing packet is a hole in a time series, and
     // what is being measured here is the receiver, not the air.
     sc.loss_prob = 0.0;
@@ -282,10 +331,26 @@ fn empty_scenario(seed: u64, seconds: f64) -> Scenario {
 /// threshold with the person already in the room.
 fn seated_scenario(seed: u64, seated_s: f64) -> Scenario {
     let tl = vec![
-        Segment { duration_s: scenarios::LEAD_IN_S, activity: Activity::Absent },
-        Segment { duration_s: seated_s, activity: Activity::Seated { at: CHAIR, bpm: 14.0, bpm_end: None } },
+        Segment {
+            duration_s: scenarios::LEAD_IN_S,
+            activity: Activity::Absent,
+        },
+        Segment {
+            duration_s: seated_s,
+            activity: Activity::Seated {
+                at: CHAIR,
+                bpm: 14.0,
+                bpm_end: None,
+            },
+        },
     ];
-    let mut sc = scenarios::scenario("seated", scenarios::room_clear_los(), scenarios::one_link(), tl, seed);
+    let mut sc = scenarios::scenario(
+        "seated",
+        scenarios::room_clear_los(),
+        scenarios::one_link(),
+        tl,
+        seed,
+    );
     sc.loss_prob = 0.0;
     sc
 }
@@ -312,7 +377,9 @@ fn med(xs: &[f64]) -> f64 {
 
 fn main() {
     let fs = 20.0;
-    println!("saans-sim impairment cost. SYNTHETIC; the receiver model is UNVERIFIED (src/impair.rs).");
+    println!(
+        "saans-sim impairment cost. SYNTHETIC; the receiver model is UNVERIFIED (src/impair.rs)."
+    );
     println!("{} room seeds, 1 link x 56 subcarriers at {fs} Hz, no packet loss, first {SETTLE_PACKETS} packets dropped.\n", SEEDS.len());
 
     // ---------------------------------------------------------- empty room
@@ -349,12 +416,15 @@ fn main() {
             jump_med[i].push(percentile(&j, 50.0));
             jump_p99[i].push(percentile(&j, 99.0));
             jump_max[i].push(percentile(&j, 100.0));
-            jump_big[i].push(100.0 * j.iter().filter(|&&x| x > 0.3).count() as f64 / j.len() as f64);
+            jump_big[i]
+                .push(100.0 * j.iter().filter(|&&x| x > 0.3).count() as f64 / j.len() as f64);
             level[i].push(mean(&rows.iter().map(|r| mean(r)).collect::<Vec<_>>()));
             if arm == Arm::Esp32 {
                 agc_rate.push(r.agc_moves as f64 / r.frames.len() as f64);
                 if !r.agc_steps_db.is_empty() {
-                    agc_step.push(mean(&r.agc_steps_db.iter().map(|s| s.abs()).collect::<Vec<_>>()));
+                    agc_step.push(mean(
+                        &r.agc_steps_db.iter().map(|s| s.abs()).collect::<Vec<_>>(),
+                    ));
                 }
             }
         }
@@ -366,15 +436,50 @@ fn main() {
         print!("{:>11}", a.name());
     }
     println!();
-    row("per-subcarrier amplitude CV (mean over k)", &cv_mean.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("per-subcarrier amplitude CV (worst k)", &cv_max.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("|packet power jump| median, dB", &jump_med.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("|packet power jump| p99, dB", &jump_p99.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("|packet power jump| max, dB", &jump_max.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("packets jumping more than 0.3 dB, %", &jump_big.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("mean |H| (clean units / int8 counts)", &level.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    println!("\nAGC moved on {:.1}% of packets, mean move {:.2} dB.", 100.0 * med(&agc_rate), med(&agc_step));
-    println!("clean channel bit-identical across arms: {}", if clean_identical { "yes" } else { "NO" });
+    row(
+        "per-subcarrier amplitude CV (mean over k)",
+        &cv_mean.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "per-subcarrier amplitude CV (worst k)",
+        &cv_max.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "|packet power jump| median, dB",
+        &jump_med.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "|packet power jump| p99, dB",
+        &jump_p99.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "|packet power jump| max, dB",
+        &jump_max.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "packets jumping more than 0.3 dB, %",
+        &jump_big.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "mean |H| (clean units / int8 counts)",
+        &level.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    println!(
+        "\nAGC moved on {:.1}% of packets, mean move {:.2} dB.",
+        100.0 * med(&agc_rate),
+        med(&agc_step)
+    );
+    println!(
+        "clean channel bit-identical across arms: {}",
+        if clean_identical { "yes" } else { "NO" }
+    );
 
     // ------------------------------------------------------------- seated
     let seated_s = 180.0;
@@ -425,19 +530,48 @@ fn main() {
             // The empty room as the presence detector saw it, after its
             // 50 s warm-up and before the person arrives: the other half
             // of the contrast a threshold is supposed to separate.
-            let empty_motion: Vec<f64> = all_ff.iter().filter(|f| (60.0..scenarios::LEAD_IN_S - 5.0).contains(&f.t)).map(|f| f.motion).collect();
+            let empty_motion: Vec<f64> = all_ff
+                .iter()
+                .filter(|f| (60.0..scenarios::LEAD_IN_S - 5.0).contains(&f.t))
+                .map(|f| f.motion)
+                .collect();
             pipe_empty[i].push(percentile(&empty_motion, 50.0));
-            let ff: Vec<&Feat> = all_ff.iter().filter(|f| f.t >= scenarios::LEAD_IN_S + 65.0).collect();
+            let ff: Vec<&Feat> = all_ff
+                .iter()
+                .filter(|f| f.t >= scenarios::LEAD_IN_S + 65.0)
+                .collect();
             let valid: Vec<f64> = ff.iter().filter(|f| f.conf > 0.0).map(|f| f.bpm).collect();
-            pipe_bnr[i].push(10.0 * percentile(&ff.iter().map(|f| f.best_bnr).collect::<Vec<_>>(), 50.0).max(1e-12).log10());
-            pipe_conf[i].push(percentile(&ff.iter().map(|f| f.conf).collect::<Vec<_>>(), 50.0));
-            pipe_bpm[i].push(if valid.is_empty() { f64::NAN } else { percentile(&valid, 50.0) });
+            pipe_bnr[i].push(
+                10.0 * percentile(&ff.iter().map(|f| f.best_bnr).collect::<Vec<_>>(), 50.0)
+                    .max(1e-12)
+                    .log10(),
+            );
+            pipe_conf[i].push(percentile(
+                &ff.iter().map(|f| f.conf).collect::<Vec<_>>(),
+                50.0,
+            ));
+            pipe_bpm[i].push(if valid.is_empty() {
+                f64::NAN
+            } else {
+                percentile(&valid, 50.0)
+            });
             // Frames whose BPM is within 2 of the truth, the tolerance
             // `evaluate.py` scores breathing with.
-            pipe_hit[i].push(100.0 * valid.iter().filter(|b| (*b - 14.0).abs() <= 2.0).count() as f64 / ff.len().max(1) as f64);
-            pipe_occ[i].push(100.0 * ff.iter().filter(|f| f.occupied).count() as f64 / ff.len().max(1) as f64);
-            pipe_motion[i].push(percentile(&ff.iter().map(|f| f.motion).collect::<Vec<_>>(), 50.0));
-            pipe_thresh[i].push(percentile(&ff.iter().map(|f| f.threshold).collect::<Vec<_>>(), 50.0));
+            pipe_hit[i].push(
+                100.0 * valid.iter().filter(|b| (*b - 14.0).abs() <= 2.0).count() as f64
+                    / ff.len().max(1) as f64,
+            );
+            pipe_occ[i].push(
+                100.0 * ff.iter().filter(|f| f.occupied).count() as f64 / ff.len().max(1) as f64,
+            );
+            pipe_motion[i].push(percentile(
+                &ff.iter().map(|f| f.motion).collect::<Vec<_>>(),
+                50.0,
+            ));
+            pipe_thresh[i].push(percentile(
+                &ff.iter().map(|f| f.threshold).collect::<Vec<_>>(),
+                50.0,
+            ));
         }
     }
 
@@ -452,19 +586,67 @@ fn main() {
         print!("{:>11}", a.name());
     }
     println!();
-    row("breathing BNR, best subcarrier, dB", &bnr_best.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("breathing BNR, median subcarrier, dB", &bnr_mid.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("breathing-band RMS of that bin (units)", &breath_rms.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("as a fraction of that bin's mean |H|", &breath_frac.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
+    row(
+        "breathing BNR, best subcarrier, dB",
+        &bnr_best.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "breathing BNR, median subcarrier, dB",
+        &bnr_mid.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "breathing-band RMS of that bin (units)",
+        &breath_rms.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "as a fraction of that bin's mean |H|",
+        &breath_frac.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
     println!("\nthrough the node's own FeatureExtractor (the gateway's raw path), frames from t = {} s on:", scenarios::LEAD_IN_S + 65.0);
-    row("presence: frames reporting occupied, %", &pipe_occ.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("presence: motion energy, empty room", &pipe_empty.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("presence: motion energy, person seated", &pipe_motion.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("presence: calibrated threshold", &pipe_thresh.iter().map(|v| med(v)).collect::<Vec<_>>(), f3);
-    row("best_bnr reported, dB", &pipe_bnr.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("breathing BPM (truth 14.0)", &pipe_bpm.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("breathing confidence", &pipe_conf.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
-    row("frames within 2 BPM of truth, %", &pipe_hit.iter().map(|v| med(v)).collect::<Vec<_>>(), f2);
+    row(
+        "presence: frames reporting occupied, %",
+        &pipe_occ.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "presence: motion energy, empty room",
+        &pipe_empty.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "presence: motion energy, person seated",
+        &pipe_motion.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "presence: calibrated threshold",
+        &pipe_thresh.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f3,
+    );
+    row(
+        "best_bnr reported, dB",
+        &pipe_bnr.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "breathing BPM (truth 14.0)",
+        &pipe_bpm.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "breathing confidence",
+        &pipe_conf.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
+    row(
+        "frames within 2 BPM of truth, %",
+        &pipe_hit.iter().map(|v| med(v)).collect::<Vec<_>>(),
+        f2,
+    );
     println!("\nOne int8 count is 1.0 in the three wire columns; one 0.5 dB AGC step at 32 counts is 1.9 counts.");
 
     // ------------------------------------------------- what it rests on
@@ -476,22 +658,47 @@ fn main() {
     // It says what would have to be true of a real node for the
     // conclusion to hold, and it is the first thing an empty-room
     // recording would settle.
-    println!("\nSENSITIVITY TO agc_dither_prob (every other constant as committed; default {:.3})", ImpairConfig::esp32_s3().agc_dither_prob);
-    println!("{:<12}{:>11}{:>11}{:>11}{:>11}{:>11}", "dither", "moves %", "empty", "seated", "threshold", "occupied %");
+    println!(
+        "\nSENSITIVITY TO agc_dither_prob (every other constant as committed; default {:.3})",
+        ImpairConfig::esp32_s3().agc_dither_prob
+    );
+    println!(
+        "{:<12}{:>11}{:>11}{:>11}{:>11}{:>11}",
+        "dither", "moves %", "empty", "seated", "threshold", "occupied %"
+    );
     for dither in [0.0, 0.002, 0.005, 0.02] {
-        let cfg = ImpairConfig { agc_dither_prob: dither, ..ImpairConfig::esp32_s3() };
-        let (mut moves, mut empty, mut seated, mut thr, mut occ) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        let cfg = ImpairConfig {
+            agc_dither_prob: dither,
+            ..ImpairConfig::esp32_s3()
+        };
+        let (mut moves, mut empty, mut seated, mut thr, mut occ) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
         for &seed in &SEEDS {
             let sc = seated_scenario(seed, seated_s);
             let r = run_cfg(&sc, cfg);
             moves.push(100.0 * r.agc_moves as f64 / r.frames.len() as f64);
             let ff = features(&sc, &r.frames);
-            let e: Vec<f64> = ff.iter().filter(|f| (60.0..scenarios::LEAD_IN_S - 5.0).contains(&f.t)).map(|f| f.motion).collect();
-            let o: Vec<&Feat> = ff.iter().filter(|f| f.t >= scenarios::LEAD_IN_S + 65.0).collect();
+            let e: Vec<f64> = ff
+                .iter()
+                .filter(|f| (60.0..scenarios::LEAD_IN_S - 5.0).contains(&f.t))
+                .map(|f| f.motion)
+                .collect();
+            let o: Vec<&Feat> = ff
+                .iter()
+                .filter(|f| f.t >= scenarios::LEAD_IN_S + 65.0)
+                .collect();
             empty.push(percentile(&e, 50.0));
-            seated.push(percentile(&o.iter().map(|f| f.motion).collect::<Vec<_>>(), 50.0));
-            thr.push(percentile(&o.iter().map(|f| f.threshold).collect::<Vec<_>>(), 50.0));
-            occ.push(100.0 * o.iter().filter(|f| f.occupied).count() as f64 / o.len().max(1) as f64);
+            seated.push(percentile(
+                &o.iter().map(|f| f.motion).collect::<Vec<_>>(),
+                50.0,
+            ));
+            thr.push(percentile(
+                &o.iter().map(|f| f.threshold).collect::<Vec<_>>(),
+                50.0,
+            ));
+            occ.push(
+                100.0 * o.iter().filter(|f| f.occupied).count() as f64 / o.len().max(1) as f64,
+            );
         }
         println!(
             "{dither:<12.3}{:>11.2}{:>11.3}{:>11.3}{:>11.3}{:>11.1}",

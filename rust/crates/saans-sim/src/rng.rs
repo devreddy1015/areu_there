@@ -24,7 +24,12 @@ pub struct Rng {
 impl Rng {
     pub fn new(seed: u64) -> Self {
         let mut sm = seed;
-        let s = [splitmix64(&mut sm), splitmix64(&mut sm), splitmix64(&mut sm), splitmix64(&mut sm)];
+        let s = [
+            splitmix64(&mut sm),
+            splitmix64(&mut sm),
+            splitmix64(&mut sm),
+            splitmix64(&mut sm),
+        ];
         Self { s, spare: None }
     }
 

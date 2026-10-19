@@ -105,12 +105,26 @@ impl Auth {
             users: cfg
                 .users
                 .iter()
-                .map(|u| (u.name.clone(), u.role, scope(&u.spaces), u.password_hash.clone()))
+                .map(|u| {
+                    (
+                        u.name.clone(),
+                        u.role,
+                        scope(&u.spaces),
+                        u.password_hash.clone(),
+                    )
+                })
                 .collect(),
             tokens: cfg
                 .tokens
                 .iter()
-                .map(|t| (t.name.clone(), t.role, scope(&t.spaces), t.sha256.to_ascii_lowercase()))
+                .map(|t| {
+                    (
+                        t.name.clone(),
+                        t.role,
+                        scope(&t.spaces),
+                        t.sha256.to_ascii_lowercase(),
+                    )
+                })
                 .collect(),
             sessions: Mutex::new(HashMap::new()),
             last_sweep: Mutex::new(Instant::now()),
@@ -123,7 +137,10 @@ impl Auth {
     }
 
     pub fn sessions_open(&self) -> usize {
-        self.sessions.lock().unwrap_or_else(|p| p.into_inner()).len()
+        self.sessions
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .len()
     }
 
     /// The principal for a request, or why there is none.
@@ -132,12 +149,19 @@ impl Auth {
     /// `Authorization` header. Both are optional and either may be
     /// attacker-controlled, so neither is trusted beyond an exact match
     /// against configured material.
-    pub fn principal(&self, authorization: Option<&str>, cookies: Option<&str>) -> Result<Principal, Denied> {
+    pub fn principal(
+        &self,
+        authorization: Option<&str>,
+        cookies: Option<&str>,
+    ) -> Result<Principal, Denied> {
         if !self.required {
             return Ok(Principal::local_admin());
         }
         if let Some(raw) = authorization {
-            let Some(token) = raw.strip_prefix("Bearer ").or_else(|| raw.strip_prefix("bearer ")) else {
+            let Some(token) = raw
+                .strip_prefix("Bearer ")
+                .or_else(|| raw.strip_prefix("bearer "))
+            else {
                 return Err(Denied::Invalid);
             };
             let presented = sha256_hex(token.trim());
@@ -145,7 +169,11 @@ impl Auth {
                 .tokens
                 .iter()
                 .find(|(_, _, _, sha)| ct_eq(sha, &presented))
-                .map(|(name, role, spaces, _)| Principal { name: name.clone(), role: *role, spaces: spaces.clone() })
+                .map(|(name, role, spaces, _)| Principal {
+                    name: name.clone(),
+                    role: *role,
+                    spaces: spaces.clone(),
+                })
                 .ok_or(Denied::Invalid);
         }
         let Some(id) = cookies.and_then(cookie_value) else {
@@ -165,29 +193,49 @@ impl Auth {
     pub fn login(&self, name: &str, password: &str) -> Option<(String, Principal)> {
         let found = self.users.iter().find(|(n, _, _, _)| n == name);
         let ok = found.is_some_and(|(_, _, _, phc)| {
-            PasswordHash::new(phc).is_ok_and(|parsed| Argon2::default().verify_password(password.as_bytes(), &parsed).is_ok())
+            PasswordHash::new(phc).is_ok_and(|parsed| {
+                Argon2::default()
+                    .verify_password(password.as_bytes(), &parsed)
+                    .is_ok()
+            })
         });
         let Some((name, role, spaces, _)) = found.filter(|_| ok) else {
             // Hash a dummy so an unknown user costs roughly what a known
             // one does, then add the same fixed delay either way.
             if found.is_none() {
-                let _ = PasswordHash::new(DUMMY_PHC)
-                    .map(|p| Argon2::default().verify_password(password.as_bytes(), &p).is_ok());
+                let _ = PasswordHash::new(DUMMY_PHC).map(|p| {
+                    Argon2::default()
+                        .verify_password(password.as_bytes(), &p)
+                        .is_ok()
+                });
             }
             std::thread::sleep(FAIL_DELAY);
             return None;
         };
-        let principal = Principal { name: name.clone(), role: *role, spaces: spaces.clone() };
+        let principal = Principal {
+            name: name.clone(),
+            role: *role,
+            spaces: spaces.clone(),
+        };
         let id = random_id().ok()?;
         let mut sessions = self.sessions.lock().unwrap_or_else(|p| p.into_inner());
         self.sweep(&mut sessions);
-        sessions.insert(id.clone(), Session { principal: principal.clone(), expires: Instant::now() + self.session_ttl });
+        sessions.insert(
+            id.clone(),
+            Session {
+                principal: principal.clone(),
+                expires: Instant::now() + self.session_ttl,
+            },
+        );
         Some((id, principal))
     }
 
     pub fn logout(&self, cookies: Option<&str>) {
         if let Some(id) = cookies.and_then(cookie_value) {
-            self.sessions.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
+            self.sessions
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .remove(&id);
         }
     }
 
@@ -262,18 +310,33 @@ mod tests {
         let a = authed();
         assert!(a.required());
         assert_eq!(a.principal(None, None), Err(Denied::Missing));
-        assert_eq!(a.principal(Some("Bearer wrong"), None), Err(Denied::Invalid));
-        assert_eq!(a.principal(Some("Basic abc"), None), Err(Denied::Invalid), "only Bearer is accepted");
-        assert_eq!(a.principal(None, Some("saans_session=nope")), Err(Denied::Invalid));
+        assert_eq!(
+            a.principal(Some("Bearer wrong"), None),
+            Err(Denied::Invalid)
+        );
+        assert_eq!(
+            a.principal(Some("Basic abc"), None),
+            Err(Denied::Invalid),
+            "only Bearer is accepted"
+        );
+        assert_eq!(
+            a.principal(None, Some("saans_session=nope")),
+            Err(Denied::Invalid)
+        );
         assert_eq!(a.principal(None, Some("other=1")), Err(Denied::Missing));
     }
 
     #[test]
     fn a_token_carries_its_role_and_space_scope() {
-        let p = authed().principal(Some("Bearer s3cret"), None).expect("token accepted");
+        let p = authed()
+            .principal(Some("Bearer s3cret"), None)
+            .expect("token accepted");
         assert_eq!((p.name.as_str(), p.role), ("bms", Role::Occupancy));
         assert!(p.can_see_space("lab") && !p.can_see_space("rest"));
-        assert!(!p.can_see_vitals("lab", true), "occupancy never sees vitals");
+        assert!(
+            !p.can_see_vitals("lab", true),
+            "occupancy never sees vitals"
+        );
     }
 
     #[test]
@@ -287,7 +350,9 @@ mod tests {
         let cookie = format!("{SESSION_COOKIE}={id}");
         assert_eq!(a.principal(None, Some(&cookie)).unwrap().name, "ops");
         // A header with other cookies around it still parses.
-        assert!(a.principal(None, Some(&format!("theme=dark; {cookie}; x=1"))).is_ok());
+        assert!(a
+            .principal(None, Some(&format!("theme=dark; {cookie}; x=1")))
+            .is_ok());
         a.logout(Some(&cookie));
         assert_eq!(a.principal(None, Some(&cookie)), Err(Denied::Invalid));
         assert_eq!(a.sessions_open(), 0);
@@ -302,13 +367,23 @@ mod tests {
         )));
         let (id, _) = a.login("ops", "correct horse").expect("login");
         std::thread::sleep(Duration::from_millis(5));
-        assert_eq!(a.principal(None, Some(&format!("{SESSION_COOKIE}={id}"))), Err(Denied::Invalid));
+        assert_eq!(
+            a.principal(None, Some(&format!("{SESSION_COOKIE}={id}"))),
+            Err(Denied::Invalid)
+        );
     }
 
     #[test]
     fn cookie_attributes_are_set() {
         let c = session_cookie("abc", 3600, true);
-        for want in ["saans_session=abc", "HttpOnly", "SameSite=Strict", "Max-Age=3600", "Secure", "Path=/"] {
+        for want in [
+            "saans_session=abc",
+            "HttpOnly",
+            "SameSite=Strict",
+            "Max-Age=3600",
+            "Secure",
+            "Path=/",
+        ] {
             assert!(c.contains(want), "{c:?} missing {want}");
         }
         assert!(!session_cookie("abc", 3600, false).contains("Secure"));
@@ -317,7 +392,9 @@ mod tests {
 
     #[test]
     fn ct_eq_matches_str_eq() {
-        assert!(ct_eq("abc", "abc") && !ct_eq("abc", "abd") && !ct_eq("abc", "abcd") && !ct_eq("", "a"));
+        assert!(
+            ct_eq("abc", "abc") && !ct_eq("abc", "abd") && !ct_eq("abc", "abcd") && !ct_eq("", "a")
+        );
         assert!(ct_eq("", ""));
     }
 }

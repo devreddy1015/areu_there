@@ -51,7 +51,15 @@ pub struct EventLog {
 impl EventLog {
     pub fn new(dir: &Path, offset_min: i32) -> io::Result<Self> {
         fs::create_dir_all(dir)?;
-        Ok(Self { dir: dir.to_path_buf(), offset_min, day: i64::MIN, file: None, written: 0, write_errors: 0, last_error: None })
+        Ok(Self {
+            dir: dir.to_path_buf(),
+            offset_min,
+            day: i64::MIN,
+            file: None,
+            written: 0,
+            write_errors: 0,
+            last_error: None,
+        })
     }
 
     pub fn path_for_day(&self, day: i64) -> PathBuf {
@@ -63,7 +71,11 @@ impl EventLog {
         let day = local_day(unix_ms, self.offset_min);
         if day != self.day || self.file.is_none() {
             self.day = day;
-            self.file = match OpenOptions::new().create(true).append(true).open(self.path_for_day(day)) {
+            self.file = match OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(self.path_for_day(day))
+            {
                 Ok(f) => Some(f),
                 Err(e) => {
                     self.fail(e);
@@ -131,8 +143,11 @@ pub fn load_recent_events(dir: &Path, max: usize) -> Vec<Value> {
     let mut n = 0;
     for (_, path) in list_logs(dir).into_iter().rev() {
         let Ok(f) = File::open(&path) else { continue };
-        let mut day: Vec<Value> =
-            BufReader::new(f).lines().map_while(Result::ok).filter_map(|l| serde_json::from_str(&l).ok()).collect();
+        let mut day: Vec<Value> = BufReader::new(f)
+            .lines()
+            .map_while(Result::ok)
+            .filter_map(|l| serde_json::from_str(&l).ok())
+            .collect();
         if day.len() > max - n {
             day.drain(..day.len() - (max - n));
         }
@@ -162,28 +177,53 @@ pub fn load_history(dir: &Path) -> (BTreeMap<String, Vec<DailySummary>>, Option<
         let spaces = v.get("spaces")?.as_object()?;
         spaces
             .iter()
-            .map(|(k, v)| serde_json::from_value::<Vec<DailySummary>>(v.clone()).ok().map(|h| (k.clone(), h)))
+            .map(|(k, v)| {
+                serde_json::from_value::<Vec<DailySummary>>(v.clone())
+                    .ok()
+                    .map(|h| (k.clone(), h))
+            })
             .collect::<Option<BTreeMap<_, _>>>()
     });
     match parsed {
         Some(h) => (h, None),
         None => {
-            let aside = dir.join(format!("history.json.unreadable-{}", crate::timefmt::now_unix_ms()));
+            let aside = dir.join(format!(
+                "history.json.unreadable-{}",
+                crate::timefmt::now_unix_ms()
+            ));
             let moved = fs::rename(&path, &aside).is_ok();
-            let what = if moved { format!("moved to {}", aside.display()) } else { "left in place".into() };
-            (BTreeMap::new(), Some(format!("{} does not parse; {what}; starting with empty baselines", path.display())))
+            let what = if moved {
+                format!("moved to {}", aside.display())
+            } else {
+                "left in place".into()
+            };
+            (
+                BTreeMap::new(),
+                Some(format!(
+                    "{} does not parse; {what}; starting with empty baselines",
+                    path.display()
+                )),
+            )
         }
     }
 }
 
 /// Write `history.json` atomically (temp file + rename).
-pub fn save_history(dir: &Path, history: &BTreeMap<String, Vec<DailySummary>>, saved_time: &str) -> io::Result<()> {
+pub fn save_history(
+    dir: &Path,
+    history: &BTreeMap<String, Vec<DailySummary>>,
+    saved_time: &str,
+) -> io::Result<()> {
     fs::create_dir_all(dir)?;
     let doc = serde_json::json!({ "version": 1, "saved": saved_time, "spaces": history });
     let tmp = dir.join("history.json.tmp");
     {
         let mut f = File::create(&tmp)?;
-        f.write_all(serde_json::to_string_pretty(&doc).map_err(io::Error::other)?.as_bytes())?;
+        f.write_all(
+            serde_json::to_string_pretty(&doc)
+                .map_err(io::Error::other)?
+                .as_bytes(),
+        )?;
         f.write_all(b"\n")?;
         f.sync_all()?;
     }
@@ -223,17 +263,28 @@ mod tests {
         log.append(oct13 - 4 * 3_600_000, "{\"n\":1}");
         log.append(oct13 - 40 * day_ms, "{\"n\":0}");
         log.append(oct13 + 3_600_000, "{\"n\":2}");
-        let names: Vec<String> =
-            list_logs(&dir).iter().map(|(_, p)| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
-        assert_eq!(names, vec!["events-2026-09-03.jsonl", "events-2026-10-13.jsonl"]);
+        let names: Vec<String> = list_logs(&dir)
+            .iter()
+            .map(|(_, p)| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["events-2026-09-03.jsonl", "events-2026-10-13.jsonl"]
+        );
         assert_eq!(load_recent_events(&dir, 10).len(), 3);
-        assert_eq!(load_recent_events(&dir, 2), vec![serde_json::json!({"n":1}), serde_json::json!({"n":2})]);
+        assert_eq!(
+            load_recent_events(&dir, 2),
+            vec![serde_json::json!({"n":1}), serde_json::json!({"n":2})]
+        );
         let removed = prune_logs(&dir, 30, 330, oct13 + 3_600_000);
         assert_eq!(removed.len(), 1);
         assert_eq!(list_logs(&dir).len(), 1);
         // A file is kept while any of its events may still be in retention.
         assert!(prune_logs(&dir, 1, 330, oct13 + day_ms + 3_600_000).is_empty());
-        assert_eq!(prune_logs(&dir, 1, 330, oct13 + 2 * day_ms + 3_600_000).len(), 1);
+        assert_eq!(
+            prune_logs(&dir, 1, 330, oct13 + 2 * day_ms + 3_600_000).len(),
+            1
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 

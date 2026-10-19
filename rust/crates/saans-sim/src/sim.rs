@@ -129,7 +129,8 @@ impl Simulator {
 
     /// Build a simulator with explicit options. Panics on an invalid scenario.
     pub fn with_options(s: &Scenario, opts: SimOptions) -> Self {
-        Self::try_with_options(s, opts).unwrap_or_else(|e| panic!("invalid scenario {:?}: {e}", s.name))
+        Self::try_with_options(s, opts)
+            .unwrap_or_else(|e| panic!("invalid scenario {:?}: {e}", s.name))
     }
 
     /// Build a simulator, or say what is wrong with the scenario.
@@ -144,7 +145,10 @@ impl Simulator {
             return Err(format!("room size {:?} must be positive", s.room.size_m));
         }
         if !(s.sample_rate_hz > 0.0 && s.sample_rate_hz.is_finite()) {
-            return Err(format!("sample_rate_hz {} must be positive", s.sample_rate_hz));
+            return Err(format!(
+                "sample_rate_hz {} must be positive",
+                s.sample_rate_hz
+            ));
         }
         if s.n_subcarriers == 0 {
             return Err("n_subcarriers must be at least 1".into());
@@ -163,17 +167,34 @@ impl Simulator {
         }
         for n in &s.nodes {
             if !(n.pos.0 > 0.0 && n.pos.0 < w && n.pos.1 > 0.0 && n.pos.1 < h) {
-                return Err(format!("node {} at {:?} is not inside room {:?}", n.id, n.pos, s.room.size_m));
+                return Err(format!(
+                    "node {} at {:?} is not inside room {:?}",
+                    n.id, n.pos, s.room.size_m
+                ));
             }
         }
-        let node = |id: u8| s.nodes.iter().find(|n| n.id == id).map(|n| n.pos).ok_or(format!("link references unknown node {id}"));
+        let node = |id: u8| {
+            s.nodes
+                .iter()
+                .find(|n| n.id == id)
+                .map(|n| n.pos)
+                .ok_or(format!("link references unknown node {id}"))
+        };
 
         // Furniture: explicit first, then Python's rule for random ones.
-        let mut scatterers: Vec<(Point, f64)> = s.room.scatterers.iter().map(|sc| (sc.pos, sc.rcs_m2)).collect();
+        let mut scatterers: Vec<(Point, f64)> = s
+            .room
+            .scatterers
+            .iter()
+            .map(|sc| (sc.pos, sc.rcs_m2))
+            .collect();
         let mut room_rng = Rng::stream(s.seed, STREAM_ROOM);
         let (lo, hi) = s.room.scatterer_rcs_m2;
         for _ in 0..s.room.n_scatterers {
-            let p = (room_rng.range(0.05 * w, 0.95 * w), room_rng.range(0.05 * h, 0.95 * h));
+            let p = (
+                room_rng.range(0.05 * w, 0.95 * w),
+                room_rng.range(0.05 * h, 0.95 * h),
+            );
             let rcs = room_rng.range(lo, hi);
             scatterers.push((p, rcs));
         }
@@ -184,8 +205,22 @@ impl Simulator {
             if crate::physics::dist(ptx, prx) <= 0.0 {
                 return Err(format!("link ({tx}, {rx}): nodes coincide"));
             }
-            let ch = LinkChannel::new(&s.room, &scatterers, ptx, prx, opts.carrier_hz, opts.subcarrier_spacing_hz, s.n_subcarriers);
-            links.push(LinkSim { tx, rx, ch, rng: Rng::stream(s.seed, STREAM_LINK0 + i as u64), seq: 0 });
+            let ch = LinkChannel::new(
+                &s.room,
+                &scatterers,
+                ptx,
+                prx,
+                opts.carrier_hz,
+                opts.subcarrier_spacing_hz,
+                s.n_subcarriers,
+            );
+            links.push(LinkSim {
+                tx,
+                rx,
+                ch,
+                rng: Rng::stream(s.seed, STREAM_LINK0 + i as u64),
+                seq: 0,
+            });
         }
 
         let plan = Plan::new(s, &mut Rng::stream(s.seed, STREAM_PLAN));
@@ -244,7 +279,18 @@ impl Simulator {
         let fs = self.sc.sample_rate_hz;
         let t = self.tick as f64 / fs;
         let truth = self.truth_at(t);
-        let Self { sc, opts, plan, links, pts, re, im, pos_override, present, .. } = self;
+        let Self {
+            sc,
+            opts,
+            plan,
+            links,
+            pts,
+            re,
+            im,
+            pos_override,
+            present,
+            ..
+        } = self;
         let (pos_override, present) = (*pos_override, *present);
         let mut frames = Vec::with_capacity(links.len());
         for link in links.iter_mut() {
@@ -262,7 +308,13 @@ impl Simulator {
             re.copy_from_slice(&link.ch.static_re);
             im.copy_from_slice(&link.ch.static_im);
             if body.present {
-                link.ch.torso(body.centre, sc.body_points, sc.body_width_m, BODY_RCS_M2, pts);
+                link.ch.torso(
+                    body.centre,
+                    sc.body_points,
+                    sc.body_width_m,
+                    BODY_RCS_M2,
+                    pts,
+                );
                 for p in pts.iter() {
                     // Chest motion shortens/lengthens the path by gain * disp:
                     // exp(-j k L) * exp(+j k g disp) = exp(-j k (L - g disp)).
@@ -290,13 +342,21 @@ impl Simulator {
                 phases.push(hi.atan2(hr));
             }
             let mean = (sum_amp / n as f64).max(1e-9);
-            let rssi = (RSSI_REF_DBM + 20.0 * (mean / 40.0).log10() + link.rng.range(-1.0, 1.0)).round() as i32;
+            let rssi = (RSSI_REF_DBM + 20.0 * (mean / 40.0).log10() + link.rng.range(-1.0, 1.0))
+                .round() as i32;
             frames.push(LinkFrame {
                 tx: link.tx,
                 rx: link.rx,
                 seq,
                 t_s: tl,
-                frame: CsiFrame { amplitudes, phases, sample_index: seq as u64, sample_rate_hz: fs, rssi_dbm: rssi, node_id: link.rx },
+                frame: CsiFrame {
+                    amplitudes,
+                    phases,
+                    sample_index: seq as u64,
+                    sample_rate_hz: fs,
+                    rssi_dbm: rssi,
+                    node_id: link.rx,
+                },
             });
         }
         self.now_s = t;
@@ -402,11 +462,30 @@ impl Simulator {
             .links
             .iter()
             .find(|l| (l.tx, l.rx) == link)
-            .unwrap_or_else(|| panic!("sensitivity: link {link:?} is not in scenario {:?}", self.sc.name));
+            .unwrap_or_else(|| {
+                panic!(
+                    "sensitivity: link {link:?} is not in scenario {:?}",
+                    self.sc.name
+                )
+            });
         let mut pts = Vec::with_capacity(self.sc.body_points.max(1));
-        l.ch.torso(centre, self.sc.body_points, self.sc.body_width_m, BODY_RCS_M2, &mut pts);
-        let extra: Vec<(f64, f64)> =
-            if self.opts.arm_rcs_m2 > 0.0 { vec![point_path(l.ch.tx, l.ch.rx, self.plan.arm_rest(centre), self.opts.arm_rcs_m2)] } else { Vec::new() };
+        l.ch.torso(
+            centre,
+            self.sc.body_points,
+            self.sc.body_width_m,
+            BODY_RCS_M2,
+            &mut pts,
+        );
+        let extra: Vec<(f64, f64)> = if self.opts.arm_rcs_m2 > 0.0 {
+            vec![point_path(
+                l.ch.tx,
+                l.ch.rx,
+                self.plan.arm_rest(centre),
+                self.opts.arm_rcs_m2,
+            )]
+        } else {
+            Vec::new()
+        };
         l.ch.sensitivity(&pts, &extra)
     }
 
@@ -414,7 +493,8 @@ impl Simulator {
     /// `res_m` grid. See [`Coverage`]. Panics on a link that is not in the
     /// scenario or a `res_m` [`Simulator::try_coverage`] rejects.
     pub fn coverage(&self, link: (u8, u8), res_m: f64) -> Coverage {
-        self.try_coverage(link, res_m).unwrap_or_else(|e| panic!("coverage: {e}"))
+        self.try_coverage(link, res_m)
+            .unwrap_or_else(|e| panic!("coverage: {e}"))
     }
 
     /// [`Simulator::coverage`], saying what is wrong with `res_m` instead
@@ -430,7 +510,9 @@ impl Simulator {
         let h = (room_h / res_m).ceil().max(1.0) as usize;
         let cells = w.saturating_mul(h);
         if cells > MAX_COVERAGE_CELLS {
-            return Err(format!("res_m {res_m} gives {w}x{h} = {cells} cells, over the {MAX_COVERAGE_CELLS} cap"));
+            return Err(format!(
+                "res_m {res_m} gives {w}x{h} = {cells} cells, over the {MAX_COVERAGE_CELLS} cap"
+            ));
         }
         let origin_m = (res_m / 2.0, res_m / 2.0);
 
@@ -449,7 +531,10 @@ impl Simulator {
         let mut raw: Vec<f64> = Vec::with_capacity(cells);
         for iy in 0..h {
             for ix in 0..w {
-                let c = (origin_m.0 + ix as f64 * res_m, origin_m.1 + iy as f64 * res_m);
+                let c = (
+                    origin_m.0 + ix as f64 * res_m,
+                    origin_m.1 + iy as f64 * res_m,
+                );
                 raw.push(self.sensitivity_at(link, c).into_iter().fold(0.0, f64::max));
             }
         }
@@ -469,8 +554,19 @@ impl Simulator {
         };
         // A room whose median sensitivity is zero has no scale to be
         // relative to; serve the raw [0, 1] values rather than 0/0.
-        let values = if median_raw > 0.0 { raw.iter().map(|v| v / median_raw).collect() } else { raw };
-        Ok(Coverage { res_m, w, h, origin_m, median_raw, values })
+        let values = if median_raw > 0.0 {
+            raw.iter().map(|v| v / median_raw).collect()
+        } else {
+            raw
+        };
+        Ok(Coverage {
+            res_m,
+            w,
+            h,
+            origin_m,
+            median_raw,
+            values,
+        })
     }
 }
 

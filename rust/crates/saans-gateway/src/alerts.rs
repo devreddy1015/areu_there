@@ -76,7 +76,11 @@ impl AlertService {
 
     /// Consume the output fan-out; deliver, escalate, poll Telegram for
     /// button presses. Ends when `stop` turns true.
-    pub fn spawn(self: &Arc<Self>, _rx: broadcast::Receiver<OutputMsg>, _stop: watch::Receiver<bool>) -> JoinHandle<()> {
+    pub fn spawn(
+        self: &Arc<Self>,
+        _rx: broadcast::Receiver<OutputMsg>,
+        _stop: watch::Receiver<bool>,
+    ) -> JoinHandle<()> {
         todo!("outputs agent")
     }
 
@@ -94,7 +98,13 @@ impl AlertService {
         todo!("outputs agent")
     }
 
-    pub fn resolve(&self, _id: u64, _by: &str, _note: &str, _unix_ms: i64) -> Result<Alert, AlertError> {
+    pub fn resolve(
+        &self,
+        _id: u64,
+        _by: &str,
+        _note: &str,
+        _unix_ms: i64,
+    ) -> Result<Alert, AlertError> {
         todo!("outputs agent")
     }
 }

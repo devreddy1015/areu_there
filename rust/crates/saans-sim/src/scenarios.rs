@@ -54,18 +54,32 @@ pub fn room_clear_los() -> Room {
 
 /// Order 2, LoS -6 dB, 12 scatterers ("attenuated-LoS").
 pub fn room_attenuated_los() -> Room {
-    Room { reflection_order: 2, los_attenuation_db: 6.0, n_scatterers: 12, ..Room::default() }
+    Room {
+        reflection_order: 2,
+        los_attenuation_db: 6.0,
+        n_scatterers: 12,
+        ..Room::default()
+    }
 }
 
 /// Order 2, LoS -15 dB, 12 scatterers, Gamma 0.6 ("rich-NLoS").
 pub fn room_rich_nlos() -> Room {
-    Room { reflection_order: 2, los_attenuation_db: 15.0, n_scatterers: 12, wall_reflection: 0.6, ..Room::default() }
+    Room {
+        reflection_order: 2,
+        los_attenuation_db: 15.0,
+        n_scatterers: 12,
+        wall_reflection: 0.6,
+        ..Room::default()
+    }
 }
 
 // -------------------------------------------------------------- layouts
 
 fn nodes(ps: &[Point]) -> Vec<Node> {
-    ps.iter().enumerate().map(|(i, &pos)| Node { id: i as u8, pos }).collect()
+    ps.iter()
+        .enumerate()
+        .map(|(i, &pos)| Node { id: i as u8, pos })
+        .collect()
 }
 
 const N0: Point = (1.5, 2.5);
@@ -74,23 +88,35 @@ const N2: Point = (3.0, 4.6);
 
 /// Two nodes 3 m apart, one link (the Python reference geometry).
 pub fn one_link() -> Layout {
-    Layout { nodes: nodes(&[N0, N1]), links: vec![(0, 1)] }
+    Layout {
+        nodes: nodes(&[N0, N1]),
+        links: vec![(0, 1)],
+    }
 }
 
 /// Three nodes, two links at different angles (horizontal and ~54 deg).
 pub fn two_links() -> Layout {
-    Layout { nodes: nodes(&[N0, N1, N2]), links: vec![(0, 1), (0, 2)] }
+    Layout {
+        nodes: nodes(&[N0, N1, N2]),
+        links: vec![(0, 1), (0, 2)],
+    }
 }
 
 /// The same three nodes, all three links.
 pub fn three_links() -> Layout {
-    Layout { nodes: nodes(&[N0, N1, N2]), links: vec![(0, 1), (0, 2), (1, 2)] }
+    Layout {
+        nodes: nodes(&[N0, N1, N2]),
+        links: vec![(0, 1), (0, 2), (1, 2)],
+    }
 }
 
 // ------------------------------------------------------------ timelines
 
 fn seg(duration_s: f64, activity: Activity) -> Segment {
-    Segment { duration_s, activity }
+    Segment {
+        duration_s,
+        activity,
+    }
 }
 
 fn absent(duration_s: f64) -> Segment {
@@ -99,7 +125,13 @@ fn absent(duration_s: f64) -> Segment {
 
 /// Walk from `from` to `to` at walking speed, plus a second standing.
 fn walk(from: Point, to: Point) -> Segment {
-    seg(dist(from, to) / WALK_SPEED_MPS + 1.0, Activity::WalkTo { to, speed_mps: WALK_SPEED_MPS })
+    seg(
+        dist(from, to) / WALK_SPEED_MPS + 1.0,
+        Activity::WalkTo {
+            to,
+            speed_mps: WALK_SPEED_MPS,
+        },
+    )
 }
 
 fn seated(duration_s: f64, at: Point, bpm: f64, bpm_end: Option<f64>) -> Segment {
@@ -113,7 +145,13 @@ pub fn empty(hours: f64) -> Vec<Segment> {
 
 /// Walk in, sit still reading for `minutes` (15 -> 14 BPM), walk out.
 pub fn reader(minutes: f64) -> Vec<Segment> {
-    vec![absent(LEAD_IN_S), walk(DOOR, CHAIR), seated(minutes * 60.0, CHAIR, 15.0, Some(14.0)), walk(CHAIR, DOOR), absent(LEAD_OUT_S)]
+    vec![
+        absent(LEAD_IN_S),
+        walk(DOOR, CHAIR),
+        seated(minutes * 60.0, CHAIR, 15.0, Some(14.0)),
+        walk(CHAIR, DOOR),
+        absent(LEAD_OUT_S),
+    ]
 }
 
 /// [`night_seeded`] with seed 1.
@@ -133,12 +171,22 @@ const NIGHT_CHUNK_S: f64 = 900.0;
 /// and occasional fidget episodes, then walk out. Events are at least
 /// 90 s apart, the first 3 min after lying down, so each pause follows
 /// steady breathing. The night lasts `hours` in total.
-pub fn night_seeded(hours: f64, pauses_per_hour: f64, pause_s: (f64, f64), seed: u64) -> Vec<Segment> {
+pub fn night_seeded(
+    hours: f64,
+    pauses_per_hour: f64,
+    pause_s: (f64, f64),
+    seed: u64,
+) -> Vec<Segment> {
     let mut rng = Rng::stream(seed, 0x004E_4947_4854);
     let walk_in = walk(DOOR, BED);
     let walk_out = walk(BED, DOOR);
-    let lying = (hours * 3600.0 - LEAD_IN_S - walk_in.duration_s - walk_out.duration_s - LEAD_OUT_S).max(NIGHT_SETTLE_S + 60.0);
-    let (pmin, pmax) = (pause_s.0.min(pause_s.1).max(1.0), pause_s.0.max(pause_s.1).max(1.0));
+    let lying =
+        (hours * 3600.0 - LEAD_IN_S - walk_in.duration_s - walk_out.duration_s - LEAD_OUT_S)
+            .max(NIGHT_SETTLE_S + 60.0);
+    let (pmin, pmax) = (
+        pause_s.0.min(pause_s.1).max(1.0),
+        pause_s.0.max(pause_s.1).max(1.0),
+    );
     let pph = pauses_per_hour.max(0.0);
     let rate = (pph + NIGHT_FIDGETS_PER_HOUR) / 3600.0;
 
@@ -150,7 +198,11 @@ pub fn night_seeded(hours: f64, pauses_per_hour: f64, pause_s: (f64, f64), seed:
         t += rng.exp(1.0 / rate);
         t = t.max(prev_end + NIGHT_MIN_GAP_S);
         let is_pause = rng.uniform() < pph / (pph + NIGHT_FIDGETS_PER_HOUR);
-        let d = if is_pause { rng.range(pmin, pmax) } else { NIGHT_FIDGET_S };
+        let d = if is_pause {
+            rng.range(pmin, pmax)
+        } else {
+            NIGHT_FIDGET_S
+        };
         if t + d + 60.0 > lying {
             break;
         }
@@ -179,7 +231,15 @@ pub fn night_seeded(hours: f64, pauses_per_hour: f64, pause_s: (f64, f64), seed:
         if is_pause {
             out.push(seg(d, Activity::BreathingPause { at: BED }));
         } else {
-            out.push(seg(d, Activity::Fidget { at: BED, bpm, every_s: 6.0, burst_s: 3.0 }));
+            out.push(seg(
+                d,
+                Activity::Fidget {
+                    at: BED,
+                    bpm,
+                    every_s: 6.0,
+                    burst_s: 3.0,
+                },
+            ));
         }
         cursor = start + d;
     }
@@ -195,10 +255,27 @@ pub fn collapse() -> Vec<Segment> {
     vec![
         absent(LEAD_IN_S),
         walk(DOOR, CHAIR),
-        seg(30.0, Activity::Walk { speed_mps: WALK_SPEED_MPS }),
+        seg(
+            30.0,
+            Activity::Walk {
+                speed_mps: WALK_SPEED_MPS,
+            },
+        ),
         // From anywhere in the room: the longest walk is under 7 s.
-        seg(8.0, Activity::WalkTo { to: FALL_FROM, speed_mps: WALK_SPEED_MPS }),
-        seg(0.8 + 300.0, Activity::Fall { to: FALL_TO, bpm: 18.0 }),
+        seg(
+            8.0,
+            Activity::WalkTo {
+                to: FALL_FROM,
+                speed_mps: WALK_SPEED_MPS,
+            },
+        ),
+        seg(
+            0.8 + 300.0,
+            Activity::Fall {
+                to: FALL_TO,
+                bpm: 18.0,
+            },
+        ),
     ]
 }
 
@@ -206,11 +283,20 @@ pub fn collapse() -> Vec<Segment> {
 /// walk out.
 pub fn sit_down() -> Vec<Segment> {
     let d = dist(DOOR, CHAIR);
-    let approach = (CHAIR.0 + (DOOR.0 - CHAIR.0) * 0.4 / d, CHAIR.1 + (DOOR.1 - CHAIR.1) * 0.4 / d);
+    let approach = (
+        CHAIR.0 + (DOOR.0 - CHAIR.0) * 0.4 / d,
+        CHAIR.1 + (DOOR.1 - CHAIR.1) * 0.4 / d,
+    );
     vec![
         absent(LEAD_IN_S),
         walk(DOOR, approach),
-        seg(0.6 + 600.0, Activity::SitDown { at: CHAIR, bpm: 16.0 }),
+        seg(
+            0.6 + 600.0,
+            Activity::SitDown {
+                at: CHAIR,
+                bpm: 16.0,
+            },
+        ),
         walk(CHAIR, DOOR),
         absent(LEAD_OUT_S),
     ]
@@ -236,7 +322,15 @@ pub fn lone_worker(minutes: f64) -> Vec<Segment> {
     vec![
         absent(LEAD_IN_S),
         walk(DOOR, DESK),
-        seg(minutes * 60.0, Activity::Fidget { at: DESK, bpm: 15.0, every_s: 20.0, burst_s: 3.0 }),
+        seg(
+            minutes * 60.0,
+            Activity::Fidget {
+                at: DESK,
+                bpm: 15.0,
+                every_s: 20.0,
+                burst_s: 3.0,
+            },
+        ),
         seated(40.0 * 60.0, DESK, 13.0, None),
     ]
 }
@@ -247,7 +341,13 @@ pub fn lone_worker(minutes: f64) -> Vec<Segment> {
 /// 20 Hz, noise 2.0 (per component, against |LoS| = 40), 2% loss, a
 /// 3-point x 0.3 m torso. (2 ms jitter and the 0.05 m^2 arm come from
 /// `SimOptions::default()`.)
-pub fn scenario(name: &str, room: Room, layout: Layout, timeline: Vec<Segment>, seed: u64) -> Scenario {
+pub fn scenario(
+    name: &str,
+    room: Room,
+    layout: Layout,
+    timeline: Vec<Segment>,
+    seed: u64,
+) -> Scenario {
     Scenario {
         name: name.to_string(),
         room,
@@ -274,7 +374,14 @@ mod tests {
 
     #[test]
     fn timelines_start_empty_long_enough() {
-        for tl in [reader(5.0), night(1.0, 4.0, (10.0, 40.0)), collapse(), sit_down(), tachypnea(), lone_worker(5.0)] {
+        for tl in [
+            reader(5.0),
+            night(1.0, 4.0, (10.0, 40.0)),
+            collapse(),
+            sit_down(),
+            tachypnea(),
+            lone_worker(5.0),
+        ] {
             assert!(matches!(tl[0].activity, Activity::Absent));
             assert!(tl[0].duration_s >= 95.0);
         }
@@ -284,10 +391,21 @@ mod tests {
     fn night_has_requested_length_and_pauses() {
         let tl = night_seeded(8.0, 4.0, (10.0, 40.0), 9);
         assert!((total(&tl) - 8.0 * 3600.0).abs() < 1e-6, "{}", total(&tl));
-        let pauses: Vec<f64> = tl.iter().filter(|s| matches!(s.activity, Activity::BreathingPause { .. })).map(|s| s.duration_s).collect();
+        let pauses: Vec<f64> = tl
+            .iter()
+            .filter(|s| matches!(s.activity, Activity::BreathingPause { .. }))
+            .map(|s| s.duration_s)
+            .collect();
         // ~4/h over ~7.9 h, thinned slightly by the minimum gap.
-        assert!(pauses.len() > 15 && pauses.len() < 50, "{} pauses", pauses.len());
+        assert!(
+            pauses.len() > 15 && pauses.len() < 50,
+            "{} pauses",
+            pauses.len()
+        );
         assert!(pauses.iter().all(|&d| (10.0..=40.0).contains(&d)));
-        assert_ne!(format!("{:?}", night_seeded(8.0, 4.0, (10.0, 40.0), 10)), format!("{tl:?}"));
+        assert_ne!(
+            format!("{:?}", night_seeded(8.0, 4.0, (10.0, 40.0), 10)),
+            format!("{tl:?}")
+        );
     }
 }

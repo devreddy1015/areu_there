@@ -103,7 +103,9 @@ impl<R: Read> PcapReader<R> {
         let mut head = [0u8; 24];
         let n = read_full(&mut r, &mut head)?;
         if n < 24 {
-            return Err(PcapError::Format(format!("not a pcap file (only {n} bytes)")));
+            return Err(PcapError::Format(format!(
+                "not a pcap file (only {n} bytes)"
+            )));
         }
         let le = u32::from_le_bytes(head[0..4].try_into().unwrap());
         let (big_endian, frac_ns) = match le {
@@ -112,12 +114,15 @@ impl<R: Read> PcapReader<R> {
             _ => match u32::from_be_bytes(head[0..4].try_into().unwrap()) {
                 PCAP_MAGIC_US => (true, 1000),
                 PCAP_MAGIC_NS => (true, 1),
-                _ if le == PCAPNG_MAGIC => {
-                    return Err(PcapError::Format(
-                        "pcapng is not supported; convert with `editcap -F pcap in.pcapng out.pcap`".into(),
-                    ))
+                _ if le == PCAPNG_MAGIC => return Err(PcapError::Format(
+                    "pcapng is not supported; convert with `editcap -F pcap in.pcapng out.pcap`"
+                        .into(),
+                )),
+                _ => {
+                    return Err(PcapError::Format(format!(
+                        "not a pcap file (magic 0x{le:08X})"
+                    )))
                 }
-                _ => return Err(PcapError::Format(format!("not a pcap file (magic 0x{le:08X})"))),
             },
         };
         let u32_at = |o: usize| {
@@ -130,13 +135,33 @@ impl<R: Read> PcapReader<R> {
         };
         // The top bits of the link-type field can carry FCS information.
         let linktype = u32_at(20) & 0x03FF_FFFF;
-        if ![LINKTYPE_NULL, LINKTYPE_ETHERNET, LINKTYPE_RAW, LINKTYPE_LINUX_SLL, LINKTYPE_IPV4, LINKTYPE_LINUX_SLL2]
-            .contains(&linktype)
+        if ![
+            LINKTYPE_NULL,
+            LINKTYPE_ETHERNET,
+            LINKTYPE_RAW,
+            LINKTYPE_LINUX_SLL,
+            LINKTYPE_IPV4,
+            LINKTYPE_LINUX_SLL2,
+        ]
+        .contains(&linktype)
         {
-            return Err(PcapError::Format(format!("unsupported pcap link type {linktype}")));
+            return Err(PcapError::Format(format!(
+                "unsupported pcap link type {linktype}"
+            )));
         }
-        let stats = ReadStats { linktype, nanosecond: frac_ns == 1, ..Default::default() };
-        Ok(Self { r, big_endian, frac_ns, linktype, port, stats })
+        let stats = ReadStats {
+            linktype,
+            nanosecond: frac_ns == 1,
+            ..Default::default()
+        };
+        Ok(Self {
+            r,
+            big_endian,
+            frac_ns,
+            linktype,
+            port,
+            stats,
+        })
     }
 
     fn u32_of(&self, b: &[u8]) -> u32 {
@@ -160,7 +185,11 @@ impl<R: Read> PcapReader<R> {
                 self.stats.truncated = true;
                 return Ok(None);
             }
-            let (sec, frac, incl) = (self.u32_of(&hdr[0..4]), self.u32_of(&hdr[4..8]), self.u32_of(&hdr[8..12]));
+            let (sec, frac, incl) = (
+                self.u32_of(&hdr[0..4]),
+                self.u32_of(&hdr[4..8]),
+                self.u32_of(&hdr[8..12]),
+            );
             if incl > MAX_RECORD {
                 return Err(PcapError::Format(format!(
                     "corrupt record {}: length {incl} exceeds {MAX_RECORD}",
@@ -173,7 +202,10 @@ impl<R: Read> PcapReader<R> {
                 return Ok(None);
             }
             self.stats.records += 1;
-            if let Some(d) = self.udp_of(&data, sec as i64 * 1_000_000_000 + frac as i64 * self.frac_ns) {
+            if let Some(d) = self.udp_of(
+                &data,
+                sec as i64 * 1_000_000_000 + frac as i64 * self.frac_ns,
+            ) {
                 self.stats.packets += 1;
                 return Ok(Some(d));
             }
@@ -183,7 +215,9 @@ impl<R: Read> PcapReader<R> {
     fn udp_of(&mut self, data: &[u8], t_ns: i64) -> Option<Datagram> {
         let be16 = |o: usize| u16::from_be_bytes([data[o], data[o + 1]]);
         let st = &mut self.stats;
-        let Some(ip) = ipv4_offset(self.linktype, data).filter(|&ip| data.len() >= ip + 20 && data[ip] >> 4 == 4) else {
+        let Some(ip) = ipv4_offset(self.linktype, data)
+            .filter(|&ip| data.len() >= ip + 20 && data[ip] >> 4 == 4)
+        else {
             st.not_ipv4 += 1;
             return None;
         };
@@ -203,7 +237,11 @@ impl<R: Read> PcapReader<R> {
         // Ethernet pads short frames and may carry an FCS: trust the IP
         // total length over the record length where it is set.
         let ip_total = be16(ip + 2) as usize;
-        let ip_end = if ip_total == 0 { data.len() } else { data.len().min(ip + ip_total) };
+        let ip_end = if ip_total == 0 {
+            data.len()
+        } else {
+            data.len().min(ip + ip_total)
+        };
         let udp = ip + ihl;
         if ip_end < udp + 8 {
             st.snapped += 1;
@@ -275,9 +313,18 @@ impl<W: Write> PcapWriter<W> {
         Ok(Self { w, ip_id: 0 })
     }
 
-    pub fn write(&mut self, t_ns: i64, src: SocketAddrV4, dst: SocketAddrV4, payload: &[u8]) -> io::Result<()> {
+    pub fn write(
+        &mut self,
+        t_ns: i64,
+        src: SocketAddrV4,
+        dst: SocketAddrV4,
+        payload: &[u8],
+    ) -> io::Result<()> {
         if payload.len() > 65_535 - 28 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "payload does not fit one IPv4 datagram"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "payload does not fit one IPv4 datagram",
+            ));
         }
         let total = 28 + payload.len();
         let mut ip = [0u8; 28];
@@ -289,7 +336,10 @@ impl<W: Write> PcapWriter<W> {
         ip[9] = 17;
         ip[12..16].copy_from_slice(&src.ip().octets());
         ip[16..20].copy_from_slice(&dst.ip().octets());
-        let mut sum: u32 = ip[..20].chunks(2).map(|c| u16::from_be_bytes([c[0], c[1]]) as u32).sum();
+        let mut sum: u32 = ip[..20]
+            .chunks(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]) as u32)
+            .sum();
         while sum >> 16 != 0 {
             sum = (sum & 0xFFFF) + (sum >> 16);
         }
@@ -297,7 +347,10 @@ impl<W: Write> PcapWriter<W> {
         ip[20..22].copy_from_slice(&src.port().to_be_bytes());
         ip[22..24].copy_from_slice(&dst.port().to_be_bytes());
         ip[24..26].copy_from_slice(&((8 + payload.len()) as u16).to_be_bytes());
-        let (sec, nsec) = (t_ns.div_euclid(1_000_000_000), t_ns.rem_euclid(1_000_000_000));
+        let (sec, nsec) = (
+            t_ns.div_euclid(1_000_000_000),
+            t_ns.rem_euclid(1_000_000_000),
+        );
         let mut rec = Vec::with_capacity(16);
         rec.extend_from_slice(&(sec as u32).to_le_bytes());
         rec.extend_from_slice(&(nsec as u32).to_le_bytes());
@@ -326,8 +379,20 @@ mod tests {
     #[test]
     fn writer_reader_round_trip() {
         let mut w = PcapWriter::new(Vec::new()).unwrap();
-        w.write(1_700_000_000_123_456_789, addr(7, 4000), addr(1, 5566), b"hello").unwrap();
-        w.write(1_700_000_000_623_456_789, addr(8, 4000), addr(1, 9999), b"other port").unwrap();
+        w.write(
+            1_700_000_000_123_456_789,
+            addr(7, 4000),
+            addr(1, 5566),
+            b"hello",
+        )
+        .unwrap();
+        w.write(
+            1_700_000_000_623_456_789,
+            addr(8, 4000),
+            addr(1, 9999),
+            b"other port",
+        )
+        .unwrap();
         let mut bytes = w.into_inner();
         bytes.extend_from_slice(&[1, 2, 3]); // half-written final record
         let mut r = PcapReader::new(&bytes[..], Some(5566)).unwrap();
@@ -346,11 +411,34 @@ mod tests {
         // Hand-built: BE µs header, Ethernet + one VLAN tag + IPv4 + UDP.
         let mut f = Vec::new();
         f.extend_from_slice(&PCAP_MAGIC_US.to_be_bytes());
-        f.extend_from_slice(&[0, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 0, 0, 0, 1]);
+        f.extend_from_slice(&[
+            0, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 0, 0, 0, 1,
+        ]);
         let payload = b"xyz";
         let mut pkt = vec![0u8; 12];
         pkt.extend_from_slice(&[0x81, 0x00, 0x00, 0x05, 0x08, 0x00]);
-        let mut ip = vec![0x45, 0, 0, (28 + payload.len()) as u8, 0, 0, 0, 0, 64, 17, 0, 0, 10, 0, 0, 9, 10, 0, 0, 1];
+        let mut ip = vec![
+            0x45,
+            0,
+            0,
+            (28 + payload.len()) as u8,
+            0,
+            0,
+            0,
+            0,
+            64,
+            17,
+            0,
+            0,
+            10,
+            0,
+            0,
+            9,
+            10,
+            0,
+            0,
+            1,
+        ];
         ip.extend_from_slice(&[0x10, 0x00, 0x15, 0xBE, 0, (8 + payload.len()) as u8, 0, 0]);
         pkt.extend_from_slice(&ip);
         pkt.extend_from_slice(payload);
@@ -373,6 +461,10 @@ mod tests {
         assert!(PcapReader::new(&[0u8; 10][..], None).is_err());
         let mut ng = [0u8; 24];
         ng[..4].copy_from_slice(&PCAPNG_MAGIC.to_le_bytes());
-        assert!(PcapReader::new(&ng[..], None).err().unwrap().to_string().contains("pcapng"));
+        assert!(PcapReader::new(&ng[..], None)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("pcapng"));
     }
 }

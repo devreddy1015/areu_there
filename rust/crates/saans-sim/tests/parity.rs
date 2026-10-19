@@ -24,17 +24,31 @@ fn golden_dir() -> PathBuf {
 impl Vectors {
     fn load(name: &str) -> Self {
         let path = golden_dir().join(format!("{name}.kv"));
-        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e} (run spec/golden/generate.py)", path.display()));
-        Self { kv: text.lines().filter_map(|l| l.split_once(' ')).map(|(k, v)| (k.to_string(), v.to_string())).collect() }
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("{}: {e} (run spec/golden/generate.py)", path.display()));
+        Self {
+            kv: text
+                .lines()
+                .filter_map(|l| l.split_once(' '))
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
     }
     fn f(&self, k: &str) -> f64 {
-        self.kv[k].parse().unwrap_or_else(|_| panic!("{k} not a number"))
+        self.kv[k]
+            .parse()
+            .unwrap_or_else(|_| panic!("{k} not a number"))
     }
     fn a(&self, k: &str) -> Vec<f64> {
         let n: usize = self.kv[&format!("array.{k}")].parse().unwrap();
         let bytes = std::fs::read(golden_dir().join(format!("sim_geometric__{k}.f64"))).unwrap();
         assert_eq!(bytes.len(), n * 8, "array {k} length");
-        bytes.as_chunks::<8>().0.iter().map(|c| f64::from_le_bytes(*c)).collect()
+        bytes
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|c| f64::from_le_bytes(*c))
+            .collect()
     }
 }
 
@@ -45,7 +59,10 @@ fn compare(what: &str, got: &[f64], want: &[f64]) -> f64 {
     for (i, (g, w)) in got.iter().zip(want).enumerate() {
         let err = (g - w).abs();
         let scale = g.abs().max(w.abs());
-        assert!(err <= REL * scale + ABS, "{what}[{i}]: got {g:e}, want {w:e} (err {err:e})");
+        assert!(
+            err <= REL * scale + ABS,
+            "{what}[{i}]: got {g:e}, want {w:e} (err {err:e})"
+        );
         if scale > 0.0 {
             worst = worst.max(err / scale);
         }
@@ -57,7 +74,12 @@ fn python_scene(v: &Vectors) -> Scenario {
     let xs = v.a("scatterer_x");
     let ys = v.a("scatterer_y");
     let rcs = v.a("scatterer_rcs");
-    let scatterers = (0..xs.len()).map(|i| Scatterer { pos: (xs[i], ys[i]), rcs_m2: rcs[i] }).collect();
+    let scatterers = (0..xs.len())
+        .map(|i| Scatterer {
+            pos: (xs[i], ys[i]),
+            rcs_m2: rcs[i],
+        })
+        .collect();
     let room = Room {
         size_m: (v.f("room_w"), v.f("room_h")),
         wall_reflection: v.f("wall_reflection"),
@@ -73,11 +95,24 @@ fn python_scene(v: &Vectors) -> Scenario {
     Scenario {
         name: "python-parity".into(),
         room,
-        nodes: vec![Node { id: 0, pos: (v.f("tx_x"), v.f("tx_y")) }, Node { id: 1, pos: (v.f("rx_x"), v.f("rx_y")) }],
+        nodes: vec![
+            Node {
+                id: 0,
+                pos: (v.f("tx_x"), v.f("tx_y")),
+            },
+            Node {
+                id: 1,
+                pos: (v.f("rx_x"), v.f("rx_y")),
+            },
+        ],
         links: vec![(0, 1)],
         timeline: vec![Segment {
             duration_s: n_frames as f64 / fs,
-            activity: Activity::Seated { at: (v.f("body_x"), v.f("body_y")), bpm: v.f("breathing_bpm"), bpm_end: None },
+            activity: Activity::Seated {
+                at: (v.f("body_x"), v.f("body_y")),
+                bpm: v.f("breathing_bpm"),
+                bpm_end: None,
+            },
         }],
         sample_rate_hz: fs,
         n_subcarriers: v.f("n_subcarriers") as usize,
@@ -91,19 +126,34 @@ fn python_scene(v: &Vectors) -> Scenario {
 
 /// Exact-time sampling, no arm: the reference has neither.
 fn python_options(v: &Vectors) -> SimOptions {
-    SimOptions { carrier_hz: v.f("carrier_hz"), subcarrier_spacing_hz: v.f("subcarrier_spacing_hz"), jitter_s: 0.0, arm_rcs_m2: 0.0 }
+    SimOptions {
+        carrier_hz: v.f("carrier_hz"),
+        subcarrier_spacing_hz: v.f("subcarrier_spacing_hz"),
+        jitter_s: 0.0,
+        arm_rcs_m2: 0.0,
+    }
 }
 
 #[test]
 fn constants_match_the_reference() {
     let v = Vectors::load("sim_geometric");
-    assert_eq!(v.f("static_magnitude"), saans_sim::physics::STATIC_MAGNITUDE);
+    assert_eq!(
+        v.f("static_magnitude"),
+        saans_sim::physics::STATIC_MAGNITUDE
+    );
     assert_eq!(v.f("body_rcs_m2"), saans_sim::physics::BODY_RCS_M2);
-    assert_eq!(v.f("breathing_amplitude_m"), saans_sim::BREATHING_AMPLITUDE_M);
+    assert_eq!(
+        v.f("breathing_amplitude_m"),
+        saans_sim::BREATHING_AMPLITUDE_M
+    );
     assert_eq!(v.f("heart_amplitude_m"), saans_sim::HEART_AMPLITUDE_M);
     assert_eq!(v.f("heart_bpm"), saans_sim::HEART_BPM);
     let d = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1);
-    let (tx, rx, body) = ((v.f("tx_x"), v.f("tx_y")), (v.f("rx_x"), v.f("rx_y")), (v.f("body_x"), v.f("body_y")));
+    let (tx, rx, body) = (
+        (v.f("tx_x"), v.f("tx_y")),
+        (v.f("rx_x"), v.f("rx_y")),
+        (v.f("body_x"), v.f("body_y")),
+    );
     assert!((d(tx, body) + d(body, rx) - d(tx, rx) - v.f("excess_path_m")).abs() < 1e-12);
 }
 

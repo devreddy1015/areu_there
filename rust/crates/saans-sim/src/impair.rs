@@ -430,9 +430,19 @@ impl NodeImpairment {
     /// If the layout fixes a length and `n` is not it, because a wrong
     /// bin map is worse than a stopped test: the ripple and the slope
     /// would be functions of the wrong subcarrier.
-    pub fn with_layout(cfg: ImpairConfig, layout: BinLayout, n: usize, seed: u64, node_id: u8, boot: u32) -> Self {
+    pub fn with_layout(
+        cfg: ImpairConfig,
+        layout: BinLayout,
+        n: usize,
+        seed: u64,
+        node_id: u8,
+        boot: u32,
+    ) -> Self {
         if let Some(need) = layout.required_len() {
-            assert_eq!(n, need, "layout {layout:?} describes {need} entries, got {n}");
+            assert_eq!(
+                n, need,
+                "layout {layout:?} describes {need} entries, got {n}"
+            );
         }
         // One stream per (node, boot). Folding both into the id rather
         // than reseeding keeps every node independent of how many other
@@ -441,10 +451,20 @@ impl NodeImpairment {
 
         let scale = db_to_linear(rng.range(-cfg.boot_scale_db, cfg.boot_scale_db));
 
-        let k_max = (0..n).filter(|&i| !layout.is_null(i, n)).map(|i| layout.bin(i, n).abs()).max().unwrap_or(1).max(1) as f64;
+        let k_max = (0..n)
+            .filter(|&i| !layout.is_null(i, n))
+            .map(|i| layout.bin(i, n).abs())
+            .max()
+            .unwrap_or(1)
+            .max(1) as f64;
         let fft = layout.fft_size(n) as f64;
 
-        let (mut amp, mut phase, mut slope, mut null) = (Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n));
+        let (mut amp, mut phase, mut slope, mut null) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
         for i in 0..n {
             let k = layout.bin(i, n);
             let is_null = layout.is_null(i, n);
@@ -464,14 +484,34 @@ impl NodeImpairment {
             // side of DC are treated as an edge too, because that is
             // where LO leakage and DC-offset correction land.
             let near_dc = cfg.dc_bins > 0 && k.abs() <= cfg.dc_bins;
-            let w = (1.0 + (cfg.edge_excess - 1.0) * x * x).max(if near_dc { cfg.edge_excess } else { 0.0 });
-            let notch = if near_dc { cfg.dc_notch_db * (1.0 - k.abs() as f64 / (cfg.dc_bins + 1) as f64) } else { 0.0 };
+            let w = (1.0 + (cfg.edge_excess - 1.0) * x * x).max(if near_dc {
+                cfg.edge_excess
+            } else {
+                0.0
+            });
+            let notch = if near_dc {
+                cfg.dc_notch_db * (1.0 - k.abs() as f64 / (cfg.dc_bins + 1) as f64)
+            } else {
+                0.0
+            };
             let a_db = -cfg.edge_rolloff_db * x * x - notch + cfg.amp_ripple_db * w * rng.gauss();
             amp.push(db_to_linear(a_db));
             phase.push(cfg.phase_ripple_rad * w * rng.gauss());
         }
 
-        Self { cfg, layout, n, scale, amp, phase, slope, null, gain_index: 0, rng, packets: 0 }
+        Self {
+            cfg,
+            layout,
+            n,
+            scale,
+            amp,
+            phase,
+            slope,
+            null,
+            gain_index: 0,
+            rng,
+            packets: 0,
+        }
     }
 
     pub fn config(&self) -> &ImpairConfig {
@@ -580,8 +620,19 @@ impl NodeImpairment {
 
         // Per-packet phase terms. Drawn unconditionally when enabled so
         // the stream does not depend on the channel.
-        let phi0 = if self.cfg.random_phase { self.rng.range(-std::f64::consts::PI, std::f64::consts::PI) } else { 0.0 };
-        let d = if self.cfg.timing_offset_samples > 0.0 { self.rng.range(-self.cfg.timing_offset_samples, self.cfg.timing_offset_samples) } else { 0.0 };
+        let phi0 = if self.cfg.random_phase {
+            self.rng.range(-std::f64::consts::PI, std::f64::consts::PI)
+        } else {
+            0.0
+        };
+        let d = if self.cfg.timing_offset_samples > 0.0 {
+            self.rng.range(
+                -self.cfg.timing_offset_samples,
+                self.cfg.timing_offset_samples,
+            )
+        } else {
+            0.0
+        };
 
         for i in 0..self.n {
             if self.null[i] {
@@ -668,7 +719,9 @@ impl NodeImpairment {
                 self.gain_index += if direction < 0.5 { 1 } else { -1 };
             }
         }
-        let limit = (self.cfg.agc_range_db / self.cfg.agc_step_db).floor().max(0.0) as i32;
+        let limit = (self.cfg.agc_range_db / self.cfg.agc_step_db)
+            .floor()
+            .max(0.0) as i32;
         self.gain_index = self.gain_index.clamp(-limit, limit);
     }
 }
@@ -708,7 +761,11 @@ mod tests {
         // gain is an amplitude, so with noise off it cannot reach the
         // phase — which makes any phase difference proof that the draw
         // stream moved, rather than that a different gain was applied.
-        let cfg = ImpairConfig { noise_counts: 0.0, quantize: false, ..ImpairConfig::esp32_s3() };
+        let cfg = ImpairConfig {
+            noise_counts: 0.0,
+            quantize: false,
+            ..ImpairConfig::esp32_s3()
+        };
         let n = 56;
         let run = |loud: bool| {
             let mut node = NodeImpairment::new(cfg, n, 7, 1, 0);
@@ -719,7 +776,11 @@ mod tests {
                 // the one that used to draw conditionally — is the one
                 // that runs. One packet is driven far outside it, so
                 // that packet takes the other branch instead.
-                let level = if loud && packet == 2 { 4000.0 } else { cfg.agc_target_counts };
+                let level = if loud && packet == 2 {
+                    4000.0
+                } else {
+                    cfg.agc_target_counts
+                };
                 let mut re = vec![level; n];
                 let mut im = vec![0.0; n];
                 node.apply(&mut re, &mut im);
@@ -785,14 +846,19 @@ mod tests {
         // The reconciliation with the firmware's 56: 64 FFT bins minus
         // DC minus 7 guard bins IS 56.
         let n = 64;
-        let occupied: Vec<i32> = (0..n).filter(|&i| !BinLayout::Ht20Fft.is_null(i, n)).map(|i| BinLayout::Ht20Fft.bin(i, n)).collect();
+        let occupied: Vec<i32> = (0..n)
+            .filter(|&i| !BinLayout::Ht20Fft.is_null(i, n))
+            .map(|i| BinLayout::Ht20Fft.bin(i, n))
+            .collect();
         assert_eq!(occupied.len(), 56);
         let mut sorted = occupied.clone();
         sorted.sort_unstable();
         let want: Vec<i32> = (-28..=-1).chain(1..=28).collect();
         assert_eq!(sorted, want);
         // And the 56-entry layout is those same bins, in order.
-        let direct: Vec<i32> = (0..56).map(|i| BinLayout::Ht20Occupied.bin(i, 56)).collect();
+        let direct: Vec<i32> = (0..56)
+            .map(|i| BinLayout::Ht20Occupied.bin(i, 56))
+            .collect();
         assert_eq!(direct, want);
         assert!((0..56).all(|i| !BinLayout::Ht20Occupied.is_null(i, 56)));
     }
@@ -826,7 +892,11 @@ mod tests {
         let cfg = ImpairConfig::esp32_s3();
         let mut a = NodeImpairment::new(cfg, n, 4242, 1, 0);
         let b = NodeImpairment::new(cfg, n, 4242, 2, 0);
-        let (amp0, ph0, s0) = (a.amp_ripple().to_vec(), a.phase_ripple().to_vec(), a.scale());
+        let (amp0, ph0, s0) = (
+            a.amp_ripple().to_vec(),
+            a.phase_ripple().to_vec(),
+            a.scale(),
+        );
 
         let (mut re, mut im) = clean(n);
         for _ in 0..200 {
@@ -851,8 +921,14 @@ mod tests {
 
         // The ripple is a believable size rather than an accidental 0
         // or an accidental 10x.
-        let max_db = amp0.iter().map(|a| 20.0 * a.log10()).fold(0.0f64, |m, v: f64| m.max(v.abs()));
-        assert!((0.5..12.0).contains(&max_db), "amplitude ripple spread {max_db} dB");
+        let max_db = amp0
+            .iter()
+            .map(|a| 20.0 * a.log10())
+            .fold(0.0f64, |m, v: f64| m.max(v.abs()));
+        assert!(
+            (0.5..12.0).contains(&max_db),
+            "amplitude ripple spread {max_db} dB"
+        );
     }
 
     #[test]
@@ -868,7 +944,11 @@ mod tests {
             // Walk the channel level over ~40 dB so the loop has to
             // work, with a jump partway: a slow ramp alone could be
             // tracked by anything.
-            let level = if p < 200 { 10f64.powf(p as f64 * 0.1 / 20.0) } else { 0.01 };
+            let level = if p < 200 {
+                10f64.powf(p as f64 * 0.1 / 20.0)
+            } else {
+                0.01
+            };
             let mut re: Vec<f64> = base_re.iter().map(|v| v * level).collect();
             let mut im: Vec<f64> = base_im.iter().map(|v| v * level).collect();
             node.apply(&mut re, &mut im);
@@ -878,15 +958,30 @@ mod tests {
             let d = w[1] - w[0];
             if d != 0.0 {
                 moves += 1;
-                assert!(d.abs() >= cfg.agc_step_db - 1e-12, "step {d} dB is smaller than the {} dB quantum", cfg.agc_step_db);
+                assert!(
+                    d.abs() >= cfg.agc_step_db - 1e-12,
+                    "step {d} dB is smaller than the {} dB quantum",
+                    cfg.agc_step_db
+                );
             }
             // On the grid, not between its points.
             let q = w[1] / cfg.agc_step_db;
-            assert!((q - q.round()).abs() < 1e-9, "gain {} dB is off the quantum grid", w[1]);
+            assert!(
+                (q - q.round()).abs() < 1e-9,
+                "gain {} dB is off the quantum grid",
+                w[1]
+            );
         }
-        assert!(moves > 5, "the AGC never moved ({moves} changes): the test proved nothing");
+        assert!(
+            moves > 5,
+            "the AGC never moved ({moves} changes): the test proved nothing"
+        );
         // Piecewise: it holds far more often than it moves.
-        assert!(moves < gains.len() / 4, "the AGC moved on {moves} of {} packets, which is not piecewise constant", gains.len());
+        assert!(
+            moves < gains.len() / 4,
+            "the AGC moved on {moves} of {} packets, which is not piecewise constant",
+            gains.len()
+        );
     }
 
     #[test]
@@ -913,7 +1008,10 @@ mod tests {
             let err_db = 20.0 * (mean / cfg.agc_target_counts).log10();
             // Dead zone + boot scale + half a quantum + the ripple's
             // effect on the mean. Nowhere near the rails either way.
-            assert!(err_db.abs() < 6.0, "level {level}: mean {mean} counts is {err_db} dB from target");
+            assert!(
+                err_db.abs() < 6.0,
+                "level {level}: mean {mean} counts is {err_db} dB from target"
+            );
         }
     }
 
@@ -936,15 +1034,26 @@ mod tests {
             b.apply(&mut re_b, &mut im_b);
             for i in 0..n {
                 assert_eq!(re_a[i], re_a[i].round(), "not an integer count");
-                assert!((IQ_MIN..=IQ_MAX).contains(&re_a[i]) && (IQ_MIN..=IQ_MAX).contains(&im_a[i]), "outside int8");
+                assert!(
+                    (IQ_MIN..=IQ_MAX).contains(&re_a[i]) && (IQ_MIN..=IQ_MAX).contains(&im_a[i]),
+                    "outside int8"
+                );
                 // Only meaningful where the unquantized value was in
                 // range; at the rails the error is the clip, not the
                 // rounding, and that is deliberate.
                 if (IQ_MIN..=IQ_MAX).contains(&re_b[i]) {
-                    assert!((re_a[i] - re_b[i]).abs() <= 0.5 + 1e-12, "re error {} counts", re_a[i] - re_b[i]);
+                    assert!(
+                        (re_a[i] - re_b[i]).abs() <= 0.5 + 1e-12,
+                        "re error {} counts",
+                        re_a[i] - re_b[i]
+                    );
                 }
                 if (IQ_MIN..=IQ_MAX).contains(&im_b[i]) {
-                    assert!((im_a[i] - im_b[i]).abs() <= 0.5 + 1e-12, "im error {} counts", im_a[i] - im_b[i]);
+                    assert!(
+                        (im_a[i] - im_b[i]).abs() <= 0.5 + 1e-12,
+                        "im error {} counts",
+                        im_a[i] - im_b[i]
+                    );
                 }
             }
         }
@@ -956,7 +1065,11 @@ mod tests {
         c.apply_to_iq(&mut re, &mut im, &mut iq);
         for i in 0..n {
             assert_eq!(iq[2 * i] as f64, im[i], "iq[2k] must be the imaginary part");
-            assert_eq!(iq[2 * i + 1] as f64, re[i], "iq[2k+1] must be the real part");
+            assert_eq!(
+                iq[2 * i + 1] as f64,
+                re[i],
+                "iq[2k+1] must be the real part"
+            );
         }
     }
 
@@ -999,7 +1112,8 @@ mod tests {
         let c_amp: Vec<f64> = (0..n).map(|i| c_re[i].hypot(c_im[i])).collect();
 
         let mut first: Option<(Vec<f64>, Vec<f64>)> = None;
-        let (mut max_phase_jump, mut worst_amp_repeat, mut worst_vs_clean) = (0.0f64, 1.0f64, 1.0f64);
+        let (mut max_phase_jump, mut worst_amp_repeat, mut worst_vs_clean) =
+            (0.0f64, 1.0f64, 1.0f64);
         for _ in 0..30 {
             let (mut re, mut im) = (c_re.clone(), c_im.clone());
             node.apply(&mut re, &mut im);
@@ -1008,14 +1122,21 @@ mod tests {
             worst_vs_clean = worst_vs_clean.min(corr(&amp, &c_amp));
             match &first {
                 Some((f_ph, f_amp)) => {
-                    max_phase_jump = max_phase_jump.max((0..n).map(|i| wrap(ph[i] - f_ph[i]).abs()).fold(0.0, f64::max));
+                    max_phase_jump = max_phase_jump.max(
+                        (0..n)
+                            .map(|i| wrap(ph[i] - f_ph[i]).abs())
+                            .fold(0.0, f64::max),
+                    );
                     worst_amp_repeat = worst_amp_repeat.min(corr(&amp, f_amp));
                 }
                 None => first = Some((ph, amp)),
             }
         }
         assert!(max_phase_jump > 2.0, "phase barely moved ({max_phase_jump} rad): the per-packet terms are not doing their job");
-        assert!(worst_amp_repeat > 0.99, "a static channel's amplitude profile did not repeat (corr {worst_amp_repeat})");
+        assert!(
+            worst_amp_repeat > 0.99,
+            "a static channel's amplitude profile did not repeat (corr {worst_amp_repeat})"
+        );
 
         // The other half of the story, asserted loosely because the
         // number is only as good as the uncalibrated ripple that

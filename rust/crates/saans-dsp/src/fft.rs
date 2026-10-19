@@ -43,7 +43,10 @@ impl std::ops::Mul for C64 {
     type Output = C64;
     /// Same operation order as CPython's complex multiply.
     fn mul(self, o: C64) -> C64 {
-        C64::new(self.re * o.re - self.im * o.im, self.re * o.im + self.im * o.re)
+        C64::new(
+            self.re * o.re - self.im * o.im,
+            self.re * o.im + self.im * o.re,
+        )
     }
 }
 
@@ -115,9 +118,15 @@ pub fn percentile(values: &[f64], q: f64) -> f64 {
 pub fn symmetric_eigen(matrix: &[Vec<f64>], max_sweeps: usize) -> (Vec<f64>, Vec<Vec<f64>>) {
     let n = matrix.len();
     let mut a: Vec<Vec<f64>> = matrix.to_vec();
-    let mut v: Vec<Vec<f64>> = (0..n).map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()).collect();
+    let mut v: Vec<Vec<f64>> = (0..n)
+        .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
+        .collect();
     for _ in 0..max_sweeps {
-        let off = psum((0..n).flat_map(|i| ((i + 1)..n).map(move |j| (i, j))).map(|(i, j)| a[i][j] * a[i][j]));
+        let off = psum(
+            (0..n)
+                .flat_map(|i| ((i + 1)..n).map(move |j| (i, j)))
+                .map(|(i, j)| a[i][j] * a[i][j]),
+        );
         let diag = psum((0..n).map(|i| a[i][i] * a[i][i]));
         if off <= 1e-24 * diag.max(1e-300) {
             break;
@@ -159,7 +168,12 @@ pub fn symmetric_eigen(matrix: &[Vec<f64>], max_sweeps: usize) -> (Vec<f64>, Vec
 /// Per-subcarrier breathing-to-noise *power* ratio over a window
 /// (`window[t][k]`), plus each scored subcarrier's in-band spectrum.
 /// Constant or non-finite series score 0 and have no spectrum.
-pub fn subcarrier_bnr(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_high: f64) -> (Vec<f64>, Vec<Option<Vec<C64>>>) {
+pub fn subcarrier_bnr(
+    window: &[Vec<f64>],
+    sample_rate_hz: f64,
+    f_low: f64,
+    f_high: f64,
+) -> (Vec<f64>, Vec<Option<Vec<C64>>>) {
     let n_t = window.len();
     let n_k = window.iter().map(|r| r.len()).min().unwrap_or(0);
     let mut bnr = vec![0.0; n_k];
@@ -170,8 +184,12 @@ pub fn subcarrier_bnr(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_hi
     let nfft = next_pow2(n_t);
     let bin_hz = sample_rate_hz / nfft as f64;
     let half = nfft / 2;
-    let in_band: Vec<usize> = (1..=half).filter(|&m| f_low <= m as f64 * bin_hz && m as f64 * bin_hz <= f_high).collect();
-    let out_band: Vec<usize> = (1..=half).filter(|&m| !(f_low <= m as f64 * bin_hz && m as f64 * bin_hz <= f_high)).collect();
+    let in_band: Vec<usize> = (1..=half)
+        .filter(|&m| f_low <= m as f64 * bin_hz && m as f64 * bin_hz <= f_high)
+        .collect();
+    let out_band: Vec<usize> = (1..=half)
+        .filter(|&m| !(f_low <= m as f64 * bin_hz && m as f64 * bin_hz <= f_high))
+        .collect();
     if in_band.is_empty() || out_band.is_empty() {
         return (bnr, spectra);
     }
@@ -185,13 +203,18 @@ pub fn subcarrier_bnr(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_hi
         if std <= 0.0 {
             continue;
         }
-        let mut z: Vec<C64> = col.iter().map(|x| C64::new((x - mean) / std, 0.0)).collect();
+        let mut z: Vec<C64> = col
+            .iter()
+            .map(|x| C64::new((x - mean) / std, 0.0))
+            .collect();
         z.resize(nfft, C64::ZERO);
         let spec = fft(&z);
-        let power: Vec<f64> = (0..=half).map(|m| {
-            let a = spec[m].abs();
-            a * a
-        }).collect();
+        let power: Vec<f64> = (0..=half)
+            .map(|m| {
+                let a = spec[m].abs();
+                a * a
+            })
+            .collect();
         let num = psum(in_band.iter().map(|&m| power[m]));
         let den = psum(out_band.iter().map(|&m| power[m]));
         bnr[k] = if den > 0.0 { num / den } else { f64::INFINITY };

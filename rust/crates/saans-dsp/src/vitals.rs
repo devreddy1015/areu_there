@@ -28,13 +28,23 @@ pub struct BandVitalExtractor {
 }
 
 impl BandVitalExtractor {
-    pub fn new(f_low: f64, f_high: f64, sample_rate_hz: f64, window_s: Option<f64>, resolution_hz: Option<f64>) -> Self {
+    pub fn new(
+        f_low: f64,
+        f_high: f64,
+        sample_rate_hz: f64,
+        window_s: Option<f64>,
+        resolution_hz: Option<f64>,
+    ) -> Self {
         let min_window_s = MIN_CYCLES / f_low;
         let window_s = window_s.unwrap_or(min_window_s * 1.5);
-        assert!(window_s >= min_window_s, "window_s={window_s:.1}s is too short to resolve {f_low} Hz");
+        assert!(
+            window_s >= min_window_s,
+            "window_s={window_s:.1}s is too short to resolve {f_low} Hz"
+        );
         let decimation = ((sample_rate_hz / (4.0 * f_high)) as usize).max(1);
         let analysis_rate_hz = sample_rate_hz / decimation as f64;
-        let resolution_hz = resolution_hz.unwrap_or_else(|| (1.0 / (4.0 * window_s)).max((f_high - f_low) / 400.0));
+        let resolution_hz =
+            resolution_hz.unwrap_or_else(|| (1.0 / (4.0 * window_s)).max((f_high - f_low) / 400.0));
         Self {
             f_low,
             f_high,
@@ -80,7 +90,16 @@ impl BandVitalExtractor {
         if !self.ready() {
             return VitalEstimate::unavailable();
         }
-        match band_peak(&self.history(), self.analysis_rate_hz, self.f_low, self.f_high, self.resolution_hz, true, &[], 0.0) {
+        match band_peak(
+            &self.history(),
+            self.analysis_rate_hz,
+            self.f_low,
+            self.f_high,
+            self.resolution_hz,
+            true,
+            &[],
+            0.0,
+        ) {
             None => VitalEstimate::unavailable(),
             Some(p) => VitalEstimate::from_confidence(p.freq_hz * 60.0, p.confidence),
         }
@@ -99,7 +118,13 @@ pub struct BreathingExtractor(pub BandVitalExtractor);
 
 impl BreathingExtractor {
     pub fn new(sample_rate_hz: f64, window_s: Option<f64>) -> Self {
-        Self(BandVitalExtractor::new(0.1, 0.5, sample_rate_hz, window_s, None))
+        Self(BandVitalExtractor::new(
+            0.1,
+            0.5,
+            sample_rate_hz,
+            window_s,
+            None,
+        ))
     }
 }
 
@@ -124,7 +149,13 @@ impl HeartRateExtractor {
     pub const DEFAULT_WINDOW_S: f64 = 60.0;
 
     pub fn new(sample_rate_hz: f64, window_s: Option<f64>) -> Self {
-        Self(BandVitalExtractor::new(0.8, 2.0, sample_rate_hz, Some(window_s.unwrap_or(Self::DEFAULT_WINDOW_S)), None))
+        Self(BandVitalExtractor::new(
+            0.8,
+            2.0,
+            sample_rate_hz,
+            Some(window_s.unwrap_or(Self::DEFAULT_WINDOW_S)),
+            None,
+        ))
     }
 
     pub fn estimate_with(&self, breathing_hz: Option<f64>) -> VitalEstimate {
@@ -134,7 +165,15 @@ impl HeartRateExtractor {
         }
         match breathing_hz {
             Some(bh) if bh > 0.0 => {
-                match sideband_peak(&e.history(), e.analysis_rate_hz, e.f_low, e.f_high, bh, e.resolution_hz, 0.03) {
+                match sideband_peak(
+                    &e.history(),
+                    e.analysis_rate_hz,
+                    e.f_low,
+                    e.f_high,
+                    bh,
+                    e.resolution_hz,
+                    0.03,
+                ) {
                     None => VitalEstimate::unavailable(),
                     Some(p) => VitalEstimate::from_confidence(p.freq_hz * 60.0, p.confidence),
                 }

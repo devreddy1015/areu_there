@@ -63,11 +63,21 @@ impl SensingPipeline {
         let fs = config.sample_rate_hz;
         Self {
             suppressor: StaticSuppressor::new(config.n_subcarriers, fs, 0.03),
-            presence: PresenceDetector::new(fs, PresenceConfig { calibration_s: config.calibration_s, ..Default::default() }),
+            presence: PresenceDetector::new(
+                fs,
+                PresenceConfig {
+                    calibration_s: config.calibration_s,
+                    ..Default::default()
+                },
+            ),
             breathing: BreathingExtractor::new(fs, config.breathing_window_s),
             heart: HeartRateExtractor::new(fs, config.heart_window_s),
             selector: match config.selection {
-                SubcarrierSelection::RespirFi => Some(RespirFiFusion::new(config.n_subcarriers, fs, SelectParams::default())),
+                SubcarrierSelection::RespirFi => Some(RespirFiFusion::new(
+                    config.n_subcarriers,
+                    fs,
+                    SelectParams::default(),
+                )),
                 SubcarrierSelection::Variance => None,
             },
             config,
@@ -112,7 +122,11 @@ impl SensingPipeline {
             (VitalEstimate::unavailable(), VitalEstimate::unavailable())
         } else {
             let rr = self.breathing.estimate();
-            let bh = if rr.status.usable() { Some(rr.value_bpm / 60.0) } else { None };
+            let bh = if rr.status.usable() {
+                Some(rr.value_bpm / 60.0)
+            } else {
+                None
+            };
             (rr, self.heart.estimate_with(bh))
         };
         VitalReading {

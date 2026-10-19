@@ -65,7 +65,10 @@ pub struct AuthConfig {
 
 impl Default for AuthConfig {
     fn default() -> Self {
-        Self { required: None, session_hours: 12.0 }
+        Self {
+            required: None,
+            session_hours: 12.0,
+        }
     }
 }
 
@@ -233,7 +236,11 @@ pub struct RawConfig {
 
 impl Default for RawConfig {
     fn default() -> Self {
-        Self { sample_rate_hz: 20.0, subcarriers: 0, calibration_s: 30.0 }
+        Self {
+            sample_rate_hz: 20.0,
+            subcarriers: 0,
+            calibration_s: 30.0,
+        }
     }
 }
 
@@ -254,7 +261,8 @@ fn err<T>(msg: impl Into<String>) -> Result<T, ConfigError> {
 
 impl GatewayConfig {
     pub fn load(path: &Path) -> Result<Self, ConfigError> {
-        let text = std::fs::read_to_string(path).map_err(|e| ConfigError(format!("{}: {e}", path.display())))?;
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| ConfigError(format!("{}: {e}", path.display())))?;
         Self::from_toml(&text).map_err(|e| ConfigError(format!("{}: {e}", path.display())))
     }
 
@@ -290,19 +298,33 @@ impl GatewayConfig {
         let mut ids = BTreeSet::new();
         let mut owner: BTreeMap<LinkId, &str> = BTreeMap::new();
         for s in &self.spaces {
-            if s.id.is_empty() || !s.id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
-                return err(format!("space id {:?} must be non-empty and use only A-Z a-z 0-9 - _ .", s.id));
+            if s.id.is_empty()
+                || !s
+                    .id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            {
+                return err(format!(
+                    "space id {:?} must be non-empty and use only A-Z a-z 0-9 - _ .",
+                    s.id
+                ));
             }
             if !ids.insert(s.id.as_str()) {
                 return err(format!("space id {:?} appears twice", s.id));
             }
             for l in &s.links {
                 if let Some(other) = owner.insert(*l, &s.id) {
-                    return err(format!("link {l} is listed by both space {other:?} and space {:?}", s.id));
+                    return err(format!(
+                        "link {l} is listed by both space {other:?} and space {:?}",
+                        s.id
+                    ));
                 }
             }
             if s.inactivity_alert_min.is_nan() || s.inactivity_alert_min <= 0.0 {
-                return err(format!("space {:?}: inactivity_alert_min must be positive", s.id));
+                return err(format!(
+                    "space {:?}: inactivity_alert_min must be positive",
+                    s.id
+                ));
             }
         }
         self.validate_outputs(&ids)
@@ -310,14 +332,20 @@ impl GatewayConfig {
 
     /// Auth is required when the API is reachable beyond this machine.
     pub fn auth_required(&self) -> bool {
-        let loopback = self.http_socket_addr().map(|a| a.ip().is_loopback()).unwrap_or(false);
+        let loopback = self
+            .http_socket_addr()
+            .map(|a| a.ip().is_loopback())
+            .unwrap_or(false);
         self.auth.required.unwrap_or(!loopback)
     }
 
     fn validate_outputs(&self, space_ids: &BTreeSet<&str>) -> Result<(), ConfigError> {
         let loopback = self.http_socket_addr()?.ip().is_loopback();
         if self.auth.required == Some(false) && !loopback {
-            return err(format!("auth.required = false is only allowed on a loopback http_addr (got {})", self.http_addr));
+            return err(format!(
+                "auth.required = false is only allowed on a loopback http_addr (got {})",
+                self.http_addr
+            ));
         }
         if !(self.auth.session_hours > 0.0 && self.auth.session_hours <= 24.0 * 30.0) {
             return err("auth.session_hours must be in (0, 720]");
@@ -347,8 +375,16 @@ impl GatewayConfig {
             if t.name.is_empty() || !names.insert(t.name.as_str()) {
                 return err(format!("token name {:?} is empty or used twice", t.name));
             }
-            if t.sha256.len() != 64 || !t.sha256.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) {
-                return err(format!("token {:?}: sha256 must be 64 lowercase hex digits", t.name));
+            if t.sha256.len() != 64
+                || !t
+                    .sha256
+                    .chars()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+            {
+                return err(format!(
+                    "token {:?}: sha256 must be 64 lowercase hex digits",
+                    t.name
+                ));
             }
             check_spaces(&format!("token {:?}", t.name), &t.spaces)?;
         }
@@ -360,10 +396,16 @@ impl GatewayConfig {
         }
         let h = &self.history;
         if !(h.window_s > 0.0 && h.window_s <= crate::history::MAX_WINDOW_S) {
-            return err(format!("history.window_s must be in (0, {}]", crate::history::MAX_WINDOW_S));
+            return err(format!(
+                "history.window_s must be in (0, {}]",
+                crate::history::MAX_WINDOW_S
+            ));
         }
         if !(h.cadence_s >= crate::history::MIN_CADENCE_S && h.cadence_s <= h.window_s) {
-            return err(format!("history.cadence_s must be in [{}, history.window_s]", crate::history::MIN_CADENCE_S));
+            return err(format!(
+                "history.cadence_s must be in [{}, history.window_s]",
+                crate::history::MIN_CADENCE_S
+            ));
         }
         for (name, t) in &self.telegram {
             if t.bot_token_env.is_empty() {
@@ -371,8 +413,13 @@ impl GatewayConfig {
             }
         }
         for (name, w) in &self.webhook {
-            if !(w.url.starts_with("https://") || w.url.starts_with("http://127.") || w.url.starts_with("http://localhost")) {
-                return err(format!("webhook.{name}: url must be https:// (plain http only to localhost)"));
+            if !(w.url.starts_with("https://")
+                || w.url.starts_with("http://127.")
+                || w.url.starts_with("http://localhost"))
+            {
+                return err(format!(
+                    "webhook.{name}: url must be https:// (plain http only to localhost)"
+                ));
             }
         }
         let channel_exists = |c: &str| match c.split_once(':') {
@@ -383,11 +430,17 @@ impl GatewayConfig {
         let mut route_names = BTreeSet::new();
         for r in &self.alert_routes {
             if r.name.is_empty() || !route_names.insert(r.name.as_str()) {
-                return err(format!("alert_route name {:?} is empty or used twice", r.name));
+                return err(format!(
+                    "alert_route name {:?} is empty or used twice",
+                    r.name
+                ));
             }
             check_spaces(&format!("alert_route {:?}", r.name), &r.spaces)?;
             if r.channels.is_empty() {
-                return err(format!("alert_route {:?}: needs at least one channel", r.name));
+                return err(format!(
+                    "alert_route {:?}: needs at least one channel",
+                    r.name
+                ));
             }
             for c in r.channels.iter().chain(&r.escalate_to) {
                 if !channel_exists(c) {
@@ -395,10 +448,16 @@ impl GatewayConfig {
                 }
             }
             if !(r.ack_timeout_min >= 0.0 && r.ack_timeout_min.is_finite()) {
-                return err(format!("alert_route {:?}: ack_timeout_min must be >= 0", r.name));
+                return err(format!(
+                    "alert_route {:?}: ack_timeout_min must be >= 0",
+                    r.name
+                ));
             }
             if r.ack_timeout_min > 0.0 && r.escalate_to.is_empty() {
-                return err(format!("alert_route {:?}: ack_timeout_min set but escalate_to is empty", r.name));
+                return err(format!(
+                    "alert_route {:?}: ack_timeout_min set but escalate_to is empty",
+                    r.name
+                ));
             }
         }
         if !self.alert_routes.is_empty() {
@@ -411,7 +470,12 @@ impl GatewayConfig {
     }
 
     pub fn http_socket_addr(&self) -> Result<SocketAddr, ConfigError> {
-        self.http_addr.parse().map_err(|_| ConfigError(format!("http_addr {:?} is not an IP:port address", self.http_addr)))
+        self.http_addr.parse().map_err(|_| {
+            ConfigError(format!(
+                "http_addr {:?} is not an IP:port address",
+                self.http_addr
+            ))
+        })
     }
 
     pub fn udp_socket_addr(&self) -> Result<SocketAddr, ConfigError> {
@@ -434,22 +498,34 @@ impl GatewayConfig {
 /// `SpaceConfig` ignores unknown keys; check them here so a typo is an
 /// error, not a silently different privacy or alerting setting.
 fn check_space_keys(table: &toml::Table) -> Result<(), ConfigError> {
-    let Some(spaces) = table.get("space") else { return Ok(()) };
-    let Some(spaces) = spaces.as_array() else { return err("`space` must be an array of tables: write [[space]]") };
+    let Some(spaces) = table.get("space") else {
+        return Ok(());
+    };
+    let Some(spaces) = spaces.as_array() else {
+        return err("`space` must be an array of tables: write [[space]]");
+    };
     let known: BTreeSet<String> = match serde_json::to_value(SpaceConfig::default()) {
         Ok(serde_json::Value::Object(m)) => m.keys().cloned().collect(),
         _ => return Ok(()),
     };
     for (i, s) in spaces.iter().enumerate() {
-        let Some(s) = s.as_table() else { return err("each [[space]] must be a table") };
-        let id = s.get("id").and_then(|v| v.as_str()).map_or_else(|| format!("#{}", i + 1), |s| format!("{s:?}"));
+        let Some(s) = s.as_table() else {
+            return err("each [[space]] must be a table");
+        };
+        let id = s
+            .get("id")
+            .and_then(|v| v.as_str())
+            .map_or_else(|| format!("#{}", i + 1), |s| format!("{s:?}"));
         if !s.contains_key("id") {
             return err(format!("[[space]] {id} has no id"));
         }
         for k in s.keys() {
             if !known.contains(k) {
                 let list: Vec<&str> = known.iter().map(String::as_str).collect();
-                return err(format!("[[space]] {id}: unknown key `{k}` (known keys: {})", list.join(", ")));
+                return err(format!(
+                    "[[space]] {id}: unknown key `{k}` (known keys: {})",
+                    list.join(", ")
+                ));
             }
         }
         if let Some(links) = s.get("links").and_then(|v| v.as_array()) {
@@ -479,7 +555,8 @@ mod tests {
 
     #[test]
     fn defaults_are_conservative() {
-        let cfg = GatewayConfig::from_toml("[[space]]\nid = \"a\"\nlinks = [{ rx = 1, tx = 2 }]\n").unwrap();
+        let cfg = GatewayConfig::from_toml("[[space]]\nid = \"a\"\nlinks = [{ rx = 1, tx = 2 }]\n")
+            .unwrap();
         assert_eq!(cfg.http_addr, "127.0.0.1:8080");
         assert_eq!(cfg.event_retention_days, 30);
         assert!(!cfg.spaces[0].vitals);
@@ -493,14 +570,22 @@ mod tests {
         assert!(e.0.contains("unknown key `vital`"), "{e}");
         assert!(GatewayConfig::from_toml("udp_prot = 1\n").is_err());
         assert!(GatewayConfig::from_toml("[raw]\nrate = 1\n").is_err());
-        assert!(GatewayConfig::from_toml("[[space]]\nid = \"a\"\nlinks = [{ rx = 1, txx = 2 }]\n").is_err());
+        assert!(
+            GatewayConfig::from_toml("[[space]]\nid = \"a\"\nlinks = [{ rx = 1, txx = 2 }]\n")
+                .is_err()
+        );
     }
 
     #[test]
     fn a_link_belongs_to_one_space() {
         let t = "[[space]]\nid = \"a\"\nlinks = [{ rx = 1, tx = 2 }]\n[[space]]\nid = \"b\"\nlinks = [{ rx = 1, tx = 2 }]\n";
-        assert!(GatewayConfig::from_toml(t).unwrap_err().0.contains("listed by both"));
+        assert!(GatewayConfig::from_toml(t)
+            .unwrap_err()
+            .0
+            .contains("listed by both"));
         assert!(GatewayConfig::from_toml("[[space]]\nid = \"a b\"\n").is_err());
-        assert!(GatewayConfig::from_toml("[[space]]\nid = \"a\"\n[[space]]\nid = \"a\"\n").is_err());
+        assert!(
+            GatewayConfig::from_toml("[[space]]\nid = \"a\"\n[[space]]\nid = \"a\"\n").is_err()
+        );
     }
 }

@@ -47,7 +47,11 @@ pub struct Principal {
 impl Principal {
     /// The implicit principal when authentication is off (loopback only).
     pub fn local_admin() -> Self {
-        Self { name: "local".into(), role: Role::Admin, spaces: None }
+        Self {
+            name: "local".into(),
+            role: Role::Admin,
+            spaces: None,
+        }
     }
 
     pub fn can_see_space(&self, space_id: &str) -> bool {
@@ -58,7 +62,9 @@ impl Principal {
     /// read them. Consent is checked by the privacy gate upstream of here
     /// too; this is the second, role-based lock.
     pub fn can_see_vitals(&self, space_id: &str, space_vitals: bool) -> bool {
-        space_vitals && matches!(self.role, Role::Admin | Role::Safety) && self.can_see_space(space_id)
+        space_vitals
+            && matches!(self.role, Role::Admin | Role::Safety)
+            && self.can_see_space(space_id)
     }
 
     /// Health alerts (pauses, inactivity, collapse) and their evidence.
@@ -86,15 +92,28 @@ mod tests {
     use super::*;
 
     fn p(role: Role, spaces: Option<&[&str]>) -> Principal {
-        Principal { name: "x".into(), role, spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()) }
+        Principal {
+            name: "x".into(),
+            role,
+            spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()),
+        }
     }
 
     #[test]
     fn vitals_need_consent_role_and_scope() {
         assert!(p(Role::Safety, Some(&["lab3"])).can_see_vitals("lab3", true));
-        assert!(!p(Role::Safety, Some(&["lab3"])).can_see_vitals("lab3", false), "no consent, no vitals");
-        assert!(!p(Role::Safety, Some(&["lab3"])).can_see_vitals("lab4", true), "out of scope");
-        assert!(!p(Role::Ops, None).can_see_vitals("lab3", true), "ops never sees vitals");
+        assert!(
+            !p(Role::Safety, Some(&["lab3"])).can_see_vitals("lab3", false),
+            "no consent, no vitals"
+        );
+        assert!(
+            !p(Role::Safety, Some(&["lab3"])).can_see_vitals("lab4", true),
+            "out of scope"
+        );
+        assert!(
+            !p(Role::Ops, None).can_see_vitals("lab3", true),
+            "ops never sees vitals"
+        );
         assert!(!p(Role::Occupancy, None).can_see_vitals("lab3", true));
     }
 

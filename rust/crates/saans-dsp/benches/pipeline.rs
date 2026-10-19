@@ -12,7 +12,9 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 fn read_f64(name: &str) -> Vec<f64> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../spec/golden").join(name);
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../spec/golden")
+        .join(name);
     std::fs::read(&p)
         .unwrap_or_else(|e| panic!("{}: {e}", p.display()))
         .chunks(8)
@@ -25,7 +27,11 @@ fn main() {
     let seq = read_f64("features_vitals__seq_in.f64");
     let t = read_f64("features_vitals__t_in.f64");
     let amps = read_f64("features_vitals__amplitudes_in.f64");
-    let frames: Vec<CsiFrame> = amps.chunks(n).enumerate().map(|(i, a)| CsiFrame::new(a.to_vec(), seq[i] as u64, fs)).collect();
+    let frames: Vec<CsiFrame> = amps
+        .chunks(n)
+        .enumerate()
+        .map(|(i, a)| CsiFrame::new(a.to_vec(), seq[i] as u64, fs))
+        .collect();
     let recorded_s = t.last().unwrap() - t[0];
 
     let reps = 20;
@@ -41,7 +47,9 @@ fn main() {
             ..Default::default()
         });
         for (i, f) in frames.iter().enumerate() {
-            emitted += fx.push(f.clone(), Some(seq[i] as u64), Some(t[i]), Some(-92)).len();
+            emitted += fx
+                .push(f.clone(), Some(seq[i] as u64), Some(t[i]), Some(-92))
+                .len();
         }
     }
     let el = start.elapsed().as_secs_f64();
@@ -50,7 +58,12 @@ fn main() {
         "saans-dsp FeatureExtractor: {} CSI frames x {} reps ({} subcarriers, {} Hz, vitals+heart on) in {:.3} s",
         frames.len(), reps, n, fs, el
     );
-    println!("  {:.0} frames/s = {:.0}x real time for one link; {} FeatureFrames", fps, fps / fs, emitted / reps);
+    println!(
+        "  {:.0} frames/s = {:.0}x real time for one link; {} FeatureFrames",
+        fps,
+        fps / fs,
+        emitted / reps
+    );
     println!("  recording length {:.0} s", recorded_s);
 
     // Same work as the Python reference does: a full spectral estimate on
@@ -60,7 +73,12 @@ fn main() {
     let start = Instant::now();
     let reps_eager = 3;
     for _ in 0..reps_eager {
-        let mut p = SensingPipeline::new(PipelineConfig { n_subcarriers: n, sample_rate_hz: fs, calibration_s: 10.0, ..Default::default() });
+        let mut p = SensingPipeline::new(PipelineConfig {
+            n_subcarriers: n,
+            sample_rate_hz: fs,
+            calibration_s: 10.0,
+            ..Default::default()
+        });
         for f in &frames {
             std::hint::black_box(p.process(f));
         }
