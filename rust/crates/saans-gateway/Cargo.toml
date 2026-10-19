@@ -33,3 +33,13 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 [dev-dependencies]
 rumqttd = "0.19"
+
+[lints.clippy]
+# Every handler helper in `http.rs` returns `Result<T, Response>`, where the
+# error *is* the HTTP response to send: `principal`, `system_only`, the four
+# `sim_*` guards. The lint asks us to box it because `Response` is 128 bytes.
+# Boxing would put an allocation on every rejected request -- the auth-failure
+# path, which is the one an attacker drives -- to shrink a `Result` that is
+# constructed once and immediately returned. That is a worse trade than the
+# lint assumes, so it is off here and nowhere else in the workspace.
+result_large_err = "allow"

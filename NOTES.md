@@ -381,7 +381,7 @@ possible without re-running stages, `SensingPipeline` now exposes
 `preprocess.subcarrier_bnr` was split out of `respirfi_select` (no
 behaviour change; RespirFi tests unchanged).
 
-`spec/golden/generate.py` writes 21 vector sets (3.2 MB) covering every
+`spec/golden/generate.py` writes 23 vector sets (3.2 MB) covering every
 stage, the codec, two end-to-end consent settings and the noise-free
 geometric physics for the Rust simulator.
 

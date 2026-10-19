@@ -68,7 +68,15 @@ impl AuditLog {
     /// still runs, it just has nothing to write to.
     pub fn new(dir: Option<&Path>, offset_min: i32) -> Self {
         let dir = dir.and_then(|d| fs::create_dir_all(d).ok().map(|_| d.to_path_buf()));
-        Self { dir, offset_min, state: Mutex::new(State { day: i64::MIN, ..Default::default() }), written: Mutex::new((0, 0, None)) }
+        Self {
+            dir,
+            offset_min,
+            state: Mutex::new(State {
+                day: i64::MIN,
+                ..Default::default()
+            }),
+            written: Mutex::new((0, 0, None)),
+        }
     }
 
     pub fn enabled(&self) -> bool {
@@ -84,7 +92,14 @@ impl AuditLog {
         json!({ "enabled": self.enabled(), "written": written, "write_errors": errors, "last_error": last })
     }
 
-    pub fn record(&self, unix_ms: i64, action: Action, who: &str, role: Option<&str>, detail: Value) {
+    pub fn record(
+        &self,
+        unix_ms: i64,
+        action: Action,
+        who: &str,
+        role: Option<&str>,
+        detail: Value,
+    ) {
         let Some(dir) = &self.dir else { return };
         let line = json!({
             "time": iso8601(unix_ms, self.offset_min),
@@ -98,7 +113,11 @@ impl AuditLog {
         let day = local_day(unix_ms, self.offset_min);
         if day != st.day || st.file.is_none() {
             st.day = day;
-            st.file = match OpenOptions::new().create(true).append(true).open(dir.join(format!("audit-{}.jsonl", date_string(day)))) {
+            st.file = match OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join(format!("audit-{}.jsonl", date_string(day))))
+            {
                 Ok(f) => Some(f),
                 Err(e) => return self.fail(e.to_string()),
             };
@@ -130,11 +149,19 @@ impl AuditLog {
             let key = (p.name.clone(), space_id.to_string());
             match st.last_vitals_read.get(&key) {
                 // Time can also move backwards (a replay); treat that as due.
-                Some(&prev) if unix_ms >= prev && unix_ms - prev < VITALS_READ_EVERY_MS => return false,
+                Some(&prev) if unix_ms >= prev && unix_ms - prev < VITALS_READ_EVERY_MS => {
+                    return false
+                }
                 _ => st.last_vitals_read.insert(key, unix_ms),
             };
         }
-        self.record(unix_ms, Action::VitalsRead, &p.name, Some(p.role.as_str()), json!({ "space_id": space_id }));
+        self.record(
+            unix_ms,
+            Action::VitalsRead,
+            &p.name,
+            Some(p.role.as_str()),
+            json!({ "space_id": space_id }),
+        );
         true
     }
 
@@ -151,14 +178,20 @@ mod tests {
     use crate::roles::Role;
 
     fn principal(name: &str) -> Principal {
-        Principal { name: name.into(), role: Role::Safety, spaces: None }
+        Principal {
+            name: name.into(),
+            role: Role::Safety,
+            spaces: None,
+        }
     }
 
     fn lines(dir: &Path) -> Vec<Value> {
         let mut out = Vec::new();
         for e in fs::read_dir(dir).expect("read dir") {
             let p = e.expect("entry").path();
-            if p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("audit-")) {
+            if p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with("audit-"))
+            {
                 for l in fs::read_to_string(&p).expect("read").lines() {
                     out.push(serde_json::from_str(l).expect("json"));
                 }
@@ -177,8 +210,20 @@ mod tests {
     fn actions_are_appended_as_json_lines() {
         let dir = tmp("actions");
         let log = AuditLog::new(Some(&dir), 330);
-        log.record(1_700_000_000_000, Action::Login, "ops", Some("ops"), json!({"from": "127.0.0.1"}));
-        log.record(1_700_000_001_000, Action::Denied, "-", None, json!({"path": "/api/spaces"}));
+        log.record(
+            1_700_000_000_000,
+            Action::Login,
+            "ops",
+            Some("ops"),
+            json!({"from": "127.0.0.1"}),
+        );
+        log.record(
+            1_700_000_001_000,
+            Action::Denied,
+            "-",
+            None,
+            json!({"path": "/api/spaces"}),
+        );
         let l = lines(&dir);
         assert_eq!(l.len(), 2);
         assert_eq!(l[0]["action"], "login");
@@ -187,7 +232,10 @@ mod tests {
         assert_eq!(l[0]["detail"]["from"], "127.0.0.1");
         assert_eq!(l[1]["action"], "denied");
         assert_eq!(l[1]["role"], Value::Null);
-        assert!(l[0]["time"].as_str().is_some_and(|t| t.ends_with("+05:30")), "local offset is recorded");
+        assert!(
+            l[0]["time"].as_str().is_some_and(|t| t.ends_with("+05:30")),
+            "local offset is recorded"
+        );
         assert_eq!(log.status()["written"], 2);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -198,10 +246,22 @@ mod tests {
         let log = AuditLog::new(Some(&dir), 0);
         let t = 1_700_000_000_000;
         assert!(log.vitals_read(t, &principal("ana"), "lab"));
-        assert!(!log.vitals_read(t + 1000, &principal("ana"), "lab"), "same hour, same space");
-        assert!(log.vitals_read(t + 1000, &principal("ana"), "rest"), "a different space is a new read");
-        assert!(log.vitals_read(t + 1000, &principal("bo"), "lab"), "a different person is a new read");
-        assert!(log.vitals_read(t + VITALS_READ_EVERY_MS, &principal("ana"), "lab"), "an hour later");
+        assert!(
+            !log.vitals_read(t + 1000, &principal("ana"), "lab"),
+            "same hour, same space"
+        );
+        assert!(
+            log.vitals_read(t + 1000, &principal("ana"), "rest"),
+            "a different space is a new read"
+        );
+        assert!(
+            log.vitals_read(t + 1000, &principal("bo"), "lab"),
+            "a different person is a new read"
+        );
+        assert!(
+            log.vitals_read(t + VITALS_READ_EVERY_MS, &principal("ana"), "lab"),
+            "an hour later"
+        );
         assert_eq!(lines(&dir).len(), 4);
         let _ = fs::remove_dir_all(&dir);
     }

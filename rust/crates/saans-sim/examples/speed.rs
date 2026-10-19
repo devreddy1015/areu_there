@@ -4,7 +4,13 @@ use saans_sim::{scenarios, Simulator};
 use std::time::Instant;
 
 fn main() {
-    let sc = scenarios::scenario("night-8h", scenarios::room_rich_nlos(), scenarios::three_links(), scenarios::night(8.0, 4.0, (10.0, 40.0)), 1);
+    let sc = scenarios::scenario(
+        "night-8h",
+        scenarios::room_rich_nlos(),
+        scenarios::three_links(),
+        scenarios::night(8.0, 4.0, (10.0, 40.0)),
+        1,
+    );
     let t0 = Instant::now();
     let mut sim = Simulator::new(&sc);
     let build = t0.elapsed().as_secs_f64();

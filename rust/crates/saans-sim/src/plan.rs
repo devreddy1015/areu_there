@@ -101,16 +101,32 @@ pub struct Bounds {
 impl Bounds {
     pub fn new(size: Point) -> Self {
         let (w, h) = size;
-        Self { x0: MARGIN_M.min(w / 2.0), x1: (w - MARGIN_M).max(w / 2.0), y0: MARGIN_M.min(h / 2.0), y1: (h - MARGIN_M).max(h / 2.0) }
+        Self {
+            x0: MARGIN_M.min(w / 2.0),
+            x1: (w - MARGIN_M).max(w / 2.0),
+            y0: MARGIN_M.min(h / 2.0),
+            y1: (h - MARGIN_M).max(h / 2.0),
+        }
     }
     pub fn clamp(&self, p: Point) -> Point {
-        let cx = if p.0.is_finite() { p.0 } else { (self.x0 + self.x1) / 2.0 };
-        let cy = if p.1.is_finite() { p.1 } else { (self.y0 + self.y1) / 2.0 };
+        let cx = if p.0.is_finite() {
+            p.0
+        } else {
+            (self.x0 + self.x1) / 2.0
+        };
+        let cy = if p.1.is_finite() {
+            p.1
+        } else {
+            (self.y0 + self.y1) / 2.0
+        };
         (cx.clamp(self.x0, self.x1), cy.clamp(self.y0, self.y1))
     }
     #[cfg(test)]
     pub fn contains(&self, p: Point) -> bool {
-        p.0 >= self.x0 - 1e-9 && p.0 <= self.x1 + 1e-9 && p.1 >= self.y0 - 1e-9 && p.1 <= self.y1 + 1e-9
+        p.0 >= self.x0 - 1e-9
+            && p.0 <= self.x1 + 1e-9
+            && p.1 >= self.y0 - 1e-9
+            && p.1 <= self.y1 + 1e-9
     }
     fn diag(&self) -> f64 {
         (self.x1 - self.x0).hypot(self.y1 - self.y0)
@@ -168,7 +184,11 @@ fn sane_bpm(b: f64) -> f64 {
 /// is exactly the reference's `2 * pi * (bpm / 60) * t`.
 fn phase_delta(b0: f64, b1: f64, d: f64, tau: f64) -> f64 {
     let lin = 2.0 * PI * (b0 / 60.0) * tau;
-    let quad = if d > 0.0 { 2.0 * PI * ((b1 - b0) / 60.0) * (tau * tau) / (2.0 * d) } else { 0.0 };
+    let quad = if d > 0.0 {
+        2.0 * PI * ((b1 - b0) / 60.0) * (tau * tau) / (2.0 * d)
+    } else {
+        0.0
+    };
     lin + quad
 }
 
@@ -211,7 +231,13 @@ struct Builder<'a> {
 impl Builder<'_> {
     fn hold(&mut self, t0: f64, t1: f64) {
         if t1 > t0 {
-            self.legs.push(Leg { t0, t1, from: self.pos, to: self.pos, kind: LegKind::Hold });
+            self.legs.push(Leg {
+                t0,
+                t1,
+                from: self.pos,
+                to: self.pos,
+                kind: LegKind::Hold,
+            });
         }
     }
 
@@ -228,12 +254,24 @@ impl Builder<'_> {
         }
         let dur = d / speed;
         if t0 + dur <= t1 {
-            self.legs.push(Leg { t0, t1: t0 + dur, from: self.pos, to: target, kind: LegKind::Walk });
+            self.legs.push(Leg {
+                t0,
+                t1: t0 + dur,
+                from: self.pos,
+                to: target,
+                kind: LegKind::Walk,
+            });
             self.pos = target;
             t0 + dur
         } else {
             let end = lerp(self.pos, target, (t1 - t0) / dur);
-            self.legs.push(Leg { t0, t1, from: self.pos, to: end, kind: LegKind::Walk });
+            self.legs.push(Leg {
+                t0,
+                t1,
+                from: self.pos,
+                to: end,
+                kind: LegKind::Walk,
+            });
             self.pos = end;
             t1
         }
@@ -244,7 +282,13 @@ impl Builder<'_> {
     fn drop_to(&mut self, t0: f64, t1: f64, dur: f64, target: Point) -> f64 {
         let te = (t0 + dur).min(t1);
         if te > t0 {
-            self.legs.push(Leg { t0, t1: te, from: self.pos, to: target, kind: LegKind::Drop });
+            self.legs.push(Leg {
+                t0,
+                t1: te,
+                from: self.pos,
+                to: target,
+                kind: LegKind::Drop,
+            });
         }
         self.pos = target;
         te
@@ -254,8 +298,16 @@ impl Builder<'_> {
         let min_step = WAYPOINT_MIN_STEP_M.min(0.5 * self.bx.diag());
         let mut p = self.pos;
         for _ in 0..64 {
-            p = (self.rng.range(self.bx.x0, self.bx.x1), self.rng.range(self.bx.y0, self.bx.y1));
-            if dist(p, self.pos) >= min_step && self.nodes.iter().all(|&n| dist(p, n) >= WAYPOINT_NODE_CLEARANCE_M) {
+            p = (
+                self.rng.range(self.bx.x0, self.bx.x1),
+                self.rng.range(self.bx.y0, self.bx.y1),
+            );
+            if dist(p, self.pos) >= min_step
+                && self
+                    .nodes
+                    .iter()
+                    .all(|&n| dist(p, n) >= WAYPOINT_NODE_CLEARANCE_M)
+            {
                 break;
             }
         }
@@ -300,8 +352,18 @@ impl Builder<'_> {
             let end = start + burst_s;
             let freq_hz = self.rng.range(1.0, 2.0);
             let dir = self.rng.unit_vector();
-            self.arms.push(ArmMove { t0: start, t1: end, freq_hz, dir, burst: true });
-            self.events.push(TruthEvent { kind: TruthKind::Burst, t_start_s: start, t_end_s: end });
+            self.arms.push(ArmMove {
+                t0: start,
+                t1: end,
+                freq_hz,
+                dir,
+                burst: true,
+            });
+            self.events.push(TruthEvent {
+                kind: TruthKind::Burst,
+                t_start_s: start,
+                t_end_s: end,
+            });
             let mut next = start + self.rng.exp(every_s);
             while next < end {
                 next += self.rng.exp(every_s);
@@ -316,7 +378,15 @@ impl Plan {
         let bx = Bounds::new(sc.room.size_m);
         let door = bx.clamp(sc.room.door_m);
         let arm_side = rng.unit_vector();
-        let mut b = Builder { bx, nodes: sc.nodes.iter().map(|n| n.pos).collect(), rng, legs: Vec::new(), arms: Vec::new(), events: Vec::new(), pos: door };
+        let mut b = Builder {
+            bx,
+            nodes: sc.nodes.iter().map(|n| n.pos).collect(),
+            rng,
+            legs: Vec::new(),
+            arms: Vec::new(),
+            events: Vec::new(),
+            pos: door,
+        };
         let mut segs: Vec<SegPlan> = Vec::with_capacity(sc.timeline.len());
         let (mut t, mut present, mut rate, mut phase) = (0.0f64, false, DEFAULT_BPM, 0.0f64);
 
@@ -356,7 +426,12 @@ impl Plan {
                     b.settle(present, t0, t1, *at);
                     (rate, rate)
                 }
-                Activity::Fidget { at, bpm, every_s, burst_s } => {
+                Activity::Fidget {
+                    at,
+                    bpm,
+                    every_s,
+                    burst_s,
+                } => {
                     let ts = b.settle(present, t0, t1, *at);
                     b.bursts(ts, t1, *every_s, *burst_s);
                     (sane_bpm(*bpm), sane_bpm(*bpm))
@@ -369,9 +444,19 @@ impl Plan {
                     if te > t0 {
                         let freq_hz = b.rng.range(1.5, 2.5);
                         let dir = b.rng.unit_vector();
-                        b.arms.push(ArmMove { t0, t1: te, freq_hz, dir, burst: false });
+                        b.arms.push(ArmMove {
+                            t0,
+                            t1: te,
+                            freq_hz,
+                            dir,
+                            burst: false,
+                        });
                     }
-                    b.events.push(TruthEvent { kind: TruthKind::Fall, t_start_s: t0, t_end_s: te });
+                    b.events.push(TruthEvent {
+                        kind: TruthKind::Fall,
+                        t_start_s: t0,
+                        t_end_s: te,
+                    });
                     b.hold(te, t1);
                     (sane_bpm(*bpm), sane_bpm(*bpm))
                 }
@@ -384,37 +469,88 @@ impl Plan {
                     let mut ts = t0;
                     if d > SIT_DOWN_DROP_M {
                         let f = SIT_DOWN_DROP_M / d;
-                        let approach = (target.0 + (b.pos.0 - target.0) * f, target.1 + (b.pos.1 - target.1) * f);
+                        let approach = (
+                            target.0 + (b.pos.0 - target.0) * f,
+                            target.1 + (b.pos.1 - target.1) * f,
+                        );
                         ts = b.walk_to(t0, t1, approach, RELOCATE_SPEED_MPS);
                     }
                     if ts < t1 {
                         let te = b.drop_to(ts, t1, SIT_DOWN_S, target);
-                        b.events.push(TruthEvent { kind: TruthKind::SitDown, t_start_s: ts, t_end_s: te });
+                        b.events.push(TruthEvent {
+                            kind: TruthKind::SitDown,
+                            t_start_s: ts,
+                            t_end_s: te,
+                        });
                         b.hold(te, t1);
                     }
                     (sane_bpm(*bpm), sane_bpm(*bpm))
                 }
             };
             let now_present = !matches!(seg.activity, Activity::Absent);
-            segs.push(SegPlan { t0, t1, present: now_present, pause, bpm0, bpm1, phase0: phase });
+            segs.push(SegPlan {
+                t0,
+                t1,
+                present: now_present,
+                pause,
+                bpm0,
+                bpm1,
+                phase0: phase,
+            });
             phase = (phase + phase_delta(bpm0, bpm1, d, d)).rem_euclid(TAU);
             rate = bpm1;
             present = now_present;
             t = t1;
         }
 
-        let Builder { legs, arms, mut events, .. } = b;
-        for (a, z) in merge(segs.iter().filter(|s| s.present).map(|s| (s.t0, s.t1)).collect()) {
-            events.push(TruthEvent { kind: TruthKind::Occupied, t_start_s: a, t_end_s: z });
+        let Builder {
+            legs,
+            arms,
+            mut events,
+            ..
+        } = b;
+        for (a, z) in merge(
+            segs.iter()
+                .filter(|s| s.present)
+                .map(|s| (s.t0, s.t1))
+                .collect(),
+        ) {
+            events.push(TruthEvent {
+                kind: TruthKind::Occupied,
+                t_start_s: a,
+                t_end_s: z,
+            });
         }
-        let pause_iv = merge(segs.iter().filter(|s| s.pause).map(|s| (s.t0, s.t1)).collect());
+        let pause_iv = merge(
+            segs.iter()
+                .filter(|s| s.pause)
+                .map(|s| (s.t0, s.t1))
+                .collect(),
+        );
         for &(a, z) in &pause_iv {
-            events.push(TruthEvent { kind: TruthKind::BreathingPause, t_start_s: a, t_end_s: z });
+            events.push(TruthEvent {
+                kind: TruthKind::BreathingPause,
+                t_start_s: a,
+                t_end_s: z,
+            });
         }
-        for (a, z) in merge(legs.iter().filter(|l| l.kind == LegKind::Walk).map(|l| (l.t0, l.t1)).collect()) {
-            events.push(TruthEvent { kind: TruthKind::Walking, t_start_s: a, t_end_s: z });
+        for (a, z) in merge(
+            legs.iter()
+                .filter(|l| l.kind == LegKind::Walk)
+                .map(|l| (l.t0, l.t1))
+                .collect(),
+        ) {
+            events.push(TruthEvent {
+                kind: TruthKind::Walking,
+                t_start_s: a,
+                t_end_s: z,
+            });
         }
-        events.sort_by(|a, b| a.t_start_s.total_cmp(&b.t_start_s).then(a.kind.cmp(&b.kind)));
+        events.sort_by(|a, b| {
+            a.t_start_s
+                .total_cmp(&b.t_start_s)
+                .then(a.kind.cmp(&b.kind))
+        });
 
         let mut pauses = Vec::with_capacity(pause_iv.len());
         let mut prev: Option<(f64, f64)> = None;
@@ -424,11 +560,25 @@ impl Plan {
                 Some((e, a)) => (a + (p0 - e) / PAUSE_RAMP_S).min(1.0),
             };
             let a1 = (a0 - (p1 - p0) / PAUSE_RAMP_S).max(0.0);
-            pauses.push(Pause { t0: p0, t1: p1, a0, a1 });
+            pauses.push(Pause {
+                t0: p0,
+                t1: p1,
+                a0,
+                a1,
+            });
             prev = Some((p1, a1));
         }
 
-        Self { duration_s: t, segs, legs, arms, pauses, events, arm_side, rest: door }
+        Self {
+            duration_s: t,
+            segs,
+            legs,
+            arms,
+            pauses,
+            events,
+            arm_side,
+            rest: door,
+        }
     }
 
     pub fn events(&self) -> &[TruthEvent] {
@@ -439,7 +589,10 @@ impl Plan {
         if self.segs.is_empty() {
             return None;
         }
-        let i = self.segs.partition_point(|s| s.t1 <= t).min(self.segs.len() - 1);
+        let i = self
+            .segs
+            .partition_point(|s| s.t1 <= t)
+            .min(self.segs.len() - 1);
         Some(&self.segs[i])
     }
 
@@ -447,7 +600,10 @@ impl Plan {
         if self.legs.is_empty() {
             return None;
         }
-        let i = self.legs.partition_point(|l| l.t1 <= t).min(self.legs.len() - 1);
+        let i = self
+            .legs
+            .partition_point(|l| l.t1 <= t)
+            .min(self.legs.len() - 1);
         Some(&self.legs[i])
     }
 
@@ -458,9 +614,15 @@ impl Plan {
 
     /// Body centre at time t.
     pub fn position(&self, t: f64) -> Point {
-        let Some(l) = self.leg_at(t) else { return self.rest };
+        let Some(l) = self.leg_at(t) else {
+            return self.rest;
+        };
         let span = l.t1 - l.t0;
-        let u = if span > 0.0 { ((t - l.t0) / span).clamp(0.0, 1.0) } else { 1.0 };
+        let u = if span > 0.0 {
+            ((t - l.t0) / span).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
         match l.kind {
             LegKind::Hold => l.from,
             LegKind::Walk => lerp(l.from, l.to, u),
@@ -469,7 +631,8 @@ impl Plan {
     }
 
     fn moving(&self, t: f64) -> bool {
-        self.leg_at(t).is_some_and(|l| l.kind != LegKind::Hold && t >= l.t0 && t < l.t1)
+        self.leg_at(t)
+            .is_some_and(|l| l.kind != LegKind::Hold && t >= l.t0 && t < l.t1)
     }
 
     /// Breathing amplitude gain in [0, 1] (pause ramps).
@@ -498,7 +661,10 @@ impl Plan {
 
     /// Rest position of the arm for a body centred at `centre`.
     pub fn arm_rest(&self, centre: Point) -> Point {
-        (centre.0 + ARM_OFFSET_M * self.arm_side.0, centre.1 + ARM_OFFSET_M * self.arm_side.1)
+        (
+            centre.0 + ARM_OFFSET_M * self.arm_side.0,
+            centre.1 + ARM_OFFSET_M * self.arm_side.1,
+        )
     }
 
     pub fn body_at(&self, t: f64) -> BodyState {
@@ -508,7 +674,8 @@ impl Plan {
             Some(s) => {
                 let phase_b = s.phase0 + phase_delta(s.bpm0, s.bpm1, s.t1 - s.t0, t - s.t0);
                 let breath = BREATHING_AMPLITUDE_M * self.breath_gain(t);
-                let disp = breath * phase_b.sin() + HEART_AMPLITUDE_M * (2.0 * PI * (HEART_BPM / 60.0) * t).sin();
+                let disp = breath * phase_b.sin()
+                    + HEART_AMPLITUDE_M * (2.0 * PI * (HEART_BPM / 60.0) * t).sin();
                 (s.present, disp)
             }
         };
@@ -518,7 +685,12 @@ impl Plan {
             let swing = ARM_SWING_M * taper(tau, a.t1 - a.t0) * (2.0 * PI * a.freq_hz * tau).sin();
             arm = (arm.0 + swing * a.dir.0, arm.1 + swing * a.dir.1);
         }
-        BodyState { present, centre, disp, arm }
+        BodyState {
+            present,
+            centre,
+            disp,
+            arm,
+        }
     }
 
     pub fn truth(&self, t: f64) -> Truth {
@@ -532,7 +704,16 @@ impl Plan {
             Some(s) if breathing => Self::rate(s, t),
             _ => 0.0,
         };
-        Truth { t_s: t, present, still, breathing, bpm, in_pause, in_burst, position: self.position(t) }
+        Truth {
+            t_s: t,
+            present,
+            still,
+            breathing,
+            bpm,
+            in_pause,
+            in_burst,
+            position: self.position(t),
+        }
     }
 }
 
@@ -556,9 +737,26 @@ mod tests {
             scenarios::room_clear_los(),
             scenarios::one_link(),
             vec![
-                crate::scenario::Segment { duration_s: 10.0, activity: Activity::Seated { at: (3.0, 3.5), bpm: 15.0, bpm_end: None } },
-                crate::scenario::Segment { duration_s: 5.0, activity: Activity::BreathingPause { at: (3.0, 3.5) } },
-                crate::scenario::Segment { duration_s: 10.0, activity: Activity::Seated { at: (3.0, 3.5), bpm: 15.0, bpm_end: None } },
+                crate::scenario::Segment {
+                    duration_s: 10.0,
+                    activity: Activity::Seated {
+                        at: (3.0, 3.5),
+                        bpm: 15.0,
+                        bpm_end: None,
+                    },
+                },
+                crate::scenario::Segment {
+                    duration_s: 5.0,
+                    activity: Activity::BreathingPause { at: (3.0, 3.5) },
+                },
+                crate::scenario::Segment {
+                    duration_s: 10.0,
+                    activity: Activity::Seated {
+                        at: (3.0, 3.5),
+                        bpm: 15.0,
+                        bpm_end: None,
+                    },
+                },
             ],
             1,
         );
@@ -577,14 +775,23 @@ mod tests {
         let mut tl = scenarios::collapse();
         tl.extend(scenarios::lone_worker(5.0));
         // A fall aimed outside the room is clamped.
-        tl.push(crate::scenario::Segment { duration_s: 20.0, activity: Activity::Fall { to: (-3.0, 9.0), bpm: 15.0 } });
+        tl.push(crate::scenario::Segment {
+            duration_s: 20.0,
+            activity: Activity::Fall {
+                to: (-3.0, 9.0),
+                bpm: 15.0,
+            },
+        });
         let sc = scenarios::scenario("inside", room, scenarios::three_links(), tl, 3);
         let plan = Plan::new(&sc, &mut Rng::new(3));
         let mut t = 0.0;
         while t < plan.duration_s {
             let b = plan.body_at(t);
             for p in [b.centre, b.arm] {
-                assert!(p.0 > 0.0 && p.0 < w && p.1 > 0.0 && p.1 < h, "t={t}: {p:?} outside");
+                assert!(
+                    p.0 > 0.0 && p.0 < w && p.1 > 0.0 && p.1 < h,
+                    "t={t}: {p:?} outside"
+                );
             }
             assert!(Bounds::new((w, h)).contains(b.centre));
             t += 0.01;

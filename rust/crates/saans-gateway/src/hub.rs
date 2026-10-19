@@ -18,7 +18,7 @@ use crate::engine::{Engine, Ingested, TICK_S};
 use crate::privacy;
 use crate::shared::Shared;
 use crate::store::{self, EventLog};
-use crate::timefmt::{iso8601, now_unix_ms};
+use crate::timefmt::{iso8601, local_day, now_unix_ms};
 use saans_health::{LinkId, Severity};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -46,7 +46,9 @@ impl Wall {
     pub fn unix_ms(&self, t_s: f64, now_t_s: f64) -> i64 {
         match *self {
             Wall::System => now_unix_ms() - ((now_t_s - t_s) * 1000.0).round() as i64,
-            Wall::Anchored { t0, unix_ms_at_t0 } => unix_ms_at_t0 + ((t_s - t0) * 1000.0).round() as i64,
+            Wall::Anchored { t0, unix_ms_at_t0 } => {
+                unix_ms_at_t0 + ((t_s - t0) * 1000.0).round() as i64
+            }
         }
     }
 }
@@ -108,7 +110,13 @@ pub struct Hub {
 impl Hub {
     /// `persist`: write event logs and history under `data_dir` and load
     /// what is there (live mode). Replay never touches `data_dir`.
-    pub fn new(cfg: GatewayConfig, shared: Option<Arc<Shared>>, persist: bool, wall: Wall, t_start: f64) -> Self {
+    pub fn new(
+        cfg: GatewayConfig,
+        shared: Option<Arc<Shared>>,
+        persist: bool,
+        wall: Wall,
+        t_start: f64,
+    ) -> Self {
         let engine = Engine::new(&cfg);
         let n = engine.spaces.len();
         let mut hub = Self {
@@ -137,7 +145,10 @@ impl Hub {
         }
         for s in &hub.cfg.spaces {
             if s.links.is_empty() {
-                hub.notes.push(format!("space {:?} lists no links: it will always be unknown", s.id));
+                hub.notes.push(format!(
+                    "space {:?} lists no links: it will always be unknown",
+                    s.id
+                ));
             }
         }
         hub
@@ -147,21 +158,46 @@ impl Hub {
         let dir = self.cfg.data_dir.clone();
         match EventLog::new(&dir, self.cfg.utc_offset_minutes) {
             Ok(l) => self.log = Some(l),
-            Err(e) => self.notes.push(format!("cannot create data_dir {}: {e}; events are not being logged", dir.display())),
+            Err(e) => self.notes.push(format!(
+                "cannot create data_dir {}: {e}; events are not being logged",
+                dir.display()
+            )),
         }
-        let (history, err) = store::load_history(&dir);
+        let (mut history, err) = store::load_history(&dir);
         if let Some(e) = err {
             self.notes.push(e);
+        }
+        // Before anything reads it: a file written by an older build, or
+        // by a gateway that was off for a year, can hold summaries past
+        // their retention. Dropping them here means they are never
+        // imported, never shown and never written back.
+        let today = local_day(
+            self.wall.unix_ms(self.t_start, self.t_start),
+            self.cfg.utc_offset_minutes,
+        );
+        let dropped = store::prune_history(&mut history, self.cfg.history_retention_days, today);
+        if dropped > 0 {
+            self.notes.push(format!(
+                "retention: dropped {dropped} day summar{} older than {} days from history.json",
+                if dropped == 1 { "y" } else { "ies" },
+                self.cfg.history_retention_days
+            ));
         }
         for (id, h) in history {
             match self.engine.space_index(&id) {
                 Some(i) => self.engine.spaces[i].monitor.import_history(h),
-                None => self.notes.push(format!("history.json has space {id:?}, which is not configured; kept on disk")),
+                None => self.notes.push(format!(
+                    "history.json has space {id:?}, which is not configured; kept on disk"
+                )),
             }
         }
         if let Some(shared) = &self.shared {
             for mut v in store::load_recent_events(&dir, crate::shared::EVENT_RING) {
-                let space = v.get("space_id").and_then(Value::as_str).unwrap_or("").to_string();
+                let space = v
+                    .get("space_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
                 let unix_ms = v.get("unix_ms").and_then(Value::as_i64).unwrap_or(0);
                 // Re-apply today's consent setting: a space that has since
                 // opted out must not show yesterday's breathing events.
@@ -192,7 +228,9 @@ impl Hub {
         let offset = self.cfg.utc_offset_minutes;
         for (i, ev) in events {
             let vitals = self.engine.spaces[i].config.vitals;
-            let Ok(mut v) = serde_json::to_value(&ev) else { continue };
+            let Ok(mut v) = serde_json::to_value(&ev) else {
+                continue;
+            };
             if !privacy::event_allowed(&v, vitals) {
                 self.events_withheld += 1;
                 continue;
@@ -208,8 +246,14 @@ impl Hub {
             if let Some(out) = &mut self.out {
                 let _ = writeln!(out, "{line}");
             }
-            let ty = map.get("type").and_then(Value::as_str).unwrap_or("unknown").to_string();
-            *self.counts[i].entry((ty.clone(), severity_str(ev.severity))).or_default() += 1;
+            let ty = map
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+                .to_string();
+            *self.counts[i]
+                .entry((ty.clone(), severity_str(ev.severity)))
+                .or_default() += 1;
             self.events_emitted += 1;
             let mut record = map;
             record.insert("time".into(), Value::String(time));
@@ -218,7 +262,11 @@ impl Hub {
             match &self.shared {
                 Some(shared) => {
                     let stored = shared.push_event(&ev.space_id, unix_ms, record);
-                    shared.broadcast(json!({"type": "event", "event": &*stored}).to_string().into());
+                    shared.broadcast(
+                        json!({"type": "event", "event": &*stored})
+                            .to_string()
+                            .into(),
+                    );
                     self.last_by_type[i].insert(ty, stored);
                 }
                 None => {
@@ -235,7 +283,10 @@ impl Hub {
     }
 
     fn housekeeping(&mut self, t_s: f64) {
-        if self.retention_t.is_none_or(|r| t_s - r >= RETENTION_CHECK_S) {
+        if self
+            .retention_t
+            .is_none_or(|r| t_s - r >= RETENTION_CHECK_S)
+        {
             self.retention_t = Some(t_s);
             let removed = store::prune_logs(
                 &self.cfg.data_dir,
@@ -255,9 +306,22 @@ impl Hub {
 
     pub fn save_history(&mut self, t_s: f64) {
         self.history_saved_t = Some(t_s);
-        let history: BTreeMap<String, _> =
-            self.engine.spaces.iter().map(|s| (s.config.id.clone(), s.monitor.export_history())).collect();
-        let time = iso8601(self.wall.unix_ms(t_s, t_s), self.cfg.utc_offset_minutes);
+        let mut history: BTreeMap<String, _> = self
+            .engine
+            .spaces
+            .iter()
+            .map(|s| (s.config.id.clone(), s.monitor.export_history()))
+            .collect();
+        // The monitor's own cap is `HISTORY_MAX_DAYS` entries, which
+        // bounds memory but not age. Age is enforced here, at the one
+        // place the data becomes a file that outlives the process.
+        let unix_ms = self.wall.unix_ms(t_s, t_s);
+        store::prune_history(
+            &mut history,
+            self.cfg.history_retention_days,
+            local_day(unix_ms, self.cfg.utc_offset_minutes),
+        );
+        let time = iso8601(unix_ms, self.cfg.utc_offset_minutes);
         if let Err(e) = store::save_history(&self.cfg.data_dir, &history, &time) {
             self.history_errors += 1;
             self.history_last_error = Some(e.to_string());
@@ -278,14 +342,22 @@ impl Hub {
     // ------------------------------------------------------------ publish
 
     pub fn publish(&mut self, t_s: f64) {
-        let Some(shared) = self.shared.clone() else { return };
+        let Some(shared) = self.shared.clone() else {
+            return;
+        };
         let datagrams = self.engine.stats.datagrams;
         self.rate_window.push_back((t_s, datagrams));
         while self.rate_window.len() > 2 && t_s - self.rate_window[1].0 >= 10.0 {
             self.rate_window.pop_front();
         }
-        let spaces: Vec<(String, Value)> =
-            (0..self.engine.spaces.len()).map(|i| (self.engine.spaces[i].config.id.clone(), self.space_json(i, t_s))).collect();
+        let spaces: Vec<(String, Value)> = (0..self.engine.spaces.len())
+            .map(|i| {
+                (
+                    self.engine.spaces[i].config.id.clone(),
+                    self.space_json(i, t_s),
+                )
+            })
+            .collect();
         let state_msg: Arc<str> =
             json!({"type": "state", "t_s": t_s, "spaces": spaces.iter().map(|(_, v)| v).collect::<Vec<_>>()})
                 .to_string()
@@ -296,8 +368,15 @@ impl Hub {
         let unix_ms = self.wall.unix_ms(t_s, t_s);
         self.record_history(&shared, t_s, unix_ms);
         if shared.outputs.receiver_count() > 0 {
-            shared.emit(crate::outputs::OutputMsg::States { unix_ms, spaces: Arc::new(spaces.clone()) });
-            shared.emit(crate::outputs::OutputMsg::System { unix_ms, links: Arc::new(links.clone()), health: Arc::new(health.clone()) });
+            shared.emit(crate::outputs::OutputMsg::States {
+                unix_ms,
+                spaces: Arc::new(spaces.clone()),
+            });
+            shared.emit(crate::outputs::OutputMsg::System {
+                unix_ms,
+                links: Arc::new(links.clone()),
+                health: Arc::new(health.clone()),
+            });
         }
         {
             let mut p = shared.write();
@@ -324,15 +403,19 @@ impl Hub {
                 h.record_space(&sp.config.id, unix_ms, sample, sp.config.vitals);
             }
             for r in sp.system.link_report(&sp.fusion, t_s) {
-                h.record_link(&sp.config.id, r.link, crate::history::LinkPoint {
-                    t_s,
-                    unix_ms,
-                    up: r.up,
-                    rate_hz: r.rate_hz as f32,
-                    loss: r.loss as f32,
-                    best_bnr: r.best_bnr as f32,
-                    rssi_dbm: r.rssi_dbm,
-                });
+                h.record_link(
+                    &sp.config.id,
+                    r.link,
+                    crate::history::LinkPoint {
+                        t_s,
+                        unix_ms,
+                        up: r.up,
+                        rate_hz: r.rate_hz as f32,
+                        loss: r.loss as f32,
+                        best_bnr: r.best_bnr as f32,
+                        rssi_dbm: r.rssi_dbm,
+                    },
+                );
             }
         }
     }
@@ -343,7 +426,11 @@ impl Hub {
         let sp = &self.engine.spaces[i];
         let vitals = sp.config.vitals;
         let mut v = serde_json::to_value(&sp.state).unwrap_or_else(|_| json!({}));
-        let raw: Vec<String> = sp.raw_mode_links(t_s).iter().map(LinkId::to_string).collect();
+        let raw: Vec<String> = sp
+            .raw_mode_links(t_s)
+            .iter()
+            .map(LinkId::to_string)
+            .collect();
         let alerts: Vec<Value> = sp
             .state
             .active_alerts
@@ -362,11 +449,28 @@ impl Hub {
             .collect();
         if let Value::Object(m) = &mut v {
             m.insert("name".into(), GatewayConfig::space_name(&sp.config).into());
-            m.insert("collapse_detection".into(), sp.config.collapse_detection.into());
+            m.insert(
+                "collapse_detection".into(),
+                sp.config.collapse_detection.into(),
+            );
             m.insert("raw_mode".into(), (!raw.is_empty()).into());
             m.insert("raw_mode_links".into(), raw.into());
-            m.insert("vitals_gated_links".into(), sp.vitals_gated_links.iter().map(LinkId::to_string).collect::<Vec<_>>().into());
-            m.insert("active_alerts".into(), alerts.iter().map(|a| a["name"].clone()).collect::<Vec<_>>().into());
+            m.insert(
+                "vitals_gated_links".into(),
+                sp.vitals_gated_links
+                    .iter()
+                    .map(LinkId::to_string)
+                    .collect::<Vec<_>>()
+                    .into(),
+            );
+            m.insert(
+                "active_alerts".into(),
+                alerts
+                    .iter()
+                    .map(|a| a["name"].clone())
+                    .collect::<Vec<_>>()
+                    .into(),
+            );
             m.insert("alerts".into(), alerts.into());
         }
         privacy::redact_value(&mut v, vitals);
@@ -379,7 +483,8 @@ impl Hub {
                 .spaces
                 .iter()
                 .map(|sp| {
-                    let mut reports = serde_json::to_value(sp.system.link_report(&sp.fusion, t_s)).unwrap_or(json!([]));
+                    let mut reports = serde_json::to_value(sp.system.link_report(&sp.fusion, t_s))
+                        .unwrap_or(json!([]));
                     privacy::redact_value(&mut reports, sp.config.vitals);
                     json!({
                         "space_id": sp.config.id,
@@ -404,17 +509,33 @@ impl Hub {
         let raw_links: Vec<Value> = e
             .spaces
             .iter()
-            .flat_map(|sp| sp.raw_mode_links(t_s).into_iter().map(move |l| json!({"space_id": sp.config.id, "rx": l.rx, "tx": l.tx})))
+            .flat_map(|sp| {
+                sp.raw_mode_links(t_s)
+                    .into_iter()
+                    .map(move |l| json!({"space_id": sp.config.id, "rx": l.rx, "tx": l.tx}))
+            })
             .collect();
         let gated: Vec<Value> = e
             .spaces
             .iter()
-            .flat_map(|sp| sp.vitals_gated_links.iter().map(move |l| json!({"space_id": sp.config.id, "rx": l.rx, "tx": l.tx})))
+            .flat_map(|sp| {
+                sp.vitals_gated_links
+                    .iter()
+                    .map(move |l| json!({"space_id": sp.config.id, "rx": l.rx, "tx": l.tx}))
+            })
             .collect();
         let configured: usize = e.spaces.iter().map(|s| s.fusion.links.len()).sum();
-        let usable: usize = e.spaces.iter().map(|s| s.fusion.links.values().filter(|l| l.usable(t_s)).count()).sum();
-        let blind: Vec<&str> =
-            e.spaces.iter().filter(|s| s.sample.is_some_and(|x| x.occupied.is_none())).map(|s| s.config.id.as_str()).collect();
+        let usable: usize = e
+            .spaces
+            .iter()
+            .map(|s| s.fusion.links.values().filter(|l| l.usable(t_s)).count())
+            .sum();
+        let blind: Vec<&str> = e
+            .spaces
+            .iter()
+            .filter(|s| s.sample.is_some_and(|x| x.occupied.is_none()))
+            .map(|s| s.config.id.as_str())
+            .collect();
         let mut h = json!({
             "version": env!("CARGO_PKG_VERSION"),
             "mode": shared.mode,
@@ -466,15 +587,47 @@ impl Hub {
     pub fn metrics_text(&self, t_s: f64, shared: &Shared) -> String {
         let e = &self.engine;
         let mut p = Prom::default();
-        p.family("saans_gateway_uptime_seconds", "gauge", "Seconds since the gateway process started.");
-        p.sample("saans_gateway_uptime_seconds", &[], shared.started.elapsed().as_secs_f64());
-        p.family("saans_datagrams_total", "counter", "UDP datagrams received, by type.");
-        p.sample("saans_datagrams_total", &[("type", "feature")], e.stats.feature_frames as f64);
-        p.sample("saans_datagrams_total", &[("type", "raw")], e.stats.raw_datagrams as f64);
-        p.sample("saans_datagrams_total", &[("type", "invalid")], e.stats.errors.total() as f64);
-        p.family("saans_datagrams_per_second", "gauge", "Datagram rate over the last 10 s.");
+        p.family(
+            "saans_gateway_uptime_seconds",
+            "gauge",
+            "Seconds since the gateway process started.",
+        );
+        p.sample(
+            "saans_gateway_uptime_seconds",
+            &[],
+            shared.started.elapsed().as_secs_f64(),
+        );
+        p.family(
+            "saans_datagrams_total",
+            "counter",
+            "UDP datagrams received, by type.",
+        );
+        p.sample(
+            "saans_datagrams_total",
+            &[("type", "feature")],
+            e.stats.feature_frames as f64,
+        );
+        p.sample(
+            "saans_datagrams_total",
+            &[("type", "raw")],
+            e.stats.raw_datagrams as f64,
+        );
+        p.sample(
+            "saans_datagrams_total",
+            &[("type", "invalid")],
+            e.stats.errors.total() as f64,
+        );
+        p.family(
+            "saans_datagrams_per_second",
+            "gauge",
+            "Datagram rate over the last 10 s.",
+        );
         p.sample("saans_datagrams_per_second", &[], self.datagram_rate());
-        p.family("saans_decode_errors_total", "counter", "Datagrams rejected, by reason.");
+        p.family(
+            "saans_decode_errors_total",
+            "counter",
+            "Datagrams rejected, by reason.",
+        );
         let er = &e.stats.errors;
         for (reason, n) in [
             ("size", er.size),
@@ -487,14 +640,38 @@ impl Hub {
         ] {
             p.sample("saans_decode_errors_total", &[("reason", reason)], n as f64);
         }
-        p.family("saans_raw_feature_frames_total", "counter", "FeatureFrames the gateway computed from raw CSI.");
-        p.sample("saans_raw_feature_frames_total", &[], e.stats.raw_feature_frames as f64);
-        p.family("saans_vitals_gated_frames_total", "counter", "Frames that carried vitals for a space without consent (zeroed).");
-        p.sample("saans_vitals_gated_frames_total", &[], e.stats.vitals_gated as f64);
-        p.family("saans_unknown_link_frames_total", "counter", "Frames from links that no space lists.");
+        p.family(
+            "saans_raw_feature_frames_total",
+            "counter",
+            "FeatureFrames the gateway computed from raw CSI.",
+        );
+        p.sample(
+            "saans_raw_feature_frames_total",
+            &[],
+            e.stats.raw_feature_frames as f64,
+        );
+        p.family(
+            "saans_vitals_gated_frames_total",
+            "counter",
+            "Frames that carried vitals for a space without consent (zeroed).",
+        );
+        p.sample(
+            "saans_vitals_gated_frames_total",
+            &[],
+            e.stats.vitals_gated as f64,
+        );
+        p.family(
+            "saans_unknown_link_frames_total",
+            "counter",
+            "Frames from links that no space lists.",
+        );
         for u in e.unknown.values() {
             let (rx, tx) = (u.rx.to_string(), u.tx.to_string());
-            p.sample("saans_unknown_link_frames_total", &[("rx", &rx), ("tx", &tx), ("kind", u.kind)], u.frames as f64);
+            p.sample(
+                "saans_unknown_link_frames_total",
+                &[("rx", &rx), ("tx", &tx), ("kind", u.kind)],
+                u.frames as f64,
+            );
         }
 
         let mut link_rows = Vec::new();
@@ -504,46 +681,127 @@ impl Hub {
                 link_rows.push((sp.config.id.as_str(), r, usable));
             }
         }
-        type LinkGauge = (&'static str, &'static str, &'static str, fn(&saans_health::system::LinkReport, bool) -> f64);
+        type LinkGauge = (
+            &'static str,
+            &'static str,
+            &'static str,
+            fn(&saans_health::system::LinkReport, bool) -> f64,
+        );
         let gauges: [LinkGauge; 8] = [
-            ("saans_link_frames_total", "counter", "FeatureFrames received per link.", |r, _| r.frames as f64),
-            ("saans_link_up", "gauge", "1 if the link sent a frame within 5 s.", |r, _| r.up as u8 as f64),
-            ("saans_link_usable", "gauge", "1 if fresh, calibrated and fast enough to vote on presence.", |_, u| u as u8 as f64),
-            ("saans_link_csi_rate_hz", "gauge", "Achieved CSI rate reported by the node.", |r, _| r.rate_hz),
-            ("saans_link_loss_ratio", "gauge", "CSI sequence loss reported by the node (0-1).", |r, _| r.loss),
-            ("saans_link_silent_seconds", "gauge", "Seconds since the link's last frame.", |r, _| r.silent_s),
-            ("saans_link_rssi_dbm", "gauge", "Mean RSSI of the link's last frame interval.", |r, _| r.rssi_dbm as f64),
-            ("saans_link_raw_mode", "gauge", "1 if the node is also streaming raw CSI (privacy notice).", |r, _| r.raw_mode as u8 as f64),
+            (
+                "saans_link_frames_total",
+                "counter",
+                "FeatureFrames received per link.",
+                |r, _| r.frames as f64,
+            ),
+            (
+                "saans_link_up",
+                "gauge",
+                "1 if the link sent a frame within 5 s.",
+                |r, _| r.up as u8 as f64,
+            ),
+            (
+                "saans_link_usable",
+                "gauge",
+                "1 if fresh, calibrated and fast enough to vote on presence.",
+                |_, u| u as u8 as f64,
+            ),
+            (
+                "saans_link_csi_rate_hz",
+                "gauge",
+                "Achieved CSI rate reported by the node.",
+                |r, _| r.rate_hz,
+            ),
+            (
+                "saans_link_loss_ratio",
+                "gauge",
+                "CSI sequence loss reported by the node (0-1).",
+                |r, _| r.loss,
+            ),
+            (
+                "saans_link_silent_seconds",
+                "gauge",
+                "Seconds since the link's last frame.",
+                |r, _| r.silent_s,
+            ),
+            (
+                "saans_link_rssi_dbm",
+                "gauge",
+                "Mean RSSI of the link's last frame interval.",
+                |r, _| r.rssi_dbm as f64,
+            ),
+            (
+                "saans_link_raw_mode",
+                "gauge",
+                "1 if the node is also streaming raw CSI (privacy notice).",
+                |r, _| r.raw_mode as u8 as f64,
+            ),
         ];
         for (name, kind, help, f) in gauges {
             p.family(name, kind, help);
             for (space, r, usable) in &link_rows {
                 let (rx, tx) = (r.link.rx.to_string(), r.link.tx.to_string());
-                p.sample(name, &[("space", space), ("rx", &rx), ("tx", &tx)], f(r, *usable));
+                p.sample(
+                    name,
+                    &[("space", space), ("rx", &rx), ("tx", &tx)],
+                    f(r, *usable),
+                );
             }
         }
-        p.family("saans_link_calibration_age_hours", "gauge", "Age of the link's empty-room calibration.");
+        p.family(
+            "saans_link_calibration_age_hours",
+            "gauge",
+            "Age of the link's empty-room calibration.",
+        );
         for (space, r, _) in &link_rows {
             if let Some(age) = r.calib_age_h {
                 let (rx, tx) = (r.link.rx.to_string(), r.link.tx.to_string());
-                p.sample("saans_link_calibration_age_hours", &[("space", space), ("rx", &rx), ("tx", &tx)], age);
+                p.sample(
+                    "saans_link_calibration_age_hours",
+                    &[("space", space), ("rx", &rx), ("tx", &tx)],
+                    age,
+                );
             }
         }
 
         // One family at a time: the text format requires each family's
         // lines to be one contiguous group.
-        type SpaceGauge = (&'static str, &'static str, fn(&crate::engine::SpaceRt) -> f64);
+        type SpaceGauge = (
+            &'static str,
+            &'static str,
+            fn(&crate::engine::SpaceRt) -> f64,
+        );
         let space_gauges: [SpaceGauge; 4] = [
-            ("saans_space_occupied", "1 occupied, 0 empty, -1 unknown (no usable link).", |sp| match sp.state.occupied {
-                Some(true) => 1.0,
-                Some(false) => 0.0,
-                None => -1.0,
-            }),
-            ("saans_space_links_usable", "Links currently usable in the space.", |sp| sp.state.links_usable as f64),
-            ("saans_space_links_total", "Links configured for the space.", |sp| sp.fusion.links.len() as f64),
-            ("saans_space_active_alerts", "Alerts currently active in the space.", |sp| {
-                sp.state.active_alerts.iter().filter(|a| privacy::alert_allowed(a, sp.config.vitals)).count() as f64
-            }),
+            (
+                "saans_space_occupied",
+                "1 occupied, 0 empty, -1 unknown (no usable link).",
+                |sp| match sp.state.occupied {
+                    Some(true) => 1.0,
+                    Some(false) => 0.0,
+                    None => -1.0,
+                },
+            ),
+            (
+                "saans_space_links_usable",
+                "Links currently usable in the space.",
+                |sp| sp.state.links_usable as f64,
+            ),
+            (
+                "saans_space_links_total",
+                "Links configured for the space.",
+                |sp| sp.fusion.links.len() as f64,
+            ),
+            (
+                "saans_space_active_alerts",
+                "Alerts currently active in the space.",
+                |sp| {
+                    sp.state
+                        .active_alerts
+                        .iter()
+                        .filter(|a| privacy::alert_allowed(a, sp.config.vitals))
+                        .count() as f64
+                },
+            ),
         ];
         for (name, help, f) in space_gauges {
             p.family(name, "gauge", help);
@@ -551,11 +809,19 @@ impl Hub {
                 p.sample(name, &[("space", sp.config.id.as_str())], f(sp));
             }
         }
-        p.family("saans_events_total", "counter", "Health and system events emitted, by type and severity.");
+        p.family(
+            "saans_events_total",
+            "counter",
+            "Health and system events emitted, by type and severity.",
+        );
         for (i, counts) in self.counts.iter().enumerate() {
             let id = e.spaces[i].config.id.as_str();
             for ((ty, sev), n) in counts {
-                p.sample("saans_events_total", &[("space", id), ("type", ty), ("severity", sev)], *n as f64);
+                p.sample(
+                    "saans_events_total",
+                    &[("space", id), ("type", ty), ("severity", sev)],
+                    *n as f64,
+                );
             }
         }
         p.family("saans_ws_clients", "gauge", "Connected WebSocket clients.");
@@ -599,7 +865,11 @@ struct Prom {
 
 impl Prom {
     fn family(&mut self, name: &str, kind: &str, help: &str) {
-        let _ = writeln!(self.out, "# HELP {name} {}", help.replace('\\', "\\\\").replace('\n', "\\n"));
+        let _ = writeln!(
+            self.out,
+            "# HELP {name} {}",
+            help.replace('\\', "\\\\").replace('\n', "\\n")
+        );
         let _ = writeln!(self.out, "# TYPE {name} {kind}");
     }
 
@@ -611,7 +881,10 @@ impl Prom {
                 if i > 0 {
                     self.out.push(',');
                 }
-                let v = v.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+                let v = v
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n");
                 let _ = write!(self.out, "{k}=\"{v}\"");
             }
             self.out.push('}');
@@ -641,8 +914,94 @@ mod tests {
     }
 
     #[test]
+    fn a_gateway_drops_out_of_retention_history_on_load_and_does_not_write_it_back() {
+        // The wiring test. `store::prune_history` having correct
+        // arithmetic is worth nothing if nobody calls it, and the shape of
+        // this change -- a pure function plus two call sites -- is exactly
+        // the shape where that goes unnoticed.
+        use saans_health::detectors::DailySummary;
+        let dir = std::env::temp_dir().join(format!("saans-hub-ret-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let unix_ms = 1_760_000_000_000i64;
+        let offset = 330;
+        let today = crate::timefmt::local_day(unix_ms, offset);
+        let summary = |day: i64| DailySummary {
+            day,
+            resting_bpm_median: Some(14.0),
+            resting_samples: 10,
+            occupied_s: 60.0,
+            motion_bouts: 1,
+            pauses: 0,
+        };
+        // Two summaries inside 90 days, one well outside it.
+        let on_disk = BTreeMap::from([(
+            "lab".to_string(),
+            vec![
+                summary(today - 400),
+                summary(today - 10),
+                summary(today - 1),
+            ],
+        )]);
+        store::save_history(&dir, &on_disk, "seeded").unwrap();
+
+        let mut cfg = GatewayConfig {
+            data_dir: dir.clone(),
+            utc_offset_minutes: offset,
+            ..GatewayConfig::default()
+        };
+        cfg.spaces = vec![saans_health::SpaceConfig {
+            id: "lab".into(),
+            name: "Lab".into(),
+            ..Default::default()
+        }];
+        assert_eq!(cfg.history_retention_days, 90);
+
+        // t_start is the local epoch in seconds, as live.rs sets it, so
+        // the day index the hub computes matches the one in the file.
+        let t0 = local_epoch_s(unix_ms, offset);
+        let mut hub = Hub::new(
+            cfg,
+            None,
+            true,
+            Wall::Anchored {
+                t0,
+                unix_ms_at_t0: unix_ms,
+            },
+            t0,
+        );
+        assert!(
+            hub.notes
+                .iter()
+                .any(|n| n.contains("retention") && n.contains("history.json")),
+            "the drop must be reported, not silent; notes were {:?}",
+            hub.notes
+        );
+
+        // And it must not come back on the next write.
+        hub.save_history(t0);
+        let (after, err) = store::load_history(&dir);
+        assert!(err.is_none(), "{err:?}");
+        let days: Vec<i64> = after["lab"].iter().map(|s| s.day).collect();
+        assert!(
+            !days.contains(&(today - 400)),
+            "the 400-day-old summary was written back: {days:?}"
+        );
+        assert_eq!(
+            days.len(),
+            2,
+            "both in-retention summaries must survive: {days:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn anchored_wall_clock() {
-        let w = Wall::Anchored { t0: 100.0, unix_ms_at_t0: 5_000 };
+        let w = Wall::Anchored {
+            t0: 100.0,
+            unix_ms_at_t0: 5_000,
+        };
         assert_eq!(w.unix_ms(101.25, 0.0), 6_250);
     }
 }

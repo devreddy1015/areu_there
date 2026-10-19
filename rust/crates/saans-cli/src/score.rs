@@ -48,20 +48,29 @@ impl Occupancy {
     }
     pub fn accuracy(&self) -> f64 {
         let ok = self.present_occ + self.absent_empty;
-        let n = ok + self.present_empty + self.absent_occ + self.present_unknown + self.absent_unknown;
+        let n =
+            ok + self.present_empty + self.absent_occ + self.present_unknown + self.absent_unknown;
         ratio(ok, n)
     }
     pub fn false_empty_still(&self) -> f64 {
         ratio(self.still_false_empty, self.still_present)
     }
     pub fn false_occupied(&self) -> f64 {
-        ratio(self.absent_occ, self.absent_occ + self.absent_empty + self.absent_unknown)
+        ratio(
+            self.absent_occ,
+            self.absent_occ + self.absent_empty + self.absent_unknown,
+        )
     }
     pub fn unknown(&self) -> f64 {
         ratio(self.present_unknown + self.absent_unknown, self.total())
     }
     pub fn total(&self) -> u64 {
-        self.present_occ + self.present_empty + self.present_unknown + self.absent_occ + self.absent_empty + self.absent_unknown
+        self.present_occ
+            + self.present_empty
+            + self.present_unknown
+            + self.absent_occ
+            + self.absent_empty
+            + self.absent_unknown
     }
 }
 
@@ -77,7 +86,10 @@ fn near_transition(run: &Run, t: f64) -> bool {
     run.truth_events
         .iter()
         .filter(|e| e.kind == TruthKind::Occupied)
-        .any(|e| (t - e.t_start_s).abs() < TRANSITION_GUARD_S || (t - e.t_end_s).abs() < TRANSITION_GUARD_S)
+        .any(|e| {
+            (t - e.t_start_s).abs() < TRANSITION_GUARD_S
+                || (t - e.t_end_s).abs() < TRANSITION_GUARD_S
+        })
 }
 
 pub fn occupancy(run: &Run) -> Occupancy {
@@ -140,8 +152,13 @@ pub fn breathing(run: &Run, settle_s: f64) -> BreathingScore {
     let mut b = BreathingScore::default();
     let mut steady_since: Option<f64> = None;
     for (truth, s) in &run.samples {
-        let steady = truth.present && truth.still && truth.breathing && !truth.in_pause && !truth.in_burst;
-        steady_since = if steady { steady_since.or(Some(truth.t_s)) } else { None };
+        let steady =
+            truth.present && truth.still && truth.breathing && !truth.in_pause && !truth.in_burst;
+        steady_since = if steady {
+            steady_since.or(Some(truth.t_s))
+        } else {
+            None
+        };
         let Some(since) = steady_since else { continue };
         if truth.t_s - since < settle_s || truth.t_s < SETTLE_S {
             continue;
@@ -200,33 +217,57 @@ impl EventScore {
 /// Interval-matching: a detection is correct if it overlaps a truth
 /// interval of the given kind, widened by `slack_s` at the end (detectors
 /// report on completion).
-pub fn interval_events<F>(run: &Run, truth_kind: TruthKind, min_truth_s: f64, slack_s: f64, is_detection: F) -> EventScore
+pub fn interval_events<F>(
+    run: &Run,
+    truth_kind: TruthKind,
+    min_truth_s: f64,
+    slack_s: f64,
+    is_detection: F,
+) -> EventScore
 where
     F: Fn(&HealthEvent) -> Option<(f64, f64)>,
 {
     let truths: Vec<&TruthEvent> = run
         .truth_events
         .iter()
-        .filter(|e| e.kind == truth_kind && e.t_end_s - e.t_start_s >= min_truth_s && e.t_start_s >= SETTLE_S)
+        .filter(|e| {
+            e.kind == truth_kind
+                && e.t_end_s - e.t_start_s >= min_truth_s
+                && e.t_start_s >= SETTLE_S
+        })
         .collect();
     let dets: Vec<(f64, f64)> = run.events.iter().filter_map(&is_detection).collect();
-    let overlaps = |d: &(f64, f64), t: &TruthEvent| d.0 <= t.t_end_s + slack_s && d.1 >= t.t_start_s;
-    let mut s = EventScore { truths: truths.len() as u64, detections: dets.len() as u64, hours: run.hours, ..Default::default() };
+    let overlaps =
+        |d: &(f64, f64), t: &TruthEvent| d.0 <= t.t_end_s + slack_s && d.1 >= t.t_start_s;
+    let mut s = EventScore {
+        truths: truths.len() as u64,
+        detections: dets.len() as u64,
+        hours: run.hours,
+        ..Default::default()
+    };
     for t in &truths {
         if let Some(d) = dets.iter().find(|d| overlaps(d, t)) {
             s.caught += 1;
             s.latency_s.push(d.1 - t.t_start_s);
-            s.duration_err_s.push(((d.1 - d.0) - (t.t_end_s - t.t_start_s)).abs());
+            s.duration_err_s
+                .push(((d.1 - d.0) - (t.t_end_s - t.t_start_s)).abs());
         }
     }
-    s.correct_detections = dets.iter().filter(|d| truths.iter().any(|t| overlaps(d, t))).count() as u64;
+    s.correct_detections = dets
+        .iter()
+        .filter(|d| truths.iter().any(|t| overlaps(d, t)))
+        .count() as u64;
     s
 }
 
 pub fn pauses(run: &Run) -> EventScore {
-    interval_events(run, TruthKind::BreathingPause, 10.0, 5.0, |e| match e.kind {
-        EventKind::BreathingPause { ongoing: false, .. } => Some((e.t_start_s.unwrap_or(e.t_s), e.t_s)),
-        _ => None,
+    interval_events(run, TruthKind::BreathingPause, 10.0, 5.0, |e| {
+        match e.kind {
+            EventKind::BreathingPause { ongoing: false, .. } => {
+                Some((e.t_start_s.unwrap_or(e.t_s), e.t_s))
+            }
+            _ => None,
+        }
     })
 }
 

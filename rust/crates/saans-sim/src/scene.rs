@@ -102,7 +102,10 @@ pub struct SceneError {
 
 impl SceneError {
     fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { path: path.into(), message: message.into() }
+        Self {
+            path: path.into(),
+            message: message.into(),
+        }
     }
 }
 
@@ -196,18 +199,54 @@ fn complex_sqrt(z: (f64, f64)) -> (f64, f64) {
     (re, im)
 }
 
-pub const CONCRETE: MaterialConstants =
-    MaterialConstants { name: "concrete", a: 5.24, b: 0.0, c: 0.0462, d: 0.7822, valid_ghz: (1.0, 100.0) };
-pub const BRICK: MaterialConstants =
-    MaterialConstants { name: "brick", a: 3.91, b: 0.0, c: 0.0238, d: 0.16, valid_ghz: (1.0, 10.0) };
-pub const DRYWALL: MaterialConstants =
-    MaterialConstants { name: "drywall", a: 2.73, b: 0.0, c: 0.0085, d: 0.9395, valid_ghz: (1.0, 100.0) };
-pub const GLASS: MaterialConstants =
-    MaterialConstants { name: "glass", a: 6.31, b: 0.0, c: 0.0036, d: 1.3394, valid_ghz: (0.1, 100.0) };
-pub const WOOD: MaterialConstants =
-    MaterialConstants { name: "wood", a: 1.99, b: 0.0, c: 0.0047, d: 1.0718, valid_ghz: (0.001, 100.0) };
-pub const METAL: MaterialConstants =
-    MaterialConstants { name: "metal", a: 1.0, b: 0.0, c: 1.0e7, d: 0.0, valid_ghz: (1.0, 100.0) };
+pub const CONCRETE: MaterialConstants = MaterialConstants {
+    name: "concrete",
+    a: 5.24,
+    b: 0.0,
+    c: 0.0462,
+    d: 0.7822,
+    valid_ghz: (1.0, 100.0),
+};
+pub const BRICK: MaterialConstants = MaterialConstants {
+    name: "brick",
+    a: 3.91,
+    b: 0.0,
+    c: 0.0238,
+    d: 0.16,
+    valid_ghz: (1.0, 10.0),
+};
+pub const DRYWALL: MaterialConstants = MaterialConstants {
+    name: "drywall",
+    a: 2.73,
+    b: 0.0,
+    c: 0.0085,
+    d: 0.9395,
+    valid_ghz: (1.0, 100.0),
+};
+pub const GLASS: MaterialConstants = MaterialConstants {
+    name: "glass",
+    a: 6.31,
+    b: 0.0,
+    c: 0.0036,
+    d: 1.3394,
+    valid_ghz: (0.1, 100.0),
+};
+pub const WOOD: MaterialConstants = MaterialConstants {
+    name: "wood",
+    a: 1.99,
+    b: 0.0,
+    c: 0.0047,
+    d: 1.0718,
+    valid_ghz: (0.001, 100.0),
+};
+pub const METAL: MaterialConstants = MaterialConstants {
+    name: "metal",
+    a: 1.0,
+    b: 0.0,
+    c: 1.0e7,
+    d: 0.0,
+    valid_ghz: (1.0, 100.0),
+};
 
 /// Every material with an ITU-R P.2040 row. `fabric` is not here: see
 /// [`ObjectMaterial::constants`].
@@ -364,7 +403,12 @@ impl SceneRoom {
     /// The floor outline, counter-clockwise: the polygon, or the box.
     pub fn footprint(&self) -> Vec<[f64; 2]> {
         if self.polygon_m.is_empty() {
-            vec![[0.0, 0.0], [self.width_m, 0.0], [self.width_m, self.depth_m], [0.0, self.depth_m]]
+            vec![
+                [0.0, 0.0],
+                [self.width_m, 0.0],
+                [self.width_m, self.depth_m],
+                [0.0, self.depth_m],
+            ]
         } else {
             self.polygon_m.clone()
         }
@@ -430,7 +474,13 @@ pub struct SceneObject {
 impl SceneObject {
     /// The four plan-view corners after rotation, counter-clockwise.
     pub fn footprint(&self) -> [[f64; 2]; 4] {
-        rotated_footprint(self.centre_m[0], self.centre_m[1], self.size_m[0], self.size_m[1], self.rotation_deg)
+        rotated_footprint(
+            self.centre_m[0],
+            self.centre_m[1],
+            self.size_m[0],
+            self.size_m[1],
+            self.rotation_deg,
+        )
     }
 
     pub fn z_extent_m(&self) -> (f64, f64) {
@@ -544,7 +594,10 @@ impl Scene {
     /// would be built from. Until then this is the default channel in a
     /// scene-shaped room, and saying otherwise would be inventing physics.
     pub fn to_sim_room(&self) -> SimRoom {
-        SimRoom { size_m: self.sim_room_size_m(), ..SimRoom::default() }
+        SimRoom {
+            size_m: self.sim_room_size_m(),
+            ..SimRoom::default()
+        }
     }
 
     /// The scene's nodes as simulator nodes, dropping elevation.
@@ -553,7 +606,13 @@ impl Scene {
     /// one height. [`Scene::node_z_spread_m`] is the number that says
     /// whether a given scene honours that.
     pub fn to_sim_nodes(&self) -> Vec<SimNode> {
-        self.nodes.iter().map(|n| SimNode { id: n.id, pos: (n.pos_m[0], n.pos_m[1]) }).collect()
+        self.nodes
+            .iter()
+            .map(|n| SimNode {
+                id: n.id,
+                pos: (n.pos_m[0], n.pos_m[1]),
+            })
+            .collect()
     }
 
     /// Largest difference in node elevation; 0.0 with fewer than two nodes.
@@ -575,11 +634,24 @@ impl Scene {
         json::check_keys(
             root,
             &["schema_version", "room"],
-            &["name", "description", "walls", "objects", "nodes", "people", "phone"],
+            &[
+                "name",
+                "description",
+                "walls",
+                "objects",
+                "nodes",
+                "people",
+                "phone",
+            ],
             "scene",
         )?;
 
-        let version = json::integer(json::get(root, "schema_version").unwrap(), 0, u32::MAX as i64, "scene.schema_version")? as u32;
+        let version = json::integer(
+            json::get(root, "schema_version").unwrap(),
+            0,
+            u32::MAX as i64,
+            "scene.schema_version",
+        )? as u32;
         if version != SCHEMA_VERSION {
             return Err(SceneError::new(
                 "scene.schema_version",
@@ -594,24 +666,50 @@ impl Scene {
         let footprint = room.footprint();
 
         let mut walls = Vec::new();
-        for (i, item) in json::array_or_empty(root, "walls", "scene.walls")?.iter().enumerate() {
+        for (i, item) in json::array_or_empty(root, "walls", "scene.walls")?
+            .iter()
+            .enumerate()
+        {
             walls.push(parse_wall(item, &room, &format!("scene.walls[{i}]"))?);
         }
 
         let mut objects = Vec::new();
-        for (i, item) in json::array_or_empty(root, "objects", "scene.objects")?.iter().enumerate() {
-            objects.push(parse_object(item, &room, &footprint, &format!("scene.objects[{i}]"))?);
+        for (i, item) in json::array_or_empty(root, "objects", "scene.objects")?
+            .iter()
+            .enumerate()
+        {
+            objects.push(parse_object(
+                item,
+                &room,
+                &footprint,
+                &format!("scene.objects[{i}]"),
+            )?);
         }
 
         let mut nodes = Vec::new();
-        for (i, item) in json::array_or_empty(root, "nodes", "scene.nodes")?.iter().enumerate() {
-            nodes.push(parse_node(item, &room, &footprint, &format!("scene.nodes[{i}]"))?);
+        for (i, item) in json::array_or_empty(root, "nodes", "scene.nodes")?
+            .iter()
+            .enumerate()
+        {
+            nodes.push(parse_node(
+                item,
+                &room,
+                &footprint,
+                &format!("scene.nodes[{i}]"),
+            )?);
         }
         check_nodes_distinct(&nodes)?;
 
         let mut people = Vec::new();
-        for (i, item) in json::array_or_empty(root, "people", "scene.people")?.iter().enumerate() {
-            people.push(parse_person(item, &footprint, &format!("scene.people[{i}]"))?);
+        for (i, item) in json::array_or_empty(root, "people", "scene.people")?
+            .iter()
+            .enumerate()
+        {
+            people.push(parse_person(
+                item,
+                &footprint,
+                &format!("scene.people[{i}]"),
+            )?);
         }
 
         let phone = match json::get(root, "phone") {
@@ -635,7 +733,12 @@ impl Scene {
 
 fn parse_room(value: &json::Json) -> Result<SceneRoom, SceneError> {
     let obj = value.as_object("scene.room")?;
-    json::check_keys(obj, &["width_m", "depth_m", "height_m"], &["polygon_m"], "scene.room")?;
+    json::check_keys(
+        obj,
+        &["width_m", "depth_m", "height_m"],
+        &["polygon_m"],
+        "scene.room",
+    )?;
     let width = json::positive(json::get(obj, "width_m").unwrap(), "scene.room.width_m")?;
     let depth = json::positive(json::get(obj, "depth_m").unwrap(), "scene.room.depth_m")?;
     let height = json::positive(json::get(obj, "height_m").unwrap(), "scene.room.height_m")?;
@@ -655,7 +758,12 @@ fn parse_room(value: &json::Json) -> Result<SceneRoom, SceneError> {
         check_polygon(&polygon, width, depth)?;
     }
 
-    Ok(SceneRoom { width_m: width, depth_m: depth, height_m: height, polygon_m: polygon })
+    Ok(SceneRoom {
+        width_m: width,
+        depth_m: depth,
+        height_m: height,
+        polygon_m: polygon,
+    })
 }
 
 /// A polygon has to agree with the width and depth it is declared with.
@@ -709,7 +817,9 @@ fn check_polygon(polygon: &[[f64; 2]], width: f64, depth: f64) -> Result<(), Sce
     if area <= 0.0 {
         return Err(SceneError::new(
             "scene.room.polygon_m",
-            format!("vertices must run counter-clockwise and enclose an area; signed area is {area} m2"),
+            format!(
+                "vertices must run counter-clockwise and enclose an area; signed area is {area} m2"
+            ),
         ));
     }
     Ok(())
@@ -717,7 +827,12 @@ fn check_polygon(polygon: &[[f64; 2]], width: f64, depth: f64) -> Result<(), Sce
 
 fn parse_wall(value: &json::Json, room: &SceneRoom, path: &str) -> Result<Wall, SceneError> {
     let obj = value.as_object(path)?;
-    json::check_keys(obj, &["from_m", "to_m", "material", "thickness_m"], &["id", "height_m"], path)?;
+    json::check_keys(
+        obj,
+        &["from_m", "to_m", "material", "thickness_m"],
+        &["id", "height_m"],
+        path,
+    )?;
     let from = json::point2(json::get(obj, "from_m").unwrap(), &format!("{path}.from_m"))?;
     let to = json::point2(json::get(obj, "to_m").unwrap(), &format!("{path}.to_m"))?;
     if (to[0] - from[0]).hypot(to[1] - from[1]) <= CONTAIN_TOL_M {
@@ -729,9 +844,15 @@ fn parse_wall(value: &json::Json, room: &SceneRoom, path: &str) -> Result<Wall, 
     check_in_box(from[0], from[1], room, &format!("{path}.from_m"))?;
     check_in_box(to[0], to[1], room, &format!("{path}.to_m"))?;
 
-    let thickness = json::positive(json::get(obj, "thickness_m").unwrap(), &format!("{path}.thickness_m"))?;
+    let thickness = json::positive(
+        json::get(obj, "thickness_m").unwrap(),
+        &format!("{path}.thickness_m"),
+    )?;
     if thickness > 2.0 {
-        return Err(SceneError::new(format!("{path}.thickness_m"), format!("{thickness} m is not a wall")));
+        return Err(SceneError::new(
+            format!("{path}.thickness_m"),
+            format!("{thickness} m is not a wall"),
+        ));
     }
 
     let height = match json::get(obj, "height_m") {
@@ -748,7 +869,9 @@ fn parse_wall(value: &json::Json, room: &SceneRoom, path: &str) -> Result<Wall, 
         }
     };
 
-    let material_name = json::get(obj, "material").unwrap().as_string(&format!("{path}.material"))?;
+    let material_name = json::get(obj, "material")
+        .unwrap()
+        .as_string(&format!("{path}.material"))?;
     let material = WallMaterial::parse(material_name).ok_or_else(|| {
         SceneError::new(
             format!("{path}.material"),
@@ -773,9 +896,16 @@ fn parse_object(
     path: &str,
 ) -> Result<SceneObject, SceneError> {
     let obj = value.as_object(path)?;
-    json::check_keys(obj, &["type", "centre_m", "size_m", "material"], &["id", "rotation_deg"], path)?;
+    json::check_keys(
+        obj,
+        &["type", "centre_m", "size_m", "material"],
+        &["id", "rotation_deg"],
+        path,
+    )?;
 
-    let type_name = json::get(obj, "type").unwrap().as_string(&format!("{path}.type"))?;
+    let type_name = json::get(obj, "type")
+        .unwrap()
+        .as_string(&format!("{path}.type"))?;
     let kind = ObjectType::parse(type_name).ok_or_else(|| {
         SceneError::new(
             format!("{path}.type"),
@@ -783,8 +913,13 @@ fn parse_object(
         )
     })?;
 
-    let centre = json::point3(json::get(obj, "centre_m").unwrap(), &format!("{path}.centre_m"))?;
-    let size_raw = json::get(obj, "size_m").unwrap().as_array(&format!("{path}.size_m"))?;
+    let centre = json::point3(
+        json::get(obj, "centre_m").unwrap(),
+        &format!("{path}.centre_m"),
+    )?;
+    let size_raw = json::get(obj, "size_m")
+        .unwrap()
+        .as_array(&format!("{path}.size_m"))?;
     if size_raw.len() != 3 {
         return Err(SceneError::new(
             format!("{path}.size_m"),
@@ -810,7 +945,9 @@ fn parse_object(
         }
     };
 
-    let material_name = json::get(obj, "material").unwrap().as_string(&format!("{path}.material"))?;
+    let material_name = json::get(obj, "material")
+        .unwrap()
+        .as_string(&format!("{path}.material"))?;
     let material = ObjectMaterial::parse(material_name).ok_or_else(|| {
         SceneError::new(
             format!("{path}.material"),
@@ -869,16 +1006,26 @@ fn parse_node(
     if !contains_point(footprint, pos[0], pos[1], CONTAIN_TOL_M) {
         return Err(SceneError::new(
             path,
-            format!("node {id} is at ({:.3}, {:.3}) m, outside the room", pos[0], pos[1]),
+            format!(
+                "node {id} is at ({:.3}, {:.3}) m, outside the room",
+                pos[0], pos[1]
+            ),
         ));
     }
     if pos[2] < -CONTAIN_TOL_M || pos[2] > room.height_m + CONTAIN_TOL_M {
         return Err(SceneError::new(
             path,
-            format!("node {id} is at z = {:.3} m, outside the room's 0 to {} m", pos[2], room.height_m),
+            format!(
+                "node {id} is at z = {:.3} m, outside the room's 0 to {} m",
+                pos[2], room.height_m
+            ),
         ));
     }
-    Ok(SceneNode { id, label: json::opt_string(obj, "label", 64, &format!("{path}.label"))?, pos_m: pos })
+    Ok(SceneNode {
+        id,
+        label: json::opt_string(obj, "label", 64, &format!("{path}.label"))?,
+        pos_m: pos,
+    })
 }
 
 fn check_nodes_distinct(nodes: &[SceneNode]) -> Result<(), SceneError> {
@@ -887,7 +1034,10 @@ fn check_nodes_distinct(nodes: &[SceneNode]) -> Result<(), SceneError> {
             if nodes[i].id == nodes[j].id {
                 return Err(SceneError::new(
                     format!("scene.nodes[{i}]"),
-                    format!("node id {} is already used by scene.nodes[{j}]", nodes[i].id),
+                    format!(
+                        "node id {} is already used by scene.nodes[{j}]",
+                        nodes[i].id
+                    ),
                 ));
             }
         }
@@ -895,7 +1045,8 @@ fn check_nodes_distinct(nodes: &[SceneNode]) -> Result<(), SceneError> {
     for i in 0..nodes.len() {
         for j in (i + 1)..nodes.len() {
             let (a, b) = (nodes[i].pos_m, nodes[j].pos_m);
-            let gap = ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+            let gap =
+                ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
             if gap <= NODE_MIN_SEPARATION_M {
                 return Err(SceneError::new(
                     format!("scene.nodes[{i}]"),
@@ -911,14 +1062,21 @@ fn check_nodes_distinct(nodes: &[SceneNode]) -> Result<(), SceneError> {
     Ok(())
 }
 
-fn parse_person(value: &json::Json, footprint: &[[f64; 2]], path: &str) -> Result<Person, SceneError> {
+fn parse_person(
+    value: &json::Json,
+    footprint: &[[f64; 2]],
+    path: &str,
+) -> Result<Person, SceneError> {
     let obj = value.as_object(path)?;
     json::check_keys(obj, &["pos_m"], &["id", "height_m"], path)?;
     let pos = json::point2(json::get(obj, "pos_m").unwrap(), &format!("{path}.pos_m"))?;
     if !contains_point(footprint, pos[0], pos[1], CONTAIN_TOL_M) {
         return Err(SceneError::new(
             path,
-            format!("person is at ({:.3}, {:.3}) m, outside the room", pos[0], pos[1]),
+            format!(
+                "person is at ({:.3}, {:.3}) m, outside the room",
+                pos[0], pos[1]
+            ),
         ));
     }
     let height = match json::get(obj, "height_m") {
@@ -926,12 +1084,19 @@ fn parse_person(value: &json::Json, footprint: &[[f64; 2]], path: &str) -> Resul
         Some(raw) => {
             let h = json::positive(raw, &format!("{path}.height_m"))?;
             if h > 2.5 {
-                return Err(SceneError::new(format!("{path}.height_m"), format!("{h} m is not a person")));
+                return Err(SceneError::new(
+                    format!("{path}.height_m"),
+                    format!("{h} m is not a person"),
+                ));
             }
             h
         }
     };
-    Ok(Person { id: json::opt_string(obj, "id", 64, &format!("{path}.id"))?, pos_m: pos, height_m: height })
+    Ok(Person {
+        id: json::opt_string(obj, "id", 64, &format!("{path}.id"))?,
+        pos_m: pos,
+        height_m: height,
+    })
 }
 
 fn parse_phone(
@@ -946,16 +1111,25 @@ fn parse_phone(
     if !contains_point(footprint, pos[0], pos[1], CONTAIN_TOL_M) {
         return Err(SceneError::new(
             path,
-            format!("phone is at ({:.3}, {:.3}) m, outside the room", pos[0], pos[1]),
+            format!(
+                "phone is at ({:.3}, {:.3}) m, outside the room",
+                pos[0], pos[1]
+            ),
         ));
     }
     if pos[2] < -CONTAIN_TOL_M || pos[2] > room.height_m + CONTAIN_TOL_M {
         return Err(SceneError::new(
             path,
-            format!("phone is at z = {:.3} m, outside the room's 0 to {} m", pos[2], room.height_m),
+            format!(
+                "phone is at z = {:.3} m, outside the room's 0 to {} m",
+                pos[2], room.height_m
+            ),
         ));
     }
-    Ok(Phone { id: json::opt_string(obj, "id", 64, &format!("{path}.id"))?, pos_m: pos })
+    Ok(Phone {
+        id: json::opt_string(obj, "id", 64, &format!("{path}.id"))?,
+        pos_m: pos,
+    })
 }
 
 fn check_in_box(x: f64, y: f64, room: &SceneRoom, path: &str) -> Result<(), SceneError> {
@@ -1039,7 +1213,10 @@ pub fn rotated_footprint(cx: f64, cy: f64, w: f64, d: f64, rotation_deg: f64) ->
     let offsets = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
     let mut out = [[0.0f64; 2]; 4];
     for (i, o) in offsets.iter().enumerate() {
-        out[i] = [cx + o[0] * cos_t - o[1] * sin_t, cy + o[0] * sin_t + o[1] * cos_t];
+        out[i] = [
+            cx + o[0] * cos_t - o[1] * sin_t,
+            cy + o[0] * sin_t + o[1] * cos_t,
+        ];
     }
     out
 }
@@ -1086,28 +1263,40 @@ pub mod json {
         pub fn as_object(&self, path: &str) -> Result<&[(String, Json)], SceneError> {
             match self {
                 Json::Object(fields) => Ok(fields),
-                other => Err(SceneError::new(path, format!("expected an object, got {}", other.kind()))),
+                other => Err(SceneError::new(
+                    path,
+                    format!("expected an object, got {}", other.kind()),
+                )),
             }
         }
 
         pub fn as_array(&self, path: &str) -> Result<&[Json], SceneError> {
             match self {
                 Json::Array(items) => Ok(items),
-                other => Err(SceneError::new(path, format!("expected an array, got {}", other.kind()))),
+                other => Err(SceneError::new(
+                    path,
+                    format!("expected an array, got {}", other.kind()),
+                )),
             }
         }
 
         pub fn as_number(&self, path: &str) -> Result<f64, SceneError> {
             match self {
                 Json::Number(v) => Ok(*v),
-                other => Err(SceneError::new(path, format!("expected a number, got {}", other.kind()))),
+                other => Err(SceneError::new(
+                    path,
+                    format!("expected a number, got {}", other.kind()),
+                )),
             }
         }
 
         pub fn as_string(&self, path: &str) -> Result<&str, SceneError> {
             match self {
                 Json::String(s) => Ok(s),
-                other => Err(SceneError::new(path, format!("expected a string, got {}", other.kind()))),
+                other => Err(SceneError::new(
+                    path,
+                    format!("expected a string, got {}", other.kind()),
+                )),
             }
         }
     }
@@ -1122,9 +1311,16 @@ pub mod json {
         optional: &[&str],
         path: &str,
     ) -> Result<(), SceneError> {
-        let missing: Vec<&str> = required.iter().copied().filter(|k| get(fields, k).is_none()).collect();
+        let missing: Vec<&str> = required
+            .iter()
+            .copied()
+            .filter(|k| get(fields, k).is_none())
+            .collect();
         if !missing.is_empty() {
-            return Err(SceneError::new(path, format!("missing {}", missing.join(", "))));
+            return Err(SceneError::new(
+                path,
+                format!("missing {}", missing.join(", ")),
+            ));
         }
         let mut extra: Vec<&str> = fields
             .iter()
@@ -1137,7 +1333,11 @@ pub mod json {
             allowed.sort_unstable();
             return Err(SceneError::new(
                 path,
-                format!("unknown key(s) {} (allowed: {})", extra.join(", "), allowed.join(", ")),
+                format!(
+                    "unknown key(s) {} (allowed: {})",
+                    extra.join(", "),
+                    allowed.join(", ")
+                ),
             ));
         }
         Ok(())
@@ -1165,7 +1365,10 @@ pub mod json {
             Some(value) => {
                 let s = value.as_string(path)?;
                 if s.chars().count() > max_length {
-                    return Err(SceneError::new(path, format!("longer than {max_length} characters")));
+                    return Err(SceneError::new(
+                        path,
+                        format!("longer than {max_length} characters"),
+                    ));
                 }
                 Ok(Some(s.to_string()))
             }
@@ -1183,11 +1386,17 @@ pub mod json {
     pub fn integer(value: &Json, lo: i64, hi: i64, path: &str) -> Result<i64, SceneError> {
         let v = value.as_number(path)?;
         if v.fract() != 0.0 {
-            return Err(SceneError::new(path, format!("expected an integer, got {v}")));
+            return Err(SceneError::new(
+                path,
+                format!("expected an integer, got {v}"),
+            ));
         }
         let as_int = v as i64;
         if as_int < lo || as_int > hi {
-            return Err(SceneError::new(path, format!("{as_int} is outside {lo}..{hi}")));
+            return Err(SceneError::new(
+                path,
+                format!("{as_int} is outside {lo}..{hi}"),
+            ));
         }
         Ok(as_int)
     }
@@ -1195,15 +1404,24 @@ pub mod json {
     pub fn point2(value: &Json, path: &str) -> Result<[f64; 2], SceneError> {
         let items = value.as_array(path)?;
         if items.len() != 2 {
-            return Err(SceneError::new(path, format!("expected 2 numbers, got {}", items.len())));
+            return Err(SceneError::new(
+                path,
+                format!("expected 2 numbers, got {}", items.len()),
+            ));
         }
-        Ok([items[0].as_number(&format!("{path}[0]"))?, items[1].as_number(&format!("{path}[1]"))?])
+        Ok([
+            items[0].as_number(&format!("{path}[0]"))?,
+            items[1].as_number(&format!("{path}[1]"))?,
+        ])
     }
 
     pub fn point3(value: &Json, path: &str) -> Result<[f64; 3], SceneError> {
         let items = value.as_array(path)?;
         if items.len() != 3 {
-            return Err(SceneError::new(path, format!("expected 3 numbers, got {}", items.len())));
+            return Err(SceneError::new(
+                path,
+                format!("expected 3 numbers, got {}", items.len()),
+            ));
         }
         Ok([
             items[0].as_number(&format!("{path}[0]"))?,
@@ -1213,7 +1431,10 @@ pub mod json {
     }
 
     pub fn parse(text: &str) -> Result<Json, SceneError> {
-        let mut reader = Reader { bytes: text.as_bytes(), pos: 0 };
+        let mut reader = Reader {
+            bytes: text.as_bytes(),
+            pos: 0,
+        };
         reader.skip_whitespace();
         let value = reader.value(0)?;
         reader.skip_whitespace();
@@ -1240,7 +1461,10 @@ pub mod json {
                     column += 1;
                 }
             }
-            SceneError::new("<json>", format!("line {line}, column {column}: {}", message.into()))
+            SceneError::new(
+                "<json>",
+                format!("line {line}, column {column}: {}", message.into()),
+            )
         }
 
         fn peek(&self) -> Option<u8> {
@@ -1366,7 +1590,9 @@ pub mod json {
                     }
                     b'\\' => {
                         self.pos += 1;
-                        let escape = self.peek().ok_or_else(|| self.error("the file ends inside an escape"))?;
+                        let escape = self
+                            .peek()
+                            .ok_or_else(|| self.error("the file ends inside an escape"))?;
                         self.pos += 1;
                         match escape {
                             b'"' => out.push('"'),
@@ -1378,10 +1604,16 @@ pub mod json {
                             b'r' => out.push('\r'),
                             b't' => out.push('\t'),
                             b'u' => out.push(self.unicode_escape()?),
-                            other => return Err(self.error(format!("unknown escape \\{}", other as char))),
+                            other => {
+                                return Err(
+                                    self.error(format!("unknown escape \\{}", other as char))
+                                )
+                            }
                         }
                     }
-                    0x00..=0x1f => return Err(self.error("a control character must be escaped in a string")),
+                    0x00..=0x1f => {
+                        return Err(self.error("a control character must be escaped in a string"))
+                    }
                     _ => {
                         // Copy one whole UTF-8 sequence. The input is a
                         // &str, so it is already valid UTF-8.
@@ -1431,7 +1663,8 @@ pub mod json {
             self.pos += 2;
             let second = self.hex4()?;
             if !(0xdc00..=0xdfff).contains(&second) {
-                return Err(self.error("a high surrogate followed by something that is not a low surrogate"));
+                return Err(self
+                    .error("a high surrogate followed by something that is not a low surrogate"));
             }
             let combined = 0x10000 + (((first as u32) - 0xd800) << 10) + ((second as u32) - 0xdc00);
             char::from_u32(combined).ok_or_else(|| self.error("not a character"))
@@ -1472,8 +1705,11 @@ pub mod json {
                     self.pos += 1;
                 }
             }
-            let text = std::str::from_utf8(&self.bytes[start..self.pos]).map_err(|_| self.error("not valid UTF-8"))?;
-            let value: f64 = text.parse().map_err(|_| self.error(format!("{text} is not a number")))?;
+            let text = std::str::from_utf8(&self.bytes[start..self.pos])
+                .map_err(|_| self.error("not valid UTF-8"))?;
+            let value: f64 = text
+                .parse()
+                .map_err(|_| self.error(format!("{text} is not a number")))?;
             if !value.is_finite() {
                 // 1e400 parses without complaint and comes out infinite.
                 self.pos = start;
@@ -1515,7 +1751,11 @@ mod tests {
             assert_eq!(scene.schema_version, SCHEMA_VERSION, "{name}");
             assert!(!scene.walls.is_empty(), "{name}: no walls");
             assert!(!scene.objects.is_empty(), "{name}: no objects");
-            assert!(scene.nodes.len() >= 4, "{name}: {} nodes", scene.nodes.len());
+            assert!(
+                scene.nodes.len() >= 4,
+                "{name}: {} nodes",
+                scene.nodes.len()
+            );
             assert!(scene.phone.is_some(), "{name}: no phone");
         }
     }
@@ -1534,7 +1774,11 @@ mod tests {
     #[test]
     fn the_l_shaped_hall_is_smaller_than_its_bounding_box() {
         let scene = Scene::from_json(HALL_L).unwrap();
-        assert!((scene.room.area_m2() - 35.75).abs() < 1e-9, "{}", scene.room.area_m2());
+        assert!(
+            (scene.room.area_m2() - 35.75).abs() < 1e-9,
+            "{}",
+            scene.room.area_m2()
+        );
         // The notch is genuinely outside the floor.
         assert!(!scene.room.contains(7.0, 5.0, 0.0));
         assert!(scene.room.contains(7.0, 1.0, 0.0));
@@ -1549,7 +1793,10 @@ mod tests {
             // The trap this test exists for: every example gives width,
             // depth and elevation three different values, so swapping the
             // last two cannot pass.
-            assert_ne!(size.1, scene.room.height_m, "{name}: depth and elevation are equal, so this test proves nothing");
+            assert_ne!(
+                size.1, scene.room.height_m,
+                "{name}: depth and elevation are equal, so this test proves nothing"
+            );
             assert_eq!(scene.to_sim_room().size_m, size, "{name}");
         }
     }
@@ -1573,12 +1820,36 @@ mod tests {
         // Not a schema's business, and the kind of thing a scene gets
         // wrong by a factor of ten without anyone noticing.
         let bedroom = Scene::from_json(BEDROOM).unwrap();
-        let bed = bedroom.objects.iter().find(|o| o.kind == ObjectType::Bed).expect("a bed");
-        assert!((bed.size_m[0] - 1.9).abs() < 0.2, "bed length {}", bed.size_m[0]);
-        assert!((bed.size_m[1] - 1.4).abs() < 0.2, "double bed width {}", bed.size_m[1]);
-        let door = bedroom.objects.iter().find(|o| o.kind == ObjectType::Door).expect("a door");
-        assert!((door.size_m[0] - 0.8).abs() < 0.15, "door width {}", door.size_m[0]);
-        assert!(door.size_m[2] > 1.9 && door.size_m[2] < 2.2, "door height {}", door.size_m[2]);
+        let bed = bedroom
+            .objects
+            .iter()
+            .find(|o| o.kind == ObjectType::Bed)
+            .expect("a bed");
+        assert!(
+            (bed.size_m[0] - 1.9).abs() < 0.2,
+            "bed length {}",
+            bed.size_m[0]
+        );
+        assert!(
+            (bed.size_m[1] - 1.4).abs() < 0.2,
+            "double bed width {}",
+            bed.size_m[1]
+        );
+        let door = bedroom
+            .objects
+            .iter()
+            .find(|o| o.kind == ObjectType::Door)
+            .expect("a door");
+        assert!(
+            (door.size_m[0] - 0.8).abs() < 0.15,
+            "door width {}",
+            door.size_m[0]
+        );
+        assert!(
+            door.size_m[2] > 1.9 && door.size_m[2] < 2.2,
+            "door height {}",
+            door.size_m[2]
+        );
     }
 
     #[test]
@@ -1587,10 +1858,15 @@ mod tests {
         // and not 1.9 x 1.4. A loader that ignored rotation_deg would
         // place a corner at x = 0.75 - 0.95 = -0.2.
         let bedroom = Scene::from_json(BEDROOM).unwrap();
-        let bed = bedroom.objects.iter().find(|o| o.kind == ObjectType::Bed).unwrap();
+        let bed = bedroom
+            .objects
+            .iter()
+            .find(|o| o.kind == ObjectType::Bed)
+            .unwrap();
         assert_eq!(bed.rotation_deg, 90.0);
         let xs: Vec<f64> = bed.footprint().iter().map(|c| c[0]).collect();
-        let span = xs.iter().cloned().fold(f64::MIN, f64::max) - xs.iter().cloned().fold(f64::MAX, f64::min);
+        let span = xs.iter().cloned().fold(f64::MIN, f64::max)
+            - xs.iter().cloned().fold(f64::MAX, f64::min);
         assert!((span - 1.4).abs() < 1e-9, "rotated x span {span}");
     }
 
@@ -1599,10 +1875,16 @@ mod tests {
         let value = json::parse(MATERIALS_JSON).expect("materials.json parses");
         let root = value.as_object("materials").unwrap();
         assert_eq!(
-            json::get(root, "evaluated_at_ghz").unwrap().as_number("f").unwrap(),
+            json::get(root, "evaluated_at_ghz")
+                .unwrap()
+                .as_number("f")
+                .unwrap(),
             MATERIAL_REFERENCE_GHZ
         );
-        let table = json::get(root, "materials").unwrap().as_object("materials.materials").unwrap();
+        let table = json::get(root, "materials")
+            .unwrap()
+            .as_object("materials.materials")
+            .unwrap();
 
         let mut checked = 0;
         for (name, entry) in table {
@@ -1630,7 +1912,10 @@ mod tests {
                 assert_eq!(want, got, "{name}.{key}");
             }
 
-            let at = json::get(fields, "at_2437_mhz").unwrap().as_object("at").unwrap();
+            let at = json::get(fields, "at_2437_mhz")
+                .unwrap()
+                .as_object("at")
+                .unwrap();
             let f = MATERIAL_REFERENCE_GHZ;
             // The stored values are rounded to 9 significant digits, so
             // 1e-8 relative is the tightest honest comparison. It is a
@@ -1648,10 +1933,17 @@ mod tests {
                     "{name}.{key}: materials.json says {want}, the table computes {got}"
                 );
             }
-            assert!(constants.in_range(f), "{name} is outside its stated frequency range at {f} GHz");
+            assert!(
+                constants.in_range(f),
+                "{name} is outside its stated frequency range at {f} GHz"
+            );
             checked += 1;
         }
-        assert_eq!(checked, MATERIALS.len(), "every material in the table is in the file");
+        assert_eq!(
+            checked,
+            MATERIALS.len(),
+            "every material in the table is in the file"
+        );
     }
 
     #[test]
@@ -1661,7 +1953,10 @@ mod tests {
         // out at 0.395. The simulator's scalar is a concrete-like wall.
         let gamma = CONCRETE.reflection_normal(MATERIAL_REFERENCE_GHZ);
         assert!((gamma - 0.395).abs() < 0.001, "{gamma}");
-        assert!((gamma - SimRoom::default().wall_reflection).abs() < 0.01, "{gamma}");
+        assert!(
+            (gamma - SimRoom::default().wall_reflection).abs() < 0.01,
+            "{gamma}"
+        );
         // Metal reflects essentially everything; wood the least.
         assert!(METAL.reflection_normal(MATERIAL_REFERENCE_GHZ) > 0.99);
         assert!(WOOD.reflection_normal(MATERIAL_REFERENCE_GHZ) < 0.2);
@@ -1673,7 +1968,10 @@ mod tests {
         // hand; the two can drift. This is what stops them.
         let value = json::parse(SCHEMA_JSON).expect("scene.schema.json parses");
         let root = value.as_object("schema").unwrap();
-        let defs = json::get(root, "$defs").unwrap().as_object("$defs").unwrap();
+        let defs = json::get(root, "$defs")
+            .unwrap()
+            .as_object("$defs")
+            .unwrap();
 
         let enum_of = |name: &str| -> Vec<String> {
             let def = json::get(defs, name).unwrap().as_object(name).unwrap();
@@ -1715,8 +2013,14 @@ mod tests {
         ours.sort();
         assert_eq!(object, ours, "object materials");
 
-        let object_def = json::get(defs, "object").unwrap().as_object("object").unwrap();
-        let props = json::get(object_def, "properties").unwrap().as_object("properties").unwrap();
+        let object_def = json::get(defs, "object")
+            .unwrap()
+            .as_object("object")
+            .unwrap();
+        let props = json::get(object_def, "properties")
+            .unwrap()
+            .as_object("properties")
+            .unwrap();
         let type_def = json::get(props, "type").unwrap().as_object("type").unwrap();
         let mut types: Vec<String> = json::get(type_def, "enum")
             .unwrap()
@@ -1741,10 +2045,19 @@ mod tests {
         ours.sort();
         assert_eq!(types, ours, "object types");
 
-        let props = json::get(root, "properties").unwrap().as_object("properties").unwrap();
-        let version = json::get(props, "schema_version").unwrap().as_object("schema_version").unwrap();
+        let props = json::get(root, "properties")
+            .unwrap()
+            .as_object("properties")
+            .unwrap();
+        let version = json::get(props, "schema_version")
+            .unwrap()
+            .as_object("schema_version")
+            .unwrap();
         assert_eq!(
-            json::get(version, "const").unwrap().as_number("const").unwrap(),
+            json::get(version, "const")
+                .unwrap()
+                .as_number("const")
+                .unwrap(),
             SCHEMA_VERSION as f64
         );
     }
@@ -1752,7 +2065,10 @@ mod tests {
     // ---- what a schema cannot check -------------------------------------
 
     fn bedroom_with(find: &str, replace: &str) -> Result<Scene, SceneError> {
-        assert!(BEDROOM.contains(find), "fixture text {find:?} is not in bedroom.json");
+        assert!(
+            BEDROOM.contains(find),
+            "fixture text {find:?} is not in bedroom.json"
+        );
         Scene::from_json(&BEDROOM.replace(find, replace))
     }
 
@@ -1766,26 +2082,36 @@ mod tests {
     #[test]
     fn furniture_outside_the_room_is_refused() {
         // Push the almirah through the east wall.
-        let err = bedroom_with("\"centre_m\": [3.88, 1.2, 1.0]", "\"centre_m\": [4.5, 1.2, 1.0]").unwrap_err();
+        let err = bedroom_with(
+            "\"centre_m\": [3.88, 1.2, 1.0]",
+            "\"centre_m\": [4.5, 1.2, 1.0]",
+        )
+        .unwrap_err();
         assert!(err.path.starts_with("scene.objects"), "{err}");
         assert!(err.message.contains("outside the room"), "{err}");
     }
 
     #[test]
     fn furniture_through_the_ceiling_is_refused() {
-        let err = bedroom_with("\"centre_m\": [3.88, 1.2, 1.0]", "\"centre_m\": [3.88, 1.2, 2.0]").unwrap_err();
+        let err = bedroom_with(
+            "\"centre_m\": [3.88, 1.2, 1.0]",
+            "\"centre_m\": [3.88, 1.2, 2.0]",
+        )
+        .unwrap_err();
         assert!(err.message.contains("in z"), "{err}");
     }
 
     #[test]
     fn a_node_outside_the_room_is_refused() {
-        let err = bedroom_with("\"pos_m\": [4.1, 2.4, 1.2]", "\"pos_m\": [4.3, 2.4, 1.2]").unwrap_err();
+        let err =
+            bedroom_with("\"pos_m\": [4.1, 2.4, 1.2]", "\"pos_m\": [4.3, 2.4, 1.2]").unwrap_err();
         assert!(err.message.contains("outside the room"), "{err}");
     }
 
     #[test]
     fn two_nodes_at_one_point_are_refused() {
-        let err = bedroom_with("\"pos_m\": [4.1, 2.4, 1.2]", "\"pos_m\": [0.1, 0.9, 1.2]").unwrap_err();
+        let err =
+            bedroom_with("\"pos_m\": [4.1, 2.4, 1.2]", "\"pos_m\": [0.1, 0.9, 1.2]").unwrap_err();
         assert!(err.message.contains("same point"), "{err}");
     }
 
@@ -1807,7 +2133,8 @@ mod tests {
 
     #[test]
     fn a_polygon_that_disagrees_with_the_room_is_refused() {
-        let err = Scene::from_json(&HALL_L.replace("\"width_m\": 8.0", "\"width_m\": 9.0")).unwrap_err();
+        let err =
+            Scene::from_json(&HALL_L.replace("\"width_m\": 8.0", "\"width_m\": 9.0")).unwrap_err();
         assert_eq!(err.path, "scene.room.polygon_m");
         assert!(err.message.contains("bounding box"), "{err}");
     }
@@ -1828,7 +2155,11 @@ mod tests {
 
     #[test]
     fn an_unknown_key_is_refused() {
-        let err = bedroom_with("\"schema_version\": 1,", "\"schema_version\": 1, \"colour\": \"blue\",").unwrap_err();
+        let err = bedroom_with(
+            "\"schema_version\": 1,",
+            "\"schema_version\": 1, \"colour\": \"blue\",",
+        )
+        .unwrap_err();
         assert!(err.message.contains("unknown key"), "{err}");
     }
 
@@ -1867,18 +2198,30 @@ mod tests {
             "{\"a\": \"unterminated",
             "// a comment\n{}",
         ] {
-            assert!(json::parse(bad).is_err(), "{bad:?} parsed and should not have");
+            assert!(
+                json::parse(bad).is_err(),
+                "{bad:?} parsed and should not have"
+            );
         }
     }
 
     #[test]
     fn the_json_reader_reads_what_is_json() {
         assert_eq!(json::parse(" 1.5e-3 ").unwrap(), json::Json::Number(1.5e-3));
-        assert_eq!(json::parse("\"a\\u0041\\n\"").unwrap(), json::Json::String("aA\n".to_string()));
+        assert_eq!(
+            json::parse("\"a\\u0041\\n\"").unwrap(),
+            json::Json::String("aA\n".to_string())
+        );
         // A surrogate pair: U+1F600, which a naive reader turns into two
         // broken characters or a panic.
-        assert_eq!(json::parse("\"\\ud83d\\ude00\"").unwrap(), json::Json::String("\u{1f600}".to_string()));
-        assert_eq!(json::parse("\"ü\"").unwrap(), json::Json::String("ü".to_string()));
+        assert_eq!(
+            json::parse("\"\\ud83d\\ude00\"").unwrap(),
+            json::Json::String("\u{1f600}".to_string())
+        );
+        assert_eq!(
+            json::parse("\"ü\"").unwrap(),
+            json::Json::String("ü".to_string())
+        );
         assert_eq!(json::parse("[]").unwrap(), json::Json::Array(vec![]));
         assert_eq!(json::parse("{}").unwrap(), json::Json::Object(vec![]));
         assert!(json::parse("\"\\ud83d\"").is_err(), "a lone high surrogate");

@@ -81,10 +81,25 @@ pub fn freq_mhz(carrier_hz: f64) -> u32 {
 /// # Panics
 /// If `iq` has an odd length (half a complex pair is a caller bug, not a
 /// datagram), or if the subcarrier count would not fit the u16 field.
-pub fn serialize_raw(iq: &[i8], node_id: u8, sequence: u32, rssi_dbm: i8, noise_floor_dbm: i8, freq_mhz: u32, buf: &mut Vec<u8>) {
-    assert!(iq.len().is_multiple_of(2), "iq has {} bytes: not whole complex pairs", iq.len());
+pub fn serialize_raw(
+    iq: &[i8],
+    node_id: u8,
+    sequence: u32,
+    rssi_dbm: i8,
+    noise_floor_dbm: i8,
+    freq_mhz: u32,
+    buf: &mut Vec<u8>,
+) {
+    assert!(
+        iq.len().is_multiple_of(2),
+        "iq has {} bytes: not whole complex pairs",
+        iq.len()
+    );
     let n_subcarriers = iq.len() / 2;
-    assert!(n_subcarriers <= u16::MAX as usize, "{n_subcarriers} subcarriers does not fit the u16 field");
+    assert!(
+        n_subcarriers <= u16::MAX as usize,
+        "{n_subcarriers} subcarriers does not fit the u16 field"
+    );
 
     buf.clear();
     buf.reserve(RAW_HEADER_SIZE + iq.len());
@@ -130,8 +145,19 @@ pub struct RawNode {
 impl RawNode {
     /// A node with its own receiver drawn from `(seed, node_id, boot)`,
     /// reporting `n` subcarriers at `freq_mhz`.
-    pub fn new(cfg: ImpairConfig, n: usize, seed: u64, node_id: u8, boot: u32, freq_mhz: u32) -> Self {
-        Self::with_impairment(NodeImpairment::new(cfg, n, seed, node_id, boot), node_id, freq_mhz)
+    pub fn new(
+        cfg: ImpairConfig,
+        n: usize,
+        seed: u64,
+        node_id: u8,
+        boot: u32,
+        freq_mhz: u32,
+    ) -> Self {
+        Self::with_impairment(
+            NodeImpairment::new(cfg, n, seed, node_id, boot),
+            node_id,
+            freq_mhz,
+        )
     }
 
     /// [`RawNode::new`] with the receiver model built by the caller —
@@ -158,8 +184,18 @@ impl RawNode {
     /// or truncating would put a fabricated subcarrier on the wire.
     pub fn encode(&mut self, frame: &CsiFrame, buf: &mut Vec<u8>) {
         let n = self.re.len();
-        assert_eq!(frame.amplitudes.len(), n, "node {} takes {n}-subcarrier frames", self.node_id);
-        assert_eq!(frame.phases.len(), n, "node {} takes {n}-subcarrier frames", self.node_id);
+        assert_eq!(
+            frame.amplitudes.len(),
+            n,
+            "node {} takes {n}-subcarrier frames",
+            self.node_id
+        );
+        assert_eq!(
+            frame.phases.len(),
+            n,
+            "node {} takes {n}-subcarrier frames",
+            self.node_id
+        );
 
         // Back to rectangular. The simulator's public frame is polar
         // because that is what the reference and the firmware's capture
@@ -174,7 +210,8 @@ impl RawNode {
             self.re[k] = frame.amplitudes[k] * cos;
             self.im[k] = frame.amplitudes[k] * sin;
         }
-        self.imp.apply_to_iq(&mut self.re, &mut self.im, &mut self.iq);
+        self.imp
+            .apply_to_iq(&mut self.re, &mut self.im, &mut self.iq);
 
         // RSSI comes from the CLEAN channel, deliberately. A node reports
         // it from the radio's power detector, which is a separate
@@ -184,7 +221,15 @@ impl RawNode {
         // clamp is a type conversion, not a model: the simulator's dBm
         // is an i32 and the field is an i8.
         let rssi = frame.rssi_dbm.clamp(i8::MIN as i32, i8::MAX as i32) as i8;
-        serialize_raw(&self.iq, self.node_id, self.sequence, rssi, self.noise_floor_dbm, self.freq_mhz, buf);
+        serialize_raw(
+            &self.iq,
+            self.node_id,
+            self.sequence,
+            rssi,
+            self.noise_floor_dbm,
+            self.freq_mhz,
+            buf,
+        );
         self.sequence = self.sequence.wrapping_add(1);
     }
 
@@ -249,9 +294,14 @@ impl RawNodes {
         let f = freq_mhz(opts.carrier_hz);
         let mut nodes = BTreeMap::new();
         for &(_tx, rx) in &sc.links {
-            nodes.entry(rx).or_insert_with(|| RawNode::new(cfg, sc.n_subcarriers, sc.seed, rx, boot, f));
+            nodes
+                .entry(rx)
+                .or_insert_with(|| RawNode::new(cfg, sc.n_subcarriers, sc.seed, rx, boot, f));
         }
-        Self { nodes, buf: Vec::new() }
+        Self {
+            nodes,
+            buf: Vec::new(),
+        }
     }
 
     /// Datagrams for one tick, in the tick's own frame order, each with
@@ -289,9 +339,18 @@ mod tests {
     use crate::impair::quantize;
 
     fn frame(n: usize, rssi_dbm: i32) -> CsiFrame {
-        let amplitudes: Vec<f64> = (0..n).map(|k| 30.0 + 10.0 * (k as f64 * 0.37).sin()).collect();
+        let amplitudes: Vec<f64> = (0..n)
+            .map(|k| 30.0 + 10.0 * (k as f64 * 0.37).sin())
+            .collect();
         let phases: Vec<f64> = (0..n).map(|k| (k as f64 * 0.11).sin() * 3.0).collect();
-        CsiFrame { amplitudes, phases, sample_index: 0, sample_rate_hz: 20.0, rssi_dbm, node_id: 3 }
+        CsiFrame {
+            amplitudes,
+            phases,
+            sample_index: 0,
+            sample_rate_hz: 20.0,
+            rssi_dbm,
+            node_id: 3,
+        }
     }
 
     /// The header, field by field at the offsets `spec/wire.md` and
@@ -307,13 +366,28 @@ mod tests {
         assert_eq!(&d[0..4], &[0x01, 0x00, 0x11, 0xC5], "magic, little-endian");
         assert_eq!(d[4], 7, "node id");
         assert_eq!(d[5], 1, "antenna count");
-        assert_eq!(u16::from_le_bytes([d[6], d[7]]), 56, "subcarrier count is pairs, not bytes");
-        assert_eq!(u32::from_le_bytes(d[8..12].try_into().unwrap()), 2437, "centre frequency MHz");
-        assert_eq!(u32::from_le_bytes(d[12..16].try_into().unwrap()), 0xDEAD_BEEF, "sequence");
+        assert_eq!(
+            u16::from_le_bytes([d[6], d[7]]),
+            56,
+            "subcarrier count is pairs, not bytes"
+        );
+        assert_eq!(
+            u32::from_le_bytes(d[8..12].try_into().unwrap()),
+            2437,
+            "centre frequency MHz"
+        );
+        assert_eq!(
+            u32::from_le_bytes(d[12..16].try_into().unwrap()),
+            0xDEAD_BEEF,
+            "sequence"
+        );
         assert_eq!(d[16] as i8, -45, "RSSI");
         assert_eq!(d[17] as i8, -92, "noise floor");
         assert_eq!((d[18], d[19]), (0, 0), "PPDU type and flags");
-        assert!(d[20..].iter().zip(&iq).all(|(&b, &v)| b as i8 == v), "payload copied verbatim");
+        assert!(
+            d[20..].iter().zip(&iq).all(|(&b, &v)| b as i8 == v),
+            "payload copied verbatim"
+        );
     }
 
     #[test]
@@ -324,13 +398,24 @@ mod tests {
         // What the node reported, independently of the bytes.
         let iq = node.iq().to_vec();
         for k in 0..n {
-            assert_eq!(d[RAW_HEADER_SIZE + 2 * k] as i8, iq[2 * k], "byte 2k is the imaginary part of bin {k}");
-            assert_eq!(d[RAW_HEADER_SIZE + 2 * k + 1] as i8, iq[2 * k + 1], "byte 2k+1 is the real part of bin {k}");
+            assert_eq!(
+                d[RAW_HEADER_SIZE + 2 * k] as i8,
+                iq[2 * k],
+                "byte 2k is the imaginary part of bin {k}"
+            );
+            assert_eq!(
+                d[RAW_HEADER_SIZE + 2 * k + 1] as i8,
+                iq[2 * k + 1],
+                "byte 2k+1 is the real part of bin {k}"
+            );
         }
         // Not a symmetric accident: this frame has bins where the two
         // differ, so a reader that swapped them would see a different
         // channel and not the same one twice.
-        assert!((0..n).any(|k| iq[2 * k] != iq[2 * k + 1]), "the test frame cannot distinguish the two orders");
+        assert!(
+            (0..n).any(|k| iq[2 * k] != iq[2 * k + 1]),
+            "the test frame cannot distinguish the two orders"
+        );
     }
 
     #[test]
@@ -343,8 +428,16 @@ mod tests {
         node.datagram(&f);
         for k in 0..n {
             let (sin, cos) = f.phases[k].sin_cos();
-            assert_eq!(node.iq()[2 * k], quantize(f.amplitudes[k] * sin), "bin {k} imaginary");
-            assert_eq!(node.iq()[2 * k + 1], quantize(f.amplitudes[k] * cos), "bin {k} real");
+            assert_eq!(
+                node.iq()[2 * k],
+                quantize(f.amplitudes[k] * sin),
+                "bin {k} imaginary"
+            );
+            assert_eq!(
+                node.iq()[2 * k + 1],
+                quantize(f.amplitudes[k] * cos),
+                "bin {k} real"
+            );
         }
     }
 
@@ -357,7 +450,10 @@ mod tests {
             let d = node.datagram(&frame(n, -61));
             assert_eq!(u32::from_le_bytes(d[12..16].try_into().unwrap()), seq);
             assert_eq!(d[16] as i8, -61, "RSSI is the radio's, not the AGC's");
-            assert_eq!(d[17] as i8, NOISE_FLOOR_UNKNOWN, "no noise floor is modelled");
+            assert_eq!(
+                d[17] as i8, NOISE_FLOOR_UNKNOWN,
+                "no noise floor is modelled"
+            );
             assert_eq!(u32::from_le_bytes(d[8..12].try_into().unwrap()), 5180);
         }
         assert_eq!(node.sequence(), 5);
@@ -365,18 +461,33 @@ mod tests {
 
     #[test]
     fn a_node_is_shared_by_the_links_that_arrive_at_it() {
-        let sc = crate::scenarios::scenario("shared", crate::scenarios::room_clear_los(), crate::scenarios::three_links(), crate::scenarios::empty(0.01), 5);
+        let sc = crate::scenarios::scenario(
+            "shared",
+            crate::scenarios::room_clear_los(),
+            crate::scenarios::three_links(),
+            crate::scenarios::empty(0.01),
+            5,
+        );
         let opts = SimOptions::default();
         let nodes = RawNodes::new(&sc, &opts, ImpairConfig::esp32_s3(), 0);
         // Links (0,1), (0,2), (1,2): two receivers, not three links.
         assert_eq!(nodes.ids().collect::<Vec<_>>(), vec![1, 2]);
         assert_eq!(nodes.node(1).unwrap().freq_mhz(), 2437);
-        assert_ne!(nodes.node(1).unwrap().impairment().scale(), nodes.node(2).unwrap().impairment().scale());
+        assert_ne!(
+            nodes.node(1).unwrap().impairment().scale(),
+            nodes.node(2).unwrap().impairment().scale()
+        );
     }
 
     #[test]
     fn a_tick_becomes_one_datagram_per_frame() {
-        let sc = crate::scenarios::scenario("tick", crate::scenarios::room_clear_los(), crate::scenarios::two_links(), crate::scenarios::empty(0.01), 11);
+        let sc = crate::scenarios::scenario(
+            "tick",
+            crate::scenarios::room_clear_los(),
+            crate::scenarios::two_links(),
+            crate::scenarios::empty(0.01),
+            11,
+        );
         let mut sim = crate::Simulator::new(&sc);
         let mut nodes = RawNodes::new(&sc, sim.options(), ImpairConfig::esp32_s3(), 0);
         let tick = sim.step().unwrap();
@@ -393,7 +504,11 @@ mod tests {
 
     #[test]
     fn freq_mhz_of_the_default_carrier() {
-        assert_eq!(freq_mhz(SimOptions::default().carrier_hz), 2437, "channel 6");
+        assert_eq!(
+            freq_mhz(SimOptions::default().carrier_hz),
+            2437,
+            "channel 6"
+        );
         assert_eq!(freq_mhz(5.18e9), 5180);
     }
 }

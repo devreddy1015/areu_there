@@ -31,19 +31,25 @@ struct Vectors {
 impl Vectors {
     fn load(name: &str) -> Self {
         let path = golden_dir().join(format!("{name}.kv"));
-        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e} (run spec/golden/generate.py)", path.display()));
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("{}: {e} (run spec/golden/generate.py)", path.display()));
         let kv = text
             .lines()
             .filter_map(|l| l.split_once(' '))
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        Self { name: name.to_string(), kv }
+        Self {
+            name: name.to_string(),
+            kv,
+        }
     }
     fn f(&self, k: &str) -> f64 {
         let v = &self.kv[k];
         match v.as_str() {
             "inf" => f64::INFINITY,
-            _ => v.parse().unwrap_or_else(|_| panic!("{}: {k}={v} not a number", self.name)),
+            _ => v
+                .parse()
+                .unwrap_or_else(|_| panic!("{}: {k}={v} not a number", self.name)),
         }
     }
     fn u(&self, k: &str) -> u64 {
@@ -53,7 +59,10 @@ impl Vectors {
         let n: usize = self.kv[&format!("array.{k}")].parse().unwrap();
         let bytes = std::fs::read(golden_dir().join(format!("{}__{k}.f64", self.name))).unwrap();
         assert_eq!(bytes.len(), n * 8, "{}: array {k} length", self.name);
-        bytes.chunks(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect()
+        bytes
+            .chunks(8)
+            .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+            .collect()
     }
 }
 
@@ -67,7 +76,10 @@ fn close(a: f64, b: f64, rel: f64, abs: f64) -> bool {
 fn assert_series(name: &str, what: &str, got: &[f64], want: &[f64], rel: f64, abs: f64) {
     assert_eq!(got.len(), want.len(), "{name}/{what}: length");
     for (i, (g, w)) in got.iter().zip(want).enumerate() {
-        assert!(close(*g, *w, rel, abs), "{name}/{what}[{i}]: got {g:e}, want {w:e}");
+        assert!(
+            close(*g, *w, rel, abs),
+            "{name}/{what}[{i}]: got {g:e}, want {w:e}"
+        );
     }
 }
 
@@ -85,13 +97,25 @@ fn biquads() {
 fn goertzel() {
     let v = Vectors::load("goertzel");
     let x = v.a("input");
-    let got: Vec<f64> = v.a("freqs").iter().map(|&f| goertzel_power(&x, f, v.f("fs"))).collect();
+    let got: Vec<f64> = v
+        .a("freqs")
+        .iter()
+        .map(|&f| goertzel_power(&x, f, v.f("fs")))
+        .collect();
     assert_series("goertzel", "power", &got, &v.a("power"), REL, 1e-12);
 }
 
 #[test]
 fn band_peaks() {
-    for case in ["tone", "noisy_tone", "noise", "rect_window", "notched", "grid_rule", "notch_neighbour"] {
+    for case in [
+        "tone",
+        "noisy_tone",
+        "noise",
+        "rect_window",
+        "notched",
+        "grid_rule",
+        "notch_neighbour",
+    ] {
         let name = format!("band_peak_{case}");
         let v = Vectors::load(&name);
         let p = band_peak(
@@ -106,16 +130,35 @@ fn band_peaks() {
         );
         assert_eq!(p.is_some(), v.u("found") == 1, "{name}: found");
         let p = p.unwrap();
-        assert!(close(p.freq_hz, v.f("freq_hz"), REL, 0.0), "{name}: freq {} vs {}", p.freq_hz, v.f("freq_hz"));
+        assert!(
+            close(p.freq_hz, v.f("freq_hz"), REL, 0.0),
+            "{name}: freq {} vs {}",
+            p.freq_hz,
+            v.f("freq_hz")
+        );
         assert!(close(p.power, v.f("power"), REL, 1e-12), "{name}: power");
-        assert!(close(p.confidence, v.f("confidence"), REL, 1e-12), "{name}: confidence {} vs {}", p.confidence, v.f("confidence"));
+        assert!(
+            close(p.confidence, v.f("confidence"), REL, 1e-12),
+            "{name}: confidence {} vs {}",
+            p.confidence,
+            v.f("confidence")
+        );
     }
 }
 
 #[test]
 fn sideband() {
     let v = Vectors::load("sideband_peak");
-    let p = sideband_peak(&v.a("input"), v.f("fs"), v.f("f_low"), v.f("f_high"), v.f("modulator_hz"), v.f("resolution_hz"), v.f("harmonic_tol_hz")).unwrap();
+    let p = sideband_peak(
+        &v.a("input"),
+        v.f("fs"),
+        v.f("f_low"),
+        v.f("f_high"),
+        v.f("modulator_hz"),
+        v.f("resolution_hz"),
+        v.f("harmonic_tol_hz"),
+    )
+    .unwrap();
     assert!(close(p.freq_hz, v.f("freq_hz"), REL, 0.0));
     assert!(close(p.power, v.f("power"), REL, 1e-12));
     assert!(close(p.confidence, v.f("confidence"), REL, 1e-12));
@@ -124,10 +167,29 @@ fn sideband() {
 #[test]
 fn fft_and_bnr() {
     let v = Vectors::load("fft64");
-    let x: Vec<C64> = v.a("in_re").iter().zip(v.a("in_im")).map(|(&r, i)| C64::new(r, i)).collect();
+    let x: Vec<C64> = v
+        .a("in_re")
+        .iter()
+        .zip(v.a("in_im"))
+        .map(|(&r, i)| C64::new(r, i))
+        .collect();
     let y = fft(&x);
-    assert_series("fft64", "re", &y.iter().map(|c| c.re).collect::<Vec<_>>(), &v.a("out_re"), REL, 1e-12);
-    assert_series("fft64", "im", &y.iter().map(|c| c.im).collect::<Vec<_>>(), &v.a("out_im"), REL, 1e-12);
+    assert_series(
+        "fft64",
+        "re",
+        &y.iter().map(|c| c.re).collect::<Vec<_>>(),
+        &v.a("out_re"),
+        REL,
+        1e-12,
+    );
+    assert_series(
+        "fft64",
+        "im",
+        &y.iter().map(|c| c.im).collect::<Vec<_>>(),
+        &v.a("out_im"),
+        REL,
+        1e-12,
+    );
 
     let v = Vectors::load("bnr");
     let cols = v.u("cols") as usize;
@@ -141,11 +203,21 @@ fn respirfi() {
     let v = Vectors::load("respirfi_select");
     let cols = v.u("cols") as usize;
     let window: Vec<Vec<f64>> = v.a("window").chunks(cols).map(|c| c.to_vec()).collect();
-    let params = SelectParams { bnr_floor: v.f("bnr_floor"), bnr_percentile: v.f("bnr_percentile"), affinity_threshold: None, keep_fraction: v.f("keep_fraction") };
+    let params = SelectParams {
+        bnr_floor: v.f("bnr_floor"),
+        bnr_percentile: v.f("bnr_percentile"),
+        affinity_threshold: None,
+        keep_fraction: v.f("keep_fraction"),
+    };
     let sel = respirfi_select(&window, v.f("rate_hz"), v.f("f_low"), v.f("f_high"), params);
     assert_eq!(sel.is_some(), v.u("selected") == 1);
     let sel = sel.unwrap();
-    assert!(close(sel.affinity_threshold, v.f("affinity_threshold"), REL, 0.0));
+    assert!(close(
+        sel.affinity_threshold,
+        v.f("affinity_threshold"),
+        REL,
+        0.0
+    ));
     let mut signs = vec![0.0; cols];
     for (&k, &s) in &sel.signs {
         signs[k] = s as f64;
@@ -166,9 +238,30 @@ fn static_suppressor() {
         res.extend(r);
         wts.extend(w);
     }
-    assert_series("static_suppressor", "residuals", &res, &v.a("residuals"), REL, 1e-12);
-    assert_series("static_suppressor", "weights", &wts, &v.a("weights"), REL, 1e-12);
-    assert_series("static_suppressor", "fused", &fused, &v.a("fused"), REL, 1e-12);
+    assert_series(
+        "static_suppressor",
+        "residuals",
+        &res,
+        &v.a("residuals"),
+        REL,
+        1e-12,
+    );
+    assert_series(
+        "static_suppressor",
+        "weights",
+        &wts,
+        &v.a("weights"),
+        REL,
+        1e-12,
+    );
+    assert_series(
+        "static_suppressor",
+        "fused",
+        &fused,
+        &v.a("fused"),
+        REL,
+        1e-12,
+    );
 }
 
 #[test]
@@ -218,12 +311,36 @@ fn extractors() {
         hr.push(x);
         if j < at.len() && at[j] == i {
             let b = br.estimate();
-            let h = hr.estimate_with(if b.status.usable() { Some(b.value_bpm / 60.0) } else { None });
-            assert!(close(b.value_bpm, want_bb[j], 0.0, 1e-6), "breathing bpm at {i}: {} vs {}", b.value_bpm, want_bb[j]);
-            assert!(close(b.confidence, want_bc[j], 1e-9, 1e-12), "breathing conf at {i}");
-            assert_eq!(b.status.code() as f64, want_bs[j], "breathing status at {i}");
-            assert!(close(h.value_bpm, want_hb[j], 0.0, 1e-6), "heart bpm at {i}: {} vs {}", h.value_bpm, want_hb[j]);
-            assert!(close(h.confidence, want_hc[j], 1e-9, 1e-12), "heart conf at {i}");
+            let h = hr.estimate_with(if b.status.usable() {
+                Some(b.value_bpm / 60.0)
+            } else {
+                None
+            });
+            assert!(
+                close(b.value_bpm, want_bb[j], 0.0, 1e-6),
+                "breathing bpm at {i}: {} vs {}",
+                b.value_bpm,
+                want_bb[j]
+            );
+            assert!(
+                close(b.confidence, want_bc[j], 1e-9, 1e-12),
+                "breathing conf at {i}"
+            );
+            assert_eq!(
+                b.status.code() as f64,
+                want_bs[j],
+                "breathing status at {i}"
+            );
+            assert!(
+                close(h.value_bpm, want_hb[j], 0.0, 1e-6),
+                "heart bpm at {i}: {} vs {}",
+                h.value_bpm,
+                want_hb[j]
+            );
+            assert!(
+                close(h.confidence, want_hc[j], 1e-9, 1e-12),
+                "heart conf at {i}"
+            );
             assert_eq!(h.status.code() as f64, want_hs[j], "heart status at {i}");
             j += 1;
         }
@@ -246,23 +363,58 @@ fn gapfill() {
     assert_series("gapfill", "amp", &amp, &v.a("out_amp"), REL, 1e-12);
     assert_eq!(seq, v.a("out_seq"));
     assert_eq!(from, v.a("out_from_input"));
-    assert_eq!((g.filled, g.discontinuities, g.duplicates), (v.u("filled"), v.u("discontinuities"), v.u("duplicates")));
+    assert_eq!(
+        (g.filled, g.discontinuities, g.duplicates),
+        (v.u("filled"), v.u("discontinuities"), v.u("duplicates"))
+    );
 }
 
 fn frame_fields(f: &FeatureFrame) -> [f64; 20] {
     [
-        f.node_id as f64, f.tx_id as f64, f.flags as f64, f.seq as f64, f.uptime_ms as f64,
-        f.csi_rate_chz as f64, f.loss_permille as f64, f.motion_energy as f64, f.presence_threshold as f64,
-        f.gross_motion as f64, f.breath_rms as f64, f.breathing_bpm as f64, f.breathing_conf as f64,
-        f.heart_bpm as f64, f.heart_conf as f64, f.best_bnr as f64, f.calib_age_s as f64,
-        f.rssi_dbm as f64, f.noise_floor_dbm as f64, f.n_subcarriers as f64,
+        f.node_id as f64,
+        f.tx_id as f64,
+        f.flags as f64,
+        f.seq as f64,
+        f.uptime_ms as f64,
+        f.csi_rate_chz as f64,
+        f.loss_permille as f64,
+        f.motion_energy as f64,
+        f.presence_threshold as f64,
+        f.gross_motion as f64,
+        f.breath_rms as f64,
+        f.breathing_bpm as f64,
+        f.breathing_conf as f64,
+        f.heart_bpm as f64,
+        f.heart_conf as f64,
+        f.best_bnr as f64,
+        f.calib_age_s as f64,
+        f.rssi_dbm as f64,
+        f.noise_floor_dbm as f64,
+        f.n_subcarriers as f64,
     ]
 }
 
 const FIELDS: [&str; 20] = [
-    "node_id", "tx_id", "flags", "seq", "uptime_ms", "csi_rate_chz", "loss_permille", "motion_energy",
-    "presence_threshold", "gross_motion", "breath_rms", "breathing_bpm", "breathing_conf", "heart_bpm",
-    "heart_conf", "best_bnr", "calib_age_s", "rssi_dbm", "noise_floor_dbm", "n_subcarriers",
+    "node_id",
+    "tx_id",
+    "flags",
+    "seq",
+    "uptime_ms",
+    "csi_rate_chz",
+    "loss_permille",
+    "motion_energy",
+    "presence_threshold",
+    "gross_motion",
+    "breath_rms",
+    "breathing_bpm",
+    "breathing_conf",
+    "heart_bpm",
+    "heart_conf",
+    "best_bnr",
+    "calib_age_s",
+    "rssi_dbm",
+    "noise_floor_dbm",
+    "n_subcarriers",
 ];
 
 #[test]
@@ -276,14 +428,25 @@ fn feature_codec_is_byte_exact() {
         for (j, k) in FIELDS.iter().enumerate() {
             // Only the f32 fields (motion_energy..best_bnr) are rounded by the
             // wire; integers above 2^24 would not survive an f32 round trip.
-            let want = if (7..=15).contains(&j) { (cols[j][i] as f32) as f64 } else { cols[j][i] };
+            let want = if (7..=15).contains(&j) {
+                (cols[j][i] as f32) as f64
+            } else {
+                cols[j][i]
+            };
             assert_eq!(fields[j], want, "codec frame {i} field {k}");
         }
-        assert_eq!(&f.encode()[..], chunk, "codec frame {i} re-encodes byte-exact");
+        assert_eq!(
+            &f.encode()[..],
+            chunk,
+            "codec frame {i} re-encodes byte-exact"
+        );
     }
     let mut bad = bytes[..68].to_vec();
     bad[30] ^= 1;
-    assert!(FeatureFrame::decode(&bad).is_err(), "CRC must catch a flipped bit");
+    assert!(
+        FeatureFrame::decode(&bad).is_err(),
+        "CRC must catch a flipped bit"
+    );
 }
 
 #[test]
@@ -304,13 +467,23 @@ fn features_end_to_end() {
             max_gap_s: v.f("max_gap_s"),
             ..Default::default()
         });
-        let (seq, t, rssi, amps) = (v.a("seq_in"), v.a("t_in"), v.a("rssi_in"), v.a("amplitudes_in"));
+        let (seq, t, rssi, amps) = (
+            v.a("seq_in"),
+            v.a("t_in"),
+            v.a("rssi_in"),
+            v.a("amplitudes_in"),
+        );
         let mut out = Vec::new();
         for (i, a) in amps.chunks(n).enumerate() {
             let mut f = CsiFrame::new(a.to_vec(), seq[i] as u64, fs);
             f.rssi_dbm = rssi[i] as i32;
             f.node_id = 3;
-            out.extend(fx.push(f, Some(seq[i] as u64), Some(t[i]), Some(v.f("noise_floor_dbm") as i32)));
+            out.extend(fx.push(
+                f,
+                Some(seq[i] as u64),
+                Some(t[i]),
+                Some(v.f("noise_floor_dbm") as i32),
+            ));
         }
         assert_eq!(out.len() as u64, v.u("frames_out"), "{name}: frame count");
         let want: Vec<Vec<f64>> = FIELDS.iter().map(|k| v.a(k)).collect();
@@ -321,12 +494,21 @@ fn features_end_to_end() {
             for (j, k) in FIELDS.iter().enumerate() {
                 // f32 fields: the reference rounds f64 -> f32 at the wire too,
                 // so the only slack needed is one f32 ulp from f64 noise.
-                assert!(close(got[j], want[j][i], 2e-7, 1e-30), "{name} frame {i} {k}: got {} want {}", got[j], want[j][i]);
+                assert!(
+                    close(got[j], want[j][i], 2e-7, 1e-30),
+                    "{name} frame {i} {k}: got {} want {}",
+                    got[j],
+                    want[j][i]
+                );
             }
             if f.encode()[..] == want_bytes[i * 68..(i + 1) * 68] {
                 byte_exact += 1;
             }
         }
-        eprintln!("{name}: {}/{} frames byte-identical to the Python reference", byte_exact, out.len());
+        eprintln!(
+            "{name}: {}/{} frames byte-identical to the Python reference",
+            byte_exact,
+            out.len()
+        );
     }
 }

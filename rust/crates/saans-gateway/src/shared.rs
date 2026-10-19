@@ -3,13 +3,13 @@
 //! snapshot and pushes WebSocket messages, so a slow HTTP client can never
 //! stall ingest and handlers never see a half-updated space.
 
+use crate::history::{History, HistoryConfig};
+use crate::outputs::{OutputMsg, OUTPUT_CAPACITY};
 use serde_json::Value;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
-use crate::history::{History, HistoryConfig};
-use crate::outputs::{OutputMsg, OUTPUT_CAPACITY};
 use tokio::sync::broadcast;
 
 /// Events kept in memory for `/api/events` (older ones are in the logs).
@@ -91,19 +91,34 @@ impl Shared {
         if ring.len() == EVENT_RING {
             ring.pop_front();
         }
-        ring.push_back(EventEntry { space_id: space_id.to_string(), unix_ms, value: value.clone() });
+        ring.push_back(EventEntry {
+            space_id: space_id.to_string(),
+            unix_ms,
+            value: value.clone(),
+        });
         drop(ring);
-        let _ = self.outputs.send(OutputMsg::Event { space_id: space_id.to_string(), unix_ms, value: value.clone() });
+        let _ = self.outputs.send(OutputMsg::Event {
+            space_id: space_id.to_string(),
+            unix_ms,
+            value: value.clone(),
+        });
         value
     }
 
     /// Up to `limit` most recent events matching the filters, oldest first.
-    pub fn query_events(&self, space: Option<&str>, since_ms: Option<i64>, limit: usize) -> Vec<Arc<Value>> {
+    pub fn query_events(
+        &self,
+        space: Option<&str>,
+        since_ms: Option<i64>,
+        limit: usize,
+    ) -> Vec<Arc<Value>> {
         let ring = self.events.lock().unwrap_or_else(|p| p.into_inner());
         let mut out: Vec<Arc<Value>> = ring
             .iter()
             .rev()
-            .filter(|e| space.is_none_or(|s| e.space_id == s) && since_ms.is_none_or(|t| e.unix_ms > t))
+            .filter(|e| {
+                space.is_none_or(|s| e.space_id == s) && since_ms.is_none_or(|t| e.unix_ms > t)
+            })
             .take(limit)
             .map(|e| e.value.clone())
             .collect();

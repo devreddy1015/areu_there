@@ -14,7 +14,9 @@
 //! withheld by default rather than leaked by default.
 
 use crate::roles::Principal;
-use saans_dsp::features::{FeatureFrame, FLAG_BREATHING_VALID, FLAG_HEART_VALID, FLAG_VITALS_ENABLED};
+use saans_dsp::features::{
+    FeatureFrame, FLAG_BREATHING_VALID, FLAG_HEART_VALID, FLAG_VITALS_ENABLED,
+};
 use serde_json::Value;
 
 const VITAL_WORDS: [&str; 4] = ["breath", "bpm", "heart", "pause"];
@@ -66,7 +68,15 @@ pub fn alert_allowed(name: &str, vitals: bool) -> bool {
 /// True if a frame carries (or claims to carry) vitals.
 pub fn frame_has_vitals(f: &FeatureFrame) -> bool {
     f.flags & (FLAG_VITALS_ENABLED | FLAG_BREATHING_VALID | FLAG_HEART_VALID) != 0
-        || [f.breath_rms, f.breathing_bpm, f.breathing_conf, f.heart_bpm, f.heart_conf].iter().any(|&x| x != 0.0)
+        || [
+            f.breath_rms,
+            f.breathing_bpm,
+            f.breathing_conf,
+            f.heart_bpm,
+            f.heart_conf,
+        ]
+        .iter()
+        .any(|&x| x != 0.0)
 }
 
 /// Zero the vitals fields and flags, as a node would have done.
@@ -97,7 +107,10 @@ fn is_health_alert(name: &str) -> bool {
 
 /// Event types that describe the sensors rather than the occupants.
 fn is_system_event(ty: &str) -> bool {
-    matches!(ty, "link_down" | "link_up" | "link_degraded" | "calibration_stale" | "raw_mode_active")
+    matches!(
+        ty,
+        "link_down" | "link_up" | "link_degraded" | "calibration_stale" | "raw_mode_active"
+    )
 }
 
 /// One published space as `principal` may see it, or `None` when the
@@ -146,14 +159,20 @@ pub fn event_for(v: &Value, principal: &Principal) -> Option<Value> {
         return None;
     }
     // "Someone arrived", "the room went blind" — occupancy and coverage.
-    let coverage = matches!(ty, "occupancy_started" | "occupancy_ended" | "space_blind" | "space_visible");
+    let coverage = matches!(
+        ty,
+        "occupancy_started" | "occupancy_ended" | "space_blind" | "space_visible"
+    );
     if !coverage && !principal.can_see_health_alerts(space_id) {
         return None;
     }
     let mut out = v.clone();
     // An event reaching here was allowed by consent; the role lock can
     // still require the vitals numbers inside it to go.
-    if !matches!(principal.role, crate::roles::Role::Admin | crate::roles::Role::Safety) {
+    if !matches!(
+        principal.role,
+        crate::roles::Role::Admin | crate::roles::Role::Safety
+    ) {
         redact_value(&mut out, false);
     }
     Some(out)
@@ -170,7 +189,10 @@ mod tests {
         let mut v = json!({"occupied": true, "breathing": {"bpm": 14}, "bpm_median_5min": 14.0,
             "in_breathing_pause": false, "nested": [{"heart": 1, "motion_index": 0.3}], "still_for_s": 3});
         redact_value(&mut v, false);
-        assert_eq!(v, json!({"occupied": true, "nested": [{"motion_index": 0.3}], "still_for_s": 3}));
+        assert_eq!(
+            v,
+            json!({"occupied": true, "nested": [{"motion_index": 0.3}], "still_for_s": 3})
+        );
         let mut w = json!({"breathing": null});
         redact_value(&mut w, true);
         assert_eq!(w, json!({"breathing": null}));
@@ -183,15 +205,25 @@ mod tests {
             assert!(event_allowed(&json!({"type": ty}), true));
         }
         assert!(event_allowed(&json!({"type": "inactivity"}), false));
-        assert!(!event_allowed(&json!({"type": "trend_deviation", "metric": "resting_bpm"}), false));
-        assert!(event_allowed(&json!({"type": "trend_deviation", "metric": "motion_bouts_per_h"}), false));
+        assert!(!event_allowed(
+            &json!({"type": "trend_deviation", "metric": "resting_bpm"}),
+            false
+        ));
+        assert!(event_allowed(
+            &json!({"type": "trend_deviation", "metric": "motion_bouts_per_h"}),
+            false
+        ));
         assert!(!alert_allowed("inactivity_no_breathing", false));
         assert!(!alert_allowed("rate_high", false));
         assert!(alert_allowed("inactivity", false) && alert_allowed("blind", false));
     }
 
     fn p(role: Role, spaces: Option<&[&str]>) -> Principal {
-        Principal { name: "x".into(), role, spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()) }
+        Principal {
+            name: "x".into(),
+            role,
+            spaces: spaces.map(|s| s.iter().map(|x| x.to_string()).collect()),
+        }
     }
 
     fn consented_space() -> Value {
@@ -246,21 +278,37 @@ mod tests {
 
     #[test]
     fn events_follow_the_same_two_locks() {
-        let (admin, ops, occ) = (p(Role::Admin, None), p(Role::Ops, None), p(Role::Occupancy, None));
+        let (admin, ops, occ) = (
+            p(Role::Admin, None),
+            p(Role::Ops, None),
+            p(Role::Occupancy, None),
+        );
         let pause = json!({"space_id": "lab", "type": "breathing_pause", "duration_s": 12.0});
         assert!(event_for(&pause, &admin).is_some());
-        assert!(event_for(&pause, &ops).is_none(), "ops sees no health events");
+        assert!(
+            event_for(&pause, &ops).is_none(),
+            "ops sees no health events"
+        );
         assert!(event_for(&pause, &occ).is_none());
 
         let arrived = json!({"space_id": "lab", "type": "occupancy_started"});
         for who in [&admin, &ops, &occ] {
-            assert!(event_for(&arrived, who).is_some(), "arrival is occupancy, not health");
+            assert!(
+                event_for(&arrived, who).is_some(),
+                "arrival is occupancy, not health"
+            );
         }
-        assert!(event_for(&arrived, &p(Role::Occupancy, Some(&["other"]))).is_none(), "out of scope");
+        assert!(
+            event_for(&arrived, &p(Role::Occupancy, Some(&["other"]))).is_none(),
+            "out of scope"
+        );
 
         let down = json!({"space_id": "lab", "type": "link_down", "link": {"rx": 1, "tx": 2}});
         assert!(event_for(&down, &ops).is_some() && event_for(&down, &admin).is_some());
-        assert!(event_for(&down, &occ).is_none(), "a sensor fault is for ops");
+        assert!(
+            event_for(&down, &occ).is_none(),
+            "a sensor fault is for ops"
+        );
 
         // A health event an ops-like role may see at all still loses its
         // numbers: inactivity reaches safety, not ops.
@@ -271,10 +319,19 @@ mod tests {
 
     #[test]
     fn gate_zeroes_vitals() {
-        let f = FeatureFrame { flags: 0xFF, breathing_bpm: 14.0, breath_rms: 0.3, heart_conf: 0.5, ..Default::default() };
+        let f = FeatureFrame {
+            flags: 0xFF,
+            breathing_bpm: 14.0,
+            breath_rms: 0.3,
+            heart_conf: 0.5,
+            ..Default::default()
+        };
         assert!(frame_has_vitals(&f));
         let g = gate_frame(f);
         assert!(!frame_has_vitals(&g));
-        assert_eq!(g.flags, !(FLAG_VITALS_ENABLED | FLAG_BREATHING_VALID | FLAG_HEART_VALID));
+        assert_eq!(
+            g.flags,
+            !(FLAG_VITALS_ENABLED | FLAG_BREATHING_VALID | FLAG_HEART_VALID)
+        );
     }
 }

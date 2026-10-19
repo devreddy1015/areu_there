@@ -160,14 +160,31 @@ const LINKS: [(u8, u8); 1] = [(0, 1)];
 
 /// The scenario the explorer runs. Deterministic from `SEED`.
 pub fn explorer_scenario() -> Scenario {
-    let room = Room { door_m: DOOR_M, ..scenarios::room_clear_los() };
+    let room = Room {
+        door_m: DOOR_M,
+        ..scenarios::room_clear_los()
+    };
     let layout = scenarios::Layout {
-        nodes: NODES_M.iter().enumerate().map(|(i, &pos)| Node { id: i as u8, pos }).collect(),
+        nodes: NODES_M
+            .iter()
+            .enumerate()
+            .map(|(i, &pos)| Node { id: i as u8, pos })
+            .collect(),
         links: LINKS.to_vec(),
     };
     let timeline = vec![
-        Segment { duration_s: LEAD_IN_S, activity: Activity::Absent },
-        Segment { duration_s: SEATED_S, activity: Activity::Seated { at: START_M, bpm: BPM, bpm_end: None } },
+        Segment {
+            duration_s: LEAD_IN_S,
+            activity: Activity::Absent,
+        },
+        Segment {
+            duration_s: SEATED_S,
+            activity: Activity::Seated {
+                at: START_M,
+                bpm: BPM,
+                bpm_end: None,
+            },
+        },
     ];
     scenarios::scenario(SCENARIO, room, layout, timeline, SEED)
 }
@@ -236,7 +253,12 @@ pub struct SimState {
 impl SimState {
     pub fn new(scenario: Scenario, space_id: &str) -> Arc<Self> {
         let sim = Simulator::new(&scenario);
-        Arc::new(Self { space_id: space_id.to_string(), maps: sim.clone(), scenario, core: Mutex::new(SimCore { sim, t_s: 0.0 }) })
+        Arc::new(Self {
+            space_id: space_id.to_string(),
+            maps: sim.clone(),
+            scenario,
+            core: Mutex::new(SimCore { sim, t_s: 0.0 }),
+        })
     }
 
     fn core(&self) -> std::sync::MutexGuard<'_, SimCore> {
@@ -386,7 +408,9 @@ impl Sensors {
     /// `/api/health`.
     fn feed(&mut self, tick: &Tick, t0: f64, hub: &mut Hub) {
         for lf in &tick.frames {
-            let Some((_, ex)) = self.ex.iter_mut().find(|(k, _)| *k == (lf.tx, lf.rx)) else { continue };
+            let Some((_, ex)) = self.ex.iter_mut().find(|(k, _)| *k == (lf.tx, lf.rx)) else {
+                continue;
+            };
             for ff in ex.push(lf.frame.clone(), Some(lf.seq as u64), Some(lf.t_s), None) {
                 self.last_t = self.last_t.max(t0 + lf.t_s);
                 let t = self.last_t;
@@ -429,7 +453,9 @@ impl SimGateway {
     pub async fn start(cfg: GatewayConfig, opts: SimulateOptions) -> io::Result<SimGateway> {
         let scenario = explorer_scenario();
         let cfg = simulate_config(cfg, &scenario);
-        let http_bind = cfg.http_socket_addr().map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.0))?;
+        let http_bind = cfg
+            .http_socket_addr()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.0))?;
         let listener = TcpListener::bind(http_bind)
             .await
             .map_err(|e| io::Error::new(e.kind(), format!("cannot bind HTTP {http_bind}: {e}")))?;
@@ -440,9 +466,14 @@ impl SimGateway {
         let (stop, stop_rx) = watch::channel(false);
         // No audit file and no event log: simulate mode leaves `data_dir`
         // alone, exactly as replay does.
-        let deps = crate::http::HttpDeps::new(shared.clone(), stop_rx.clone(), Arc::new(cfg.clone()), None)
-            .without_audit()
-            .with_sim(sim.clone());
+        let deps = crate::http::HttpDeps::new(
+            shared.clone(),
+            stop_rx.clone(),
+            Arc::new(cfg.clone()),
+            None,
+        )
+        .without_audit()
+        .with_sim(sim.clone());
         let app = crate::http::router(deps);
         let mut http_stop = stop_rx.clone();
         let http = tokio::spawn(async move {
@@ -454,13 +485,23 @@ impl SimGateway {
             }
         });
         let core = tokio::spawn(run(cfg, sim.clone(), shared.clone(), opts, stop_rx));
-        Ok(SimGateway { http_addr, shared, sim, stop, core, http })
+        Ok(SimGateway {
+            http_addr,
+            shared,
+            sim,
+            stop,
+            core,
+            http,
+        })
     }
 
     pub async fn shutdown(self) {
         let _ = self.stop.send(true);
         let _ = self.core.await;
-        if tokio::time::timeout(Duration::from_secs(5), self.http).await.is_err() {
+        if tokio::time::timeout(Duration::from_secs(5), self.http)
+            .await
+            .is_err()
+        {
             crate::log("HTTP server did not stop within 5 s");
         }
     }
@@ -469,14 +510,26 @@ impl SimGateway {
 /// The sim task: step the simulator, run its CSI through the node DSP
 /// into the hub, tick the hub on the same 0.5 s grid live mode uses, and
 /// pace the whole thing against the wall clock.
-async fn run(cfg: GatewayConfig, state: Arc<SimState>, shared: Arc<Shared>, opts: SimulateOptions, mut stop: watch::Receiver<bool>) {
+async fn run(
+    cfg: GatewayConfig,
+    state: Arc<SimState>,
+    shared: Arc<Shared>,
+    opts: SimulateOptions,
+    mut stop: watch::Receiver<bool>,
+) {
     let offset = cfg.utc_offset_minutes;
     let vitals = cfg.spaces.first().is_some_and(|s| s.vitals);
     // Simulator time 0 is now: `t_s` is local-epoch seconds, like live
     // mode and replay, so persisted day boundaries mean something.
     let unix_ms_at_t0 = now_unix_ms();
     let t0 = local_epoch_s(unix_ms_at_t0, offset);
-    let mut hub = Hub::new(cfg, Some(shared), false, Wall::Anchored { t0, unix_ms_at_t0 }, t0);
+    let mut hub = Hub::new(
+        cfg,
+        Some(shared),
+        false,
+        Wall::Anchored { t0, unix_ms_at_t0 },
+        t0,
+    );
     for n in &hub.notes {
         crate::log(n);
     }
@@ -493,7 +546,9 @@ async fn run(cfg: GatewayConfig, state: Arc<SimState>, shared: Arc<Shared>, opts
         let tick = {
             let mut c = state.core();
             let Some(tick) = c.sim.step() else {
-                crate::log("the simulated timeline has ended; the explorer keeps serving its final state");
+                crate::log(
+                    "the simulated timeline has ended; the explorer keeps serving its final state",
+                );
                 break;
             };
             c.t_s = tick.truth.t_s;
@@ -535,10 +590,25 @@ mod tests {
     /// one). Returns the space exactly as `/api/spaces` would show it.
     fn park(at: Option<Point>, run_s: f64) -> Value {
         let sc = explorer_scenario();
-        let cfg = simulate_config(GatewayConfig { data_dir: std::path::PathBuf::new(), ..Default::default() }, &sc);
+        let cfg = simulate_config(
+            GatewayConfig {
+                data_dir: std::path::PathBuf::new(),
+                ..Default::default()
+            },
+            &sc,
+        );
         let vitals = cfg.spaces[0].vitals;
         let t0 = 1_790_000_000.0;
-        let mut hub = Hub::new(cfg, None, false, Wall::Anchored { t0, unix_ms_at_t0: 0 }, t0);
+        let mut hub = Hub::new(
+            cfg,
+            None,
+            false,
+            Wall::Anchored {
+                t0,
+                unix_ms_at_t0: 0,
+            },
+            t0,
+        );
         let mut sensors = Sensors::new(&sc, vitals, t0);
         let mut sim = Simulator::new(&sc);
         match at {
@@ -579,19 +649,43 @@ mod tests {
     #[test]
     fn the_gap_the_explorer_exists_to_show() {
         let seen = park(Some(START_M), RUN_S);
-        assert_eq!(seen["occupied"], true, "the person the explorer opens with must be visible: {seen}");
-        assert!((bpm(&seen).unwrap_or(0.0) - BPM).abs() < 1.0, "breathing rate should be ~{BPM}: {}", seen["breathing"]);
-        assert!(seen["breathing"]["confidence"].as_f64().unwrap_or(0.0) > 0.9, "{}", seen["breathing"]);
+        assert_eq!(
+            seen["occupied"], true,
+            "the person the explorer opens with must be visible: {seen}"
+        );
+        assert!(
+            (bpm(&seen).unwrap_or(0.0) - BPM).abs() < 1.0,
+            "breathing rate should be ~{BPM}: {}",
+            seen["breathing"]
+        );
+        assert!(
+            seen["breathing"]["confidence"].as_f64().unwrap_or(0.0) > 0.9,
+            "{}",
+            seen["breathing"]
+        );
 
         // The same person, 0.51 m away, in a whole-band null.
         let null = park(Some(DEMO_NULL_M), RUN_S);
-        assert_eq!(null["occupied"], false, "the null must actually blind the pipeline: {null}");
-        assert!(null["breathing"].is_null(), "and with no person there is no breathing: {null}");
+        assert_eq!(
+            null["occupied"], false,
+            "the null must actually blind the pipeline: {null}"
+        );
+        assert!(
+            null["breathing"].is_null(),
+            "and with no person there is no breathing: {null}"
+        );
 
         // Half a metre out of it, the person is back.
         let beside = park(Some((DEMO_NULL_M.0 + 0.5, DEMO_NULL_M.1)), RUN_S);
-        assert_eq!(beside["occupied"], true, "0.5 m from the null the person is visible again: {beside}");
-        assert!((bpm(&beside).unwrap_or(0.0) - BPM).abs() < 1.0, "{}", beside["breathing"]);
+        assert_eq!(
+            beside["occupied"], true,
+            "0.5 m from the null the person is visible again: {beside}"
+        );
+        assert!(
+            (bpm(&beside).unwrap_or(0.0) - BPM).abs() < 1.0,
+            "{}",
+            beside["breathing"]
+        );
 
         // And an empty room reads empty, so "not occupied" in the null
         // is not the pipeline simply never reporting anyone.
@@ -611,13 +705,28 @@ mod tests {
         let sim = Simulator::new(&explorer_scenario());
         let c = sim.coverage(LINKS[0], 0.02);
         let at = |p: Point| {
-            let ix = ((p.0 - c.origin_m.0) / c.res_m).round().clamp(0.0, (c.w - 1) as f64) as usize;
-            let iy = ((p.1 - c.origin_m.1) / c.res_m).round().clamp(0.0, (c.h - 1) as f64) as usize;
+            let ix = ((p.0 - c.origin_m.0) / c.res_m)
+                .round()
+                .clamp(0.0, (c.w - 1) as f64) as usize;
+            let iy = ((p.1 - c.origin_m.1) / c.res_m)
+                .round()
+                .clamp(0.0, (c.h - 1) as f64) as usize;
             c.values[iy * c.w + ix]
         };
-        assert!(at(DEMO_NULL_M) < 0.2, "the null reads dark: {}", at(DEMO_NULL_M));
-        assert!(at(START_M) > 0.9, "the starting seat reads bright: {}", at(START_M));
-        assert!(at((DEMO_NULL_M.0 + 0.5, DEMO_NULL_M.1)) > 0.5, "and so does the seat beside it");
+        assert!(
+            at(DEMO_NULL_M) < 0.2,
+            "the null reads dark: {}",
+            at(DEMO_NULL_M)
+        );
+        assert!(
+            at(START_M) > 0.9,
+            "the starting seat reads bright: {}",
+            at(START_M)
+        );
+        assert!(
+            at((DEMO_NULL_M.0 + 0.5, DEMO_NULL_M.1)) > 0.5,
+            "and so does the seat beside it"
+        );
     }
 
     /// The map served over HTTP is the simulator's own, cell for cell:
@@ -635,16 +744,29 @@ mod tests {
         // One link, so `best` is that link; with more it is the per-cell
         // maximum, which is how ADR-006 fuses.
         assert_eq!(v["best"], json!(own.values));
-        assert_eq!(v["units"], "relative breathing sensitivity; 1.0 = this room's median");
+        assert_eq!(
+            v["units"],
+            "relative breathing sensitivity; 1.0 = this room's median"
+        );
 
         state.set_person(DEMO_NULL_M);
         state.set_present(false);
-        assert_eq!(state.coverage(0.25).unwrap(), v, "coverage is a map of the room, not of the person");
+        assert_eq!(
+            state.coverage(0.25).unwrap(),
+            v,
+            "coverage is a map of the room, not of the person"
+        );
 
-        assert!(state.coverage(0.0).is_err(), "a zero resolution is rejected, not divided by");
+        assert!(
+            state.coverage(0.0).is_err(),
+            "a zero resolution is rejected, not divided by"
+        );
         assert!(state.coverage(f64::NAN).is_err());
         assert!(state.coverage(-1.0).is_err());
-        assert!(state.coverage(0.0001).is_err(), "and so is a grid over the cell cap");
+        assert!(
+            state.coverage(0.0001).is_err(),
+            "and so is a grid over the cell cap"
+        );
     }
 
     /// The person is an input. Setting it moves the truth immediately —
@@ -666,7 +788,10 @@ mod tests {
 
         // The lead-in is an empty room, so there is nobody to remove yet
         // and nobody to bring back; `present` reports what is true.
-        assert!(!state.truth().present, "the explorer opens on an empty room");
+        assert!(
+            !state.truth().present,
+            "the explorer opens on an empty room"
+        );
         assert!(!state.set_present(false));
     }
 
@@ -681,7 +806,10 @@ mod tests {
 
         let default = sim_space(&GatewayConfig::default(), &sc);
         assert_eq!(default.id, SPACE_ID);
-        assert!(default.vitals, "the explorer is about breathing, so it consents by default");
+        assert!(
+            default.vitals,
+            "the explorer is about breathing, so it consents by default"
+        );
         assert_eq!(default.links, links);
 
         let text = format!(
@@ -689,9 +817,15 @@ mod tests {
         );
         let cfg = GatewayConfig::from_toml(&text).expect("valid config");
         let configured = sim_space(&cfg, &sc);
-        assert!(!configured.vitals, "a space that has not consented stays unconsented in simulate mode");
+        assert!(
+            !configured.vitals,
+            "a space that has not consented stays unconsented in simulate mode"
+        );
         assert_eq!(configured.name, "Quiet room");
-        assert_eq!(configured.links, links, "the config does not get to rewire the simulator");
+        assert_eq!(
+            configured.links, links,
+            "the config does not get to rewire the simulator"
+        );
 
         // And the gateway runs that space and only that space.
         let only = simulate_config(cfg, &sc);
@@ -713,9 +847,14 @@ mod tests {
                 break;
             }
             for lf in &tick.frames {
-                let Some((_, ex)) = gated.ex.iter_mut().find(|(k, _)| *k == (lf.tx, lf.rx)) else { continue };
+                let Some((_, ex)) = gated.ex.iter_mut().find(|(k, _)| *k == (lf.tx, lf.rx)) else {
+                    continue;
+                };
                 for ff in ex.push(lf.frame.clone(), Some(lf.seq as u64), Some(lf.t_s), None) {
-                    assert_eq!(ff.breathing_bpm, 0.0, "a node without consent reports no rate");
+                    assert_eq!(
+                        ff.breathing_bpm, 0.0,
+                        "a node without consent reports no rate"
+                    );
                     assert_eq!(ff.breathing_conf, 0.0);
                     assert_eq!(ff.breath_rms, 0.0);
                     frames += 1;
@@ -732,22 +871,36 @@ mod tests {
         let v = state.describe();
         assert_eq!(v["scenario"], SCENARIO);
         assert_eq!(v["space_id"], SPACE_ID);
-        assert_eq!(v["room"], json!({ "w_m": 6.0, "h_m": 5.0, "door_m": [DOOR_M.0, DOOR_M.1] }));
-        assert_eq!(v["nodes"], json!([
-            { "id": 0, "x_m": NODES_M[0].0, "y_m": NODES_M[0].1 },
-            { "id": 1, "x_m": NODES_M[1].0, "y_m": NODES_M[1].1 },
-        ]));
+        assert_eq!(
+            v["room"],
+            json!({ "w_m": 6.0, "h_m": 5.0, "door_m": [DOOR_M.0, DOOR_M.1] })
+        );
+        assert_eq!(
+            v["nodes"],
+            json!([
+                { "id": 0, "x_m": NODES_M[0].0, "y_m": NODES_M[0].1 },
+                { "id": 1, "x_m": NODES_M[1].0, "y_m": NODES_M[1].1 },
+            ])
+        );
         assert_eq!(v["links"], json!([{ "tx": 0, "rx": 1 }]));
         assert_eq!(v["sample_rate_hz"], 20.0);
         assert_eq!(v["n_subcarriers"], 56);
         let sc = state.scenario();
-        assert_eq!(v["scatterers"].as_array().map(Vec::len), Some(sc.room.n_scatterers));
+        assert_eq!(
+            v["scatterers"].as_array().map(Vec::len),
+            Some(sc.room.n_scatterers)
+        );
         for s in v["scatterers"].as_array().unwrap() {
             assert!(s["x_m"].as_f64().is_some_and(|x| x > 0.0 && x < 6.0), "{s}");
             assert!(s["rcs_m2"].as_f64().is_some_and(|r| r > 0.0), "{s}");
         }
         for n in &sc.nodes {
-            assert!(n.pos.0 > 0.0 && n.pos.0 < sc.room.size_m.0 && n.pos.1 > 0.0 && n.pos.1 < sc.room.size_m.1);
+            assert!(
+                n.pos.0 > 0.0
+                    && n.pos.0 < sc.room.size_m.0
+                    && n.pos.1 > 0.0
+                    && n.pos.1 < sc.room.size_m.1
+            );
         }
         assert!(v["truth"]["t_s"].as_f64() == Some(0.0) && v["truth"]["present"] == false);
     }

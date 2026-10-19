@@ -13,7 +13,10 @@ use crate::privacy;
 use crate::raw;
 use saans_dsp::features::{DecodeError, FeatureFrame, FLAG_RAW_MODE};
 use saans_dsp::{CsiFrame, FeatureExtractor, FeatureExtractorConfig};
-use saans_health::{HealthEvent, LinkId, SpaceConfig, SpaceFusion, SpaceMonitor, SpaceSample, SpaceState, SystemMonitor};
+use saans_health::{
+    HealthEvent, LinkId, SpaceConfig, SpaceFusion, SpaceMonitor, SpaceSample, SpaceState,
+    SystemMonitor,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::SocketAddr;
@@ -47,7 +50,13 @@ pub struct DecodeErrors {
 
 impl DecodeErrors {
     pub fn total(&self) -> u64 {
-        self.size + self.crc + self.version + self.unknown_type + self.raw_malformed + self.raw_subcarrier_mismatch + self.non_finite
+        self.size
+            + self.crc
+            + self.version
+            + self.unknown_type
+            + self.raw_malformed
+            + self.raw_subcarrier_mismatch
+            + self.non_finite
     }
 }
 
@@ -84,10 +93,19 @@ pub struct UnknownLink {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ingested {
-    Frame { space: usize, link: LinkId },
+    Frame {
+        space: usize,
+        link: LinkId,
+    },
     /// Raw CSI accepted; `frames` FeatureFrames were due.
-    Raw { space: usize, link: LinkId, frames: usize },
-    Shadowed { link: LinkId },
+    Raw {
+        space: usize,
+        link: LinkId,
+        frames: usize,
+    },
+    Shadowed {
+        link: LinkId,
+    },
     Unknown(LinkId),
     Rejected(&'static str),
 }
@@ -111,7 +129,9 @@ impl SpaceRt {
         self.fusion
             .links
             .values()
-            .filter(|l| l.last.is_some_and(|f| f.flag(FLAG_RAW_MODE)) && t_s - l.last_seen_s <= RAW_ACTIVE_S)
+            .filter(|l| {
+                l.last.is_some_and(|f| f.flag(FLAG_RAW_MODE)) && t_s - l.last_seen_s <= RAW_ACTIVE_S
+            })
             .map(|l| l.link)
             .collect()
     }
@@ -163,14 +183,25 @@ impl Engine {
                     fusion: SpaceFusion::new(sc.clone()),
                     monitor: SpaceMonitor::new(sc.clone()),
                     system: SystemMonitor::new(),
-                    state: SpaceState { space_id: sc.id.clone(), vitals: sc.vitals, ..Default::default() },
+                    state: SpaceState {
+                        space_id: sc.id.clone(),
+                        vitals: sc.vitals,
+                        ..Default::default()
+                    },
                     sample: None,
                     last_native: BTreeMap::new(),
                     vitals_gated_links: BTreeSet::new(),
                 }
             })
             .collect();
-        Self { spaces, route, raw_cfg: cfg.raw.clone(), raw: BTreeMap::new(), stats: IngestStats::default(), unknown: BTreeMap::new() }
+        Self {
+            spaces,
+            route,
+            raw_cfg: cfg.raw.clone(),
+            raw: BTreeMap::new(),
+            stats: IngestStats::default(),
+            unknown: BTreeMap::new(),
+        }
     }
 
     pub fn space_index(&self, id: &str) -> Option<usize> {
@@ -213,14 +244,23 @@ impl Engine {
         let fr = match raw::parse(data) {
             // No subcarriers or no antennas carries no CSI (and an extractor
             // sized from it would assert); a short I/Q list cannot be fed.
-            Ok(fr) if fr.n_subcarriers > 0 && fr.n_antennas > 0 && fr.iq.len() == fr.n_subcarriers as usize => fr,
+            Ok(fr)
+                if fr.n_subcarriers > 0
+                    && fr.n_antennas > 0
+                    && fr.iq.len() == fr.n_subcarriers as usize =>
+            {
+                fr
+            }
             _ => {
                 self.stats.errors.raw_malformed += 1;
                 return Ingested::Rejected("malformed raw-CSI frame");
             }
         };
         self.stats.raw_datagrams += 1;
-        let link = LinkId { rx: fr.node_id, tx: RAW_TX };
+        let link = LinkId {
+            rx: fr.node_id,
+            tx: RAW_TX,
+        };
         let Some(&space) = self.route.get(&link) else {
             self.note_unknown(link, "raw", t_s, src);
             return Ingested::Unknown(link);
@@ -229,7 +269,11 @@ impl Engine {
         let vitals = self.spaces[space].config.vitals;
         let rl = self.raw.entry(fr.node_id).or_insert_with(|| RawLink {
             extractor: FeatureExtractor::new(FeatureExtractorConfig {
-                n_subcarriers: if rc.subcarriers > 0 { rc.subcarriers } else { fr.n_subcarriers as usize },
+                n_subcarriers: if rc.subcarriers > 0 {
+                    rc.subcarriers
+                } else {
+                    fr.n_subcarriers as usize
+                },
                 sample_rate_hz: rc.sample_rate_hz,
                 node_id: fr.node_id,
                 tx_id: RAW_TX,
@@ -244,9 +288,17 @@ impl Engine {
             self.stats.errors.raw_subcarrier_mismatch += 1;
             return Ingested::Rejected("subcarrier count changed");
         }
-        let csi = CsiFrame::from_iq(&fr.iq, fr.sequence as u64, rc.sample_rate_hz, fr.rssi_dbm as i32, fr.node_id);
+        let csi = CsiFrame::from_iq(
+            &fr.iq,
+            fr.sequence as u64,
+            rc.sample_rate_hz,
+            fr.rssi_dbm as i32,
+            fr.node_id,
+        );
         let noise = (fr.noise_floor_dbm != i8::MIN).then_some(fr.noise_floor_dbm as i32);
-        let frames = rl.extractor.push(csi, Some(fr.sequence as u64), Some(t_s), noise);
+        let frames = rl
+            .extractor
+            .push(csi, Some(fr.sequence as u64), Some(t_s), noise);
         let n = frames.len();
         for f in frames {
             if !is_finite(&f) {
@@ -256,10 +308,20 @@ impl Engine {
             self.stats.raw_feature_frames += 1;
             self.route_frame(f, t_s, src, false);
         }
-        Ingested::Raw { space, link, frames: n }
+        Ingested::Raw {
+            space,
+            link,
+            frames: n,
+        }
     }
 
-    fn note_unknown(&mut self, link: LinkId, kind: &'static str, t_s: f64, src: Option<SocketAddr>) {
+    fn note_unknown(
+        &mut self,
+        link: LinkId,
+        kind: &'static str,
+        t_s: f64,
+        src: Option<SocketAddr>,
+    ) {
         self.stats.unassigned += 1;
         let u = self.unknown.entry(link).or_insert(UnknownLink {
             rx: link.rx,
@@ -278,8 +340,17 @@ impl Engine {
         }
     }
 
-    fn route_frame(&mut self, f: FeatureFrame, t_s: f64, src: Option<SocketAddr>, native: bool) -> Ingested {
-        let link = LinkId { rx: f.node_id, tx: f.tx_id };
+    fn route_frame(
+        &mut self,
+        f: FeatureFrame,
+        t_s: f64,
+        src: Option<SocketAddr>,
+        native: bool,
+    ) -> Ingested {
+        let link = LinkId {
+            rx: f.node_id,
+            tx: f.tx_id,
+        };
         let Some(&space) = self.route.get(&link) else {
             self.note_unknown(link, "feature", t_s, src);
             return Ingested::Unknown(link);
@@ -287,7 +358,11 @@ impl Engine {
         let sp = &mut self.spaces[space];
         if native {
             sp.last_native.insert(link, t_s);
-        } else if sp.last_native.get(&link).is_some_and(|&tn| t_s - tn < NATIVE_PREFERRED_S) {
+        } else if sp
+            .last_native
+            .get(&link)
+            .is_some_and(|&tn| t_s - tn < NATIVE_PREFERRED_S)
+        {
             self.stats.raw_shadowed += 1;
             return Ingested::Shadowed { link };
         }
@@ -346,15 +421,44 @@ mod tests {
     #[test]
     fn routes_by_link_and_counts_errors() {
         let mut e = Engine::new(&cfg());
-        assert_eq!(e.ingest(&frame(1, 2).encode(), 0.0, None), Ingested::Frame { space: 0, link: LinkId { rx: 1, tx: 2 } });
-        assert_eq!(e.ingest(&frame(3, 2).encode(), 0.0, None), Ingested::Frame { space: 1, link: LinkId { rx: 3, tx: 2 } });
-        assert_eq!(e.ingest(&frame(9, 9).encode(), 0.0, None), Ingested::Unknown(LinkId { rx: 9, tx: 9 }));
+        assert_eq!(
+            e.ingest(&frame(1, 2).encode(), 0.0, None),
+            Ingested::Frame {
+                space: 0,
+                link: LinkId { rx: 1, tx: 2 }
+            }
+        );
+        assert_eq!(
+            e.ingest(&frame(3, 2).encode(), 0.0, None),
+            Ingested::Frame {
+                space: 1,
+                link: LinkId { rx: 3, tx: 2 }
+            }
+        );
+        assert_eq!(
+            e.ingest(&frame(9, 9).encode(), 0.0, None),
+            Ingested::Unknown(LinkId { rx: 9, tx: 9 })
+        );
         let mut bad = frame(1, 2).encode();
         bad[30] ^= 1;
         assert!(matches!(e.ingest(&bad, 0.0, None), Ingested::Rejected(_)));
-        assert!(matches!(e.ingest(&bad[..60], 0.0, None), Ingested::Rejected(_)));
-        assert!(matches!(e.ingest(b"hello world", 0.0, None), Ingested::Rejected(_)));
-        assert_eq!(e.stats.errors, DecodeErrors { crc: 1, size: 1, unknown_type: 1, ..Default::default() });
+        assert!(matches!(
+            e.ingest(&bad[..60], 0.0, None),
+            Ingested::Rejected(_)
+        ));
+        assert!(matches!(
+            e.ingest(b"hello world", 0.0, None),
+            Ingested::Rejected(_)
+        ));
+        assert_eq!(
+            e.stats.errors,
+            DecodeErrors {
+                crc: 1,
+                size: 1,
+                unknown_type: 1,
+                ..Default::default()
+            }
+        );
         assert_eq!(e.unknown[&LinkId { rx: 9, tx: 9 }].frames, 1);
         assert_eq!(e.stats.datagrams, 6);
     }
@@ -366,16 +470,28 @@ mod tests {
         f.breathing_bpm = 15.0;
         f.breathing_conf = 0.9;
         e.ingest(&f.encode(), 0.0, None);
-        let last = e.spaces[1].fusion.links[&LinkId { rx: 3, tx: 2 }].last.unwrap();
+        let last = e.spaces[1].fusion.links[&LinkId { rx: 3, tx: 2 }]
+            .last
+            .unwrap();
         assert_eq!((last.breathing_bpm, last.breathing_conf), (0.0, 0.0));
         assert_eq!(e.stats.vitals_gated, 1);
-        e.ingest(&{
-            let mut g = frame(1, 2);
-            g.breathing_bpm = 15.0;
-            g
-        }
-        .encode(), 0.0, None);
-        assert_eq!(e.spaces[0].fusion.links[&LinkId { rx: 1, tx: 2 }].last.unwrap().breathing_bpm, 15.0);
+        e.ingest(
+            &{
+                let mut g = frame(1, 2);
+                g.breathing_bpm = 15.0;
+                g
+            }
+            .encode(),
+            0.0,
+            None,
+        );
+        assert_eq!(
+            e.spaces[0].fusion.links[&LinkId { rx: 1, tx: 2 }]
+                .last
+                .unwrap()
+                .breathing_bpm,
+            15.0
+        );
     }
 
     #[test]
@@ -385,24 +501,45 @@ mod tests {
         // Presence warms its filter up for 50 s before calibrating (2 s here).
         for i in 0..1200u32 {
             let t = i as f64 / 20.0;
-            let iq: Vec<(i8, i8)> =
-                (0..56).map(|k| (((t * 0.3 + k as f64).sin() * 20.0) as i8, 40 + ((t * 1.3).sin() * 5.0) as i8)).collect();
+            let iq: Vec<(i8, i8)> = (0..56)
+                .map(|k| {
+                    (
+                        ((t * 0.3 + k as f64).sin() * 20.0) as i8,
+                        40 + ((t * 1.3).sin() * 5.0) as i8,
+                    )
+                })
+                .collect();
             match e.ingest(&raw::build(&iq, 5, i, -50, -95), t, None) {
                 Ingested::Raw { frames, .. } => produced += frames,
                 other => panic!("{other:?}"),
             }
         }
-        assert_eq!(produced, 120, "1200 CSI frames at 20 Hz -> 120 FeatureFrames at 2 Hz");
+        assert_eq!(
+            produced, 120,
+            "1200 CSI frames at 20 Hz -> 120 FeatureFrames at 2 Hz"
+        );
         let track = &e.spaces[0].fusion.links[&LinkId { rx: 5, tx: 255 }];
         let last = track.last.unwrap();
         assert!(last.flag(FLAG_RAW_MODE));
-        assert!(last.flag(FLAG_CALIBRATED), "50 s warm-up + 2 s calibration < 60 s");
+        assert!(
+            last.flag(FLAG_CALIBRATED),
+            "50 s warm-up + 2 s calibration < 60 s"
+        );
         assert_eq!(last.n_subcarriers, 56);
-        assert_eq!(e.spaces[0].raw_mode_links(60.0), vec![LinkId { rx: 5, tx: 255 }]);
+        assert_eq!(
+            e.spaces[0].raw_mode_links(60.0),
+            vec![LinkId { rx: 5, tx: 255 }]
+        );
         // A different subcarrier count is rejected, not mixed in.
-        assert!(matches!(e.ingest(&raw::build(&[(1, 1); 52], 5, 1200, -50, -95), 60.0, None), Ingested::Rejected(_)));
+        assert!(matches!(
+            e.ingest(&raw::build(&[(1, 1); 52], 5, 1200, -50, -95), 60.0, None),
+            Ingested::Rejected(_)
+        ));
         // A raw node no space lists is unknown.
-        assert!(matches!(e.ingest(&raw::build(&[(1, 1); 52], 6, 0, -50, -95), 60.0, None), Ingested::Unknown(_)));
+        assert!(matches!(
+            e.ingest(&raw::build(&[(1, 1); 52], 6, 0, -50, -95), 60.0, None),
+            Ingested::Unknown(_)
+        ));
         assert_eq!(e.unknown[&LinkId { rx: 6, tx: 255 }].kind, "raw");
     }
 
@@ -412,7 +549,11 @@ mod tests {
         e.ingest(&frame(5, 255).encode(), 0.0, None);
         let mut shadowed = 0;
         for i in 0..20u32 {
-            if let Ingested::Raw { frames, .. } = e.ingest(&raw::build(&[(3, 4); 56], 5, i, -50, -95), 0.05 * i as f64, None) {
+            if let Ingested::Raw { frames, .. } = e.ingest(
+                &raw::build(&[(3, 4); 56], 5, i, -50, -95),
+                0.05 * i as f64,
+                None,
+            ) {
                 shadowed += frames;
             }
         }

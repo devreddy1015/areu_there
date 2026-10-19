@@ -18,7 +18,12 @@ pub struct SelectParams {
 
 impl Default for SelectParams {
     fn default() -> Self {
-        Self { bnr_floor: 2.0, bnr_percentile: 80.0, affinity_threshold: None, keep_fraction: 0.5 }
+        Self {
+            bnr_floor: 2.0,
+            bnr_percentile: 80.0,
+            affinity_threshold: None,
+            keep_fraction: 0.5,
+        }
     }
 }
 
@@ -33,7 +38,13 @@ pub struct Selection {
 }
 
 /// Pick and sign subcarriers from `window[t][k]` sampled at `sample_rate_hz`.
-pub fn respirfi_select(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_high: f64, p: SelectParams) -> Option<Selection> {
+pub fn respirfi_select(
+    window: &[Vec<f64>],
+    sample_rate_hz: f64,
+    f_low: f64,
+    f_high: f64,
+    p: SelectParams,
+) -> Option<Selection> {
     if window.is_empty() || window[0].is_empty() {
         return None;
     }
@@ -47,7 +58,9 @@ pub fn respirfi_select(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_h
         return None;
     }
     let eta = percentile(&bnr, p.bnr_percentile).max(p.bnr_floor);
-    let candidates: Vec<usize> = (0..n_k).filter(|&k| bnr[k] >= eta && spectra[k].is_some()).collect();
+    let candidates: Vec<usize> = (0..n_k)
+        .filter(|&k| bnr[k] >= eta && spectra[k].is_some())
+        .collect();
     let affinity_threshold = p.affinity_threshold.unwrap_or_else(|| {
         let n_ind = 2.0 * (f_high - f_low) * n_t as f64 / sample_rate_hz;
         (2.0 / n_ind.max(1.0).sqrt()).min(0.9)
@@ -58,13 +71,25 @@ pub fn respirfi_select(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_h
     if candidates.len() == 1 {
         let mut signs = BTreeMap::new();
         signs.insert(candidates[0], 1);
-        return Some(Selection { signs, bnr, bnr_threshold: eta, affinity_threshold, candidates });
+        return Some(Selection {
+            signs,
+            bnr,
+            bnr_threshold: eta,
+            affinity_threshold,
+            candidates,
+        });
     }
     let spec = |k: usize| -> &Vec<C64> { spectra[k].as_ref().expect("candidate has spectrum") };
-    let energy: Vec<f64> = candidates.iter().map(|&k| psum(spec(k).iter().map(|c| {
-        let a = c.abs();
-        a * a
-    })).sqrt()).collect();
+    let energy: Vec<f64> = candidates
+        .iter()
+        .map(|&k| {
+            psum(spec(k).iter().map(|c| {
+                let a = c.abs();
+                a * a
+            }))
+            .sqrt()
+        })
+        .collect();
     let m = candidates.len();
     let mut sim = vec![vec![0.0; m]; m];
     for i in 0..m {
@@ -80,12 +105,32 @@ pub fn respirfi_select(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_h
     }
     let tern: Vec<Vec<f64>> = sim
         .iter()
-        .map(|row| row.iter().map(|&s| if s >= affinity_threshold { 1.0 } else if s <= -affinity_threshold { -1.0 } else { 0.0 }).collect())
+        .map(|row| {
+            row.iter()
+                .map(|&s| {
+                    if s >= affinity_threshold {
+                        1.0
+                    } else if s <= -affinity_threshold {
+                        -1.0
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
+        })
         .collect();
     let (values, vectors) = symmetric_eigen(&tern, 60);
     let lead = argmax_first(m, |i| values[i])?;
     let mut x: Vec<i32> = (0..m)
-        .map(|i| if vectors[i][lead] > 0.0 { 1 } else if vectors[i][lead] < 0.0 { -1 } else { 0 })
+        .map(|i| {
+            if vectors[i][lead] > 0.0 {
+                1
+            } else if vectors[i][lead] < 0.0 {
+                -1
+            } else {
+                0
+            }
+        })
         .collect();
     for i in 0..m {
         if x[i] == 0 {
@@ -94,18 +139,35 @@ pub fn respirfi_select(window: &[Vec<f64>], sample_rate_hz: f64, f_low: f64, f_h
         }
     }
     let scores: Vec<f64> = (0..m)
-        .map(|i| psum((0..m).filter(|&j| j != i).map(|j| sim[i][j] * (x[i] * x[j]) as f64)))
+        .map(|i| {
+            psum(
+                (0..m)
+                    .filter(|&j| j != i)
+                    .map(|j| sim[i][j] * (x[i] * x[j]) as f64),
+            )
+        })
         .collect();
     let best = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     if best <= 0.0 {
         return None;
     }
-    let keep: Vec<usize> = (0..m).filter(|&i| scores[i] > 0.0 && scores[i] >= p.keep_fraction * best).collect();
+    let keep: Vec<usize> = (0..m)
+        .filter(|&i| scores[i] > 0.0 && scores[i] >= p.keep_fraction * best)
+        .collect();
     let plus = psum(keep.iter().filter(|&&i| x[i] > 0).map(|&i| scores[i]));
     let minus = psum(keep.iter().filter(|&&i| x[i] < 0).map(|&i| scores[i]));
     let flip = if minus > plus { -1 } else { 1 };
-    let signs = keep.iter().map(|&i| (candidates[i], (flip * x[i]) as i8)).collect();
-    Some(Selection { signs, bnr, bnr_threshold: eta, affinity_threshold, candidates })
+    let signs = keep
+        .iter()
+        .map(|&i| (candidates[i], (flip * x[i]) as i8))
+        .collect();
+    Some(Selection {
+        signs,
+        bnr,
+        bnr_threshold: eta,
+        affinity_threshold,
+        candidates,
+    })
 }
 
 /// Streaming wrapper: block-average residuals, re-select every `update_s`,
@@ -133,7 +195,16 @@ pub struct RespirFiFusion {
 
 impl RespirFiFusion {
     pub fn new(n_subcarriers: usize, sample_rate_hz: f64, params: SelectParams) -> Self {
-        Self::with_options(n_subcarriers, sample_rate_hz, 0.1, 0.5, None, 5.0, 4.0, params)
+        Self::with_options(
+            n_subcarriers,
+            sample_rate_hz,
+            0.1,
+            0.5,
+            None,
+            5.0,
+            4.0,
+            params,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -151,7 +222,10 @@ impl RespirFiFusion {
         let window_s = window_s.unwrap_or(3.0 / f_low);
         let decimation = (py_round(sample_rate_hz / analysis_rate_hz) as usize).max(1);
         let analysis = sample_rate_hz / decimation as f64;
-        assert!(f_high < analysis / 2.0, "analysis rate {analysis} Hz cannot represent {f_high} Hz");
+        assert!(
+            f_high < analysis / 2.0,
+            "analysis rate {analysis} Hz cannot represent {f_high} Hz"
+        );
         Self {
             n_subcarriers,
             sample_rate_hz,
@@ -199,7 +273,13 @@ impl RespirFiFusion {
         }
         match &self.weights {
             None => fuse(residuals, fallback_weights),
-            Some(w) => psum(w[..n].iter().zip(&residuals[..n]).filter(|(_, r)| r.is_finite()).map(|(w, r)| w * r)),
+            Some(w) => psum(
+                w[..n]
+                    .iter()
+                    .zip(&residuals[..n])
+                    .filter(|(_, r)| r.is_finite())
+                    .map(|(w, r)| w * r),
+            ),
         }
     }
 
@@ -235,14 +315,28 @@ impl RespirFiFusion {
     }
 
     fn compute_weights(&mut self, window: &[Vec<f64>]) -> Option<Vec<f64>> {
-        let sel = respirfi_select(window, self.analysis_rate_hz, self.f_low, self.f_high, self.params)?;
+        let sel = respirfi_select(
+            window,
+            self.analysis_rate_hz,
+            self.f_low,
+            self.f_high,
+            self.params,
+        )?;
         let mut sigmas = BTreeMap::new();
         for &k in sel.signs.keys() {
             let col: Vec<f64> = window.iter().map(|r| r[k]).collect();
             let mean = psum(col.iter().copied()) / col.len() as f64;
-            sigmas.insert(k, (psum(col.iter().map(|x| (x - mean) * (x - mean))) / col.len() as f64).sqrt());
+            sigmas.insert(
+                k,
+                (psum(col.iter().map(|x| (x - mean) * (x - mean))) / col.len() as f64).sqrt(),
+            );
         }
-        let live: Vec<usize> = sel.signs.keys().copied().filter(|k| sigmas[k] > 0.0).collect();
+        let live: Vec<usize> = sel
+            .signs
+            .keys()
+            .copied()
+            .filter(|k| sigmas[k] > 0.0)
+            .collect();
         if live.is_empty() {
             return None;
         }

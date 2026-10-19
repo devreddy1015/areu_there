@@ -11,12 +11,23 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub enum OutputMsg {
     /// One redacted event record, as stored in the event log.
-    Event { space_id: String, unix_ms: i64, value: Arc<Value> },
+    Event {
+        space_id: String,
+        unix_ms: i64,
+        value: Arc<Value>,
+    },
     /// The redacted state of every space, published each 0.5 s tick, in
     /// config order: (space id, state JSON).
-    States { unix_ms: i64, spaces: Arc<Vec<(String, Value)>> },
+    States {
+        unix_ms: i64,
+        spaces: Arc<Vec<(String, Value)>>,
+    },
     /// Link and gateway health, published each tick.
-    System { unix_ms: i64, links: Arc<Value>, health: Arc<Value> },
+    System {
+        unix_ms: i64,
+        links: Arc<Value>,
+        health: Arc<Value>,
+    },
 }
 
 /// Channel capacity: about a minute of ticks with headroom for bursts.

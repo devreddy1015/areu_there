@@ -70,3 +70,11 @@ sense that the dashboard already was: it is a file with no data in it,
 which then asks for data as whoever is asking. On a loopback gateway that
 is the local admin; on a gateway that requires sign-in, the page says so
 instead of inventing a room.
+
+## Amendment, 2026-10-19
+"Seven pages" above was true when this was written (`afdc09d`). `/room-sim`
+was added in `a5c59c6` under the same decision and without changing it, so
+the site is eight pages now. The body is left as it was: an ADR records
+what was decided and when, and correcting its arithmetic after the fact
+would make it a worse record, not a better one. The count that is load
+bearing is the one in `site::PAGES`, which the tests walk.

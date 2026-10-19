@@ -10,7 +10,8 @@
 
 use crate::types::{Breathing, LinkId, Rate, SpaceConfig, SpaceSample};
 use saans_dsp::features::{
-    FeatureFrame, FLAG_BREATHING_VALID, FLAG_CALIBRATED, FLAG_HEART_VALID, FLAG_OCCUPIED, FLAG_VITALS_ENABLED,
+    FeatureFrame, FLAG_BREATHING_VALID, FLAG_CALIBRATED, FLAG_HEART_VALID, FLAG_OCCUPIED,
+    FLAG_VITALS_ENABLED,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -38,7 +39,13 @@ pub struct LinkTrack {
 
 impl LinkTrack {
     fn new(link: LinkId) -> Self {
-        Self { link, last: None, last_seen_s: f64::NEG_INFINITY, frames: 0, noise: VecDeque::new() }
+        Self {
+            link,
+            last: None,
+            last_seen_s: f64::NEG_INFINITY,
+            frames: 0,
+            noise: VecDeque::new(),
+        }
     }
 
     pub fn noise_rms(&self) -> Option<f64> {
@@ -93,8 +100,16 @@ pub struct SpaceFusion {
 
 impl SpaceFusion {
     pub fn new(config: SpaceConfig) -> Self {
-        let links = config.links.iter().map(|&l| (l, LinkTrack::new(l))).collect();
-        Self { config, links, breathing_link: None }
+        let links = config
+            .links
+            .iter()
+            .map(|&l| (l, LinkTrack::new(l)))
+            .collect();
+        Self {
+            config,
+            links,
+            breathing_link: None,
+        }
     }
 
     /// Accept a frame. Frames from links not listed in the config are
@@ -108,7 +123,11 @@ impl SpaceFusion {
             self.links.insert(link, LinkTrack::new(link));
         }
         let track = self.links.get_mut(&link).expect("inserted above");
-        if frame.flag(FLAG_CALIBRATED) && !frame.flag(FLAG_OCCUPIED) && frame.flag(FLAG_VITALS_ENABLED) && frame.breath_rms.is_finite() {
+        if frame.flag(FLAG_CALIBRATED)
+            && !frame.flag(FLAG_OCCUPIED)
+            && frame.flag(FLAG_VITALS_ENABLED)
+            && frame.breath_rms.is_finite()
+        {
             if track.noise.len() == 600 {
                 track.noise.pop_front();
             }
@@ -132,10 +151,23 @@ impl SpaceFusion {
     pub fn sample(&mut self, t_s: f64) -> SpaceSample {
         let usable: Vec<&LinkTrack> = self.links.values().filter(|l| l.usable(t_s)).collect();
         let n_usable = usable.len();
-        let votes = usable.iter().filter(|l| l.last.unwrap().flag(FLAG_OCCUPIED)).count();
-        let occupied = if n_usable == 0 { None } else { Some(votes >= self.quorum(n_usable)) };
-        let presence_index = usable.iter().map(|l| l.index(l.last.unwrap().motion_energy)).fold(0.0, f64::max);
-        let motion_index = usable.iter().map(|l| l.index(l.last.unwrap().gross_motion)).fold(0.0, f64::max);
+        let votes = usable
+            .iter()
+            .filter(|l| l.last.unwrap().flag(FLAG_OCCUPIED))
+            .count();
+        let occupied = if n_usable == 0 {
+            None
+        } else {
+            Some(votes >= self.quorum(n_usable))
+        };
+        let presence_index = usable
+            .iter()
+            .map(|l| l.index(l.last.unwrap().motion_energy))
+            .fold(0.0, f64::max);
+        let motion_index = usable
+            .iter()
+            .map(|l| l.index(l.last.unwrap().gross_motion))
+            .fold(0.0, f64::max);
 
         let mut breathing = None;
         let mut heart = None;
@@ -148,7 +180,12 @@ impl SpaceFusion {
             let best = candidates
                 .iter()
                 .filter(|l| l.last.unwrap().breathing_conf.is_finite())
-                .max_by(|a, b| a.last.unwrap().breathing_conf.total_cmp(&b.last.unwrap().breathing_conf))
+                .max_by(|a, b| {
+                    a.last
+                        .unwrap()
+                        .breathing_conf
+                        .total_cmp(&b.last.unwrap().breathing_conf)
+                })
                 .map(|l| (l.link, l.last.unwrap().breathing_conf as f64));
             let current = self
                 .breathing_link
@@ -171,7 +208,10 @@ impl SpaceFusion {
                     noise_rms: track.noise_rms(),
                 });
                 if f.flag(FLAG_HEART_VALID) {
-                    heart = Some(Rate { bpm: f.heart_bpm as f64, confidence: f.heart_conf as f64 });
+                    heart = Some(Rate {
+                        bpm: f.heart_bpm as f64,
+                        confidence: f.heart_conf as f64,
+                    });
                 }
             }
         } else {
@@ -250,7 +290,11 @@ mod tests {
         s.ingest(LinkId { rx: 0, tx: 9 }, frame(true, 0.9, 20.0), 1.0);
         s.ingest(LinkId { rx: 1, tx: 9 }, frame(false, 0.0, 20.0), 1.0);
         s.ingest(LinkId { rx: 2, tx: 9 }, frame(false, 0.0, 20.0), 1.0);
-        assert_eq!(s.sample(1.2).occupied, Some(false), "one wall-leaking link must not outvote two");
+        assert_eq!(
+            s.sample(1.2).occupied,
+            Some(false),
+            "one wall-leaking link must not outvote two"
+        );
     }
 
     #[test]
@@ -261,7 +305,11 @@ mod tests {
         s.ingest(b, frame(true, 0.70, 20.0), 1.0);
         assert_eq!(s.sample(1.1).breathing.unwrap().link, a);
         s.ingest(b, frame(true, 0.85, 20.0), 1.5);
-        assert_eq!(s.sample(1.6).breathing.unwrap().link, a, "0.05 better is not enough to switch");
+        assert_eq!(
+            s.sample(1.6).breathing.unwrap().link,
+            a,
+            "0.05 better is not enough to switch"
+        );
         s.ingest(b, frame(true, 0.95, 20.0), 2.0);
         assert_eq!(s.sample(2.1).breathing.unwrap().link, b);
     }
@@ -272,7 +320,10 @@ mod tests {
         s.ingest(LinkId { rx: 0, tx: 9 }, frame(true, 0.9, 7.0), 1.0);
         let out = s.sample(1.1);
         assert_eq!(out.occupied, Some(true));
-        assert!(out.breathing.is_none(), "7 Hz is below the 10 Hz vitals floor");
+        assert!(
+            out.breathing.is_none(),
+            "7 Hz is below the 10 Hz vitals floor"
+        );
     }
 
     #[test]
@@ -290,7 +341,10 @@ mod tests {
 
     #[test]
     fn vitals_off_means_no_breathing_even_if_frames_carry_it() {
-        let mut s = SpaceFusion::new(SpaceConfig { vitals: false, ..Default::default() });
+        let mut s = SpaceFusion::new(SpaceConfig {
+            vitals: false,
+            ..Default::default()
+        });
         s.ingest(LinkId { rx: 0, tx: 9 }, frame(true, 0.9, 20.0), 1.0);
         assert!(s.sample(1.1).breathing.is_none());
     }

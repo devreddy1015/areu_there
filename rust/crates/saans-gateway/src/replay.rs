@@ -123,10 +123,15 @@ impl std::error::Error for ReplayError {}
 
 /// Run a replay. With `shared`, every tick is published for the HTTP side
 /// (watch a recording on the dashboard, best with `speed` > 0).
-pub async fn replay(cfg: GatewayConfig, opts: &ReplayOptions, shared: Option<Arc<Shared>>) -> Result<ReplaySummary, ReplayError> {
+pub async fn replay(
+    cfg: GatewayConfig,
+    opts: &ReplayOptions,
+    shared: Option<Arc<Shared>>,
+) -> Result<ReplaySummary, ReplayError> {
     let path = opts.pcap.display().to_string();
     let file = File::open(&opts.pcap).map_err(|e| ReplayError(format!("{path}: {e}")))?;
-    let mut reader = PcapReader::new(BufReader::new(file), opts.port).map_err(|e| ReplayError(format!("{path}: {e}")))?;
+    let mut reader = PcapReader::new(BufReader::new(file), opts.port)
+        .map_err(|e| ReplayError(format!("{path}: {e}")))?;
     let read_err = |e: crate::pcap::PcapError| ReplayError(format!("{path}: {e}"));
     let offset = cfg.utc_offset_minutes;
     let mut summary = ReplaySummary {
@@ -146,12 +151,18 @@ pub async fn replay(cfg: GatewayConfig, opts: &ReplayOptions, shared: Option<Arc
         return Ok(summary);
     };
     // t_s = local-epoch seconds of the packet (see hub.rs, "Time").
-    let t_of = |ns: i64| local_epoch_s(ns.div_euclid(1_000_000), offset) + ns.rem_euclid(1_000_000) as f64 / 1e9;
+    let t_of = |ns: i64| {
+        local_epoch_s(ns.div_euclid(1_000_000), offset) + ns.rem_euclid(1_000_000) as f64 / 1e9
+    };
     let t0 = t_of(first.t_ns);
-    let wall = Wall::Anchored { t0, unix_ms_at_t0: first.t_ns.div_euclid(1_000_000) };
+    let wall = Wall::Anchored {
+        t0,
+        unix_ms_at_t0: first.t_ns.div_euclid(1_000_000),
+    };
     let mut hub = Hub::new(cfg, shared, false, wall, t0);
     if let Some(out) = &opts.events_out {
-        hub.set_events_out(out).map_err(|e| ReplayError(format!("{}: {e}", out.display())))?;
+        hub.set_events_out(out)
+            .map_err(|e| ReplayError(format!("{}: {e}", out.display())))?;
     }
     let started = Instant::now();
     let pace = |t: f64| {

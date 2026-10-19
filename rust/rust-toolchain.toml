@@ -1,0 +1,21 @@
+# `rustfmt` and `clippy` are named here so that a fresh checkout has them:
+# without the components line, `cargo fmt --check` on a machine that never
+# installed rustfmt fails with "component not installed", which reads like a
+# formatting error and is not one.
+#
+# The channel is `stable` rather than a fixed version, which is a trade, and
+# the cost falls on CI. Both checks are version-sensitive -- rustfmt's default
+# wrapping shifts between releases and clippy gains lints -- so when stable
+# moves, an unrelated pull request can go red on a line nobody touched. The
+# fix when that happens is a commit of its own: run `cargo fmt`, run
+# `cargo clippy --workspace --all-targets -- -D warnings`, commit what they
+# ask for, and add the formatting commit to .git-blame-ignore-revs.
+#
+# The alternative, pinning an exact version here, makes that failure
+# impossible but makes the pin a thing someone has to remember to raise, and
+# costs a toolchain download on every fresh machine. If this repository ever
+# gets contributors who are not the author, switch to the exact pin; with one
+# author, the cheaper trade is this one.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

@@ -129,7 +129,15 @@ pub struct LinkChannel {
 impl LinkChannel {
     /// Static channel: LoS + image-method reflections + scatterers, in the
     /// reference's path order. `scatterers` are (position, RCS).
-    pub fn new(room: &Room, scatterers: &[(Point, f64)], tx: Point, rx: Point, carrier_hz: f64, spacing_hz: f64, n: usize) -> Self {
+    pub fn new(
+        room: &Room,
+        scatterers: &[(Point, f64)],
+        tx: Point,
+        rx: Point,
+        carrier_hz: f64,
+        spacing_hz: f64,
+        n: usize,
+    ) -> Self {
         let d_los = dist(tx, rx);
         assert!(d_los > 0.0, "tx and rx must not coincide");
         let scale = STATIC_MAGNITUDE * d_los;
@@ -139,7 +147,12 @@ impl LinkChannel {
 
         let (w, h) = room.size_m;
         let mirrors = |p: Point| -> [(Point, i32); 4] {
-            [((-p.0, p.1), 0), ((2.0 * w - p.0, p.1), 1), ((p.0, -p.1), 2), ((p.0, 2.0 * h - p.1), 3)]
+            [
+                ((-p.0, p.1), 0),
+                ((2.0 * w - p.0, p.1), 1),
+                ((p.0, -p.1), 2),
+                ((p.0, 2.0 * h - p.1), 3),
+            ]
         };
         let mut frontier: Vec<(Point, i32)> = vec![(tx, -1)];
         for order in 1..=room.reflection_order {
@@ -161,7 +174,17 @@ impl LinkChannel {
             paths.push(point_path(tx, rx, p, rcs));
         }
 
-        let mut ch = Self { tx, rx, d_los, scale, carrier_hz, spacing_hz, n, static_re: vec![0.0; n], static_im: vec![0.0; n] };
+        let mut ch = Self {
+            tx,
+            rx,
+            d_los,
+            scale,
+            carrier_hz,
+            spacing_hz,
+            n,
+            static_re: vec![0.0; n],
+            static_im: vec![0.0; n],
+        };
         for k in 0..n {
             let f = ch.frequency(k);
             let (mut re, mut im) = (Neumaier::default(), Neumaier::default());
@@ -208,14 +231,25 @@ impl LinkChannel {
     /// The torso as this link sees it: `n_points` scatterers spread across
     /// `width_m` perpendicular to the tx-centre-rx bisector, RCS split
     /// equally (the reference's extended body).
-    pub fn torso(&self, centre: Point, n_points: usize, width_m: f64, rcs_m2: f64, out: &mut Vec<BodyPoint>) {
+    pub fn torso(
+        &self,
+        centre: Point,
+        n_points: usize,
+        width_m: f64,
+        rcs_m2: f64,
+        out: &mut Vec<BodyPoint>,
+    ) {
         out.clear();
         let b = bisector(self.tx, self.rx, centre);
         let across = (-b.1, b.0);
         let n = n_points.max(1);
         let k = (rcs_m2 / n as f64 / (4.0 * PI)).sqrt();
         for i in 0..n {
-            let off = if n == 1 { 0.0 } else { width_m * (i as f64 / (n - 1) as f64 - 0.5) };
+            let off = if n == 1 {
+                0.0
+            } else {
+                width_m * (i as f64 / (n - 1) as f64 - 0.5)
+            };
             let p = (centre.0 + off * across.0, centre.1 + off * across.1);
             let e1 = dist(self.tx, p);
             let e2 = dist(p, self.rx);
@@ -264,7 +298,11 @@ impl LinkChannel {
             }
             let scale = h0r.hypot(h0i) * mag.value();
             let proj = h0r * dr.value() + h0i * di.value();
-            out.push(if scale == 0.0 { 0.0 } else { proj.abs() / scale });
+            out.push(if scale == 0.0 {
+                0.0
+            } else {
+                proj.abs() / scale
+            });
         }
         out
     }
@@ -300,7 +338,11 @@ mod tests {
 
     #[test]
     fn unattenuated_los_is_forty() {
-        let room = Room { reflection_order: 0, n_scatterers: 0, ..Room::default() };
+        let room = Room {
+            reflection_order: 0,
+            n_scatterers: 0,
+            ..Room::default()
+        };
         let ch = LinkChannel::new(&room, &[], (1.0, 1.0), (4.0, 3.0), 2.437e9, 312_500.0, 8);
         for k in 0..8 {
             assert!((ch.static_re[k].hypot(ch.static_im[k]) - 40.0).abs() < 1e-9);

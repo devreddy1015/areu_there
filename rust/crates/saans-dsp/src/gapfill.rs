@@ -20,7 +20,14 @@ pub struct SequenceGapFiller {
 
 impl SequenceGapFiller {
     pub fn new(max_gap: u64) -> Self {
-        Self { max_gap, last_seq: None, last: None, filled: 0, discontinuities: 0, duplicates: 0 }
+        Self {
+            max_gap,
+            last_seq: None,
+            last: None,
+            filled: 0,
+            discontinuities: 0,
+            duplicates: 0,
+        }
     }
 
     /// Frames to process, in order: interpolated fill, then `frame`.
@@ -44,7 +51,12 @@ impl SequenceGapFiller {
             for j in 1..=missing {
                 let w = j as f64 / step as f64;
                 out.push(CsiFrame {
-                    amplitudes: last.amplitudes.iter().zip(&frame.amplitudes).map(|(x, y)| x + (y - x) * w).collect(),
+                    amplitudes: last
+                        .amplitudes
+                        .iter()
+                        .zip(&frame.amplitudes)
+                        .map(|(x, y)| x + (y - x) * w)
+                        .collect(),
                     phases: last.phases.clone(),
                     sample_index: (last_seq + j) % SEQ_MOD,
                     sample_rate_hz: frame.sample_rate_hz,

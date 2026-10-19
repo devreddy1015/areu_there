@@ -41,7 +41,9 @@
 //!   sleeping and praying are still too; that is why inactivity and
 //!   collapse are advisory and collapse detection is off by default.
 
-use crate::types::{Breathing, EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceSample, SpaceState};
+use crate::types::{
+    Breathing, EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceSample, SpaceState,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
@@ -327,7 +329,15 @@ fn event(
     evidence: String,
     kind: EventKind,
 ) -> HealthEvent {
-    HealthEvent { space_id: space.to_string(), t_s, t_start_s, severity, confidence: confidence.clamp(0.0, 1.0), evidence, kind }
+    HealthEvent {
+        space_id: space.to_string(),
+        t_s,
+        t_start_s,
+        severity,
+        confidence: confidence.clamp(0.0, 1.0),
+        evidence,
+        kind,
+    }
 }
 
 /// Heuristic trust in a presence transition from how many links could
@@ -475,7 +485,13 @@ struct RateCheck {
 
 impl Default for RateCheck {
     fn default() -> Self {
-        Self { window: VecDeque::new(), armed_high: true, armed_low: true, in_range_since: None, active: None }
+        Self {
+            window: VecDeque::new(),
+            armed_high: true,
+            armed_low: true,
+            in_range_since: None,
+            active: None,
+        }
     }
 }
 
@@ -508,7 +524,14 @@ struct DayAccum {
 
 impl DayAccum {
     fn new(day: i64) -> Self {
-        Self { day, resting: Hist::default(), resting_samples: 0, occupied_s: 0.0, motion_bouts: 0, pauses: 0 }
+        Self {
+            day,
+            resting: Hist::default(),
+            resting_samples: 0,
+            occupied_s: 0.0,
+            motion_bouts: 0,
+            pauses: 0,
+        }
     }
 
     /// Merge a persisted summary of this same day (gateway restarted
@@ -527,7 +550,11 @@ impl DayAccum {
     fn summary(&self) -> DailySummary {
         DailySummary {
             day: self.day,
-            resting_bpm_median: if self.resting_samples >= TREND_MIN_RESTING_SAMPLES { self.resting.quantile(0.5) } else { None },
+            resting_bpm_median: if self.resting_samples >= TREND_MIN_RESTING_SAMPLES {
+                self.resting.quantile(0.5)
+            } else {
+                None
+            },
             resting_samples: self.resting_samples,
             occupied_s: self.occupied_s,
             motion_bouts: self.motion_bouts,
@@ -618,7 +645,11 @@ impl SpaceMonitor {
             return ev;
         }
         let gap = prev.map_or(0.0, |p| t - p);
-        let dt = if prev.is_some() { gap.min(MAX_STEP_S) } else { SAMPLE_INTERVAL_S };
+        let dt = if prev.is_some() {
+            gap.min(MAX_STEP_S)
+        } else {
+            SAMPLE_INTERVAL_S
+        };
         if gap > SAMPLE_GAP_RESET_S {
             self.discontinuity(t, gap, &mut ev);
         }
@@ -626,13 +657,22 @@ impl SpaceMonitor {
 
         let present = s.occupied == Some(true);
         let visible = s.occupied.is_some();
-        self.move_run = if visible && s.motion_index >= STILL_INDEX { self.move_run + 1 } else { 0 };
+        self.move_run = if visible && s.motion_index >= STILL_INDEX {
+            self.move_run + 1
+        } else {
+            0
+        };
         let c = Ctx {
             t,
             dt,
             present,
-            moving: visible && (s.motion_index >= BOUT_INDEX || self.move_run >= MOVE_CONFIRM_SAMPLES),
-            breathing: if self.config.vitals && present { s.breathing } else { None },
+            moving: visible
+                && (s.motion_index >= BOUT_INDEX || self.move_run >= MOVE_CONFIRM_SAMPLES),
+            breathing: if self.config.vitals && present {
+                s.breathing
+            } else {
+                None
+            },
         };
 
         self.occupancy_step(s, &c, &mut ev);
@@ -659,13 +699,26 @@ impl SpaceMonitor {
     pub fn state(&self) -> SpaceState {
         let vitals = self.config.vitals;
         let Some(s) = self.last else {
-            return SpaceState { space_id: self.config.id.clone(), vitals, ..Default::default() };
+            return SpaceState {
+                space_id: self.config.id.clone(),
+                vitals,
+                ..Default::default()
+            };
         };
         let t = s.t_s;
         let (bpm_median_5min, bpm_iqr_5min) = if vitals {
-            let v = sorted(self.recent.iter().filter(|x| x.0 > t - STATE_WINDOW_S).map(|x| x.1).collect());
+            let v = sorted(
+                self.recent
+                    .iter()
+                    .filter(|x| x.0 > t - STATE_WINDOW_S)
+                    .map(|x| x.1)
+                    .collect(),
+            );
             if v.len() >= STATE_MIN_SAMPLES {
-                (quantile(&v, 0.5), Some(quantile(&v, 0.75).unwrap_or(0.0) - quantile(&v, 0.25).unwrap_or(0.0)))
+                (
+                    quantile(&v, 0.5),
+                    Some(quantile(&v, 0.75).unwrap_or(0.0) - quantile(&v, 0.25).unwrap_or(0.0)),
+                )
             } else {
                 (None, None)
             }
@@ -705,7 +758,11 @@ impl SpaceMonitor {
             breathing: if vitals { s.breathing } else { None },
             bpm_median_5min,
             bpm_iqr_5min,
-            motion_bouts_last_hour: self.bout_starts.iter().filter(|&&b| b > t - BOUT_RATE_WINDOW_S).count() as u32,
+            motion_bouts_last_hour: self
+                .bout_starts
+                .iter()
+                .filter(|&&b| b > t - BOUT_RATE_WINDOW_S)
+                .count() as u32,
             resting: self.rest.is_some(),
             in_breathing_pause: in_pause,
             links_usable: s.links_usable,
@@ -758,7 +815,12 @@ impl SpaceMonitor {
                 self.finish_session(end, t, &why, BLIND_END_CONFIDENCE, ev);
             }
             if self.rest.is_some() {
-                self.finish_rest(t - gap, t, &format!("no samples arrived for {gap:.0} s"), ev);
+                self.finish_rest(
+                    t - gap,
+                    t,
+                    &format!("no samples arrived for {gap:.0} s"),
+                    ev,
+                );
             }
             self.blind_since = None;
             self.vacant_since = None;
@@ -793,7 +855,9 @@ impl SpaceMonitor {
         if !self.config.vitals {
             return;
         }
-        let Some(value) = today.resting_bpm_median else { return };
+        let Some(value) = today.resting_bpm_median else {
+            return;
+        };
         let prev: Vec<f64> = self
             .history
             .range(..today.day)
@@ -833,17 +897,37 @@ impl SpaceMonitor {
             Severity::Info,
             n as f64 / (n as f64 + 2.0),
             evidence,
-            EventKind::TrendDeviation { metric: "resting_bpm".into(), value, baseline, mad },
+            EventKind::TrendDeviation {
+                metric: "resting_bpm".into(),
+                value,
+                baseline,
+                mad,
+            },
         ));
     }
 
-    fn finish_session(&mut self, t_end: f64, t_detect: f64, why: &str, confidence: f64, ev: &mut Vec<HealthEvent>) {
-        let Some(start) = self.session_start.take() else { return };
+    fn finish_session(
+        &mut self,
+        t_end: f64,
+        t_detect: f64,
+        why: &str,
+        confidence: f64,
+        ev: &mut Vec<HealthEvent>,
+    ) {
+        let Some(start) = self.session_start.take() else {
+            return;
+        };
         let dwell = (t_end - start).max(0.0);
         let evidence = format!("the space was occupied for {:.1} min; {why}", dwell / 60.0);
-        ev.push(event(&self.config.id, t_detect, Some(start), Severity::Info, confidence, evidence, EventKind::OccupancyEnded {
-            dwell_s: dwell,
-        }));
+        ev.push(event(
+            &self.config.id,
+            t_detect,
+            Some(start),
+            Severity::Info,
+            confidence,
+            evidence,
+            EventKind::OccupancyEnded { dwell_s: dwell },
+        ));
     }
 
     fn occupancy_step(&mut self, s: &SpaceSample, c: &Ctx, ev: &mut Vec<HealthEvent>) {
@@ -873,7 +957,11 @@ impl SpaceMonitor {
                 let was_blind = self.blind_since.take().is_some();
                 self.vacant_since.get_or_insert(c.t);
                 if self.session_start.is_some() {
-                    let end = if was_blind { self.last_occupied_t.unwrap_or(c.t) } else { c.t };
+                    let end = if was_blind {
+                        self.last_occupied_t.unwrap_or(c.t)
+                    } else {
+                        c.t
+                    };
                     let why = format!(
                         "the fused presence vote now says empty ({} of {} links usable)",
                         s.links_usable, s.links_total
@@ -898,7 +986,11 @@ impl SpaceMonitor {
 
     fn baseline(&self, link: LinkId, t: f64) -> Option<f64> {
         let q = self.baselines.get(&link)?;
-        let v: Vec<f64> = q.iter().filter(|x| x.0 > t - PAUSE_BASELINE_S).map(|x| x.1).collect();
+        let v: Vec<f64> = q
+            .iter()
+            .filter(|x| x.0 > t - PAUSE_BASELINE_S)
+            .map(|x| x.1)
+            .collect();
         if v.len() < PAUSE_BASELINE_MIN_SAMPLES {
             return None;
         }
@@ -961,7 +1053,10 @@ impl SpaceMonitor {
                             Severity::Check,
                             p.confidence(),
                             evidence,
-                            EventKind::BreathingPause { duration_s: t - p.t_start, ongoing: true },
+                            EventKind::BreathingPause {
+                                duration_s: t - p.t_start,
+                                ongoing: true,
+                            },
                         ));
                     }
                     self.pause = Some(p);
@@ -977,7 +1072,9 @@ impl SpaceMonitor {
         }
         let Some(b) = c.breathing else { return };
         // No confident breathing seen in the last minute => no baseline => abstain.
-        let Some(base) = self.baseline(b.link, t) else { return };
+        let Some(base) = self.baseline(b.link, t) else {
+            return;
+        };
         if b.band_rms >= PAUSE_ONSET_FRACTION * base {
             return;
         }
@@ -999,7 +1096,13 @@ impl SpaceMonitor {
         });
     }
 
-    fn finish_pause(&mut self, p: Pause, reason: PauseEnd, t_detect: f64, ev: &mut Vec<HealthEvent>) {
+    fn finish_pause(
+        &mut self,
+        p: Pause,
+        reason: PauseEnd,
+        t_detect: f64,
+        ev: &mut Vec<HealthEvent>,
+    ) {
         if !p.confirmed {
             return; // shorter than the minimum, or interrupted: not a pause
         }
@@ -1058,7 +1161,10 @@ impl SpaceMonitor {
             severity,
             confidence,
             evidence,
-            EventKind::BreathingPause { duration_s: duration, ongoing: false },
+            EventKind::BreathingPause {
+                duration_s: duration,
+                ongoing: false,
+            },
         ));
     }
 
@@ -1077,10 +1183,18 @@ impl SpaceMonitor {
             self.bout_last_t = Some(t);
             self.active_motion.push_back((t, c.dt));
         }
-        while self.bout_starts.front().is_some_and(|&b| b <= t - BOUT_RATE_WINDOW_S) {
+        while self
+            .bout_starts
+            .front()
+            .is_some_and(|&b| b <= t - BOUT_RATE_WINDOW_S)
+        {
             self.bout_starts.pop_front();
         }
-        while self.active_motion.front().is_some_and(|x| x.0 <= t - REST_END_WINDOW_S) {
+        while self
+            .active_motion
+            .front()
+            .is_some_and(|x| x.0 <= t - REST_END_WINDOW_S)
+        {
             self.active_motion.pop_front();
         }
         if c.moving {
@@ -1115,7 +1229,11 @@ impl SpaceMonitor {
 
     fn breathing_step(&mut self, c: &Ctx) {
         let t = c.t;
-        while self.recent.front().is_some_and(|x| x.0 <= t - STATE_WINDOW_S) {
+        while self
+            .recent
+            .front()
+            .is_some_and(|x| x.0 <= t - STATE_WINDOW_S)
+        {
             self.recent.pop_front();
         }
         for q in self.baselines.values_mut() {
@@ -1129,18 +1247,30 @@ impl SpaceMonitor {
         if let Some(b) = detected {
             self.last_breath = Some((t, b));
             self.recent.push_back((t, b.bpm));
-            let settled = !self.last_motion_t.is_some_and(|m| t - m < PAUSE_BASELINE_SETTLE_S);
+            let settled = !self
+                .last_motion_t
+                .is_some_and(|m| t - m < PAUSE_BASELINE_SETTLE_S);
             if self.pause.is_none() && !c.moving && settled {
-                self.baselines.entry(b.link).or_default().push_back((t, b.band_rms));
+                self.baselines
+                    .entry(b.link)
+                    .or_default()
+                    .push_back((t, b.band_rms));
             }
         }
-        let rate_sample = c.breathing.filter(|b| b.confidence >= CONF_RATE && c.present && !c.moving).map(|b| b.bpm);
+        let rate_sample = c
+            .breathing
+            .filter(|b| b.confidence >= CONF_RATE && c.present && !c.moving)
+            .map(|b| b.bpm);
         if let Some(ep) = &mut self.still {
             ep.breath_window.push_back((t, detected.is_some()));
             if detected.is_some() {
                 ep.breath_count += 1;
             }
-            while ep.breath_window.front().is_some_and(|x| x.0 <= t - REST_MIN_S) {
+            while ep
+                .breath_window
+                .front()
+                .is_some_and(|x| x.0 <= t - REST_MIN_S)
+            {
                 if ep.breath_window.pop_front().is_some_and(|x| x.1) {
                     ep.breath_count -= 1;
                 }
@@ -1162,12 +1292,22 @@ impl SpaceMonitor {
             self.rate.armed_low = true;
             self.rate.active = None;
         }
-        let valid = c.breathing.filter(|b| c.present && !c.moving && b.confidence >= CONF_RATE).map(|b| (b.bpm, b.confidence));
+        let valid = c
+            .breathing
+            .filter(|b| c.present && !c.moving && b.confidence >= CONF_RATE)
+            .map(|b| (b.bpm, b.confidence));
         self.rate.window.push_back((t, valid));
-        while self.rate.window.front().is_some_and(|x| x.0 <= t - RATE_WINDOW_S) {
+        while self
+            .rate
+            .window
+            .front()
+            .is_some_and(|x| x.0 <= t - RATE_WINDOW_S)
+        {
             self.rate.window.pop_front();
         }
-        let Some(&(t_first, _)) = self.rate.window.front() else { return };
+        let Some(&(t_first, _)) = self.rate.window.front() else {
+            return;
+        };
         let span = t - t_first;
         if span < RATE_WINDOW_S - 2.0 * SAMPLE_INTERVAL_S {
             return; // window not full yet
@@ -1177,7 +1317,9 @@ impl SpaceMonitor {
         if (vals.len() as f64) < RATE_MIN_COVERAGE * n as f64 {
             return; // rate unknown: abstain
         }
-        let Some(med) = median(vals.iter().map(|v| v.0).collect()) else { return };
+        let Some(med) = median(vals.iter().map(|v| v.0).collect()) else {
+            return;
+        };
         let mean_conf = vals.iter().map(|v| v.1).sum::<f64>() / vals.len() as f64;
         let dir = if med > self.config.rate_high_bpm {
             RateDir::High
@@ -1218,10 +1360,24 @@ impl SpaceMonitor {
             limit
         );
         let kind = match dir {
-            RateDir::High => EventKind::RateHigh { median_bpm: med, over_s: span },
-            RateDir::Low => EventKind::RateLow { median_bpm: med, over_s: span },
+            RateDir::High => EventKind::RateHigh {
+                median_bpm: med,
+                over_s: span,
+            },
+            RateDir::Low => EventKind::RateLow {
+                median_bpm: med,
+                over_s: span,
+            },
         };
-        ev.push(event(&self.config.id, t, Some(t_first), Severity::Advisory, mean_conf, evidence, kind));
+        ev.push(event(
+            &self.config.id,
+            t,
+            Some(t_first),
+            Severity::Advisory,
+            mean_conf,
+            evidence,
+            kind,
+        ));
     }
 
     fn inactivity_step(&mut self, c: &Ctx, ev: &mut Vec<HealthEvent>) {
@@ -1231,7 +1387,11 @@ impl SpaceMonitor {
         }
         let vitals = self.config.vitals;
         let t = c.t;
-        let detected = vitals && self.last_breath.as_ref().is_some_and(|(bt, _)| t - bt <= BREATHING_RECENT_S);
+        let detected = vitals
+            && self
+                .last_breath
+                .as_ref()
+                .is_some_and(|(bt, _)| t - bt <= BREATHING_RECENT_S);
         let phrase = breathing_phrase(vitals, self.last_breath.as_ref(), t);
         let Some(ep) = &mut self.still else { return };
         let still_s = t - ep.since;
@@ -1242,9 +1402,21 @@ impl SpaceMonitor {
             ep.inactivity_alerted = true;
             ep.inactivity_escalated = vitals && !detected;
             if ep.inactivity_escalated {
-                (Severity::Check, format!("no gross motion for {:.1} min while present; {phrase}; check on the space", still_s / 60.0))
+                (
+                    Severity::Check,
+                    format!(
+                        "no gross motion for {:.1} min while present; {phrase}; check on the space",
+                        still_s / 60.0
+                    ),
+                )
             } else {
-                (Severity::Advisory, format!("no gross motion for {:.1} min while present; {phrase}", still_s / 60.0))
+                (
+                    Severity::Advisory,
+                    format!(
+                        "no gross motion for {:.1} min while present; {phrase}",
+                        still_s / 60.0
+                    ),
+                )
             }
         } else if vitals && !ep.inactivity_escalated && !detected {
             ep.inactivity_escalated = true;
@@ -1261,20 +1433,36 @@ impl SpaceMonitor {
         };
         let confidence = ep.present_fraction();
         let since = ep.since;
-        ev.push(event(&self.config.id, t, Some(since), severity, confidence, evidence, EventKind::Inactivity {
-            still_min: still_s / 60.0,
-            breathing_detected: detected,
-        }));
+        ev.push(event(
+            &self.config.id,
+            t,
+            Some(since),
+            severity,
+            confidence,
+            evidence,
+            EventKind::Inactivity {
+                still_min: still_s / 60.0,
+                breathing_detected: detected,
+            },
+        ));
     }
 
     fn collapse_step(&mut self, s: &SpaceSample, c: &Ctx, ev: &mut Vec<HealthEvent>) {
         let t = c.t;
         if s.occupied.is_some() && s.motion_index >= BURST_INDEX {
             let peak = match &self.burst {
-                Some(b) if b.still_start.is_none() && t - b.last_t <= COLLAPSE_SETTLE_S => b.peak.max(s.motion_index),
+                Some(b) if b.still_start.is_none() && t - b.last_t <= COLLAPSE_SETTLE_S => {
+                    b.peak.max(s.motion_index)
+                }
                 _ => s.motion_index,
             };
-            self.burst = Some(Burst { peak, last_t: t, still_start: None, blind_since: None, fired: false });
+            self.burst = Some(Burst {
+                peak,
+                last_t: t,
+                still_start: None,
+                blind_since: None,
+                fired: false,
+            });
             return;
         }
         let Some(b) = &mut self.burst else { return };
@@ -1323,10 +1511,18 @@ impl SpaceMonitor {
             settle,
             still_s
         );
-        ev.push(event(&self.config.id, t, Some(burst_t), Severity::Check, COLLAPSE_CONFIDENCE, evidence, EventKind::PossibleCollapse {
-            burst_index: peak,
-            still_s,
-        }));
+        ev.push(event(
+            &self.config.id,
+            t,
+            Some(burst_t),
+            Severity::Check,
+            COLLAPSE_CONFIDENCE,
+            evidence,
+            EventKind::PossibleCollapse {
+                burst_index: peak,
+                still_s,
+            },
+        ));
     }
 
     fn finish_rest(&mut self, t_end: f64, t_detect: f64, why: &str, ev: &mut Vec<HealthEvent>) {
@@ -1337,7 +1533,9 @@ impl SpaceMonitor {
         let bpm_iqr = if enough { r.bpm.iqr() } else { None };
         let breathing = match (mean_bpm, bpm_iqr) {
             (Some(m), Some(i)) => format!("breathing {m:.1} BPM mean (IQR {i:.1})"),
-            _ if self.config.vitals => "breathing rate unknown (too few confident estimates)".to_string(),
+            _ if self.config.vitals => {
+                "breathing rate unknown (too few confident estimates)".to_string()
+            }
             _ => "breathing not monitored (vitals off)".to_string(),
         };
         let evidence = format!(
@@ -1345,13 +1543,21 @@ impl SpaceMonitor {
              period, not sleep staging",
             duration_min, r.bouts, r.pauses
         );
-        ev.push(event(&self.config.id, t_detect, Some(r.t_start), Severity::Info, 0.8, evidence, EventKind::RestEnded {
-            duration_min,
-            motion_bouts: r.bouts,
-            mean_bpm,
-            bpm_iqr,
-            pauses: r.pauses,
-        }));
+        ev.push(event(
+            &self.config.id,
+            t_detect,
+            Some(r.t_start),
+            Severity::Info,
+            0.8,
+            evidence,
+            EventKind::RestEnded {
+                duration_min,
+                motion_bouts: r.bouts,
+                mean_bpm,
+                bpm_iqr,
+                pauses: r.pauses,
+            },
+        ));
     }
 
     /// Start of the current stretch of bout samples (see `REST_END_QUIET_S`).
@@ -1375,9 +1581,19 @@ impl SpaceMonitor {
                 let why = format!("of sustained activity ({active:.0} s of motion bouts in the last {REST_END_WINDOW_S:.0} s)");
                 self.finish_rest(t_end, t, &why, ev);
             } else if let Some(v) = self.vacant_since.filter(|v| t - v >= VACANCY_GRACE_S) {
-                self.finish_rest(v, t, &format!("the space has read as empty for {:.0} s", t - v), ev);
+                self.finish_rest(
+                    v,
+                    t,
+                    &format!("the space has read as empty for {:.0} s", t - v),
+                    ev,
+                );
             } else if let Some(b) = self.blind_since.filter(|b| t - b >= BLIND_END_S) {
-                self.finish_rest(b, t, &format!("no link could see the space for {:.0} s", t - b), ev);
+                self.finish_rest(
+                    b,
+                    t,
+                    &format!("no link could see the space for {:.0} s", t - b),
+                    ev,
+                );
             }
             return;
         }
@@ -1395,7 +1611,10 @@ impl SpaceMonitor {
             return;
         }
         let (confidence, evidence) = if vitals {
-            let med = ep.bpm.quantile(0.5).map_or("unknown".to_string(), |m| format!("{m:.1} BPM"));
+            let med = ep
+                .bpm
+                .quantile(0.5)
+                .map_or("unknown".to_string(), |m| format!("{m:.1} BPM"));
             (
                 frac,
                 format!(
@@ -1415,8 +1634,21 @@ impl SpaceMonitor {
                 ),
             )
         };
-        let rest = Rest { t_start: ep.since, bouts: 0, pauses: ep.pauses, bpm: ep.bpm.clone() };
-        ev.push(event(&self.config.id, t, Some(rest.t_start), Severity::Info, confidence, evidence, EventKind::RestStarted));
+        let rest = Rest {
+            t_start: ep.since,
+            bouts: 0,
+            pauses: ep.pauses,
+            bpm: ep.bpm.clone(),
+        };
+        ev.push(event(
+            &self.config.id,
+            t,
+            Some(rest.t_start),
+            Severity::Info,
+            confidence,
+            evidence,
+            EventKind::RestStarted,
+        ));
         self.rest = Some(rest);
     }
 
@@ -1425,7 +1657,10 @@ impl SpaceMonitor {
         if c.present {
             d.occupied_s += c.dt;
         }
-        let settled = self.still.as_ref().is_some_and(|ep| c.t - ep.since >= RESTING_SETTLE_S);
+        let settled = self
+            .still
+            .as_ref()
+            .is_some_and(|ep| c.t - ep.since >= RESTING_SETTLE_S);
         if let Some(b) = c.breathing {
             if c.present && !c.moving && settled && b.confidence >= CONF_RATE {
                 d.resting.add(b.bpm);
@@ -1445,14 +1680,29 @@ mod tests {
     const NOISE: Option<f64> = Some(0.02);
 
     fn cfg(vitals: bool) -> SpaceConfig {
-        SpaceConfig { id: "room".into(), vitals, ..Default::default() }
+        SpaceConfig {
+            id: "room".into(),
+            vitals,
+            ..Default::default()
+        }
     }
 
     fn br(bpm: f64, conf: f64, band: f64, noise: Option<f64>) -> Option<Breathing> {
-        Some(Breathing { link: L, bpm, confidence: conf, band_rms: band, noise_rms: noise })
+        Some(Breathing {
+            link: L,
+            bpm,
+            confidence: conf,
+            band_rms: band,
+            noise_rms: noise,
+        })
     }
 
-    fn sample(t: f64, occupied: Option<bool>, motion: f64, breathing: Option<Breathing>) -> SpaceSample {
+    fn sample(
+        t: f64,
+        occupied: Option<bool>,
+        motion: f64,
+        breathing: Option<Breathing>,
+    ) -> SpaceSample {
         SpaceSample {
             t_s: t,
             occupied,
@@ -1471,13 +1721,22 @@ mod tests {
     }
 
     /// Feed samples at 2 Hz for t in [t0, t1).
-    fn run(m: &mut SpaceMonitor, t0: f64, t1: f64, f: impl Fn(f64) -> SpaceSample) -> Vec<HealthEvent> {
+    fn run(
+        m: &mut SpaceMonitor,
+        t0: f64,
+        t1: f64,
+        f: impl Fn(f64) -> SpaceSample,
+    ) -> Vec<HealthEvent> {
         let n = ((t1 - t0) / SAMPLE_INTERVAL_S).round() as usize;
-        (0..n).flat_map(|i| m.update(&f(t0 + i as f64 * SAMPLE_INTERVAL_S))).collect()
+        (0..n)
+            .flat_map(|i| m.update(&f(t0 + i as f64 * SAMPLE_INTERVAL_S)))
+            .collect()
     }
 
     fn pauses(ev: &[HealthEvent]) -> Vec<&HealthEvent> {
-        ev.iter().filter(|e| matches!(e.kind, EventKind::BreathingPause { .. })).collect()
+        ev.iter()
+            .filter(|e| matches!(e.kind, EventKind::BreathingPause { .. }))
+            .collect()
     }
 
     fn count(ev: &[HealthEvent], pred: impl Fn(&EventKind) -> bool) -> usize {
@@ -1488,15 +1747,23 @@ mod tests {
     fn still_breather_with_a_15s_pause_is_detected() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 135.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
+        ev.extend(run(&mut m, 120.0, 135.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
         assert!(m.state().in_breathing_pause, "confirmed after 10 s");
-        assert!(m.state().active_alerts.contains(&"breathing_pause".to_string()));
+        assert!(m
+            .state()
+            .active_alerts
+            .contains(&"breathing_pause".to_string()));
         ev.extend(run(&mut m, 135.0, 200.0, calm));
         let p = pauses(&ev);
         assert_eq!(p.len(), 1, "{p:?}");
         let e = p[0];
         match e.kind {
-            EventKind::BreathingPause { duration_s, ongoing } => {
+            EventKind::BreathingPause {
+                duration_s,
+                ongoing,
+            } => {
                 assert!(!ongoing);
                 assert!((duration_s - 15.0).abs() <= 2.0, "duration {duration_s}");
             }
@@ -1505,7 +1772,11 @@ mod tests {
         assert_eq!(e.severity, Severity::Advisory);
         assert!((e.t_start_s.unwrap() - 120.0).abs() <= 2.0);
         assert!((e.confidence - 0.92).abs() < 1e-9, "(B - noise) / B");
-        assert!(e.evidence.contains("15.0 s") && e.evidence.contains("0.250"), "{}", e.evidence);
+        assert!(
+            e.evidence.contains("15.0 s") && e.evidence.contains("0.250"),
+            "{}",
+            e.evidence
+        );
         assert!(!m.state().in_breathing_pause);
     }
 
@@ -1513,15 +1784,23 @@ mod tests {
     fn long_pause_escalates_once_while_ongoing() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 150.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
+        ev.extend(run(&mut m, 120.0, 150.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
         ev.extend(run(&mut m, 150.0, 170.0, calm));
         let p = pauses(&ev);
         assert_eq!(p.len(), 2);
-        assert!(matches!(p[0].kind, EventKind::BreathingPause { ongoing: true, .. }));
+        assert!(matches!(
+            p[0].kind,
+            EventKind::BreathingPause { ongoing: true, .. }
+        ));
         assert_eq!(p[0].severity, Severity::Check);
         assert!((p[0].t_s - 120.0 - 20.0).abs() <= 1.0);
         match p[1].kind {
-            EventKind::BreathingPause { duration_s, ongoing: false } => assert!((duration_s - 30.0).abs() <= 2.0),
+            EventKind::BreathingPause {
+                duration_s,
+                ongoing: false,
+            } => assert!((duration_s - 30.0).abs() <= 2.0),
             _ => panic!("{:?}", p[1]),
         }
     }
@@ -1530,7 +1809,9 @@ mod tests {
     fn short_dip_is_not_a_pause() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 128.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
+        ev.extend(run(&mut m, 120.0, 128.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
         ev.extend(run(&mut m, 128.0, 200.0, calm));
         assert!(pauses(&ev).is_empty());
     }
@@ -1540,7 +1821,9 @@ mod tests {
         for before in [br(14.0, 0.2, 0.25, NOISE), None] {
             let mut m = SpaceMonitor::new(cfg(true));
             let mut ev = run(&mut m, 0.0, 120.0, |t| sample(t, Some(true), 0.5, before));
-            ev.extend(run(&mut m, 120.0, 140.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
+            ev.extend(run(&mut m, 120.0, 140.0, |t| {
+                sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+            }));
             ev.extend(run(&mut m, 140.0, 200.0, calm));
             assert!(pauses(&ev).is_empty(), "{before:?}: {ev:?}");
         }
@@ -1550,16 +1833,28 @@ mod tests {
     fn pause_on_breathing_never_clear_of_noise_abstains() {
         let mut m = SpaceMonitor::new(cfg(true));
         // Baseline 0.03 < 2 x noise 0.02.
-        let mut ev = run(&mut m, 0.0, 120.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, NOISE)));
-        ev.extend(run(&mut m, 120.0, 140.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.001, NOISE))));
-        ev.extend(run(&mut m, 140.0, 200.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, NOISE))));
+        let mut ev = run(&mut m, 0.0, 120.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, NOISE))
+        });
+        ev.extend(run(&mut m, 120.0, 140.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.001, NOISE))
+        }));
+        ev.extend(run(&mut m, 140.0, 200.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, NOISE))
+        }));
         assert!(pauses(&ev).is_empty());
 
         // Same, but noise unknown: detected with the fallback confidence.
         let mut m = SpaceMonitor::new(cfg(true));
-        let mut ev = run(&mut m, 0.0, 120.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, None)));
-        ev.extend(run(&mut m, 120.0, 140.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.001, None))));
-        ev.extend(run(&mut m, 140.0, 200.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, None))));
+        let mut ev = run(&mut m, 0.0, 120.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, None))
+        });
+        ev.extend(run(&mut m, 120.0, 140.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.001, None))
+        }));
+        ev.extend(run(&mut m, 140.0, 200.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.03, None))
+        }));
         let p = pauses(&ev);
         assert_eq!(p.len(), 1);
         assert_eq!(p[0].confidence, PAUSE_UNKNOWN_NOISE_CONFIDENCE);
@@ -1569,19 +1864,32 @@ mod tests {
     fn breathing_signal_lost_mid_candidate_abstains_and_mid_pause_reports_lower_bound() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 125.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
-        ev.extend(run(&mut m, 125.0, 140.0, |t| sample(t, Some(true), 0.5, None)));
-        assert!(pauses(&ev).is_empty(), "a 5 s candidate then no signal is not a pause");
+        ev.extend(run(&mut m, 120.0, 125.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
+        ev.extend(run(&mut m, 125.0, 140.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
+        assert!(
+            pauses(&ev).is_empty(),
+            "a 5 s candidate then no signal is not a pause"
+        );
 
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 132.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
-        ev.extend(run(&mut m, 132.0, 150.0, |t| sample(t, Some(true), 0.5, None)));
+        ev.extend(run(&mut m, 120.0, 132.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
+        ev.extend(run(&mut m, 132.0, 150.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
         let p = pauses(&ev);
         assert_eq!(p.len(), 1);
         assert!(p[0].evidence.contains("lower bound"));
         match p[0].kind {
-            EventKind::BreathingPause { duration_s, .. } => assert!((duration_s - 11.5).abs() < 1e-9),
+            EventKind::BreathingPause { duration_s, .. } => {
+                assert!((duration_s - 11.5).abs() < 1e-9)
+            }
             _ => unreachable!(),
         }
     }
@@ -1590,8 +1898,12 @@ mod tests {
     fn pause_ended_by_vacancy_without_motion_asks_for_a_check() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 136.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
-        ev.extend(run(&mut m, 136.0, 150.0, |t| sample(t, Some(false), 0.5, None)));
+        ev.extend(run(&mut m, 120.0, 136.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
+        ev.extend(run(&mut m, 136.0, 150.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
         let p = pauses(&ev);
         assert_eq!(p.len(), 1);
         assert_eq!(p[0].severity, Severity::Check);
@@ -1602,8 +1914,12 @@ mod tests {
     fn pause_ended_by_motion_has_lower_confidence() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 135.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
-        ev.extend(run(&mut m, 135.0, 140.0, |t| sample(t, Some(true), 5.0, br(14.0, 0.8, 0.5, NOISE))));
+        ev.extend(run(&mut m, 120.0, 135.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
+        ev.extend(run(&mut m, 135.0, 140.0, |t| {
+            sample(t, Some(true), 5.0, br(14.0, 0.8, 0.5, NOISE))
+        }));
         let p = pauses(&ev);
         assert_eq!(p.len(), 1);
         assert!((p[0].confidence - 0.46).abs() < 1e-9);
@@ -1614,9 +1930,15 @@ mod tests {
         let mut m = SpaceMonitor::new(cfg(false));
         // Inputs that would trigger pause, rate and trend detectors if vitals were on.
         let mut ev = run(&mut m, 0.0, 120.0, calm);
-        ev.extend(run(&mut m, 120.0, 150.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))));
-        ev.extend(run(&mut m, 150.0, 600.0, |t| sample(t, Some(true), 0.5, br(30.0, 0.95, 0.25, NOISE))));
-        ev.extend(run(&mut m, 600.0, 900.0, |t| sample(t, Some(true), 0.5, br(5.0, 0.95, 0.25, NOISE))));
+        ev.extend(run(&mut m, 120.0, 150.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.8, 0.01, NOISE))
+        }));
+        ev.extend(run(&mut m, 150.0, 600.0, |t| {
+            sample(t, Some(true), 0.5, br(30.0, 0.95, 0.25, NOISE))
+        }));
+        ev.extend(run(&mut m, 600.0, 900.0, |t| {
+            sample(t, Some(true), 0.5, br(5.0, 0.95, 0.25, NOISE))
+        }));
         for e in &ev {
             assert!(
                 !matches!(
@@ -1628,38 +1950,68 @@ mod tests {
                 ),
                 "{e:?}"
             );
-            assert!(!e.evidence.contains("BPM"), "no breathing numbers leak: {}", e.evidence);
+            assert!(
+                !e.evidence.contains("BPM"),
+                "no breathing numbers leak: {}",
+                e.evidence
+            );
         }
         let st = m.state();
-        assert!(st.breathing.is_none() && st.bpm_median_5min.is_none() && st.bpm_iqr_5min.is_none());
+        assert!(
+            st.breathing.is_none() && st.bpm_median_5min.is_none() && st.bpm_iqr_5min.is_none()
+        );
         assert!(!st.vitals);
-        assert!(m.export_history().iter().all(|d| d.resting_bpm_median.is_none() && d.resting_samples == 0));
+        assert!(m
+            .export_history()
+            .iter()
+            .all(|d| d.resting_bpm_median.is_none() && d.resting_samples == 0));
     }
 
     fn inactivity(ev: &[HealthEvent]) -> Vec<&HealthEvent> {
-        ev.iter().filter(|e| matches!(e.kind, EventKind::Inactivity { .. })).collect()
+        ev.iter()
+            .filter(|e| matches!(e.kind, EventKind::Inactivity { .. }))
+            .collect()
     }
 
     #[test]
     fn inactivity_with_breathing_is_advisory() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 10.0, |t| sample(t, Some(true), 5.0, None));
-        ev.extend(run(&mut m, 10.0, 10.0 + 31.0 * 60.0, |t| sample(t, Some(true), 0.5, br(13.8, 0.82, 0.25, NOISE))));
+        ev.extend(run(&mut m, 10.0, 10.0 + 31.0 * 60.0, |t| {
+            sample(t, Some(true), 0.5, br(13.8, 0.82, 0.25, NOISE))
+        }));
         let i = inactivity(&ev);
         assert_eq!(i.len(), 1);
         assert_eq!(i[0].severity, Severity::Advisory);
-        assert!(matches!(i[0].kind, EventKind::Inactivity { breathing_detected: true, still_min } if (still_min - 30.0).abs() < 0.05));
-        assert!(i[0].evidence.contains("13.8 BPM (confidence 0.82)"), "{}", i[0].evidence);
+        assert!(
+            matches!(i[0].kind, EventKind::Inactivity { breathing_detected: true, still_min } if (still_min - 30.0).abs() < 0.05)
+        );
+        assert!(
+            i[0].evidence.contains("13.8 BPM (confidence 0.82)"),
+            "{}",
+            i[0].evidence
+        );
         assert!((i[0].t_s - (10.0 + 1800.0)).abs() <= 1.0);
         assert!(m.state().active_alerts.contains(&"inactivity".to_string()));
 
         // Breathing disappears later: one re-escalation to Check.
-        ev = run(&mut m, 10.0 + 31.0 * 60.0, 10.0 + 35.0 * 60.0, |t| sample(t, Some(true), 0.5, None));
+        ev = run(&mut m, 10.0 + 31.0 * 60.0, 10.0 + 35.0 * 60.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        });
         let i = inactivity(&ev);
         assert_eq!(i.len(), 1);
         assert_eq!(i[0].severity, Severity::Check);
-        assert!(matches!(i[0].kind, EventKind::Inactivity { breathing_detected: false, .. }));
-        assert!(m.state().active_alerts.contains(&"inactivity_no_breathing".to_string()));
+        assert!(matches!(
+            i[0].kind,
+            EventKind::Inactivity {
+                breathing_detected: false,
+                ..
+            }
+        ));
+        assert!(m
+            .state()
+            .active_alerts
+            .contains(&"inactivity_no_breathing".to_string()));
 
         // Moving ends the episode and its alerts.
         run(&mut m, 2200.0, 2205.0, |t| sample(t, Some(true), 5.0, None));
@@ -1669,19 +2021,35 @@ mod tests {
     #[test]
     fn inactivity_without_breathing_is_a_check_with_vitals_and_advisory_without() {
         let mut m = SpaceMonitor::new(cfg(true));
-        let ev = run(&mut m, 0.0, 31.0 * 60.0, |t| sample(t, Some(true), 0.5, None));
+        let ev = run(&mut m, 0.0, 31.0 * 60.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        });
         let i = inactivity(&ev);
         assert_eq!(i.len(), 1);
         assert_eq!(i[0].severity, Severity::Check);
-        assert!(matches!(i[0].kind, EventKind::Inactivity { breathing_detected: false, .. }));
+        assert!(matches!(
+            i[0].kind,
+            EventKind::Inactivity {
+                breathing_detected: false,
+                ..
+            }
+        ));
         assert!(i[0].evidence.contains("no confident breathing"));
 
         let mut m = SpaceMonitor::new(cfg(false));
-        let ev = run(&mut m, 0.0, 31.0 * 60.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.9, 0.25, NOISE)));
+        let ev = run(&mut m, 0.0, 31.0 * 60.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.9, 0.25, NOISE))
+        });
         let i = inactivity(&ev);
         assert_eq!(i.len(), 1);
         assert_eq!(i[0].severity, Severity::Advisory);
-        assert!(matches!(i[0].kind, EventKind::Inactivity { breathing_detected: false, .. }));
+        assert!(matches!(
+            i[0].kind,
+            EventKind::Inactivity {
+                breathing_detected: false,
+                ..
+            }
+        ));
         assert!(i[0].evidence.contains("vitals off"));
     }
 
@@ -1689,31 +2057,50 @@ mod tests {
     fn sustained_high_rate_alerts_once_brief_spike_does_not() {
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 60.0, calm);
-        ev.extend(run(&mut m, 60.0, 600.0, |t| sample(t, Some(true), 0.5, br(28.0, 0.9, 0.25, NOISE))));
-        let hi: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::RateHigh { .. })).collect();
+        ev.extend(run(&mut m, 60.0, 600.0, |t| {
+            sample(t, Some(true), 0.5, br(28.0, 0.9, 0.25, NOISE))
+        }));
+        let hi: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::RateHigh { .. }))
+            .collect();
         assert_eq!(hi.len(), 1);
         assert_eq!(hi[0].severity, Severity::Advisory);
-        assert!(matches!(hi[0].kind, EventKind::RateHigh { median_bpm, over_s } if median_bpm > 24.0 && over_s > 110.0));
+        assert!(
+            matches!(hi[0].kind, EventKind::RateHigh { median_bpm, over_s } if median_bpm > 24.0 && over_s > 110.0)
+        );
         assert!(m.state().active_alerts.contains(&"rate_high".to_string()));
         assert_eq!(count(&ev, |k| matches!(k, EventKind::RateLow { .. })), 0);
 
         // Back in range for > 5 min re-arms; a second episode alerts again.
         let mut ev = run(&mut m, 600.0, 1100.0, calm);
         assert!(!m.state().active_alerts.contains(&"rate_high".to_string()));
-        ev.extend(run(&mut m, 1100.0, 1400.0, |t| sample(t, Some(true), 0.5, br(28.0, 0.9, 0.25, NOISE))));
+        ev.extend(run(&mut m, 1100.0, 1400.0, |t| {
+            sample(t, Some(true), 0.5, br(28.0, 0.9, 0.25, NOISE))
+        }));
         assert_eq!(count(&ev, |k| matches!(k, EventKind::RateHigh { .. })), 1);
 
         let mut m = SpaceMonitor::new(cfg(true));
         let mut ev = run(&mut m, 0.0, 200.0, calm);
-        ev.extend(run(&mut m, 200.0, 220.0, |t| sample(t, Some(true), 0.5, br(28.0, 0.9, 0.25, NOISE))));
+        ev.extend(run(&mut m, 200.0, 220.0, |t| {
+            sample(t, Some(true), 0.5, br(28.0, 0.9, 0.25, NOISE))
+        }));
         ev.extend(run(&mut m, 220.0, 600.0, calm));
-        assert_eq!(count(&ev, |k| matches!(k, EventKind::RateHigh { .. } | EventKind::RateLow { .. })), 0);
+        assert_eq!(
+            count(&ev, |k| matches!(
+                k,
+                EventKind::RateHigh { .. } | EventKind::RateLow { .. }
+            )),
+            0
+        );
     }
 
     #[test]
     fn low_rate_alerts_and_thin_coverage_abstains() {
         let mut m = SpaceMonitor::new(cfg(true));
-        let ev = run(&mut m, 0.0, 300.0, |t| sample(t, Some(true), 0.5, br(6.0, 0.9, 0.25, NOISE)));
+        let ev = run(&mut m, 0.0, 300.0, |t| {
+            sample(t, Some(true), 0.5, br(6.0, 0.9, 0.25, NOISE))
+        });
         assert_eq!(count(&ev, |k| matches!(k, EventKind::RateLow { .. })), 1);
 
         // Confident estimates in only half the samples: rate unknown.
@@ -1729,40 +2116,80 @@ mod tests {
         let mut ev = run(m, 0.0, 20.0, |t| sample(t, Some(true), 5.0, None)); // walking
         ev.extend(run(m, 20.0, 21.0, |t| sample(t, Some(true), 12.0, None))); // burst
         ev.extend(run(m, 21.0, 22.0, |t| sample(t, Some(true), 2.0, None))); // settling
-        ev.extend(run(m, 22.0, 90.0, |t| sample(t, Some(true), 0.5, br(16.0, 0.7, 0.2, NOISE))));
+        ev.extend(run(m, 22.0, 90.0, |t| {
+            sample(t, Some(true), 0.5, br(16.0, 0.7, 0.2, NOISE))
+        }));
         ev
     }
 
     #[test]
     fn collapse_fires_only_when_enabled() {
-        let mut m = SpaceMonitor::new(SpaceConfig { collapse_detection: true, ..cfg(true) });
+        let mut m = SpaceMonitor::new(SpaceConfig {
+            collapse_detection: true,
+            ..cfg(true)
+        });
         let ev = collapse_timeline(&mut m);
-        let c: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::PossibleCollapse { .. })).collect();
+        let c: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::PossibleCollapse { .. }))
+            .collect();
         assert_eq!(c.len(), 1);
         assert_eq!(c[0].severity, Severity::Check);
-        assert!(matches!(c[0].kind, EventKind::PossibleCollapse { burst_index, still_s } if burst_index == 12.0 && still_s >= 30.0));
+        assert!(
+            matches!(c[0].kind, EventKind::PossibleCollapse { burst_index, still_s } if burst_index == 12.0 && still_s >= 30.0)
+        );
         assert!((c[0].t_s - 52.0).abs() <= 1.0);
-        assert!(c[0].evidence.contains("Sitting down heavily looks the same"), "{}", c[0].evidence);
-        assert!(m.state().active_alerts.contains(&"possible_collapse".to_string()));
+        assert!(
+            c[0].evidence
+                .contains("Sitting down heavily looks the same"),
+            "{}",
+            c[0].evidence
+        );
+        assert!(m
+            .state()
+            .active_alerts
+            .contains(&"possible_collapse".to_string()));
 
-        let mut m = SpaceMonitor::new(SpaceConfig { collapse_detection: false, ..cfg(true) });
+        let mut m = SpaceMonitor::new(SpaceConfig {
+            collapse_detection: false,
+            ..cfg(true)
+        });
         let ev = collapse_timeline(&mut m);
-        assert_eq!(count(&ev, |k| matches!(k, EventKind::PossibleCollapse { .. })), 0);
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::PossibleCollapse { .. })),
+            0
+        );
     }
 
     #[test]
     fn burst_followed_by_more_movement_or_leaving_is_not_a_collapse() {
-        let mut m = SpaceMonitor::new(SpaceConfig { collapse_detection: true, ..cfg(true) });
+        let mut m = SpaceMonitor::new(SpaceConfig {
+            collapse_detection: true,
+            ..cfg(true)
+        });
         let mut ev = run(&mut m, 0.0, 1.0, |t| sample(t, Some(true), 12.0, None));
         ev.extend(run(&mut m, 1.0, 11.0, |t| sample(t, Some(true), 4.0, None))); // kept moving > 5 s
-        ev.extend(run(&mut m, 11.0, 80.0, |t| sample(t, Some(true), 0.5, None)));
-        assert_eq!(count(&ev, |k| matches!(k, EventKind::PossibleCollapse { .. })), 0);
+        ev.extend(run(&mut m, 11.0, 80.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::PossibleCollapse { .. })),
+            0
+        );
 
-        let mut m = SpaceMonitor::new(SpaceConfig { collapse_detection: true, ..cfg(true) });
+        let mut m = SpaceMonitor::new(SpaceConfig {
+            collapse_detection: true,
+            ..cfg(true)
+        });
         let mut ev = run(&mut m, 0.0, 1.0, |t| sample(t, Some(true), 12.0, None));
         ev.extend(run(&mut m, 1.0, 15.0, |t| sample(t, Some(true), 0.5, None)));
-        ev.extend(run(&mut m, 15.0, 80.0, |t| sample(t, Some(false), 0.5, None))); // presence not held
-        assert_eq!(count(&ev, |k| matches!(k, EventKind::PossibleCollapse { .. })), 0);
+        ev.extend(run(&mut m, 15.0, 80.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        })); // presence not held
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::PossibleCollapse { .. })),
+            0
+        );
     }
 
     #[test]
@@ -1772,24 +2199,57 @@ mod tests {
         ev.extend(run(&mut m, 5.0, 5.0 + 25.0 * 60.0, |t| {
             // A 3 s turn-over at 22 min, once resting, is part of the rest.
             let turning = (1325.0..1328.0).contains(&t);
-            sample(t, Some(true), if turning { 4.0 } else { 0.5 }, br(14.0, 0.8, 0.25, NOISE))
+            sample(
+                t,
+                Some(true),
+                if turning { 4.0 } else { 0.5 },
+                br(14.0, 0.8, 0.25, NOISE),
+            )
         }));
-        let started: Vec<_> = ev.iter().filter(|e| e.kind == EventKind::RestStarted).collect();
+        let started: Vec<_> = ev
+            .iter()
+            .filter(|e| e.kind == EventKind::RestStarted)
+            .collect();
         assert_eq!(started.len(), 1);
-        assert!(started[0].evidence.contains("rest period, not sleep staging"));
-        assert!((started[0].t_s - (5.0 + 1200.0)).abs() <= 1.0, "{}", started[0].t_s);
+        assert!(started[0]
+            .evidence
+            .contains("rest period, not sleep staging"));
+        assert!(
+            (started[0].t_s - (5.0 + 1200.0)).abs() <= 1.0,
+            "{}",
+            started[0].t_s
+        );
         assert_eq!(started[0].t_start_s, Some(5.0));
         assert!(m.state().resting);
-        assert_eq!(count(&ev, |k| matches!(k, EventKind::RestEnded { .. })), 0, "a turn-over does not end rest");
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::RestEnded { .. })),
+            0,
+            "a turn-over does not end rest"
+        );
 
         let t_up = 5.0 + 25.0 * 60.0;
-        let ev = run(&mut m, t_up, t_up + 150.0, |t| sample(t, Some(true), 5.0, None));
-        let ended: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::RestEnded { .. })).collect();
+        let ev = run(&mut m, t_up, t_up + 150.0, |t| {
+            sample(t, Some(true), 5.0, None)
+        });
+        let ended: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::RestEnded { .. }))
+            .collect();
         assert_eq!(ended.len(), 1);
         // 117 s more of bout time on top of the 3 s turn-over.
-        assert!(ended[0].t_s > t_up + 110.0 && ended[0].t_s <= t_up + 121.0, "{}", ended[0].t_s);
+        assert!(
+            ended[0].t_s > t_up + 110.0 && ended[0].t_s <= t_up + 121.0,
+            "{}",
+            ended[0].t_s
+        );
         match &ended[0].kind {
-            EventKind::RestEnded { duration_min, motion_bouts, mean_bpm, bpm_iqr, pauses } => {
+            EventKind::RestEnded {
+                duration_min,
+                motion_bouts,
+                mean_bpm,
+                bpm_iqr,
+                pauses,
+            } => {
                 assert!((duration_min - 25.0).abs() < 0.02, "{duration_min}");
                 assert_eq!(*motion_bouts, 2, "the turn-over and getting up");
                 assert!((mean_bpm.unwrap() - 14.0).abs() < 0.1);
@@ -1805,26 +2265,46 @@ mod tests {
     #[test]
     fn rest_needs_breathing_with_vitals_but_not_without() {
         let mut m = SpaceMonitor::new(cfg(true));
-        let ev = run(&mut m, 0.0, 25.0 * 60.0, |t| sample(t, Some(true), 0.5, br(14.0, 0.3, 0.25, NOISE)));
+        let ev = run(&mut m, 0.0, 25.0 * 60.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.3, 0.25, NOISE))
+        });
         assert_eq!(count(&ev, |k| *k == EventKind::RestStarted), 0);
 
         let mut m = SpaceMonitor::new(cfg(false));
-        let mut ev = run(&mut m, 0.0, 25.0 * 60.0, |t| sample(t, Some(true), 0.5, None));
+        let mut ev = run(&mut m, 0.0, 25.0 * 60.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        });
         assert_eq!(count(&ev, |k| *k == EventKind::RestStarted), 1);
-        ev = run(&mut m, 1500.0, 1600.0, |t| sample(t, Some(false), 0.5, None));
-        let ended: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::RestEnded { .. })).collect();
+        ev = run(&mut m, 1500.0, 1600.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        });
+        let ended: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::RestEnded { .. }))
+            .collect();
         assert_eq!(ended.len(), 1);
-        assert!(matches!(ended[0].kind, EventKind::RestEnded { mean_bpm: None, bpm_iqr: None, .. }));
+        assert!(matches!(
+            ended[0].kind,
+            EventKind::RestEnded {
+                mean_bpm: None,
+                bpm_iqr: None,
+                ..
+            }
+        ));
     }
 
     /// 10 minutes of resting breathing at `bpm` an hour into `day`.
     fn rest_day(m: &mut SpaceMonitor, day: i64, bpm: f64) -> Vec<HealthEvent> {
         let t0 = day as f64 * DAY_S + 3600.0;
-        run(m, t0, t0 + 600.0, |t| sample(t, Some(true), 0.5, br(bpm, 0.9, 0.25, NOISE)))
+        run(m, t0, t0 + 600.0, |t| {
+            sample(t, Some(true), 0.5, br(bpm, 0.9, 0.25, NOISE))
+        })
     }
 
     fn trends(ev: &[HealthEvent]) -> Vec<&HealthEvent> {
-        ev.iter().filter(|e| matches!(e.kind, EventKind::TrendDeviation { .. })).collect()
+        ev.iter()
+            .filter(|e| matches!(e.kind, EventKind::TrendDeviation { .. }))
+            .collect()
     }
 
     #[test]
@@ -1840,7 +2320,12 @@ mod tests {
         assert_eq!(tr.len(), 1);
         assert_eq!(tr[0].severity, Severity::Info);
         match &tr[0].kind {
-            EventKind::TrendDeviation { metric, value, baseline, mad } => {
+            EventKind::TrendDeviation {
+                metric,
+                value,
+                baseline,
+                mad,
+            } => {
                 assert_eq!(metric, "resting_bpm");
                 assert!((value - 19.0).abs() < 0.11, "{value}");
                 assert!((baseline - 14.0).abs() < 0.11, "{baseline}");
@@ -1854,8 +2339,13 @@ mod tests {
         let ev = rest_day(&mut m, 5, 14.2);
         assert!(trends(&ev).is_empty());
         let h = m.export_history();
-        assert_eq!(h.iter().map(|d| d.day).collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5]);
-        assert!(h.iter().all(|d| d.resting_samples >= TREND_MIN_RESTING_SAMPLES));
+        assert_eq!(
+            h.iter().map(|d| d.day).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5]
+        );
+        assert!(h
+            .iter()
+            .all(|d| d.resting_samples >= TREND_MIN_RESTING_SAMPLES));
     }
 
     #[test]
@@ -1896,8 +2386,12 @@ mod tests {
         ev.extend(run(&mut m, 60.0, 90.0, |t| sample(t, None, 0.0, None)));
         assert_eq!(m.state().occupied_since_s, Some(0.0));
         assert!(m.state().active_alerts.contains(&"blind".to_string()));
-        ev.extend(run(&mut m, 90.0, 150.0, |t| sample(t, Some(true), 0.5, None)));
-        ev.extend(run(&mut m, 150.0, 170.0, |t| sample(t, Some(false), 0.5, None)));
+        ev.extend(run(&mut m, 90.0, 150.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
+        ev.extend(run(&mut m, 150.0, 170.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
         let (starts, ends) = occ(&ev);
         assert_eq!(starts, 1);
         assert_eq!(ends.len(), 1);
@@ -1908,7 +2402,9 @@ mod tests {
         let mut m = SpaceMonitor::new(cfg(false));
         let mut ev = run(&mut m, 0.0, 60.0, |t| sample(t, Some(true), 0.5, None));
         ev.extend(run(&mut m, 60.0, 150.0, |t| sample(t, None, 0.0, None)));
-        ev.extend(run(&mut m, 150.0, 160.0, |t| sample(t, Some(true), 0.5, None)));
+        ev.extend(run(&mut m, 150.0, 160.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
         let (starts, ends) = occ(&ev);
         assert_eq!(starts, 2);
         assert_eq!(ends.len(), 1);
@@ -1921,7 +2417,11 @@ mod tests {
         let ev = run(&mut m, 0.0, 600.0, |t| {
             // 2 s fidgets every 60 s, each with a 1 s dip mid-way (same bout).
             let ph = t % 60.0;
-            let motion = if ph < 1.0 || (2.0..3.0).contains(&ph) { 4.0 } else { 0.5 };
+            let motion = if ph < 1.0 || (2.0..3.0).contains(&ph) {
+                4.0
+            } else {
+                0.5
+            };
             sample(t, Some(true), motion, None)
         });
         assert!(ev.iter().all(|e| e.kind == EventKind::OccupancyStarted));
@@ -1935,7 +2435,11 @@ mod tests {
     fn state_reports_five_minute_breathing_statistics() {
         let mut m = SpaceMonitor::new(cfg(true));
         run(&mut m, 0.0, 300.0, |t| {
-            let bpm = if (t * 2.0) as i64 % 2 == 0 { 13.0 } else { 15.0 };
+            let bpm = if (t * 2.0) as i64 % 2 == 0 {
+                13.0
+            } else {
+                15.0
+            };
             sample(t, Some(true), 0.5, br(bpm, 0.5, 0.25, NOISE))
         });
         let st = m.state();

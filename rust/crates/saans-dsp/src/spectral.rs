@@ -14,7 +14,9 @@ pub fn hann_window(n: usize) -> Vec<f64> {
     if n <= 1 {
         return vec![1.0; n];
     }
-    (0..n).map(|i| 0.5 * (1.0 - (2.0 * PI * i as f64 / n as f64).cos())).collect()
+    (0..n)
+        .map(|i| 0.5 * (1.0 - (2.0 * PI * i as f64 / n as f64).cos()))
+        .collect()
 }
 
 /// |X(f)|^2 at an arbitrary frequency (generalised Goertzel).
@@ -105,7 +107,11 @@ pub fn band_peak(
     let peak_p = powers[peak_i];
 
     // Never interpolate across a notched neighbour (see the reference).
-    if peak_i > 0 && peak_i < powers.len() - 1 && !is_notched(freqs[peak_i - 1]) && !is_notched(freqs[peak_i + 1]) {
+    if peak_i > 0
+        && peak_i < powers.len() - 1
+        && !is_notched(freqs[peak_i - 1])
+        && !is_notched(freqs[peak_i + 1])
+    {
         let (y0, y1, y2) = (powers[peak_i - 1], powers[peak_i], powers[peak_i + 1]);
         let denom = y0 - 2.0 * y1 + y2;
         if denom != 0.0 {
@@ -118,7 +124,11 @@ pub fn band_peak(
 
     let mean_power = total / candidates.len() as f64;
     if peak_p <= 0.0 || mean_power <= 0.0 {
-        return Some(SpectralPeak { freq_hz: peak_f, power: peak_p, confidence: 0.0 });
+        return Some(SpectralPeak {
+            freq_hz: peak_f,
+            power: peak_p,
+            confidence: 0.0,
+        });
     }
     let enbw = if window { 1.5 } else { 1.0 };
     let duration_s = n as f64 / sample_rate_hz;
@@ -127,8 +137,16 @@ pub fn band_peak(
     let noise_ratio = n_ind.ln() + EULER_GAMMA;
     let tone_ratio = n_ind / enbw;
     let span = tone_ratio - noise_ratio;
-    let confidence = if span <= 0.0 { 0.0 } else { (ratio - noise_ratio) / span };
-    Some(SpectralPeak { freq_hz: peak_f, power: peak_p, confidence: confidence.clamp(0.0, 1.0) })
+    let confidence = if span <= 0.0 {
+        0.0
+    } else {
+        (ratio - noise_ratio) / span
+    };
+    Some(SpectralPeak {
+        freq_hz: peak_f,
+        power: peak_p,
+        confidence: confidence.clamp(0.0, 1.0),
+    })
 }
 
 /// Carrier search that requires a symmetric triplet (f - m, f, f + m):
@@ -148,7 +166,13 @@ pub fn sideband_peak(
     }
     let w = hann_window(n);
     let windowed: Vec<f64> = signal.iter().zip(&w).map(|(s, wi)| s * wi).collect();
-    let power_at = |f: f64| if f > 0.0 { goertzel_power(&windowed, f, sample_rate_hz) } else { 0.0 };
+    let power_at = |f: f64| {
+        if f > 0.0 {
+            goertzel_power(&windowed, f, sample_rate_hz)
+        } else {
+            0.0
+        }
+    };
     let is_harmonic = |f: f64| {
         let k = crate::py_round(f / modulator_hz);
         k >= 1.0 && (f - k * modulator_hz).abs() <= harmonic_tol_hz
@@ -182,8 +206,14 @@ pub fn sideband_peak(
         .iter()
         .filter(|(f, _)| (f - best_f).abs() > separation_hz)
         .map(|&(_, s)| s)
-        .fold(None, |acc: Option<f64>, s| Some(acc.map_or(s, |a| a.max(s))))
+        .fold(None, |acc: Option<f64>, s| {
+            Some(acc.map_or(s, |a| a.max(s)))
+        })
         .unwrap_or(0.0);
     let confidence = (1.0 - runner_up / best_score).clamp(0.0, 1.0);
-    Some(SpectralPeak { freq_hz: best_f, power: power_at(best_f), confidence })
+    Some(SpectralPeak {
+        freq_hz: best_f,
+        power: power_at(best_f),
+        confidence,
+    })
 }

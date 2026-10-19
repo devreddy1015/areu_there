@@ -52,7 +52,12 @@ pub fn iso8601(unix_ms: i64, offset_min: i32) -> String {
     let day = local.div_euclid(86_400_000);
     let ms_of_day = local.rem_euclid(86_400_000);
     let (y, m, d) = civil_from_days(day);
-    let (h, mi, s, ms) = (ms_of_day / 3_600_000, ms_of_day / 60_000 % 60, ms_of_day / 1000 % 60, ms_of_day % 1000);
+    let (h, mi, s, ms) = (
+        ms_of_day / 3_600_000,
+        ms_of_day / 60_000 % 60,
+        ms_of_day / 1000 % 60,
+        ms_of_day % 1000,
+    );
     let off = if offset_min == 0 {
         "Z".to_string()
     } else {
@@ -115,7 +120,10 @@ pub fn parse_iso8601(s: &str) -> Option<i64> {
     }
     let offset_min = match &s[i..] {
         "" | "Z" | "z" => 0,
-        rest if rest.len() == 6 && (rest.starts_with('+') || rest.starts_with('-')) && rest.as_bytes()[3] == b':' => {
+        rest if rest.len() == 6
+            && (rest.starts_with('+') || rest.starts_with('-'))
+            && rest.as_bytes()[3] == b':' =>
+        {
             let oh = num(i + 1, 2)?;
             let om = num(i + 4, 2)?;
             let v = oh * 60 + om;
@@ -151,7 +159,10 @@ mod tests {
         assert_eq!(iso8601(t, 330), "2026-10-14T04:35:01.500+05:30");
         assert_eq!(parse_iso8601("2026-10-14T04:35:01.500+05:30"), Some(t));
         assert_eq!(iso8601(t, -90), "2026-10-13T21:35:01.500-01:30");
-        assert_eq!(parse_iso8601("2026-10-13"), Some(days_from_civil(2026, 10, 13) * 86_400_000));
+        assert_eq!(
+            parse_iso8601("2026-10-13"),
+            Some(days_from_civil(2026, 10, 13) * 86_400_000)
+        );
         assert_eq!(parse_iso8601("2026-10-13T23:05"), Some(t - 1500));
         assert!(parse_iso8601("yesterday").is_none());
         assert!(parse_iso8601("2026-13-01").is_none());

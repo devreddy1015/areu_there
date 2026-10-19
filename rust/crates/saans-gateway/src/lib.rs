@@ -46,5 +46,8 @@ pub use simulate::{SimGateway, SimulateOptions};
 
 /// One log line on stderr, wall-clock stamped (UTC).
 pub fn log(msg: &str) {
-    eprintln!("{} saans-gateway: {msg}", timefmt::iso8601(timefmt::now_unix_ms(), 0));
+    eprintln!(
+        "{} saans-gateway: {msg}",
+        timefmt::iso8601(timefmt::now_unix_ms(), 0)
+    );
 }

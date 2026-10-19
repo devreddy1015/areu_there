@@ -36,7 +36,13 @@ impl<W: Write> PcapWriter<W> {
     }
 
     /// One UDP datagram from `src` to `dst` at `t_ns` since the epoch.
-    pub fn write(&mut self, t_ns: u64, src: ([u8; 4], u16), dst: ([u8; 4], u16), payload: &[u8]) -> io::Result<()> {
+    pub fn write(
+        &mut self,
+        t_ns: u64,
+        src: ([u8; 4], u16),
+        dst: ([u8; 4], u16),
+        payload: &[u8],
+    ) -> io::Result<()> {
         let total = 20 + 8 + payload.len();
         let mut ip = [0u8; 20];
         ip[0] = 0x45;

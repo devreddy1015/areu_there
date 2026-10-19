@@ -98,8 +98,23 @@ fn silent_s(track: &LinkTrack, first_observed: Option<f64>, t_s: f64) -> f64 {
     }
 }
 
-fn sys_event(space: &str, t_s: f64, t_start_s: Option<f64>, severity: Severity, evidence: String, kind: EventKind) -> HealthEvent {
-    HealthEvent { space_id: space.to_string(), t_s, t_start_s, severity, confidence: 1.0, evidence, kind }
+fn sys_event(
+    space: &str,
+    t_s: f64,
+    t_start_s: Option<f64>,
+    severity: Severity,
+    evidence: String,
+    kind: EventKind,
+) -> HealthEvent {
+    HealthEvent {
+        space_id: space.to_string(),
+        t_s,
+        t_start_s,
+        severity,
+        confidence: 1.0,
+        evidence,
+        kind,
+    }
 }
 
 /// Tracks link and coverage health for any number of spaces.
@@ -118,7 +133,8 @@ impl SystemMonitor {
     pub fn observe(&mut self, space_id: &str, fusion: &SpaceFusion, t_s: f64) -> Vec<HealthEvent> {
         let mut ev = Vec::new();
         if !self.spaces.contains_key(space_id) {
-            self.spaces.insert(space_id.to_string(), SpaceHealth::default());
+            self.spaces
+                .insert(space_id.to_string(), SpaceHealth::default());
         }
         let sp = self.spaces.get_mut(space_id).expect("inserted above");
 
@@ -130,15 +146,29 @@ impl SystemMonitor {
             if !up && silent > LINK_DOWN_S && !lh.down_reported {
                 lh.down_reported = true;
                 let evidence = if track.frames > 0 {
-                    format!("no frames from link {id} for {silent:.1} s (last after {} frames)", track.frames)
+                    format!(
+                        "no frames from link {id} for {silent:.1} s (last after {} frames)",
+                        track.frames
+                    )
                 } else {
                     format!("no frames from link {id} since monitoring began {silent:.1} s ago")
                 };
-                let start = if track.frames > 0 { track.last_seen_s } else { lh.first_observed };
-                ev.push(sys_event(space_id, t_s, Some(start), Severity::Advisory, evidence, EventKind::LinkDown {
-                    link: id,
-                    silent_s: silent,
-                }));
+                let start = if track.frames > 0 {
+                    track.last_seen_s
+                } else {
+                    lh.first_observed
+                };
+                ev.push(sys_event(
+                    space_id,
+                    t_s,
+                    Some(start),
+                    Severity::Advisory,
+                    evidence,
+                    EventKind::LinkDown {
+                        link: id,
+                        silent_s: silent,
+                    },
+                ));
             }
             if up && lh.down_reported {
                 lh.down_reported = false;
@@ -147,7 +177,10 @@ impl SystemMonitor {
                     t_s,
                     None,
                     Severity::Info,
-                    format!("link {id} is sending frames again ({:.1} Hz CSI)", track.rate_hz()),
+                    format!(
+                        "link {id} is sending frames again ({:.1} Hz CSI)",
+                        track.rate_hz()
+                    ),
                     EventKind::LinkUp { link: id },
                 ));
             }
@@ -162,7 +195,9 @@ impl SystemMonitor {
             let (rate, loss) = (track.rate_hz(), track.loss());
             let mut reasons = Vec::new();
             if rate < DEGRADED_MIN_RATE_HZ {
-                reasons.push(format!("CSI rate {rate:.1} Hz below the {DEGRADED_MIN_RATE_HZ:.0} Hz breathing needs"));
+                reasons.push(format!(
+                    "CSI rate {rate:.1} Hz below the {DEGRADED_MIN_RATE_HZ:.0} Hz breathing needs"
+                ));
             }
             if loss > DEGRADED_MAX_LOSS {
                 reasons.push(format!(
@@ -190,38 +225,61 @@ impl SystemMonitor {
                         "link {id}: {reason}, for {:.0} s; its breathing estimates are not used while this lasts",
                         t_s - since
                     );
-                    ev.push(sys_event(space_id, t_s, Some(since), Severity::Advisory, evidence, EventKind::LinkDegraded {
-                        link: id,
-                        reason,
-                    }));
+                    ev.push(sys_event(
+                        space_id,
+                        t_s,
+                        Some(since),
+                        Severity::Advisory,
+                        evidence,
+                        EventKind::LinkDegraded { link: id, reason },
+                    ));
                 }
             }
 
             // Stale calibration.
             if frame.calib_age_s != NOT_CALIBRATED {
                 let age_h = frame.calib_age_s as f64 / 3600.0;
-                if age_h > CALIB_STALE_H && !lh.last_stale_notice.is_some_and(|l| t_s - l < CALIB_STALE_REPEAT_S) {
+                if age_h > CALIB_STALE_H
+                    && !lh
+                        .last_stale_notice
+                        .is_some_and(|l| t_s - l < CALIB_STALE_REPEAT_S)
+                {
                     lh.last_stale_notice = Some(t_s);
                     let evidence = format!(
                         "link {id}'s empty-room calibration is {age_h:.1} h old (limit {CALIB_STALE_H:.0} h); \
                          recalibrate while the space is empty"
                     );
-                    ev.push(sys_event(space_id, t_s, None, Severity::Advisory, evidence, EventKind::CalibrationStale {
-                        link: id,
-                        age_h,
-                    }));
+                    ev.push(sys_event(
+                        space_id,
+                        t_s,
+                        None,
+                        Severity::Advisory,
+                        evidence,
+                        EventKind::CalibrationStale { link: id, age_h },
+                    ));
                 }
             }
 
             // Raw-CSI debug mode: a privacy notice (ADR-001).
-            if frame.flag(FLAG_RAW_MODE) && !lh.last_raw_notice.is_some_and(|l| t_s - l < RAW_MODE_REPEAT_S) {
+            if frame.flag(FLAG_RAW_MODE)
+                && !lh
+                    .last_raw_notice
+                    .is_some_and(|l| t_s - l < RAW_MODE_REPEAT_S)
+            {
                 lh.last_raw_notice = Some(t_s);
                 let evidence = format!(
                     "node {} is also streaming raw CSI on link {id} (debug mode); raw channel data is leaving the \
                      sensor",
                     id.rx
                 );
-                ev.push(sys_event(space_id, t_s, None, Severity::Advisory, evidence, EventKind::RawModeActive { link: id }));
+                ev.push(sys_event(
+                    space_id,
+                    t_s,
+                    None,
+                    Severity::Advisory,
+                    evidence,
+                    EventKind::RawModeActive { link: id },
+                ));
             }
         }
 
@@ -237,7 +295,14 @@ impl SystemMonitor {
                      its health outputs are unknown, not empty",
                     t_s - since
                 );
-                ev.push(sys_event(space_id, t_s, Some(since), Severity::Advisory, evidence, EventKind::SpaceBlind));
+                ev.push(sys_event(
+                    space_id,
+                    t_s,
+                    Some(since),
+                    Severity::Advisory,
+                    evidence,
+                    EventKind::SpaceBlind,
+                ));
             }
         } else {
             sp.zero_since = None;
@@ -276,10 +341,13 @@ impl SystemMonitor {
                     silent_s: silent,
                     rate_hz: track.rate_hz(),
                     loss: track.loss(),
-                    calib_age_h: f.filter(|f| f.calib_age_s != NOT_CALIBRATED).map(|f| f.calib_age_s as f64 / 3600.0),
+                    calib_age_h: f
+                        .filter(|f| f.calib_age_s != NOT_CALIBRATED)
+                        .map(|f| f.calib_age_s as f64 / 3600.0),
                     best_bnr: f.map_or(0.0, |f| f.best_bnr as f64),
                     rssi_dbm: f.map_or(0, |f| f.rssi_dbm),
-                    noise_floor_dbm: f.map_or(saans_dsp::features::NOISE_UNKNOWN, |f| f.noise_floor_dbm),
+                    noise_floor_dbm: f
+                        .map_or(saans_dsp::features::NOISE_UNKNOWN, |f| f.noise_floor_dbm),
                     raw_mode: f.is_some_and(|f| f.flag(FLAG_RAW_MODE)),
                     frames: track.frames,
                 }
@@ -313,7 +381,11 @@ mod tests {
     }
 
     fn fusion(links: &[LinkId]) -> SpaceFusion {
-        SpaceFusion::new(SpaceConfig { id: "lab".into(), links: links.to_vec(), ..Default::default() })
+        SpaceFusion::new(SpaceConfig {
+            id: "lab".into(),
+            links: links.to_vec(),
+            ..Default::default()
+        })
     }
 
     /// Run at 2 Hz over [t0, t1): `send(t)` lists the frames to ingest.
@@ -347,28 +419,55 @@ mod tests {
         let mut ev = drive(&mut sys, &mut fu, 0.0, 10.0, ok);
         assert!(ev.is_empty(), "{ev:?}");
         ev = drive(&mut sys, &mut fu, 10.0, 30.0, |_| vec![]);
-        let downs: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::LinkDown { .. })).collect();
+        let downs: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::LinkDown { .. }))
+            .collect();
         assert_eq!(downs.len(), 1);
-        assert!(matches!(downs[0].kind, EventKind::LinkDown { link: A, silent_s } if silent_s > 5.0 && silent_s <= 6.0));
+        assert!(
+            matches!(downs[0].kind, EventKind::LinkDown { link: A, silent_s } if silent_s > 5.0 && silent_s <= 6.0)
+        );
         assert!((downs[0].t_s - 15.0).abs() <= 0.6);
         let rep = sys.link_report(&fu, 29.5);
         assert!(!rep[0].up && rep[0].silent_s > 19.0 && rep[0].frames == 20);
-        assert_eq!(ev.iter().filter(|e| e.kind == EventKind::SpaceBlind).count(), 1, "its only link");
+        assert_eq!(
+            ev.iter()
+                .filter(|e| e.kind == EventKind::SpaceBlind)
+                .count(),
+            1,
+            "its only link"
+        );
         ev = drive(&mut sys, &mut fu, 30.0, 40.0, ok);
-        assert_eq!(kinds(&ev), vec![&EventKind::LinkUp { link: A }, &EventKind::SpaceVisible]);
+        assert_eq!(
+            kinds(&ev),
+            vec![&EventKind::LinkUp { link: A }, &EventKind::SpaceVisible]
+        );
         let rep = sys.link_report(&fu, 39.5);
         assert!(rep[0].up && rep[0].rate_hz == 20.0 && rep[0].calib_age_h == Some(1.0));
-        assert_eq!((rep[0].rssi_dbm, rep[0].noise_floor_dbm, rep[0].raw_mode), (-50, -92, false));
+        assert_eq!(
+            (rep[0].rssi_dbm, rep[0].noise_floor_dbm, rep[0].raw_mode),
+            (-50, -92, false)
+        );
     }
 
     #[test]
     fn never_heard_link_is_reported_down() {
         let (mut sys, mut fu) = (SystemMonitor::new(), fusion(&[A, B]));
-        let ev = drive(&mut sys, &mut fu, 100.0, 120.0, |_| vec![(A, frame(20.0, 0.0, 0))]);
-        assert_eq!(kinds(&ev), vec![&EventKind::LinkDown { link: B, silent_s: 5.5 }]);
+        let ev = drive(&mut sys, &mut fu, 100.0, 120.0, |_| {
+            vec![(A, frame(20.0, 0.0, 0))]
+        });
+        assert_eq!(
+            kinds(&ev),
+            vec![&EventKind::LinkDown {
+                link: B,
+                silent_s: 5.5
+            }]
+        );
         let rep = sys.link_report(&fu, 119.5);
         let b = rep.iter().find(|r| r.link == B).unwrap();
-        assert!(!b.up && b.frames == 0 && (b.silent_s - 19.5).abs() < 1e-9 && b.calib_age_h.is_none());
+        assert!(
+            !b.up && b.frames == 0 && (b.silent_s - 19.5).abs() < 1e-9 && b.calib_age_h.is_none()
+        );
     }
 
     #[test]
@@ -376,11 +475,16 @@ mod tests {
         let (mut sys, mut fu) = (SystemMonitor::new(), fusion(&[A]));
         // A 10 s dip is not reported.
         let ev = drive(&mut sys, &mut fu, 0.0, 60.0, |t| {
-            vec![(A, frame(if (20.0..30.0).contains(&t) { 7.0 } else { 20.0 }, 0.0, 0))]
+            vec![(
+                A,
+                frame(if (20.0..30.0).contains(&t) { 7.0 } else { 20.0 }, 0.0, 0),
+            )]
         });
         assert!(ev.is_empty(), "{ev:?}");
         // 40 s slow: reported once, about 30 s in.
-        let ev = drive(&mut sys, &mut fu, 60.0, 100.0, |_| vec![(A, frame(7.0, 0.0, 0))]);
+        let ev = drive(&mut sys, &mut fu, 60.0, 100.0, |_| {
+            vec![(A, frame(7.0, 0.0, 0))]
+        });
         assert_eq!(ev.len(), 1);
         assert!((ev[0].t_s - 90.0).abs() <= 0.6);
         match &ev[0].kind {
@@ -391,20 +495,33 @@ mod tests {
             k => panic!("{k:?}"),
         }
         // Loss instead of rate, without clearing first: same episode, no repeat.
-        let ev = drive(&mut sys, &mut fu, 100.0, 140.0, |_| vec![(A, frame(20.0, 0.15, 0))]);
+        let ev = drive(&mut sys, &mut fu, 100.0, 140.0, |_| {
+            vec![(A, frame(20.0, 0.15, 0))]
+        });
         assert!(ev.is_empty());
         // Clear for 30 s, then lossy again: a new episode.
-        drive(&mut sys, &mut fu, 140.0, 180.0, |_| vec![(A, frame(20.0, 0.0, 0))]);
-        let ev = drive(&mut sys, &mut fu, 180.0, 220.0, |_| vec![(A, frame(20.0, 0.15, 0))]);
+        drive(&mut sys, &mut fu, 140.0, 180.0, |_| {
+            vec![(A, frame(20.0, 0.0, 0))]
+        });
+        let ev = drive(&mut sys, &mut fu, 180.0, 220.0, |_| {
+            vec![(A, frame(20.0, 0.15, 0))]
+        });
         assert_eq!(ev.len(), 1);
-        assert!(matches!(&ev[0].kind, EventKind::LinkDegraded { reason, .. } if reason.contains("loss 15%")));
+        assert!(
+            matches!(&ev[0].kind, EventKind::LinkDegraded { reason, .. } if reason.contains("loss 15%"))
+        );
     }
 
     #[test]
     fn raw_mode_notice_is_rate_limited() {
         let (mut sys, mut fu) = (SystemMonitor::new(), fusion(&[A]));
-        let ev = drive(&mut sys, &mut fu, 0.0, 7300.0, |_| vec![(A, frame(20.0, 0.0, FLAG_RAW_MODE))]);
-        let raw: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::RawModeActive { .. })).collect();
+        let ev = drive(&mut sys, &mut fu, 0.0, 7300.0, |_| {
+            vec![(A, frame(20.0, 0.0, FLAG_RAW_MODE))]
+        });
+        let raw: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::RawModeActive { .. }))
+            .collect();
         assert_eq!(raw.len(), 3, "at 0 s, 3600 s and 7200 s");
         assert!(raw.iter().all(|e| e.severity == Severity::Advisory));
         assert_eq!(raw[1].t_s, 3600.0);
@@ -414,13 +531,19 @@ mod tests {
     #[test]
     fn calibration_stale_repeats_every_six_hours() {
         let (mut sys, mut fu) = (SystemMonitor::new(), fusion(&[A]));
-        let stale = FeatureFrame { calib_age_s: 25 * 3600, ..frame(20.0, 0.0, 0) };
+        let stale = FeatureFrame {
+            calib_age_s: 25 * 3600,
+            ..frame(20.0, 0.0, 0)
+        };
         let mut ev = Vec::new();
         for t in [0.0, 0.5, 3600.0, 6.0 * 3600.0, 6.0 * 3600.0 + 0.5] {
             fu.ingest(A, stale, t);
             ev.extend(sys.observe("lab", &fu, t));
         }
-        let st: Vec<_> = ev.iter().filter(|e| matches!(e.kind, EventKind::CalibrationStale { .. })).collect();
+        let st: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::CalibrationStale { .. }))
+            .collect();
         assert_eq!(st.len(), 2);
         assert!(matches!(st[0].kind, EventKind::CalibrationStale { age_h, .. } if age_h == 25.0));
     }
@@ -431,13 +554,30 @@ mod tests {
         let both = |_t: f64| vec![(A, frame(20.0, 0.0, 0)), (B, frame(20.0, 0.0, 0))];
         assert!(drive(&mut sys, &mut fu, 0.0, 10.0, both).is_empty());
         let ev = drive(&mut sys, &mut fu, 10.0, 40.0, |_| vec![]);
-        let blind: Vec<_> = ev.iter().filter(|e| e.kind == EventKind::SpaceBlind).collect();
+        let blind: Vec<_> = ev
+            .iter()
+            .filter(|e| e.kind == EventKind::SpaceBlind)
+            .collect();
         assert_eq!(blind.len(), 1);
         // Links go unusable 2.5 s after their last frame (9.5 s), blind > 10 s later.
-        assert!(blind[0].t_s > 22.0 && blind[0].t_s < 23.5, "{}", blind[0].t_s);
-        assert_eq!(ev.iter().filter(|e| matches!(e.kind, EventKind::LinkDown { .. })).count(), 2);
-        let ev = drive(&mut sys, &mut fu, 40.0, 50.0, |_| vec![(B, frame(20.0, 0.0, 0))]);
-        assert_eq!(kinds(&ev), vec![&EventKind::LinkUp { link: B }, &EventKind::SpaceVisible]);
+        assert!(
+            blind[0].t_s > 22.0 && blind[0].t_s < 23.5,
+            "{}",
+            blind[0].t_s
+        );
+        assert_eq!(
+            ev.iter()
+                .filter(|e| matches!(e.kind, EventKind::LinkDown { .. }))
+                .count(),
+            2
+        );
+        let ev = drive(&mut sys, &mut fu, 40.0, 50.0, |_| {
+            vec![(B, frame(20.0, 0.0, 0))]
+        });
+        assert_eq!(
+            kinds(&ev),
+            vec![&EventKind::LinkUp { link: B }, &EventKind::SpaceVisible]
+        );
     }
 
     #[test]

@@ -5,7 +5,9 @@
 
 #![allow(dead_code)]
 
-use saans_dsp::features::{FeatureFrame, FLAG_BREATHING_VALID, FLAG_CALIBRATED, FLAG_OCCUPIED, FLAG_VITALS_ENABLED};
+use saans_dsp::features::{
+    FeatureFrame, FLAG_BREATHING_VALID, FLAG_CALIBRATED, FLAG_OCCUPIED, FLAG_VITALS_ENABLED,
+};
 use saans_gateway::{ClockMode, Gateway, GatewayConfig};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,8 +26,11 @@ const IO_TIMEOUT: Duration = Duration::from_secs(10);
 /// A fresh, empty directory under Cargo's per-target temp dir.
 pub fn temp_dir(name: &str) -> PathBuf {
     static N: AtomicUsize = AtomicUsize::new(0);
-    let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-        .join(format!("saans-gw-{name}-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+    let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
+        "saans-gw-{name}-{}-{}",
+        std::process::id(),
+        N.fetch_add(1, Ordering::Relaxed)
+    ));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     d
@@ -55,7 +60,9 @@ pub struct TestGw {
 
 impl TestGw {
     pub async fn start(cfg: GatewayConfig) -> TestGw {
-        let gw = Gateway::start(cfg.clone(), ClockMode::Manual { t0: T0 }).await.expect("gateway starts");
+        let gw = Gateway::start(cfg.clone(), ClockMode::Manual { t0: T0 })
+            .await
+            .expect("gateway starts");
         let tx = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         TestGw { gw, cfg, t: T0, tx }
     }
@@ -114,11 +121,18 @@ impl TestGw {
             None => "/api/events?limit=1000".to_string(),
         };
         let all = self.json(&path).await;
-        all.as_array().unwrap().iter().filter(|e| e["type"] == ty).cloned().collect()
+        all.as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["type"] == ty)
+            .cloned()
+            .collect()
     }
 
     pub async fn stop(self) {
-        timeout(Duration::from_secs(15), self.gw.shutdown()).await.expect("gateway shuts down");
+        timeout(Duration::from_secs(15), self.gw.shutdown())
+            .await
+            .expect("gateway shuts down");
     }
 }
 
@@ -164,8 +178,14 @@ pub fn occupied_frame(rx: u8, tx: u8, seq: u32, vitals: Option<(f32, f32)>) -> F
 
 /// One raw-CSI datagram, single antenna, as `esp32_udp.py` builds it.
 pub fn raw_datagram(node: u8, seq: u32, t: f64, n_sub: usize) -> Vec<u8> {
-    let iq: Vec<(i8, i8)> =
-        (0..n_sub).map(|k| (((t * 0.3 + k as f64).sin() * 20.0) as i8, 40 + ((t * 1.3).sin() * 5.0) as i8)).collect();
+    let iq: Vec<(i8, i8)> = (0..n_sub)
+        .map(|k| {
+            (
+                ((t * 0.3 + k as f64).sin() * 20.0) as i8,
+                40 + ((t * 1.3).sin() * 5.0) as i8,
+            )
+        })
+        .collect();
     saans_gateway::raw::build(&iq, node, seq, -50, -95)
 }
 
@@ -181,7 +201,10 @@ pub struct Resp {
 
 impl Resp {
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
+        self.headers
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn json(&self) -> Value {
@@ -197,11 +220,20 @@ fn parse_head(head: &str) -> (u16, Vec<(String, String)>) {
     let mut lines = head.split("\r\n");
     let status_line = lines.next().unwrap();
     let mut parts = status_line.splitn(3, ' ');
-    assert_eq!(parts.next(), Some("HTTP/1.1"), "status line {status_line:?}");
-    let status = parts.next().and_then(|s| s.parse().ok()).expect("status code");
+    assert_eq!(
+        parts.next(),
+        Some("HTTP/1.1"),
+        "status line {status_line:?}"
+    );
+    let status = parts
+        .next()
+        .and_then(|s| s.parse().ok())
+        .expect("status code");
     let headers = lines
         .map(|l| {
-            let (k, v) = l.split_once(':').unwrap_or_else(|| panic!("bad header line {l:?}"));
+            let (k, v) = l
+                .split_once(':')
+                .unwrap_or_else(|| panic!("bad header line {l:?}"));
             (k.trim().to_ascii_lowercase(), v.trim().to_string())
         })
         .collect();
@@ -212,7 +244,12 @@ fn dechunk(mut b: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
     loop {
         let eol = find(b, b"\r\n").expect("chunk size line");
-        let size_hex = std::str::from_utf8(&b[..eol]).unwrap().split(';').next().unwrap().trim();
+        let size_hex = std::str::from_utf8(&b[..eol])
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .trim();
         let size = usize::from_str_radix(size_hex, 16).expect("chunk size");
         b = &b[eol + 2..];
         if size == 0 {
@@ -231,14 +268,18 @@ fn dechunk(mut b: &[u8]) -> Vec<u8> {
 pub async fn get_bytes(addr: SocketAddr, path: &str) -> (u16, Vec<(String, String)>, Vec<u8>) {
     let fut = async {
         let mut s = TcpStream::connect(addr).await.expect("connect");
-        let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nAccept: */*\r\nConnection: close\r\n\r\n");
+        let req = format!(
+            "GET {path} HTTP/1.1\r\nHost: {addr}\r\nAccept: */*\r\nConnection: close\r\n\r\n"
+        );
         s.write_all(req.as_bytes()).await.unwrap();
         let mut raw = Vec::new();
         s.read_to_end(&mut raw).await.unwrap();
         let end = find(&raw, b"\r\n\r\n").expect("response has a header terminator");
         let (status, headers) = parse_head(std::str::from_utf8(&raw[..end]).unwrap());
         let rest = &raw[end + 4..];
-        let chunked = headers.iter().any(|(k, v)| k == "transfer-encoding" && v.contains("chunked"));
+        let chunked = headers
+            .iter()
+            .any(|(k, v)| k == "transfer-encoding" && v.contains("chunked"));
         let body = if chunked {
             dechunk(rest)
         } else if let Some((_, n)) = headers.iter().find(|(k, _)| k == "content-length") {
@@ -250,13 +291,19 @@ pub async fn get_bytes(addr: SocketAddr, path: &str) -> (u16, Vec<(String, Strin
         };
         (status, headers, body)
     };
-    timeout(IO_TIMEOUT, fut).await.unwrap_or_else(|_| panic!("GET {path} timed out"))
+    timeout(IO_TIMEOUT, fut)
+        .await
+        .unwrap_or_else(|_| panic!("GET {path} timed out"))
 }
 
 /// `GET path`, body decoded as text.
 pub async fn get(addr: SocketAddr, path: &str) -> Resp {
     let (status, headers, body) = get_bytes(addr, path).await;
-    Resp { status, headers, body: String::from_utf8(body).expect("UTF-8 body") }
+    Resp {
+        status,
+        headers,
+        body: String::from_utf8(body).expect("UTF-8 body"),
+    }
 }
 
 // -------------------------------------------------------------- WebSocket
@@ -292,12 +339,17 @@ impl Ws {
             let (status, headers) = parse_head(std::str::from_utf8(&buf[..end]).unwrap());
             assert_eq!(status, 101, "{headers:?}");
             let h = |n: &str| headers.iter().find(|(k, _)| k == n).map(|(_, v)| v.clone());
-            assert_eq!(h("upgrade").map(|v| v.to_ascii_lowercase()).as_deref(), Some("websocket"));
+            assert_eq!(
+                h("upgrade").map(|v| v.to_ascii_lowercase()).as_deref(),
+                Some("websocket")
+            );
             assert_eq!(h("sec-websocket-accept").as_deref(), Some(WS_ACCEPT));
             buf.drain(..end + 4);
             Ws { s, buf }
         };
-        timeout(IO_TIMEOUT, fut).await.expect("WebSocket handshake timed out")
+        timeout(IO_TIMEOUT, fut)
+            .await
+            .expect("WebSocket handshake timed out")
     }
 
     async fn fill(&mut self, n: usize) {
@@ -323,7 +375,10 @@ impl Ws {
             }
             127 => {
                 self.fill(10).await;
-                (u64::from_be_bytes(self.buf[2..10].try_into().unwrap()) as usize, 10)
+                (
+                    u64::from_be_bytes(self.buf[2..10].try_into().unwrap()) as usize,
+                    10,
+                )
             }
             n => (n as usize, 2),
         };
@@ -346,7 +401,9 @@ impl Ws {
                 }
             }
         };
-        timeout(IO_TIMEOUT, fut).await.expect("no WebSocket message within 10 s")
+        timeout(IO_TIMEOUT, fut)
+            .await
+            .expect("no WebSocket message within 10 s")
     }
 
     pub async fn next_json(&mut self) -> Value {
@@ -375,10 +432,10 @@ impl Ws {
         f.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
         self.s.write_all(&f).await.unwrap();
         // Messages still in flight may come first.
-        let fut = async {
-            while self.frame().await.0 != 0x8 {}
-        };
-        timeout(IO_TIMEOUT, fut).await.expect("server answers a close frame");
+        let fut = async { while self.frame().await.0 != 0x8 {} };
+        timeout(IO_TIMEOUT, fut)
+            .await
+            .expect("server answers a close frame");
     }
 }
 
@@ -393,13 +450,17 @@ pub struct Sample {
 
 fn valid_metric_name(s: &str) -> bool {
     let mut c = s.chars();
-    c.next().is_some_and(|f| f.is_ascii_alphabetic() || f == '_' || f == ':')
+    c.next()
+        .is_some_and(|f| f.is_ascii_alphabetic() || f == '_' || f == ':')
         && c.all(|x| x.is_ascii_alphanumeric() || x == '_' || x == ':')
 }
 
 fn valid_label_name(s: &str) -> bool {
     let mut c = s.chars();
-    !s.starts_with("__") && c.next().is_some_and(|f| f.is_ascii_alphabetic() || f == '_') && c.all(|x| x.is_ascii_alphanumeric() || x == '_')
+    !s.starts_with("__")
+        && c.next()
+            .is_some_and(|f| f.is_ascii_alphabetic() || f == '_')
+        && c.all(|x| x.is_ascii_alphanumeric() || x == '_')
 }
 
 fn parse_value(s: &str) -> Option<f64> {
@@ -407,7 +468,12 @@ fn parse_value(s: &str) -> Option<f64> {
         "NaN" => Some(f64::NAN),
         "+Inf" | "Inf" => Some(f64::INFINITY),
         "-Inf" => Some(f64::NEG_INFINITY),
-        _ if s.chars().all(|c| c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E')) => s.parse().ok(),
+        _ if s
+            .chars()
+            .all(|c| c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E')) =>
+        {
+            s.parse().ok()
+        }
         _ => None,
     }
 }
@@ -528,7 +594,9 @@ pub fn parse_prometheus(text: &str) -> Result<Vec<Sample>, String> {
             }
             continue;
         }
-        let name_end = line.find(['{', ' ']).ok_or_else(|| at("sample without value".into()))?;
+        let name_end = line
+            .find(['{', ' '])
+            .ok_or_else(|| at("sample without value".into()))?;
         let name = &line[..name_end];
         if !valid_metric_name(name) {
             return Err(at(format!("invalid metric name {name:?}")));
@@ -542,7 +610,8 @@ pub fn parse_prometheus(text: &str) -> Result<Vec<Sample>, String> {
         let value = fields.next().ok_or_else(|| at("no value".into()))?;
         let value = parse_value(value).ok_or_else(|| at(format!("invalid value {value:?}")))?;
         if let Some(ts) = fields.next() {
-            ts.parse::<i64>().map_err(|_| at(format!("invalid timestamp {ts:?}")))?;
+            ts.parse::<i64>()
+                .map_err(|_| at(format!("invalid timestamp {ts:?}")))?;
         }
         if fields.next().is_some() {
             return Err(at("trailing fields".into()));
@@ -551,7 +620,11 @@ pub fn parse_prometheus(text: &str) -> Result<Vec<Sample>, String> {
             .iter()
             .find_map(|suf| {
                 let base = name.strip_suffix(suf)?;
-                matches!(types.get(base).map(String::as_str), Some("histogram" | "summary")).then(|| base.to_string())
+                matches!(
+                    types.get(base).map(String::as_str),
+                    Some("histogram" | "summary")
+                )
+                .then(|| base.to_string())
             })
             .unwrap_or_else(|| name.to_string());
         enter(&family, &mut current).map_err(at)?;
@@ -559,7 +632,11 @@ pub fn parse_prometheus(text: &str) -> Result<Vec<Sample>, String> {
         if !series.insert(format!("{name}{labels:?}")) {
             return Err(at("duplicate series".into()));
         }
-        samples.push(Sample { name: name.to_string(), labels, value });
+        samples.push(Sample {
+            name: name.to_string(),
+            labels,
+            value,
+        });
     }
     Ok(samples)
 }
@@ -568,9 +645,18 @@ pub fn parse_prometheus(text: &str) -> Result<Vec<Sample>, String> {
 pub fn metric(samples: &[Sample], name: &str, labels: &[(&str, &str)]) -> Option<f64> {
     let found: Vec<&Sample> = samples
         .iter()
-        .filter(|s| s.name == name && labels.iter().all(|(k, v)| s.labels.get(*k).map(String::as_str) == Some(*v)))
+        .filter(|s| {
+            s.name == name
+                && labels
+                    .iter()
+                    .all(|(k, v)| s.labels.get(*k).map(String::as_str) == Some(*v))
+        })
         .collect();
-    assert!(found.len() <= 1, "{name}{labels:?} matches {} samples", found.len());
+    assert!(
+        found.len() <= 1,
+        "{name}{labels:?} matches {} samples",
+        found.len()
+    );
     found.first().map(|s| s.value)
 }
 
@@ -601,7 +687,9 @@ pub fn vital_keys(v: &Value) -> Vec<String> {
     all.into_iter()
         .filter(|p| {
             let k = p.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-            ["breath", "bpm", "heart", "pause", "resp"].iter().any(|w| k.contains(w))
+            ["breath", "bpm", "heart", "pause", "resp"]
+                .iter()
+                .any(|w| k.contains(w))
         })
         .collect()
 }

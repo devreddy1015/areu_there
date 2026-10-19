@@ -72,7 +72,11 @@ impl StaticSuppressor {
         let stds: Vec<f64> = (0..count).map(|i| self.variance[i].std()).collect();
         let total = psum(stds.iter().copied());
         if total <= 0.0 {
-            return if count > 0 { vec![1.0 / count as f64; count] } else { Vec::new() };
+            return if count > 0 {
+                vec![1.0 / count as f64; count]
+            } else {
+                Vec::new()
+            };
         }
         stds.iter().map(|s| s / total).collect()
     }

@@ -28,7 +28,15 @@ pub struct PresenceConfig {
 
 impl Default for PresenceConfig {
     fn default() -> Self {
-        Self { calibration_s: 30.0, sigma_mult: 4.0, energy_window_s: 8.0, hold_s: 10.0, f_low: 0.1, f_high: 2.0, warmup_s: None }
+        Self {
+            calibration_s: 30.0,
+            sigma_mult: 4.0,
+            energy_window_s: 8.0,
+            hold_s: 10.0,
+            f_low: 0.1,
+            f_high: 2.0,
+            warmup_s: None,
+        }
     }
 }
 
@@ -61,7 +69,8 @@ impl PresenceDetector {
             None => (sample_rate_hz * 5.0 / cfg.f_low) as u64,
         };
         let enbw = (std::f64::consts::PI / 2.0) * (cfg.f_high - cfg.f_low);
-        let min_threshold_ratio = 1.0 + cfg.sigma_mult / (2.0 * (enbw * cfg.energy_window_s).sqrt());
+        let min_threshold_ratio =
+            1.0 + cfg.sigma_mult / (2.0 * (enbw * cfg.energy_window_s).sqrt());
         Self {
             sample_rate_hz,
             sigma_mult: cfg.sigma_mult,
@@ -87,12 +96,22 @@ impl PresenceDetector {
         }
         self.window.push_back(self.bandpass.process(residual));
         let n = self.window.len();
-        let energy = if n > 0 { (psum(self.window.iter().map(|v| v * v)) / n as f64).sqrt() } else { 0.0 };
+        let energy = if n > 0 {
+            (psum(self.window.iter().map(|v| v * v)) / n as f64).sqrt()
+        } else {
+            0.0
+        };
         self.last_energy = energy;
 
         if self.warmed < self.warmup_samples {
             self.warmed += 1;
-            return PresenceState { occupied: false, energy, threshold: self.threshold, calibrated: false, calibration_progress: 0.0 };
+            return PresenceState {
+                occupied: false,
+                energy,
+                threshold: self.threshold,
+                calibrated: false,
+                calibration_progress: 0.0,
+            };
         }
         if !self.calibrated {
             self.calib.update(energy);
@@ -115,7 +134,13 @@ impl PresenceDetector {
         } else {
             self.since_trigger += 1;
         }
-        PresenceState { occupied: self.since_trigger < self.hold_samples, energy, threshold: self.threshold, calibrated: true, calibration_progress: 1.0 }
+        PresenceState {
+            occupied: self.since_trigger < self.hold_samples,
+            energy,
+            threshold: self.threshold,
+            calibrated: true,
+            calibration_progress: 1.0,
+        }
     }
 
     pub fn calibrated(&self) -> bool {
