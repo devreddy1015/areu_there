@@ -151,7 +151,7 @@ the static suppressor would have learned them as part of the room.
 ## Verification
 
 The DSP is validated against **golden vectors** generated from the Python
-reference (`spec/golden/`, 21 sets). The same headers compile for the host
+reference (`spec/golden/`, 23 sets). The same headers compile for the host
 tests and for the firmware, so the tests are evidence about the shipped code.
 
 ```bash

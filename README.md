@@ -335,10 +335,13 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/roomplan_import.py` | Apple RoomPlan scan to scene file. A stub: the mapping table is real, the format assumptions are untested |
 | `rust/crates/saans-sim/src/scene.rs` | The same format in Rust, with its own reader |
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
-| `tests/` | 141 core tests (`test_localize_*` belong to the P0b localization work) |
+| `tests/` | 547 tests, 239 of them outside `test_localize_*` (which belong to the P0b localization work) |
 | `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |
-| `rust/crates/saans-gateway/assets/site/` | The seven public pages, the stylesheet, the scripts and the fonts |
+| `rust/crates/saans-gateway/assets/site/` | The eight public pages, the stylesheet, the scripts and the fonts |
 | `rust/crates/saans-gateway/src/site.rs` | The route table for those pages, and the offline and link tests |
+| `docs/HARDWARE.md` | What to buy for the first bench run, and how to bring it up |
+| `docs/PROTOCOL_S5.md` | The recording protocol, to be followed before any human-subject data exists |
+| `docs/EVIDENCE.md` | What this project has actually demonstrated, and what it has not |
 | `docs/UI_GAP_ANALYSIS.md` | What the interface can show, what the gateway publishes, and where they disagree |
 | `docs/UI_IMPLEMENTATION_PLAN.md` | The design the dashboard was built to, and the rules it keeps |
 
