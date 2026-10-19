@@ -261,7 +261,7 @@ impl History {
 
 /// `since` filter then stride-decimation, keeping the newest point so the
 /// right-hand end of a chart is the current value.
-fn select<'a, T>(points: &'a VecDeque<T>, since_t_s: Option<f64>, max_points: usize, t: fn(&T) -> f64) -> Vec<&'a T> {
+fn select<T>(points: &VecDeque<T>, since_t_s: Option<f64>, max_points: usize, t: fn(&T) -> f64) -> Vec<&T> {
     let from: Vec<&T> = points.iter().filter(|p| since_t_s.is_none_or(|s| t(p) > s)).collect();
     if max_points == 0 || from.len() <= max_points {
         return from;

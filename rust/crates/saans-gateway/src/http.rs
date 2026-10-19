@@ -171,7 +171,7 @@ fn unauthorized() -> Response {
     r
 }
 
-fn header_str<'a>(h: &'a HeaderMap, name: header::HeaderName) -> Option<&'a str> {
+fn header_str(h: &HeaderMap, name: header::HeaderName) -> Option<&str> {
     h.get(name).and_then(|v| v.to_str().ok())
 }
 
