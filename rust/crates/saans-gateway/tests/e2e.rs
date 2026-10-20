@@ -520,6 +520,160 @@ async fn websocket_streams_state_and_events() {
     g.stop().await;
 }
 
+/// ADR-008 decision 12: the room demo is its own page, served from the
+/// binary, under a CSP stricter than the dashboard's, and does not ship
+/// without a self-containment check. This is that check, against a real
+/// gateway rather than the constants.
+#[cfg(feature = "roomsim")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn room_demo_is_served_self_contained_and_draws_no_one() {
+    use sha2::{Digest, Sha256};
+    let g = TestGw::start(config("roomsim", LAB)).await;
+
+    let page = g.get("/roomsim").await;
+    assert_eq!(page.status, 200);
+    assert!(page.header("content-type").unwrap().starts_with("text/html"));
+    let csp = page.header("content-security-policy").expect("CSP header");
+    assert!(csp.contains("default-src 'none'") && csp.contains("script-src 'self'"), "{csp}");
+    assert!(!csp.contains("unsafe-inline") && !csp.contains("unsafe-eval"), "demo CSP must allow nothing inline: {csp}");
+    assert!(csp.contains("require-trusted-types-for 'script'") && csp.contains("trusted-types 'none'"), "{csp}");
+    assert_eq!(page.header("x-content-type-options"), Some("nosniff"));
+    // The dashboard's own policy is untouched by the demo's existence.
+    let dash = g.get("/").await;
+    assert!(dash.header("content-security-policy").unwrap().contains("script-src 'unsafe-inline'"));
+
+    // No inline style or script survives the CSP, so none may be written:
+    // every <script> has a src, and every link is same-origin.
+    let lower = page.body.to_ascii_lowercase();
+    assert!(!lower.contains("<style") && !lower.contains(" style="), "inline style would be refused by the CSP");
+    for (i, _) in lower.match_indices("<script") {
+        let tag = &lower[i..i + lower[i..].find('>').unwrap()];
+        assert!(tag.contains(" src="), "inline <script> at byte {i} would be refused by the CSP");
+    }
+    for v in link_targets(&page.body) {
+        assert!((v.starts_with('/') && !v.starts_with("//")) || v.starts_with("data:"), "{v} is not same-origin");
+    }
+    assert_nothing_foreign("roomsim.html", &page.body);
+
+    for (path, ctype) in [("/roomsim/roomsim.js", "text/javascript"), ("/roomsim/roomsim.css", "text/css")] {
+        let r = g.get(path).await;
+        assert_eq!(r.status, 200, "{path}");
+        assert!(r.header("content-type").unwrap().starts_with(ctype), "{path}: {:?}", r.header("content-type"));
+        assert_eq!(r.header("x-content-type-options"), Some("nosniff"), "{path}");
+        assert_nothing_foreign(path, &r.body);
+    }
+
+    // Follow the page's module graph from the real served script, so a
+    // version bump that misses roomsim.js fails here without this test
+    // naming a version.
+    let js = g.get("/roomsim/roomsim.js").await.body;
+    let mut seen = 0;
+    for spec in import_specifiers(&js) {
+        let url = format!("/roomsim/{}", spec.trim_start_matches("./"));
+        let r = g.get(&url).await;
+        assert_eq!(r.status, 200, "roomsim.js imports {spec}, which is not served");
+        assert!(r.header("content-type").unwrap().starts_with("text/javascript"), "{url}");
+        assert!(r.header("cache-control").unwrap().contains("immutable"), "{url}: vendored files are cacheable for good");
+        let dir = &url[..url.rfind('/').unwrap() + 1];
+        for inner in import_specifiers(&r.body) {
+            let inner_url = format!("{dir}{}", inner.trim_start_matches("./"));
+            assert_eq!(g.get(&inner_url).await.status, 200, "{url} imports {inner}, which is not served");
+            seen += 1;
+        }
+        seen += 1;
+    }
+    assert!(seen >= 3, "the page's module graph was not found ({seen} modules)");
+
+    // The vendor route answers from its own allowlist (nosniff proves it
+    // was this handler, not the router's fallback), whatever the path.
+    let rev = import_specifiers(&js)[0].split('/').nth(2).unwrap().to_string();
+    for bad in [
+        format!("/roomsim/vendor/{rev}/..%2F..%2Fetc%2Fpasswd"),
+        format!("/roomsim/vendor/{rev}/LICENSE"),
+        format!("/roomsim/vendor/{rev}/VENDOR.md"),
+        "/roomsim/vendor/0.185.0/three.module.js".to_string(),
+    ] {
+        let r = g.get(&bad).await;
+        assert_eq!(r.status, 404, "{bad}");
+        assert_eq!(r.header("x-content-type-options"), Some("nosniff"), "{bad} was not answered by the vendor route");
+        assert_eq!(r.header("cache-control"), Some("no-store"), "{bad}");
+    }
+    assert_eq!(g.get("/roomsim/vendor/0.186.1/../../../etc/passwd").await.status, 404);
+
+    // The scene list names each scene, its provenance and the hash of its
+    // file — checked here against a digest of the file on disk.
+    let list = g.get("/roomsim/scenes").await.json();
+    assert_eq!(list["label"], "SCENE");
+    let scenes = list["scenes"].as_array().expect("scenes");
+    assert_eq!(scenes.len(), 3);
+    let spec_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../spec/scenes");
+    const SERVED_KEYS: [&str; 7] = ["schema_version", "name", "provenance", "room", "walls", "objects", "nodes"];
+    for s in scenes {
+        let id = s["id"].as_str().unwrap();
+        let file = std::fs::read_to_string(spec_dir.join(format!("{id}.json"))).unwrap();
+        let digest: String = Sha256::digest(file.as_bytes()).iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(s["sha256"], digest, "{id}: the listed hash is not the file's");
+        assert_eq!(s["provenance"], "hand_written");
+
+        let sc = g.get(&format!("/roomsim/scenes/{id}")).await;
+        assert_eq!(sc.status, 200);
+        let v = sc.json();
+        for k in v.as_object().unwrap().keys() {
+            assert!(SERVED_KEYS.contains(&k.as_str()), "{id}: {k} is outside the allowlist");
+        }
+        assert!(v["nodes"].as_array().is_some_and(|n| !n.is_empty()), "{id} has nodes");
+        // ADR-008 decision 3, checked by value as well as by key: no id
+        // of a person or the phone appears anywhere in what is served.
+        let raw: Value = serde_json::from_str(&file).unwrap();
+        let mut ids: Vec<&str> = raw["people"].as_array().unwrap().iter().filter_map(|p| p["id"].as_str()).collect();
+        ids.extend(raw["phone"]["id"].as_str());
+        assert!(!ids.is_empty(), "{id}: fixture has no person ids, so this check would be vacuous");
+        for pid in ids {
+            assert!(!sc.body.contains(&format!("\"{pid}\"")), "{id}: person/phone id {pid:?} was published");
+        }
+    }
+    assert_eq!(g.get("/roomsim/scenes/nope").await.status, 404);
+    g.stop().await;
+}
+
+/// ADR-008 decision 13: a gateway built without the `roomsim` feature
+/// has no room view at all.
+#[cfg(not(feature = "roomsim"))]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn room_demo_is_absent_from_a_default_build() {
+    let g = TestGw::start(config("no-roomsim", LAB)).await;
+    for path in ["/roomsim", "/roomsim/scenes", "/roomsim/roomsim.js"] {
+        assert_eq!(g.get(path).await.status, 404, "{path} is served without the roomsim feature");
+    }
+    g.stop().await;
+}
+
+/// Module specifiers a served script names: `from '…'` and `import('…')`,
+/// skipping comment lines.
+#[cfg(feature = "roomsim")]
+fn import_specifiers(js: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in js.lines() {
+        let t = line.trim_start();
+        if t.starts_with('*') || t.starts_with("//") || t.starts_with("/*") {
+            continue;
+        }
+        for pat in [" from '", " from \"", "import('", "import(\""] {
+            let mut rest = line;
+            while let Some(i) = rest.find(pat) {
+                let after = &rest[i + pat.len()..];
+                let q = pat.chars().last().unwrap();
+                if let Some(end) = after.find(q) {
+                    out.push(after[..end].to_string());
+                }
+                rest = after;
+            }
+        }
+    }
+    out
+}
+
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dashboard_is_served_and_self_contained() {
     let g = TestGw::start(config("dashboard", LAB)).await;
@@ -541,16 +695,8 @@ async fn dashboard_is_served_and_self_contained() {
         assert!(!stripped.contains(bad), "external reference {bad:?} in the dashboard");
     }
     // Every src= / href= is relative or a fragment, never protocol-relative.
-    for attr in ["src=", "href="] {
-        for (i, _) in body.match_indices(attr) {
-            let rest = &body[i + attr.len()..];
-            let quote = rest.chars().next().filter(|c| *c == '"' || *c == '\'');
-            let v = match quote {
-                Some(q) => rest[1..].split(q).next().unwrap(),
-                None => rest.split([' ', '>']).next().unwrap(),
-            };
-            assert!(!v.starts_with("//") && !v.contains("://"), "{attr}{v}");
-        }
+    for v in link_targets(&body) {
+        assert!(!v.starts_with("//") && !v.contains("://"), "dashboard links to {v}");
     }
     assert!(r.body.contains("not a medical device"));
     assert!(r.body.contains("/api/live"), "the dashboard uses the live feed");

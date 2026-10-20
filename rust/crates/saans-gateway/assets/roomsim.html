@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saans · room demo (declared geometry)</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/roomsim/roomsim.css">
+<script type="module" src="/roomsim/roomsim.js"></script>
+</head>
+<body>
+<header class="bar">
+  <h1>Room demo</h1>
+  <span class="badge scene" title="Everything on this page is declared in a scene file. Nothing here is measured by WiFi.">SCENE · declared, not sensed</span>
+  <div class="controls">
+    <label for="scene-picker">Scene <select id="scene-picker" aria-describedby="scene-help"></select></label>
+    <button id="view-toggle" type="button" aria-pressed="false">Top-down 2D</button>
+    <button id="dims-toggle" type="button" aria-pressed="true">Dimensions</button>
+    <button id="reset-view" type="button">Reset view</button>
+  </div>
+</header>
+<main>
+  <div class="viewport" id="viewport">
+    <div class="labels" id="labels" aria-hidden="true"></div>
+    <div class="overlay-key" id="overlay-key">Dimensions · <strong>SCENE</strong> · metres, as declared in the scene file</div>
+    <div class="notice hidden" id="notice" role="alert"></div>
+    <p class="sr-only" id="view-help">3-D view of the room. With the view focused: arrow keys pan, Shift or Ctrl with arrow keys rotate, plus and minus zoom, 0 resets the view. Every object, node and wall can also be selected from the list beside the view.</p>
+  </div>
+  <aside class="panel" aria-label="Scene details">
+    <section class="card" aria-labelledby="h-scene">
+      <h2 id="h-scene">Room <span class="tag">· SCENE</span></h2>
+      <dl class="kv" id="scene-info"><dt>Loading</dt><dd>…</dd></dl>
+      <p class="empty" id="scene-help">Room geometry comes from a scene file written by a person or imported from a scan. An ESP32 at 20 MHz with one antenna cannot measure a room, so nothing on this page is inferred from WiFi.</p>
+    </section>
+    <section class="card" aria-labelledby="h-sel" aria-live="polite">
+      <h2 id="h-sel">Selected <span class="tag">· SCENE</span></h2>
+      <p class="empty" id="sel-empty">Click or tap an object, a node or a wall, or pick one from the list below.</p>
+      <dl class="kv" id="sel-info" hidden></dl>
+    </section>
+    <section class="card" aria-labelledby="h-list">
+      <h2 id="h-list">In this room <span class="tag">· SCENE</span></h2>
+      <ul class="objects" id="object-list"></ul>
+    </section>
+  </aside>
+</main>
+<footer>Static demo of declared geometry only: no people, no estimates, no sensor data. See ADR-008 for what this view may and may not draw.</footer>
+<noscript><p>This demo draws the room with JavaScript and WebGL. The scene files are also available as JSON at /roomsim/scenes.</p></noscript>
+</body>
+</html>

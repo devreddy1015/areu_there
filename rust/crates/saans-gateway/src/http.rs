@@ -14,6 +14,11 @@
 //! | `GET /api/health` | gateway self-health | ops |
 //! | `GET /metrics` | Prometheus text format | ops |
 //! | `GET /api/live` | WebSocket: `{"type":"state"}` every 0.5 s, `{"type":"event"}` as they happen | in scope |
+//! | `GET /roomsim` | the room demo page (ADR-008); `roomsim` feature only | anyone |
+//! | `GET /roomsim/roomsim.js`, `/roomsim/roomsim.css` | the demo's own script and stylesheet | anyone |
+//! | `GET /roomsim/vendor/{rev}/{file}` | vendored three.js, three named files, cached immutable | anyone |
+//! | `GET /roomsim/scenes` | `{"label":"SCENE","scenes":[{id, name, provenance, sha256}]}` | anyone |
+//! | `GET /roomsim/scenes/{id}` | one example scene, allowlisted keys only (no people, no phone) | anyone |
 //!
 //! **Two locks on every byte of data.** The hub redacts by *consent*
 //! before publishing, so a space with `vitals = false` has no breathing
@@ -23,7 +28,11 @@
 //! what may exist, the principal decides who may see it.
 //!
 //! `/` is deliberately public. It is a static file with no data in it,
-//! and it has to load before anyone can log in.
+//! and it has to load before anyone can log in. The `/roomsim` routes are
+//! public for the same reason: they serve only the hand-written example
+//! scenes compiled into the binary, with people and phone removed. A real,
+//! surveyed scene describes a real room and is served — from Phase 5 —
+//! through the authenticated, space-scoped `/api` routes, never from here.
 
 use crate::audit::{Action, AuditLog};
 use crate::auth::{self, Auth, Denied};
@@ -92,7 +101,7 @@ pub struct AppState {
 
 pub fn router(deps: HttpDeps) -> Router {
     let HttpDeps { shared, stop, cfg, alerts, auth, audit } = deps;
-    Router::new()
+    let r = Router::new()
         .route("/", get(dashboard))
         .route("/api/me", get(me))
         .route("/api/login", post(login))
@@ -104,16 +113,19 @@ pub fn router(deps: HttpDeps) -> Router {
         .route("/api/links", get(links))
         .route("/api/health", get(health))
         .route("/metrics", get(metrics))
-        .route("/api/live", get(live))
-        .fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
+        .route("/api/live", get(live));
+    // The room demo is compiled in only on purpose (ADR-008 decision 13).
+    #[cfg(feature = "roomsim")]
+    let r = r.merge(crate::roomsim::routes());
+    r.fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
         .with_state(AppState { shared, stop, cfg, alerts, auth, audit })
 }
 
-fn error(status: StatusCode, msg: &str) -> Response {
+pub(crate) fn error(status: StatusCode, msg: &str) -> Response {
     (status, Json(json!({ "error": msg }))).into_response()
 }
 
-fn no_store(mut r: Response) -> Response {
+pub(crate) fn no_store(mut r: Response) -> Response {
     r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
@@ -563,9 +575,9 @@ mod tests {
         assert_eq!(parse_since("nope"), None);
     }
 
-    /// The dashboard must fetch nothing from the internet: it is served
-    /// from a box in a building that may have no route out, and a
-    /// stylesheet that fails to load is a dashboard nobody can read.
+    /// A page the gateway serves must fetch nothing from the internet: it
+    /// is served from a box in a building that may have no route out, and
+    /// a stylesheet that fails to load is a page nobody can read.
     ///
     /// XML namespace URIs are the one exception. `http://www.w3.org/...`
     /// in `xmlns` or `createElementNS` is an identifier, not an address
@@ -573,33 +585,70 @@ mod tests {
     /// Allowed by name here rather than by assembling the string at
     /// runtime to slip past the check, which would leave this test
     /// guarding nothing.
-    #[test]
-    fn dashboard_has_no_external_urls() {
+    ///
+    /// This covers every file the gateway itself authors. Vendored
+    /// libraries are covered differently — pinned by hash in
+    /// `roomsim::tests` and fenced by the demo's CSP — because a
+    /// third-party file's comments legitimately contain URLs.
+    fn assert_no_external_urls(name: &str, body: &str) {
         const XML_NS: [&str; 3] =
             ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"];
-        let mut stripped = DASHBOARD_HTML.to_string();
+        let mut stripped = body.to_string();
         for ns in XML_NS {
             stripped = stripped.replace(ns, "");
         }
         for bad in ["http://", "https://", "//cdn", "src=\"//", "@import", "url(http"] {
-            assert!(!stripped.contains(bad), "dashboard must stay offline-capable: found {bad:?}");
+            assert!(!stripped.contains(bad), "{name} must stay offline-capable: found {bad:?}");
+        }
+        // Protocol-relative URLs: `//` opening a string or a url(), followed
+        // by a host. Catches `'//unpkg…'`, `url(//fonts…)` and
+        // `import("//evil…")`, and still lets an expression like `'//' +`
+        // through.
+        let b = body.as_bytes();
+        for (i, _) in body.match_indices("//") {
+            let opens = i > 0 && matches!(b[i - 1], b'\'' | b'"' | b'(' | b'`');
+            let host = b.get(i + 2).is_some_and(|c| c.is_ascii_alphanumeric());
+            assert!(!(opens && host), "{name}: protocol-relative URL at byte {i}: {}", &body[i..body.len().min(i + 40)]);
+        }
+        // A dynamic import may only name a same-origin path.
+        for (i, _) in body.match_indices("import(") {
+            let arg = body[i + 7..].trim_start().trim_start_matches(['\'', '"', '`']);
+            assert!(arg.starts_with("./") || arg.starts_with('/'), "{name}: import( at byte {i} is not same-origin");
         }
         // The namespaces that *are* present may only appear as a
         // namespace argument, never as something to fetch. (A bare
         // `https:` — the scheme test the WebSocket URL does — is not a
         // URL and is not matched here.)
         for scheme in ["http://", "https://"] {
-            for (i, _) in DASHBOARD_HTML.match_indices(scheme) {
-                let rest = &DASHBOARD_HTML[i..];
-                let before = &DASHBOARD_HTML[i.saturating_sub(40)..i];
+            for (i, _) in body.match_indices(scheme) {
+                let rest = &body[i..];
+                let before = &body[i.saturating_sub(40)..i];
                 assert!(
                     XML_NS.iter().any(|ns| rest.starts_with(ns)) && (before.contains("xmlns") || before.contains("createElementNS")),
-                    "unexpected URL at byte {i}: ...{before}{}",
+                    "{name}: unexpected URL at byte {i}: ...{before}{}",
                     &rest[..rest.len().min(40)]
                 );
             }
         }
+    }
+
+    #[test]
+    fn dashboard_has_no_external_urls() {
+        assert_no_external_urls("dashboard.html", DASHBOARD_HTML);
         assert!(DASHBOARD_HTML.contains("not a medical device"));
+    }
+
+    /// ADR-008 decision 12: the demo page does not ship before the
+    /// self-containment check covers it.
+    #[cfg(feature = "roomsim")]
+    #[test]
+    fn every_page_the_gateway_authors_has_no_external_urls() {
+        use crate::roomsim::{ROOMSIM_CSS, ROOMSIM_HTML, ROOMSIM_JS};
+        for (name, body) in
+            [("dashboard.html", DASHBOARD_HTML), ("roomsim.html", ROOMSIM_HTML), ("roomsim.js", ROOMSIM_JS), ("roomsim.css", ROOMSIM_CSS)]
+        {
+            assert_no_external_urls(name, body);
+        }
     }
 
     fn p(role: Role, spaces: Option<&[&str]>) -> Principal {

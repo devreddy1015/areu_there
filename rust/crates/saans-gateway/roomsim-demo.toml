@@ -1,0 +1,28 @@
+# Loopback-only gateway for looking at the room demo (ADR-008).
+#
+#   cd rust && cargo run -p saans-gateway --features roomsim -- --config crates/saans-gateway/roomsim-demo.toml
+#
+# The `roomsim` feature is off by default (ADR-008 decision 13); without
+# it /roomsim is a 404.
+#   then open http://127.0.0.1:18080/roomsim
+#
+# Bound to 127.0.0.1, so authentication is off by design (config.rs
+# refuses auth.required = false on any other address). Reach it from
+# another machine through an SSH tunnel, never by widening http_addr:
+#
+#   ssh -N -L 18080:127.0.0.1:18080 <user>@<gpu-box>
+#
+# Ports differ from saans.example.toml so this can run beside a real
+# gateway. No sensor is expected on the UDP port; the demo draws declared
+# scenes only and needs no live data.
+udp_port = 15566
+udp_bind = "127.0.0.1"
+http_addr = "127.0.0.1:18080"
+data_dir = "saans-data"
+event_retention_days = 1
+utc_offset_minutes = 330
+
+[[space]]
+id = "demo"
+name = "Room demo (no sensors)"
+links = [{ rx = 1, tx = 2 }]

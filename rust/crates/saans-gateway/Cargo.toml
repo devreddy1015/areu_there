@@ -12,6 +12,11 @@ path = "src/lib.rs"
 name = "saans-gateway"
 path = "src/main.rs"
 
+[features]
+# The static room demo at /roomsim (ADR-008). Off by default: decision 13
+# says the view is compiled in only on purpose.
+roomsim = []
+
 [dependencies]
 saans-dsp = { path = "../saans-dsp" }
 saans-health = { path = "../saans-health" }

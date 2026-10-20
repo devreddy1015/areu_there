@@ -591,3 +591,51 @@ pub fn vital_keys(v: &Value) -> Vec<String> {
         })
         .collect()
 }
+
+// ------------------------------------------------------------------ pages
+
+/// Every `src=` / `href=` value in an HTML body, quote-aware: a quoted
+/// value runs to its closing quote, an unquoted one to whitespace or `>`.
+/// Shared by the dashboard's and the room demo's self-containment tests,
+/// so the two pages are held to the same parser.
+pub fn link_targets(body: &str) -> Vec<String> {
+    let lower = body.to_ascii_lowercase();
+    let mut out = Vec::new();
+    for attr in ["src=", "href="] {
+        for (i, _) in lower.match_indices(attr) {
+            let rest = &body[i + attr.len()..];
+            let quote = rest.chars().next().filter(|c| *c == '"' || *c == '\'');
+            let v = match quote {
+                Some(q) => rest[1..].split(q).next().unwrap_or(""),
+                None => rest.split([' ', '>', '\t', '\n']).next().unwrap_or(""),
+            };
+            out.push(v.to_string());
+        }
+    }
+    out
+}
+
+/// Fails on anything in a served text body that could make the browser
+/// fetch from another origin: an absolute URL, a protocol-relative one
+/// (`//host` opening a string or a `url(`), or a dynamic `import(` of a
+/// non-relative path. XML namespace URIs are identifiers, not addresses,
+/// and are allowed by name.
+pub fn assert_nothing_foreign(name: &str, body: &str) {
+    let mut stripped = body.to_string();
+    for ns in ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"] {
+        stripped = stripped.replace(ns, "");
+    }
+    for bad in ["http://", "https://", "@import", "url(http"] {
+        assert!(!stripped.contains(bad), "{name}: external reference {bad:?}");
+    }
+    let b = body.as_bytes();
+    for (i, _) in body.match_indices("//") {
+        let opens = i > 0 && matches!(b[i - 1], b'\'' | b'"' | b'(' | b'`');
+        let host = b.get(i + 2).is_some_and(|c| c.is_ascii_alphanumeric());
+        assert!(!(opens && host), "{name}: protocol-relative URL at byte {i}");
+    }
+    for (i, _) in body.match_indices("import(") {
+        let arg = body[i + 7..].trim_start().trim_start_matches(['\'', '"', '`']);
+        assert!(arg.starts_with("./") || arg.starts_with('/'), "{name}: import( at byte {i} is not same-origin");
+    }
+}
