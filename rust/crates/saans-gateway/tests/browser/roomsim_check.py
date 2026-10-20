@@ -221,25 +221,30 @@ with sync_playwright() as p:
     check("Back after a picker change returns to the previous scene", True)
 
     # Keyboard: zoom moves the view, 0 puts it back; Reset view does too (#41).
+    # The page redraws on the next animation frame, so every comparison
+    # waits for two frames rather than a fixed time: a fixed sleep made
+    # these checks flaky under load (1 run in 5 failed).
+    def settle():
+        page.evaluate("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
     def anchor_pos():
+        settle()
         return page.evaluate("[...document.querySelectorAll('.label.dim[data-why=shown]')].map(e => e.style.transform).join('|')")
     page.keyboard.press("Escape")
     home = anchor_pos()
     page.focus("canvas")
-    page.keyboard.press("+"); page.wait_for_timeout(150)
+    page.keyboard.press("+")
     check("+ zooms the view from the keyboard", anchor_pos() != home)
-    page.keyboard.press("0"); page.wait_for_timeout(150)
+    page.keyboard.press("0")
     check("0 resets the view from the keyboard", anchor_pos() == home)
-    page.keyboard.press("ArrowLeft"); page.wait_for_timeout(150)
+    page.keyboard.press("ArrowLeft")
     check("arrow keys pan the view", anchor_pos() != home)
-    page.click("#reset-view"); page.wait_for_timeout(150)
+    page.click("#reset-view")
     check("Reset view restores the view", anchor_pos() == home)
 
     # Plan view: the primary drag pans (#36).
-    page.click("#view-toggle"); page.wait_for_timeout(200)
+    page.click("#view-toggle")
     before = anchor_pos()
     page.mouse.move(500, 400); page.mouse.down(); page.mouse.move(600, 450, steps=6); page.mouse.up()
-    page.wait_for_timeout(150)
     check("in plan view a left-drag pans", anchor_pos() != before)
     page.click("#view-toggle")
 
@@ -317,6 +322,24 @@ with sync_playwright() as p:
     check("landscape phone: the footer comes after main, not over it", fold["footerTop"] >= fold["mainBottom"] - 0.5, fold)
     c.close()
     browser.close()
+
+    # ---- without WebGL the page still describes the room (#25, #39) ----
+    nogl = p.chromium.launch(executable_path=args.chrome, headless=True,
+                             args=["--disable-webgl", "--disable-webgl2", "--disable-3d-apis"])
+    pg = nogl.new_page(viewport={"width": 1366, "height": 860})
+    pg.on("pageerror", lambda e: results["pageerrors"].append(f"[no-webgl] {e}"))
+    pg.goto(f"{BASE}#scene=bedroom")
+    pg.wait_for_selector("body[data-ready=true]", timeout=20000)
+    check("without WebGL the page says the 3-D view is unavailable", "WebGL is not available" in pg.locator("#notice").inner_text())
+    items = pg.locator("#object-list li").all_inner_texts()
+    check("without WebGL every wall, object and node is listed as text",
+          sum(t.startswith("Wall ") for t in items) == 4 and sum(t.startswith("N") and "ESP32" in t for t in items) == 4
+          and any(t.startswith("bed:") for t in items), items[:3])
+    check("without WebGL the view controls are disabled",
+          all(pg.locator(f"#{i}").is_disabled() for i in ("view-toggle", "dims-toggle", "reset-view")))
+    check("without WebGL the room panel still names the scene and its provenance",
+          "bedroom-4.2x3.6" in pg.locator("#scene-info").inner_text() and "hand-written" in pg.locator("#scene-info").inner_text())
+    nogl.close()
 
 csp = [c for c in results["console"] if "Content Security Policy" in c or "Refused to" in c]
 # The failed-load check deliberately answers one scene with a 503; the

@@ -104,15 +104,24 @@ make -C edge/dsp/test check                 # C++ edge DSP against golden vector
 
 As of commit `a9c5abb`, the Python suite reports **459 tests, 2 failures +
 1 error** on this machine. All three reproduce on a clean clone of HEAD
-with no local changes, so they are not caused by new work:
+with no local changes, so none is caused by new work — and on inspection
+none is a bug in the code under test:
 
-| test | why |
-|---|---|
-| `test_synthetic.TestRandomSceneUnchanged.test_default_output_is_bit_identical_to_original` | SHA-256 bit-identity check. This box runs CPython 3.11.5; from 3.12 `sum()` over floats is Neumaier-compensated, which moves the last bits. NOTES.md §7.2 documents the sensitivity. |
-| `test_localize_invert.TestRegularizationSmooths.test_the_conditioning_trend_stops_past_the_room_scale` | numerical conditioning trend |
-| `test_recorder.TestCli.test_replay_send_over_udp` | UDP loopback in this environment |
+| test | cause | verified how |
+|---|---|---|
+| `test_synthetic.TestRandomSceneUnchanged.test_default_output_is_bit_identical_to_original` | CPython version. The hash was taken on CPython ≥ 3.12, where float `sum()` is Neumaier-compensated (NOTES.md §7.2); this box's default `python3` is 3.11.5. | **Passes** under Python 3.12.15. |
+| `test_localize_invert.TestRegularizationSmooths.test_the_conditioning_trend_stops_past_the_room_scale` | CPython version, same mechanism. | **Passes** under Python 3.12.15. |
+| `test_recorder.TestCli.test_replay_send_over_udp` | Kernel receive-buffer limit. The test asks for a 1 MB `SO_RCVBUF`, but `net.core.rmem_max` here is 212,992, so the socket gets 425,984 bytes; the replay then sends 598 datagrams in one burst (`--speed 0`) and 43 are dropped. | Measured: 598 sent, 555 received. Would pass with a larger `rmem_max`, or if the test read while sending. Not changed: it is not this work's test, and this is a shared machine. |
 
-Re-check the baseline before blaming your own change:
+So the suite to trust here is the one run under Python 3.12:
+
+```bash
+.venv/bin/pip install uv && .venv/bin/uv python install 3.12
+$(.venv/bin/uv python find 3.12) -m unittest discover -s tests
+```
+
+which leaves exactly one expected failure, the UDP one. Re-check the
+baseline on a clean clone before blaming your own change:
 
 ```bash
 git clone /home/Aman/are_u_theone/are_U_there /tmp/pristine && cd /tmp/pristine
@@ -202,6 +211,55 @@ load until you add at least one node:
 ```
 
 Edit the file, then re-run the schema check above against it.
+
+## 4b. The room demo (Phase 2)
+
+A static three.js view of the example scenes, served by the gateway at
+`/roomsim` (ADR-008). It draws declared geometry only: no people, no
+estimates, no sensor data. It is compiled in only with the `roomsim`
+cargo feature, which is off by default (ADR-008 decision 13); a normal
+build answers 404 there, and a test proves it.
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+cd rust && cargo run -p saans-gateway --features roomsim -- --config crates/saans-gateway/roomsim-demo.toml
+```
+
+Then open `http://127.0.0.1:18080/roomsim`. The gateway is bound to
+loopback, so from your laptop tunnel to it rather than widening
+`http_addr` (a non-loopback address turns authentication on):
+
+```bash
+ssh -N -L 18080:127.0.0.1:18080 <user>@<this-host>
+```
+
+Links are shareable and Back/Forward work: `#scene=office`,
+`#scene=hall-l-shaped&view=top`, `#dims=off`, `#select=almirah`. With the
+view focused, arrow keys pan, Shift/Ctrl+arrows rotate, `+`/`-` zoom and
+`0` resets; every object, node and wall is also selectable from the list.
+
+### Checking it in a real browser
+
+The Rust tests prove the page is *served* correctly; this proves it
+*works* — WebGL draws, the CSP blocks nothing it needs, clicks select,
+nothing overflows at 375 px. It drives the system Chrome, so no browser
+download is needed:
+
+```bash
+.venv/bin/pip install playwright
+.venv/bin/python -I rust/crates/saans-gateway/tests/browser/roomsim_check.py --base http://127.0.0.1:18080
+```
+
+It exits non-zero on any failure and writes screenshots to
+`$TMPDIR/roomsim-shots`. Look at them: a page can pass every check and
+still look wrong, and two of the bugs fixed while building this page were
+found by looking, not by checking.
+
+### Upgrading three.js
+
+See `rust/crates/saans-gateway/assets/vendor/three-0.186.1/VENDOR.md`. The
+vendored files are pinned by SHA-256 in `src/roomsim.rs`, so an upgrade
+fails the tests until the record is updated with it.
 
 ## 5. Datasets
 
