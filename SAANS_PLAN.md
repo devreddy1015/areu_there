@@ -85,6 +85,7 @@ is not able to see.
 | `rust/saans-dsp` | Rust | lead | Port of the wifisense core: biquad, Goertzel, band peak, static suppression, presence, breathing, heart, gap filling, RespirFi. No dependencies. |
 | `rust/saans-health` | Rust | lead | Health detectors (§2.1) over feature streams. |
 | `rust/saans-sim` | Rust | lead | Geometric scene simulator (port of `scene="geometric"`) plus scripted timelines: enter, sit, breathe, pause, burst, leave. Ground truth for S3. |
+| `rust/saans-scene` | Rust | lead | Declared room geometry: `scene.json` types, validation and the Apple RoomPlan importer. Geometry is SCENE, never inferred from CSI (ADR-008). |
 | `rust/saans-gateway` | Rust | lead | The gateway binary. |
 | `rust/saans-cli` | Rust | lead | `saans sim | replay | eval | bench`. |
 | `edge/dsp` | C++17 | edge | Header-only DSP for the ESP32: no heap after init, `float` (the S3 FPU is single precision). Host tests on golden vectors. |
@@ -162,6 +163,7 @@ See `spec/wire.md`. Two datagram types share the sensor port:
 | 005 | Health outputs are advisory, consent-gated per space, and must abstain below a confidence. No identities, ever. |
 | 006 | Link diversity (k-of-n presence, best-confidence breathing) over subcarrier selection as the blind-spot strategy. RespirFi stays available per link. |
 | 007 | No learned models until the DSP ceiling is measured on real data. |
+| 008 | Room geometry is declared in a scene file, never inferred from WiFi. The room may be drawn; a person only as an estimate with an uncertainty radius, gated by role and consent, SIM/REPLAY only. |
 
 ## 7. Roadmap with exit gates
 

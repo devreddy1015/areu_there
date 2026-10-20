@@ -162,7 +162,13 @@ driving it. See `COMPLETION_REPORT.md` for exactly what was run.
   that does nothing is worse than no button.
 - **Raw CSI heatmap.** FeatureFrames are not subcarrier data and must
   not be drawn as if they were.
-- **Floor plan, person position, 3D room.** No coordinates exist, and
-  localisation is a published negative result.
+- **Floor plan, person position, 3D room.** *Superseded by ADR-008
+  (2026-10-21).* Coordinates now have a schema (`spec/scene.schema.json`,
+  the `saans-scene` crate), so a room drawn from a scene file is declared
+  rather than invented and may be drawn on its own page. Localisation is
+  still a published negative result: a person is drawn only as an
+  estimate with a 95% credible radius, never as a point, and LIVE stays
+  gated until a real room is surveyed into a scene and the view can show
+  what is not covered. See ADR-008 for what may and may not be drawn.
 - **Client-side synthesis of any kind.** If the series is empty the view
   says so.
