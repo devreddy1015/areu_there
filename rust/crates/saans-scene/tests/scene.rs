@@ -347,3 +347,19 @@ fn a_scene_that_does_not_say_where_it_came_from_is_refused() {
     v.as_object_mut().unwrap().remove("provenance");
     assert!(Scene::from_json_str("<test>", &v.to_string()).is_err());
 }
+
+/// Every file in spec/scenes/, not a fixed list: the gateway serves
+/// whatever is there (its own test keeps the two sets equal), so a scene
+/// added without being listed here must still be validated.
+#[test]
+fn every_scene_file_in_spec_scenes_loads_and_validates() {
+    let mut n = 0;
+    for entry in std::fs::read_dir(scenes_dir()).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "json") {
+            Scene::load(&path).unwrap_or_else(|e| panic!("{}:\n{e}", path.display()));
+            n += 1;
+        }
+    }
+    assert!(n >= 3, "found only {n} scene files");
+}
