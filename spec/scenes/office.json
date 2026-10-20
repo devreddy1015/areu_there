@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "name": "office-6x5",
+  "provenance": "hand_written",
   "room": {
     "w_m": 6.0,
     "d_m": 5.0,

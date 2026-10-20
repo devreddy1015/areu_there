@@ -35,6 +35,10 @@ pub struct Scene {
     /// Format version. Readers reject a version they do not know.
     pub schema_version: u32,
     pub name: String,
+    /// Where this geometry came from. Shown next to every drawing of the
+    /// scene (ADR-008 decision 4), so a viewer can tell a surveyed room
+    /// from a scan with guessed materials from an illustrative example.
+    pub provenance: Provenance,
     pub room: Room,
     /// Wall segments. May be empty: a bare `Room` already implies four
     /// walls around its footprint, and the simulator's image method uses
@@ -51,6 +55,21 @@ pub struct Scene {
     pub people: Vec<Person>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phone: Option<Phone>,
+}
+
+/// How a scene's geometry was obtained.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Provenance {
+    /// Measured in the real room by a person with a tape or a laser.
+    Surveyed,
+    /// Produced by `saans import-roomplan` from an Apple RoomPlan scan:
+    /// the geometry is measured, but materials and wall thickness are
+    /// guesses until someone edits them.
+    RoomplanImport,
+    /// Written by hand without measuring a particular room: an example,
+    /// a test fixture, or a plan drawing.
+    HandWritten,
 }
 
 /// The room shell: a box, or a box plus a floor outline for an L-shape.

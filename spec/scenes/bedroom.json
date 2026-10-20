@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "name": "bedroom-4.2x3.6",
+  "provenance": "hand_written",
   "room": {
     "w_m": 4.2,
     "d_m": 3.6,

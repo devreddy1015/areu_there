@@ -5,7 +5,7 @@
 //! not against another call into `geom`.
 
 use saans_scene::geom;
-use saans_scene::scene::{Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Room, Scene, Wall, WallMaterial};
+use saans_scene::scene::{Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Provenance, Room, Scene, Wall, WallMaterial};
 use saans_scene::validate::SceneError;
 use saans_scene::SCHEMA_VERSION;
 
@@ -24,6 +24,7 @@ fn minimal() -> Scene {
     Scene {
         schema_version: SCHEMA_VERSION,
         name: "test".into(),
+        provenance: Provenance::HandWritten,
         room: Room { w_m: 4.0, d_m: 3.0, h_m: 2.5, polygon: None },
         walls: Vec::new(),
         objects: Vec::new(),
@@ -327,4 +328,22 @@ fn a_scene_without_a_phone_writes_no_null() {
     assert!(!text.contains("\"phone\""), "an absent phone was written:\n{text}");
     // ... and it still reads back as absent.
     assert!(Scene::from_json_str("<test>", &text).unwrap().phone.is_none());
+}
+
+/// The examples are illustrative rooms, not surveys of real ones, and the
+/// demo prints this field next to the drawing (ADR-008 decision 4). An
+/// example that claimed to be `surveyed` would be a false statement on
+/// screen.
+#[test]
+fn the_examples_admit_they_are_hand_written() {
+    for name in ["bedroom.json", "office.json", "hall-l-shaped.json"] {
+        assert_eq!(load(name).provenance, Provenance::HandWritten, "{name}");
+    }
+}
+
+#[test]
+fn a_scene_that_does_not_say_where_it_came_from_is_refused() {
+    let mut v: serde_json::Value = serde_json::from_str(&minimal().to_json_pretty()).unwrap();
+    v.as_object_mut().unwrap().remove("provenance");
+    assert!(Scene::from_json_str("<test>", &v.to_string()).is_err());
 }

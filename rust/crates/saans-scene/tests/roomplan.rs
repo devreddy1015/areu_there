@@ -8,7 +8,7 @@
 //! importer.
 
 use saans_scene::roomplan::{import_roomplan_str, RoomPlanWarning};
-use saans_scene::scene::{Node, ObjectKind, WallMaterial};
+use saans_scene::scene::{Node, ObjectKind, Provenance, WallMaterial};
 
 /// A 4x4 transform as Apple writes it: 16 numbers, column-major, with
 /// `col0` the element's local +x and `col3` its translation.
@@ -222,4 +222,10 @@ fn imported_geometry_carries_no_floating_point_noise() {
     }
     // The fixture is axis aligned, so every rotation should be exactly 0.
     assert!(out.scene.objects.iter().all(|o| o.yaw_deg == 0.0));
+}
+
+#[test]
+fn an_import_says_it_is_an_import() {
+    let out = import_roomplan_str("fixture", &fixture()).unwrap();
+    assert_eq!(out.scene.provenance, Provenance::RoomplanImport);
 }

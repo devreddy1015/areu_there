@@ -31,8 +31,8 @@
 //! origin and the floor is z = 0.
 
 use crate::scene::{
-    Node, Object, ObjectKind, ObjectMaterial, Point, Room, Scene, Wall, WallMaterial, DEFAULT_WALL_THICKNESS_M,
-    SCHEMA_VERSION,
+    Node, Object, ObjectKind, ObjectMaterial, Point, Provenance, Room, Scene, Wall, WallMaterial,
+    DEFAULT_WALL_THICKNESS_M, SCHEMA_VERSION,
 };
 use serde_json::Value;
 use std::fmt;
@@ -395,6 +395,7 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
     let scene = Scene {
         schema_version: SCHEMA_VERSION,
         name: name.to_string(),
+        provenance: Provenance::RoomplanImport,
         room,
         walls,
         objects,

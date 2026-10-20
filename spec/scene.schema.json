@@ -4,7 +4,7 @@
   "title": "Saans scene",
   "description": "Declared room geometry: the shell, walls and their materials, furniture, ESP32 node positions, and optionally where people and one tracked phone start. Everything here is DECLARED (labelled SCENE), never inferred from WiFi. Metres throughout, right-handed with +z up, origin at a room corner; the floor plane (x, y) matches saans_sim::scenario::Point. Angles are degrees counter-clockwise about +z from +x.",
   "type": "object",
-  "required": ["schema_version", "name", "room", "nodes"],
+  "required": ["schema_version", "name", "provenance", "room", "nodes"],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
@@ -16,6 +16,10 @@
       "description": "How this scene is named in reports and in the demo.",
       "type": "string",
       "minLength": 1
+    },
+    "provenance": {
+      "description": "How this geometry was obtained. Shown next to every drawing of the scene (ADR-008 decision 4). surveyed: measured in the real room. roomplan_import: from an Apple RoomPlan scan; geometry measured, materials and wall thickness guessed. hand_written: written without measuring a particular room (an example, a fixture, a plan drawing).",
+      "enum": ["surveyed", "roomplan_import", "hand_written"]
     },
     "room": { "$ref": "#/$defs/room" },
     "walls": {

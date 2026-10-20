@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "name": "hall-l-shaped-9x7",
+  "provenance": "hand_written",
   "room": {
     "w_m": 9.0,
     "d_m": 7.0,

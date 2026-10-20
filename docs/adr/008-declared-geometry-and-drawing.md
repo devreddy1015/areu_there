@@ -56,8 +56,8 @@ So the room became describable. The person did not.
 ### What may be drawn
 4. **The room, its nodes and its links may be drawn**, because all of it
    is declared or directly measured. The view shows the scene's name, the
-   hash of the file as loaded, and its provenance — surveyed,
-   roomplan-import or hand-written — so a viewer can tell declared
+   hash of the file as loaded, and its `provenance` — `surveyed`,
+   `roomplan_import` or `hand_written` — so a viewer can tell declared
    geometry from sensing. A scene imported from RoomPlan with unresolved
    importer warnings renders with those assumptions visible.
 5. **A person is an estimate, never a point.** The only type the renderer

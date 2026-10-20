@@ -43,7 +43,7 @@ pub mod validate;
 
 pub use roomplan::{import_roomplan_str, RoomPlanImport, RoomPlanWarning};
 pub use scene::{
-    Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Point, Point3, Room, Scene, Wall, WallMaterial,
+    Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Point, Point3, Provenance, Room, Scene, Wall, WallMaterial,
     DEFAULT_WALL_THICKNESS_M, SCHEMA_VERSION,
 };
 pub use validate::SceneError;
