@@ -314,3 +314,17 @@ fn distance_to_a_segment_is_measured_from_its_ends_not_its_line() {
     let d = geom::distance_to_segment((0.0, 0.0), (0.0, 4.0), (3.0, 8.0));
     assert!((d - 5.0).abs() < 1e-12, "got {d}");
 }
+
+/// Regression: `phone` used to serialize as `"phone": null` when absent,
+/// which this crate read back happily but `spec/scene.schema.json`
+/// rejects (it has no null for that key). A file the Rust side accepts
+/// and the schema refuses is exactly the drift these two are supposed to
+/// prevent, so the key is omitted instead.
+#[test]
+fn a_scene_without_a_phone_writes_no_null() {
+    let text = minimal().to_json_pretty();
+    assert!(!text.contains("null"), "a null reached the file:\n{text}");
+    assert!(!text.contains("\"phone\""), "an absent phone was written:\n{text}");
+    // ... and it still reads back as absent.
+    assert!(Scene::from_json_str("<test>", &text).unwrap().phone.is_none());
+}

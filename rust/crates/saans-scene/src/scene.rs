@@ -49,7 +49,7 @@ pub struct Scene {
     /// not a rehearsal; the timeline decides what anyone does.
     #[serde(default)]
     pub people: Vec<Person>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phone: Option<Phone>,
 }
 

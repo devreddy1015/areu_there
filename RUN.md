@@ -178,6 +178,31 @@ for name in ("bedroom", "office", "hall-l-shaped"):
 PY
 ```
 
+### Importing a room from an iPhone scan
+
+Scan the room with any RoomPlan app that can export `CapturedRoom` JSON,
+copy the file over, then:
+
+```bash
+cd rust && cargo build --release -p saans-cli
+./target/release/saans import-roomplan ~/bedroom-scan.json --out ../spec/scenes/mine.json --name "my bedroom"
+```
+
+It prints every assumption it had to make. RoomPlan measures geometry and
+nothing else, so **the materials, the wall thickness and all the node
+positions are yours to fill in** - the written scene deliberately does not
+load until you add at least one node:
+
+```
+  assumed: RoomPlan surfaces are planar, so all 4 wall(s) were given thickness 0.1 m
+  assumed: materials are assumed, not measured: 4 wall(s) set to drywall ...
+  assumed: a scan contains no ESP32 nodes: add them to `nodes` before this scene will load
+  this scene does not load yet (1 problem(s) to fix by hand):
+    - nodes is empty: a scene with no ESP32 has nothing to simulate
+```
+
+Edit the file, then re-run the schema check above against it.
+
 ## 5. Datasets
 
 Nothing is downloaded yet. When Phases 9 and 11 need LoFi, OpenCSI,

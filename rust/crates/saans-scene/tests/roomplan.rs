@@ -192,3 +192,34 @@ fn an_unreadable_element_is_skipped_rather_than_failing_the_import() {
     assert_eq!(out.scene.walls.len(), 1);
     assert!(out.warnings.iter().any(|w| matches!(w, RoomPlanWarning::Unreadable { index: 1, .. })));
 }
+
+/// Regression: positions come out of a 4x4 transform and an `atan2`, so
+/// before rounding an axis-aligned wall landed at 9.184850993605148e-17,
+/// a 3 m room measured 3.0000000000000004 m, and every `yaw_deg` printed
+/// as `-0.0`. Scene files are read, edited and diffed by people.
+#[test]
+fn imported_geometry_carries_no_floating_point_noise() {
+    let out = import_roomplan_str("fixture", &fixture()).unwrap();
+    assert_eq!(out.scene.room.w_m, 4.0);
+    assert_eq!(out.scene.room.d_m, 3.0);
+    assert_eq!(out.scene.room.h_m, 2.5);
+
+    let tidy = |v: f64, what: &str| {
+        assert_eq!(v, (v * 1e6).round() / 1e6, "{what} = {v} is not rounded to a micrometre");
+        assert!(!(v == 0.0 && v.is_sign_negative()), "{what} is negative zero");
+    };
+    for (i, w) in out.scene.walls.iter().enumerate() {
+        for p in [w.from, w.to] {
+            tidy(p.0, &format!("walls[{i}] x"));
+            tidy(p.1, &format!("walls[{i}] y"));
+        }
+    }
+    for (i, o) in out.scene.objects.iter().enumerate() {
+        tidy(o.pos.0, &format!("objects[{i}].pos.x"));
+        tidy(o.pos.1, &format!("objects[{i}].pos.y"));
+        tidy(o.pos.2, &format!("objects[{i}].pos.z"));
+        tidy(o.yaw_deg, &format!("objects[{i}].yaw_deg"));
+    }
+    // The fixture is axis aligned, so every rotation should be exactly 0.
+    assert!(out.scene.objects.iter().all(|o| o.yaw_deg == 0.0));
+}

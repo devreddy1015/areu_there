@@ -194,6 +194,28 @@ fn to_scene(p: (f64, f64, f64)) -> (f64, f64, f64) {
     (p.0, -p.2, p.1)
 }
 
+/// Round to the nearest micrometre, and turn -0.0 into 0.0.
+///
+/// Positions come out of a 4x4 transform and a `cos`/`atan2` pair, so an
+/// axis-aligned wall arrives at 9.2e-17 rather than 0, a 3 m room
+/// measures 3.0000000000000004 m, and a rotation of zero prints as -0.
+/// A scene file is read and edited by people and diffed in review; a
+/// micrometre is orders of magnitude below what a LiDAR scan resolves,
+/// so the noise is dropped rather than published.
+fn round_m(x: f64) -> f64 {
+    let r = (x * 1e6).round() / 1e6;
+    // -0.0 == 0.0, so this normalises the sign as well as the value.
+    if r == 0.0 {
+        0.0
+    } else {
+        r
+    }
+}
+
+fn round_point(p: Point) -> Point {
+    (round_m(p.0), round_m(p.1))
+}
+
 fn default_material(kind: ObjectKind) -> ObjectMaterial {
     match kind {
         ObjectKind::Bed | ObjectKind::Sofa => ObjectMaterial::Fabric,
@@ -232,7 +254,7 @@ fn read_element(v: &Value) -> Option<Element> {
     let size = (d.0, d.2, d.1);
     let lx = t.local_x();
     // Local +x projected onto the scene floor plane.
-    let yaw_deg = (-lx.2).atan2(lx.0).to_degrees();
+    let yaw_deg = round_m((-lx.2).atan2(lx.0).to_degrees());
     if ![pos.0, pos.1, pos.2, size.0, size.1, size.2, yaw_deg].iter().all(|x| x.is_finite()) {
         return None;
     }
@@ -291,17 +313,17 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
     let shift = |p: (f64, f64)| -> Point { (p.0 - min_x, p.1 - min_y) };
     let shift3 = |p: (f64, f64, f64)| (p.0 - min_x, p.1 - min_y, p.2 - floor_z);
 
-    let room_h = raw_walls.iter().map(|w| w.top - floor_z).fold(0.0, f64::max);
-    let room = Room { w_m: max_x - min_x, d_m: max_y - min_y, h_m: room_h, polygon: None };
+    let room_h = round_m(raw_walls.iter().map(|w| w.top - floor_z).fold(0.0, f64::max));
+    let room = Room { w_m: round_m(max_x - min_x), d_m: round_m(max_y - min_y), h_m: room_h, polygon: None };
 
     let walls: Vec<Wall> = raw_walls
         .iter()
         .map(|w| Wall {
-            from: shift(w.a),
-            to: shift(w.b),
+            from: round_point(shift(w.a)),
+            to: round_point(shift(w.b)),
             material: WallMaterial::Drywall,
             thickness_m: DEFAULT_WALL_THICKNESS_M,
-            height_m: Some((w.top - floor_z).min(room_h)),
+            height_m: Some(round_m((w.top - floor_z).min(room_h))),
         })
         .collect();
     warnings.push(RoomPlanWarning::ThicknessAssumed { walls: walls.len(), thickness_m: DEFAULT_WALL_THICKNESS_M });
@@ -324,8 +346,8 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
             objects.push(Object {
                 kind,
                 id: None,
-                pos: p,
-                size: (e.size.0, depth, e.size.2),
+                pos: (round_m(p.0), round_m(p.1), round_m(p.2)),
+                size: (round_m(e.size.0), round_m(depth), round_m(e.size.2)),
                 yaw_deg: e.yaw_deg,
                 material: default_material(kind),
             });
@@ -352,11 +374,12 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
                 warnings.push(RoomPlanWarning::Unreadable { what: "objects".into(), index: i });
                 continue;
             };
+            let p = shift3(e.pos);
             objects.push(Object {
                 kind,
                 id: None,
-                pos: shift3(e.pos),
-                size: e.size,
+                pos: (round_m(p.0), round_m(p.1), round_m(p.2)),
+                size: (round_m(e.size.0), round_m(e.size.1), round_m(e.size.2)),
                 yaw_deg: e.yaw_deg,
                 material: default_material(kind),
             });
