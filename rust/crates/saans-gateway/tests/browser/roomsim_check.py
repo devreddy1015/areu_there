@@ -234,6 +234,8 @@ with sync_playwright() as p:
     page.focus("canvas")
     page.keyboard.press("+")
     check("+ zooms the view from the keyboard", anchor_pos() != home)
+    page.keyboard.press("Control+0")
+    check("Ctrl+0 is left to the browser (the view stays zoomed)", anchor_pos() != home)
     page.keyboard.press("0")
     check("0 resets the view from the keyboard", anchor_pos() == home)
     page.keyboard.press("ArrowLeft")
@@ -256,6 +258,7 @@ with sync_playwright() as p:
     check("a failed load shows a notice", page.locator("#notice").is_visible() and "Could not load" in page.locator("#notice").inner_text())
     check("after a failed load the picker still names what is drawn",
           page.eval_on_selector("#scene-picker", "e => e.value") == page.get_attribute("body", "data-scene") == "bedroom")
+    check("after a failed load the URL still names what is drawn", "scene=bedroom" in page.url and "office" not in page.url, page.url)
     page.unroute("**/roomsim/scenes/office")
     page.select_option("#scene-picker", "hall-l-shaped")
     page.wait_for_selector("body[data-scene='hall-l-shaped']")
@@ -328,6 +331,7 @@ with sync_playwright() as p:
                              args=["--disable-webgl", "--disable-webgl2", "--disable-3d-apis"])
     pg = nogl.new_page(viewport={"width": 1366, "height": 860})
     pg.on("pageerror", lambda e: results["pageerrors"].append(f"[no-webgl] {e}"))
+    pg.on("console", lambda m: results["console"].append(f"[no-webgl] {m.type}: {m.text}"))
     pg.goto(f"{BASE}#scene=bedroom")
     pg.wait_for_selector("body[data-ready=true]", timeout=20000)
     check("without WebGL the page says the 3-D view is unavailable", "WebGL is not available" in pg.locator("#notice").inner_text())
@@ -339,12 +343,30 @@ with sync_playwright() as p:
           all(pg.locator(f"#{i}").is_disabled() for i in ("view-toggle", "dims-toggle", "reset-view")))
     check("without WebGL the room panel still names the scene and its provenance",
           "bedroom-4.2x3.6" in pg.locator("#scene-info").inner_text() and "hand-written" in pg.locator("#scene-info").inner_text())
+    # A failed load and then a good one must not clear the WebGL notice.
+    pg.route("**/roomsim/scenes/office", lambda r: r.fulfill(status=503, body="down"))
+    pg.select_option("#scene-picker", "office"); pg.wait_for_timeout(400)
+    pg.unroute("**/roomsim/scenes/office")
+    pg.select_option("#scene-picker", "hall-l-shaped")
+    pg.wait_for_selector("body[data-scene='hall-l-shaped']")
+    check("without WebGL, the notice survives a failed load followed by a good one",
+          pg.locator("#notice").is_visible() and "WebGL is not available" in pg.locator("#notice").inner_text())
+    pg.goto(f"{BASE}#scene=garage"); pg.wait_for_timeout(300)
+    pg.select_option("#scene-picker", "office")
+    pg.wait_for_selector("body[data-scene='office']")
+    check("without WebGL, the notice survives an unknown scene followed by a good one",
+          pg.locator("#notice").is_visible() and "WebGL is not available" in pg.locator("#notice").inner_text())
     nogl.close()
 
 csp = [c for c in results["console"] if "Content Security Policy" in c or "Refused to" in c]
-# The failed-load check deliberately answers one scene with a 503; the
-# browser and the page both log that, and nothing else may error.
-expected = lambda c: c.startswith("[review]") and "503" in c
+# Two kinds of error are caused on purpose and nothing else may error: the
+# failed-load checks answer one scene with a 503 (the browser and the page
+# both log it), and the no-WebGL run disables WebGL, so three.js logs that
+# it could not create a context.
+def expected(c):
+    if c.startswith(("[review]", "[no-webgl]")) and "503" in c:
+        return True
+    return c.startswith("[no-webgl]") and ("WebGL context could not be created" in c or "Error creating WebGL context" in c)
 errs = [c for c in results["console"] if " error:" in c and not expected(c)]
 check("no CSP violations in the console", not csp, csp[:3])
 check("no console errors", not errs, errs[:5])

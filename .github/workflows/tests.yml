@@ -6,13 +6,15 @@
 # by `cargo test` and would otherwise be enforced by review alone.
 #
 # Written on a machine with no push access, so this has never run on
-# GitHub. Every command in it was run locally first (RUN.md §3); the first
-# push is what will show whether the runner agrees.
+# GitHub. Every command in it was run locally first (RUN.md §3) except the
+# `sudo sysctl` step, which was not run on that shared machine; the first
+# push will show whether the runner agrees.
 name: "Tests"
 
+# Every branch, not just main: a pushed feature branch should be tested
+# before it is merged, not after.
 on:
   push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -31,8 +33,9 @@ jobs:
       - run: cargo test --workspace --locked
         working-directory: rust
       # The room demo is compiled only with this feature (ADR-008 decision
-      # 13), so its tests run only here. Not --all-features: that would also
-      # switch on features meant to stay off in some crates.
+      # 13), so its tests run only here. The feature is named rather than
+      # using --all-features, so a feature added later to some other crate
+      # is not switched on here by accident.
       - run: cargo test -p saans-gateway --features roomsim --locked
         working-directory: rust
 
@@ -51,6 +54,8 @@ jobs:
       # that asks for a 1 MB receive buffer. The kernel default rmem_max
       # (212992) caps it at ~416 KB and drops ~7% of them (measured: 598
       # sent, 555 received). Raise the cap rather than weaken the test.
+      # Not run locally (shared machine); that it fixes the test is the
+      # expected, not the observed, result.
       - run: sudo sysctl -w net.core.rmem_max=4194304
       - run: python -m unittest discover -s tests
 

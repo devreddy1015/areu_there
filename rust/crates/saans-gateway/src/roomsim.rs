@@ -138,7 +138,8 @@ async fn vendor(Path((rev, file)): Path<(String, String)>) -> Response {
     asset(body, "text/javascript; charset=utf-8", true)
 }
 
-/// A scene as served: only the `SERVED_KEYS` of the file, in that order.
+/// A scene as served: only the `SERVED_KEYS` of the file. (Key order in
+/// the response is serde_json's, alphabetical; nothing depends on it.)
 pub(crate) fn served_scene(text: &str) -> Option<Value> {
     let v: Value = serde_json::from_str(text).ok()?;
     let obj = v.as_object()?;
@@ -185,12 +186,20 @@ async fn scene(Path(id): Path<String>) -> Response {
 pub(crate) fn module_specifiers(js: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in js.lines() {
-        let t = line.trim_start();
-        if t.starts_with('*') || t.starts_with("//") || t.starts_with("/*") {
+        let mut t = line.trim_start();
+        // A line that opens with a closed block comment may still carry
+        // code after it: `/* note */ import x from './x.js';`.
+        if t.starts_with("/*") {
+            match t.find("*/") {
+                Some(end) => t = t[end + 2..].trim_start(),
+                None => continue,
+            }
+        }
+        if t.starts_with('*') || t.starts_with("//") {
             continue;
         }
         for pat in [" from '", " from \"", "import('", "import(\"", "import '", "import \""] {
-            let mut rest = line;
+            let mut rest = t;
             while let Some(i) = rest.find(pat) {
                 let after = &rest[i + pat.len()..];
                 let quote = pat.chars().last().unwrap();
@@ -231,7 +240,9 @@ mod tests {
     #[test]
     fn the_vendored_files_need_no_eval_and_reach_nothing_but_each_other() {
         for (name, body) in [("three.core.js", THREE_CORE), ("three.module.js", THREE_MODULE), ("OrbitControls.js", ORBIT_CONTROLS)] {
-            for banned in ["eval(", "new Function", "new Worker", "importScripts"] {
+            // `import(` too: none of these files loads code dynamically, and
+            // a dynamic import with a computed argument could not be checked.
+            for banned in ["eval(", "new Function", "new Worker", "importScripts", "import("] {
                 assert!(!body.contains(banned), "{name} contains {banned:?}, which the CSP would have to allow");
             }
             for spec in module_specifiers(body) {
@@ -257,8 +268,8 @@ mod tests {
 
     #[test]
     fn the_specifier_scan_finds_every_form_and_ignores_comments() {
-        let js = "import { a } from './a.js';\nexport { b } from \"./b.js\";\nconst c = await import('./c.js');\nimport './d.js';\n * import { e } from 'three';\n// import x from 'y';\n";
-        assert_eq!(module_specifiers(js), ["./a.js", "./b.js", "./c.js", "./d.js"]);
+        let js = "import { a } from './a.js';\nexport { b } from \"./b.js\";\nconst c = await import('./c.js');\nimport './d.js';\n * import { e } from 'three';\n// import x from 'y';\n/* note */ import { f } from './f.js';\n/* unclosed\n";
+        assert_eq!(module_specifiers(js), ["./a.js", "./b.js", "./c.js", "./d.js", "./f.js"]);
     }
 
     /// The page's policy must be at least as strict as the dashboard's, and

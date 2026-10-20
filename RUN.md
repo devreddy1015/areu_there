@@ -65,9 +65,11 @@ export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
 rustc 1.99.0, cargo 1.99.0, clippy and rustfmt. The workspace declares
-`rust-version = "1.80"`, but `saans-sim/tests/parity.rs` and
-`examples/scan_seats.rs` use `slice::as_chunks::<8>()`, which needs a much
-newer toolchain — the crates' `src/` honours the MSRV, the tests do not.
+`rust-version = "1.80"` in `[workspace.package]`, but no crate sets
+`rust-version.workspace = true`, so cargo enforces nothing. Everything
+here was built and tested on 1.99 only; the code (and certainly
+`saans-sim`'s tests, which use `slice::as_chunks`) needs a much newer
+toolchain than 1.80. Treat the declared MSRV as aspirational.
 
 Python lives in a venv at the repo root (git-ignored):
 
@@ -96,9 +98,15 @@ by policy** and must keep running on bare `python3`, outside this venv.
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
 cd rust && cargo test --workspace          # all Rust crates
+cargo test -p saans-gateway --features roomsim   # the room demo's tests exist only here
 cd /home/Aman/are_u_theone/are_U_there && python3 -m unittest discover -s tests
 make -C edge/dsp/test check                 # C++ edge DSP against golden vectors
 ```
+
+On this box `make check` runs **g++ only**: clang++ is not installed, the
+Makefile prints "clang++ not installed, skipping", and its summary banner
+still says "(g++ and clang++)… under both toolchains". The banner is
+wrong; the g++ result is real.
 
 ### Known pre-existing failures
 
@@ -246,12 +254,13 @@ nothing overflows at 375 px. It drives the system Chrome, so no browser
 download is needed:
 
 ```bash
-.venv/bin/pip install playwright
+.venv/bin/pip install playwright pillow
 .venv/bin/python -I rust/crates/saans-gateway/tests/browser/roomsim_check.py --base http://127.0.0.1:18080
 ```
 
 It exits non-zero on any failure and writes screenshots to
-`$TMPDIR/roomsim-shots`. Look at them: a page can pass every check and
+`roomsim-shots` in Python's temp directory (`/tmp` here; pass `--out` to
+choose). Look at them: a page can pass every check and
 still look wrong, and two of the bugs fixed while building this page were
 found by looking, not by checking.
 

@@ -111,20 +111,30 @@ const state = {
 };
 
 /**
- * One overlay, several reasons to show it. Each reason is cleared only by
- * the event that resolves it, so a failed load does not hide "WebGL is
- * unavailable", and a later successful load does clear a failed one.
+ * One overlay, several reasons to show it. Every active reason is kept and
+ * the most recent is shown; each is cleared only by the event that
+ * resolves it. So a later good load clears a failed one, and nothing but
+ * WebGL itself can clear "WebGL is not available".
  */
-function showNotice(text, reason) {
-  notice.textContent = text;
-  notice.dataset.reason = reason;
-  notice.classList.remove('hidden');
-}
-function clearNotice(...reasons) {
-  if (reasons.includes(notice.dataset.reason)) {
-    notice.classList.add('hidden');
+const notices = new Map(); // reason -> text, in the order raised
+function paintNotice() {
+  const last = [...notices].pop();
+  notice.classList.toggle('hidden', !last);
+  if (last) {
+    notice.dataset.reason = last[0];
+    notice.textContent = last[1];
+  } else {
     delete notice.dataset.reason;
   }
+}
+function showNotice(text, reason) {
+  notices.delete(reason);
+  notices.set(reason, text);
+  paintNotice();
+}
+function clearNotice(...reasons) {
+  for (const r of reasons) notices.delete(r);
+  paintNotice();
 }
 
 // ---------------------------------------------------------------- three.js
@@ -622,10 +632,27 @@ function highlight(obj, on) {
 }
 
 const keyOf = (obj) => `${obj.userData.kind}:${obj.userData.index}`;
-/** How a selection is named in the URL: an object's id if it has one. */
-const urlKey = (obj) => (obj ? (obj.userData.kind === 'object' && obj.userData.data.id) || keyOf(obj) : null);
+/**
+ * How a selection is named in the URL: an object's id when exactly one
+ * object has it (readable links like select=almirah), otherwise the
+ * positional key, because ids are optional and need not be unique.
+ */
+function urlKey(obj) {
+  if (!obj) return null;
+  const id = obj.userData.kind === 'object' && obj.userData.data.id;
+  const unique = id && pickables.filter((o) => o.userData.kind === 'object' && o.userData.data.id === id).length === 1;
+  return unique ? id : keyOf(obj);
+}
+function fromUrlKey(key) {
+  if (!key) return null;
+  return pickables.find((o) => keyOf(o) === key)
+    || (pickables.filter((o) => o.userData.kind === 'object' && o.userData.data.id === key).length === 1
+      ? pickables.find((o) => o.userData.kind === 'object' && o.userData.data.id === key) : null);
+}
 
-function select(obj) {
+/** `write: false` while a load is in progress: the URL is written once,
+ *  by whoever finishes the navigation, not halfway through it. */
+function select(obj, { write = true } = {}) {
   highlight(state.selected, false);
   state.selected = obj;
   highlight(obj, true);
@@ -640,7 +667,7 @@ function select(obj) {
     ui.selInfo.hidden = false;
     ui.selEmpty.hidden = true;
   }
-  writeHash();
+  if (write) writeHash();
   render();
 }
 
@@ -680,6 +707,8 @@ if (renderer) {
     select(!hit || hit.object.userData.kind === 'floor' ? null : hit.object);
   });
   canvas.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd with + - 0 is the browser's page zoom; never take it over.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '+' || e.key === '=') zoomBy(1.2);
     else if (e.key === '-' || e.key === '_') zoomBy(1 / 1.2);
     else if (e.key === '0') { resetView(); render(); }
@@ -769,7 +798,7 @@ function showMissing(id) {
   ui.picker.value = '';
   ui.info.replaceChildren(...kv([['Scene', `none — "${id}" is not served by this gateway`]]));
   ui.list.replaceChildren();
-  select(null);
+  select(null, { write: false });
   showNotice(`No scene named "${id}" is served by this gateway. Choose one from the list above.`, 'scene');
   document.body.dataset.scene = '';
   render();
@@ -811,7 +840,8 @@ let loadSeq = 0;
 /**
  * Load and draw a served scene. Returns false if a newer request
  * overtook this one (its response is discarded, so a slow earlier pick
- * can never overwrite a later one) or if the load failed.
+ * can never overwrite a later one) or if the load failed. Never writes
+ * the URL: the caller does, once the navigation has succeeded.
  */
 async function show(id) {
   const entry = state.scenes.find((s) => s.id === id);
@@ -839,6 +869,7 @@ async function show(id) {
     resetView();
   }
   fillPanel(sc, entry);
+  select(null, { write: false });
   clearNotice('load', 'scene');
   document.body.dataset.scene = entry.id; // which scene is drawn, for automated checks
   return true;
@@ -889,13 +920,15 @@ async function applyHash() {
   }
   if (!state.entry || state.entry.id !== want) {
     if (!(await show(want))) return;
+  } else {
+    // Already drawn: any load still in flight is for a scene the viewer
+    // has navigated away from, and any load error is about it too.
+    loadSeq++;
+    clearNotice('load', 'scene');
   }
   setDims(state.dims);
   setTopDown(state.topDown);
-  const target = h.select
-    ? pickables.find((o) => keyOf(o) === h.select || (o.userData.data && o.userData.data.id === h.select)) || null
-    : null;
-  select(target);
+  select(fromUrlKey(h.select));
 }
 
 function fail(err) {
@@ -903,9 +936,16 @@ function fail(err) {
   showNotice(`Could not load the scene: ${err.message}`, 'load');
 }
 
+// A pick adds a history entry only once the scene has loaded, so a failed
+// pick leaves the URL, the picker, the panel and the drawing agreeing.
 ui.picker.addEventListener('change', () => {
-  history.pushState(null, '', hashFor({ scene: ui.picker.value, topDown: state.topDown, dims: state.dims }));
-  applyHash().catch(fail);
+  const id = ui.picker.value;
+  show(id).then((ok) => {
+    if (!ok) return;
+    history.pushState(null, '', hashFor({ scene: id, topDown: state.topDown, dims: state.dims }));
+    setDims(state.dims);
+    setTopDown(state.topDown);
+  }).catch(fail);
 });
 ui.view.addEventListener('click', () => setTopDown(!state.topDown));
 ui.dims.addEventListener('click', () => setDims(!state.dims));
@@ -944,8 +984,9 @@ async function main() {
       + 'every wall, object and node is listed below.';
     for (const b of [ui.view, ui.dims, ui.reset]) b.disabled = true;
   }
-  await applyHash();
+  // Listen first: a hash change during the first load must not be lost.
   window.addEventListener('hashchange', () => applyHash().catch(fail));
+  await applyHash();
   document.body.dataset.ready = 'true'; // for automated checks of the page
 }
 

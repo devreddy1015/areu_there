@@ -29,9 +29,10 @@ touched. Upstream sha256 of the unmodified file:
 ## Audited before vendoring
 
 None of the three JavaScript files contains `eval(`, `new Function` or
-`new Worker`, so the page needs no `'unsafe-eval'`. `three.core.js` has
-three `fetch(` calls, all inside loaders the demo does not use; the page's
-`connect-src 'self'` would refuse a cross-origin fetch from them anyway.
+`new Worker`, so the page needs no `'unsafe-eval'`. `three.core.js` has two
+`fetch()` calls (and a third mention inside a warning string), all in
+loaders the demo does not use; the page's `connect-src 'self'` would refuse
+a cross-origin fetch from them anyway.
 `three.module.js` imports only `./three.core.js`; `three.core.js` imports
 nothing.
 
@@ -42,8 +43,8 @@ immutable for a year. `0.186.1` is the upstream version; `-saans1` is the
 local revision, because `OrbitControls.js` carries a local change. **Any
 change to any vendored byte bumps the suffix** (`-saans2`, …), or browsers
 that cached the old bytes keep running them. `VENDOR_REV` in
-`src/roomsim.rs` is the single source; a test fails if this file does not
-name it.
+`src/roomsim.rs` decides the served path; tests fail if `roomsim.js`
+imports a different one or if this file does not name it.
 
 ## Upgrading
 
@@ -54,14 +55,21 @@ Every place the version lives, in order:
 2. Copy the same four files into a new `assets/vendor/three-<version>/`,
    re-apply the one-line change to `OrbitControls.js`, and re-audit (no
    `eval(`, `new Function`, `new Worker`; every import relative).
-3. In `src/roomsim.rs`: the three `include_str!` paths, the
-   `include_str!` of this file in the pinned-hash test, `VENDOR_REV`
-   (reset the suffix to `-saans1`), and the pinned SHA-256 values.
+3. In `src/roomsim.rs`: the module doc's directory name, `VENDOR_REV`
+   (reset the suffix to `-saans1`), the three `include_str!` paths, the
+   `include_str!` of this file in the pinned-hash test, and the pinned
+   SHA-256 values.
 4. In `assets/roomsim.js`: the two `import` paths. A test fails if they
    disagree with `VENDOR_REV`.
-5. In `tests/e2e.rs`: nothing — it reads the import paths from the page.
-6. This file, `NOTICE` at the repo root (version and copyright years),
-   and the mentions in `RUN.md` and `ROOMSIM.md`.
+5. In `tests/e2e.rs`: the module graph is read from the page, so nothing
+   needs to change; one literal-traversal 404 case names `0.186.1` and
+   passes whatever the version.
+6. This file (title, table, served path), `NOTICE` at the repo root
+   (version and copyright years), `RUN.md` §4b, and `ROOMSIM.md` (the
+   file map and the decisions table).
+
+`git grep -n 0.186.1` lists them all; everything it finds outside the
+vendored JavaScript is on this list.
 
 Then run `cargo test -p saans-gateway --features roomsim` and the browser
 check in `tests/browser/`. The pinned hashes fail until step 3 is done,
