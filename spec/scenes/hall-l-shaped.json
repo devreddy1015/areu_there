@@ -27,8 +27,8 @@
     { "type": "sofa", "id": "sofa", "pos": [6.5, 0.6, 0.4], "size": [2.2, 0.9, 0.8], "yaw_deg": 0.0, "material": "fabric" },
     { "type": "table", "id": "long-table", "pos": [2.0, 5.0, 0.375], "size": [1.8, 0.9, 0.75], "yaw_deg": 0.0, "material": "wood" },
     { "type": "chair", "id": "chair", "pos": [2.0, 4.2, 0.45], "size": [0.5, 0.5, 0.9], "yaw_deg": 0.0, "material": "wood" },
-    { "type": "door", "id": "door", "pos": [0.115, 1.5, 1.2], "size": [0.23, 1.2, 2.4], "yaw_deg": 0.0, "material": "wood" },
-    { "type": "window", "id": "window", "pos": [6.5, 0.115, 1.8], "size": [2.0, 0.23, 1.5], "yaw_deg": 0.0, "material": "glass" }
+    { "type": "door", "id": "door", "pos": [0.0, 1.5, 1.2], "size": [0.23, 1.2, 2.4], "yaw_deg": 0.0, "material": "wood" },
+    { "type": "window", "id": "window", "pos": [6.5, 0.0, 1.8], "size": [2.0, 0.23, 1.5], "yaw_deg": 0.0, "material": "glass" }
   ],
   "nodes": [
     { "id": 0, "pos": [0.3, 0.3, 1.6] },

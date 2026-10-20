@@ -91,6 +91,12 @@ pub struct Room {
 }
 
 /// A wall segment on the floor plane, extruded upwards.
+///
+/// `from` and `to` are the ends of the wall's CENTRELINE: half of
+/// `thickness_m` lies on each side. A wall along the footprint's edge is
+/// therefore half outside the room, and a door or window in it is centred
+/// on the same line (which is why validation only asks an opening's
+/// centre to be inside the footprint).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Wall {
     pub from: Point,

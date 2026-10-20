@@ -82,8 +82,8 @@
       "required": ["from", "to", "material", "thickness_m"],
       "additionalProperties": false,
       "properties": {
-        "from": { "$ref": "#/$defs/point2" },
-        "to": { "$ref": "#/$defs/point2" },
+        "from": { "description": "One end of the wall's CENTRELINE, metres. Half the thickness lies on each side, so a wall on the footprint edge is half outside the room. A door or window in this wall is centred on the same line.", "$ref": "#/$defs/point2" },
+        "to": { "description": "The other end of the centreline.", "$ref": "#/$defs/point2" },
         "material": {
           "description": "Bulk wall material. Names a material; the electrical constants belong to the propagation model, not to this file.",
           "enum": ["concrete", "brick", "drywall", "glass", "wood"]
