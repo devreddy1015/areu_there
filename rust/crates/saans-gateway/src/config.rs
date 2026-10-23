@@ -41,6 +41,14 @@ pub struct GatewayConfig {
     /// a gateway that runs one day a month keeps ninety summaries
     /// spanning seven years. Retention is about age, so it lives here.
     pub history_retention_days: u32,
+    /// Delete an audit log (`audit-YYYY-MM-DD.jsonl`, who read health data
+    /// and who acted on an alert) once every line in it is older than this.
+    /// ADR-010. Must be at least `event_retention_days`: while an event is
+    /// on disk, the record of who read it should be too. Left unset, it
+    /// defaults to a year *or* `event_retention_days`, whichever is longer,
+    /// so a site already keeping events longer than a year does not stop
+    /// booting on upgrade.
+    pub audit_retention_days: u32,
     /// Offset of local time from UTC, in minutes (IST = 330). Sets the day
     /// boundary of the event logs and the offset printed in timestamps.
     pub utc_offset_minutes: i32,
@@ -219,6 +227,7 @@ impl Default for GatewayConfig {
             data_dir: PathBuf::from("saans-data"),
             event_retention_days: 30,
             history_retention_days: 90,
+            audit_retention_days: 365,
             utc_offset_minutes: 0,
             raw: RawConfig::default(),
             spaces: Vec::new(),
@@ -282,7 +291,11 @@ impl GatewayConfig {
     pub fn from_toml(text: &str) -> Result<Self, ConfigError> {
         let table: toml::Table = toml::from_str(text).map_err(|e| ConfigError(e.to_string()))?;
         check_space_keys(&table)?;
-        let cfg: GatewayConfig = toml::from_str(text).map_err(|e| ConfigError(e.to_string()))?;
+        let mut cfg: GatewayConfig =
+            toml::from_str(text).map_err(|e| ConfigError(e.to_string()))?;
+        if !table.contains_key("audit_retention_days") {
+            cfg.audit_retention_days = cfg.audit_retention_days.max(cfg.event_retention_days);
+        }
         cfg.validate()?;
         Ok(cfg)
     }
@@ -293,6 +306,13 @@ impl GatewayConfig {
         }
         if self.history_retention_days == 0 {
             return err("history_retention_days must be at least 1");
+        }
+        if self.audit_retention_days < self.event_retention_days {
+            return err(format!(
+                "audit_retention_days ({}) must be at least event_retention_days ({}): \
+                 the record of who read an event must outlive the event (ADR-010)",
+                self.audit_retention_days, self.event_retention_days
+            ));
         }
         if !(-1440..=1440).contains(&self.utc_offset_minutes) {
             return err("utc_offset_minutes must be within +-1440");
@@ -578,6 +598,41 @@ mod tests {
         assert!(!cfg.spaces[0].vitals);
         assert!(!cfg.spaces[0].collapse_detection);
         assert_eq!(cfg.spaces[0].links, vec![LinkId { rx: 1, tx: 2 }]);
+    }
+
+    const ONE_SPACE: &str = "[[space]]\nid = \"a\"\nlinks = [{ rx = 1, tx = 2 }]\n";
+
+    #[test]
+    fn audit_retention_defaults_to_a_year() {
+        let cfg = GatewayConfig::from_toml(ONE_SPACE).unwrap();
+        assert_eq!(cfg.audit_retention_days, 365);
+    }
+
+    #[test]
+    fn the_audit_default_never_undercuts_event_retention() {
+        // A site already keeping events longer than a year must not stop
+        // booting on upgrade because a new key defaulted below it: the
+        // default rises to meet event_retention_days instead.
+        let cfg =
+            GatewayConfig::from_toml(&format!("event_retention_days = 400\n{ONE_SPACE}")).unwrap();
+        assert_eq!(cfg.audit_retention_days, 400);
+    }
+
+    #[test]
+    fn an_explicit_audit_retention_shorter_than_events_is_refused() {
+        // Set explicitly, it is a choice to delete the record of who read
+        // an event while the event is still on disk (ADR-010). Refused.
+        let e = GatewayConfig::from_toml(&format!(
+            "event_retention_days = 30\naudit_retention_days = 20\n{ONE_SPACE}"
+        ))
+        .unwrap_err();
+        assert!(e.0.contains("audit_retention_days"), "{}", e.0);
+        assert!(
+            GatewayConfig::from_toml(&format!("audit_retention_days = 0\n{ONE_SPACE}")).is_err()
+        );
+        let ok =
+            GatewayConfig::from_toml(&format!("audit_retention_days = 30\n{ONE_SPACE}")).unwrap();
+        assert_eq!(ok.audit_retention_days, 30);
     }
 
     #[test]

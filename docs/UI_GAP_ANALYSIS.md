@@ -170,7 +170,7 @@ this system has not demonstrated.
 | 3D observatory | P3 | Blocked on the above plus a localisation result that does not yet exist |
 | Space-level calibration roll-up | P3 | Per-link today; a roll-up needs a new field in `space_json` |
 | Browser end-to-end tests | P2 | No browser-test framework in the tree. The dashboard was driven manually across five views, two themes, three roles and two viewport widths; that is weaker than a suite and is recorded as such |
-| Audit log retention | P3 | `events-*.jsonl` is swept on the DPDP clock; `audit-*.jsonl` is not swept at all yet, deliberately — audit records usually outlive the events they describe, but "forever" is not a policy either |
+| Audit log retention | P3 | `events-*.jsonl` is swept on the DPDP clock; `audit-*.jsonl` is not swept at all yet, deliberately — audit records usually outlive the events they describe, but "forever" is not a policy either *Closed 2026-10-24: swept on `audit_retention_days`, ADR-010.* |
 
 ---
 

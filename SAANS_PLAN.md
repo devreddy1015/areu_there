@@ -164,7 +164,7 @@ See `spec/wire.md`. Two datagram types share the sensor port:
 | 007 | No learned models until the DSP ceiling is measured on real data. |
 | 008 | The site and the dashboard are one server; the dashboard moved to `/app`. |
 | 009 | A static copy of the site is published, and says on every page that it has no gateway behind it. |
-| 010 | The audit log is kept for a year, then deleted. *Decided, not built.* |
+| 010 | The audit log is kept for a year (and never less than the events), then deleted. Built 2026-10-24. |
 | 011 | One gateway per site. A hosted control plane is ruled out; multi-site, if built, is read-only federation. *Decided, not built.* |
 
 ## 7. Roadmap with exit gates

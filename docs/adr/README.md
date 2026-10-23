@@ -6,8 +6,8 @@ not edited except to add a dated amendment, because an ADR whose content
 was quietly corrected afterwards is a worse record than one that is
 dated (see the amendment at the end of ADR-008 for what that looks like).
 
-"Built" means the code does what the ADR says. Two are accepted and not
-built, and say so in their status line; an ADR in that state for long is
+"Built" means the code does what the ADR says. One is accepted and not
+built, and says so in its status line; an ADR in that state for long is
 how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 
 | ADR | Decision | Accepted | Built |
@@ -21,7 +21,7 @@ how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 | [007](007-no-learned-models-yet.md) | No learned models until the DSP ceiling is measured on real data | 2026-10-13 | n/a — a prohibition |
 | [008](008-one-origin.md) | The site and the dashboard are one server | 2026-10-14 | yes |
 | [009](009-static-copy.md) | The site is also published as a static copy that says it has no gateway behind it | 2026-10-14 | yes |
-| [010](010-audit-retention.md) | The audit log is kept for a year, then deleted | 2026-10-19 | **no** |
+| [010](010-audit-retention.md) | The audit log is kept for a year, then deleted | 2026-10-19 | yes, 2026-10-24 |
 | [011](011-multi-site.md) | One gateway per site; a hosted control plane is ruled out | 2026-10-19 | **no** — and nothing is scheduled |
 
 Writing a new one: copy the shape of the existing files — title line,

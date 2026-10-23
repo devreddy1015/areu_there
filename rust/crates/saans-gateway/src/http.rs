@@ -622,7 +622,11 @@ async fn health(State(app): State<AppState>, h: HeaderMap) -> Response {
                 "tokens": app.cfg.tokens.len(),
             }),
         );
-        m.insert("audit".into(), app.audit.status());
+        let mut audit = app.audit.status();
+        // What will be kept, beside what was written: an operator who can
+        // see the second but not the first cannot check ADR-010 is in force.
+        audit["retention_days"] = app.cfg.audit_retention_days.into();
+        m.insert("audit".into(), audit);
     }
     no_store(Json(v).into_response())
 }

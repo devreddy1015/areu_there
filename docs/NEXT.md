@@ -320,6 +320,12 @@ is the number that decides whether to buy a fourth board.
 
 ### 1.7 Build ADR-010, which I wrote and did not build
 
+**Done**, on branch `saans/audit-retention`. One deviation from the ADR,
+recorded in it: an absent `audit_retention_days` defaults to 365 or
+`event_retention_days`, whichever is longer, so no existing config stops
+booting on upgrade. `/api/health` now reports `retention_days` for the
+history and the audit log as well as the events.
+
 `docs/adr/010-audit-retention.md` is *decided, not built*. The decision
 is one config key, one prefix parameter on `prune_logs`, a second call
 in `Hub::housekeeping`, and `/api/health` reporting it. Its `changes_needed`

@@ -24,6 +24,11 @@ event_retention_days = 30
 # saans-health caps the same list at 90 entries, which bounds memory and
 # is not the same thing.
 history_retention_days = 90
+# audit-YYYY-MM-DD.jsonl is who read health data and who acted on an alert.
+# It must outlive the events it accounts for, so this must be at least
+# event_retention_days; left out, it defaults to 365 or event_retention_days,
+# whichever is longer. ADR-010.
+audit_retention_days = 365
 # Local time offset from UTC in minutes (India: 330). Sets the day
 # boundary of event logs and daily summaries.
 utc_offset_minutes = 330

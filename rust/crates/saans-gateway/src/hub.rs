@@ -297,6 +297,15 @@ impl Hub {
             for p in removed {
                 crate::log(&format!("retention: deleted {}", p.display()));
             }
+            // The audit log on its own, longer clock (ADR-010).
+            for p in store::prune_audit_logs(
+                &self.cfg.data_dir,
+                self.cfg.audit_retention_days,
+                self.cfg.utc_offset_minutes,
+                self.wall.unix_ms(t_s, t_s),
+            ) {
+                crate::log(&format!("retention: deleted {}", p.display()));
+            }
         }
         let since = self.history_saved_t.unwrap_or(self.t_start);
         if t_s - since >= HISTORY_SAVE_S {
@@ -577,6 +586,7 @@ impl Hub {
                 "last_saved_t_s": self.history_saved_t,
                 "errors": self.history_errors,
                 "last_error": self.history_last_error,
+                "retention_days": self.cfg.history_retention_days,
             });
         }
         h
@@ -993,6 +1003,56 @@ mod tests {
             2,
             "both in-retention summaries must survive: {days:?}"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn housekeeping_sweeps_the_audit_log_on_its_own_retention() {
+        // The wiring test: ADR-010 is a config key, a sweep, and a call in
+        // housekeeping, and the call is the part that goes missing.
+        let dir = std::env::temp_dir().join(format!("saans-hub-audit-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let unix_ms = 1_760_000_000_000i64;
+        let offset = 330;
+        let today = crate::timefmt::local_day(unix_ms, offset);
+        let audit = |d: i64| {
+            dir.join(format!(
+                "audit-{}.jsonl",
+                crate::timefmt::date_string(today - d)
+            ))
+        };
+        for d in [400, 10] {
+            std::fs::write(audit(d), "{}\n").unwrap();
+        }
+        let mut cfg = GatewayConfig {
+            data_dir: dir.clone(),
+            utc_offset_minutes: offset,
+            ..GatewayConfig::default()
+        };
+        cfg.spaces = vec![saans_health::SpaceConfig {
+            id: "lab".into(),
+            name: "Lab".into(),
+            ..Default::default()
+        }];
+        assert_eq!(cfg.audit_retention_days, 365);
+        let t0 = local_epoch_s(unix_ms, offset);
+        let mut hub = Hub::new(
+            cfg,
+            None,
+            true,
+            Wall::Anchored {
+                t0,
+                unix_ms_at_t0: unix_ms,
+            },
+            t0,
+        );
+        hub.housekeeping(t0);
+        assert!(
+            !audit(400).exists(),
+            "a 400-day-old audit log must be swept"
+        );
+        assert!(audit(10).exists(), "a 10-day-old one must not");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
