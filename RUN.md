@@ -91,6 +91,14 @@ source /home/Aman/are_u_theone/are_U_there/.venv/bin/activate
 The repo's own Python (`wifisense/`, `tests/`) is **pure standard library
 by policy** and must keep running on bare `python3`, outside this venv.
 
+**Which `python3` you get depends on the shell.** An interactive shell
+runs conda's init from `~/.bashrc` and gets miniconda's **3.11.5**; a
+non-interactive one (cron, `ssh host cmd`, tool runners) gets
+`/usr/bin/python3`, **3.10.12**. Results differ between them (see *Known
+pre-existing failures*), so scripts and reports should name the
+interpreter: `.venv/bin/python` is 3.11.5, `$(.venv/bin/uv python find
+3.12)` is 3.12.15, `$(.venv/bin/uv python find 3.14)` is 3.14.8.
+
 ## 3. Running things
 
 ### Tests of record
@@ -99,6 +107,7 @@ by policy** and must keep running on bare `python3`, outside this venv.
 export PATH="$HOME/.cargo/bin:$PATH"
 cd rust && cargo test --workspace          # all Rust crates
 cargo test -p saans-gateway --features roomsim   # the room demo's tests exist only here
+cargo check -p saans-roomsim --locked && cargo test -p saans-roomsim --locked   # alone, as CI does (see 4c)
 cd /home/Aman/are_u_theone/are_U_there && python3 -m unittest discover -s tests
 make -C edge/dsp/test check                 # C++ edge DSP against golden vectors
 ```
@@ -121,7 +130,10 @@ none is a bug in the code under test:
 | `test_localize_invert.TestRegularizationSmooths.test_the_conditioning_trend_stops_past_the_room_scale` | CPython version, same mechanism. | **Passes** under Python 3.12.15. |
 | `test_recorder.TestCli.test_replay_send_over_udp` | Kernel receive-buffer limit. The test asks for a 1 MB `SO_RCVBUF`, but `net.core.rmem_max` here is 212,992, so the socket gets 425,984 bytes; the replay then sends 598 datagrams in one burst (`--speed 0`) and 43 are dropped. | Measured: 598 sent, 555 received. Would pass with a larger `rmem_max`, or if the test read while sending. Not changed: it is not this work's test, and this is a shared machine. |
 
-So the suite to trust here is the one run under Python 3.12:
+So the suite to trust here is the one run under Python 3.12. (To
+*regenerate* golden vectors, use CPython 3.14 instead — see ROOMSIM.md,
+"Changing the simulator"; 3.14 is the only version that reproduces the committed
+vectors byte for byte.)
 
 ```bash
 .venv/bin/pip install uv && .venv/bin/uv python install 3.12
@@ -269,6 +281,79 @@ found by looking, not by checking.
 See `rust/crates/saans-gateway/assets/vendor/three-0.186.1/VENDOR.md`. The
 vendored files are pinned by SHA-256 in `src/roomsim.rs`, so an upgrade
 fails the tests until the record is updated with it.
+
+## 4c. Room Sim (Phase 3)
+
+The simulator is specified in `spec/roomsim.md` and implemented twice,
+bit for bit: the Python reference `wifisense/roomsim/` and the Rust crate
+`rust/crates/saans-roomsim`. Everything it produces is **SIM**. It reads a
+scene (SCENE) and writes what ESP32 nodes in that room would send.
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+cd rust && cargo build --release -p saans-cli
+./target/release/saans roomsim-export ../spec/scenes/bedroom.json --out /tmp/bedroom --duration 60
+```
+
+That writes three files and refuses to overwrite them (add
+`--overwrite`):
+
+| File | What |
+|---|---|
+| `/tmp/bedroom.sim.pcap` | the raw-CSI datagrams, byte for byte what `csi_capture.cpp` sends, in `wifisense record`'s pcap format |
+| `/tmp/bedroom.truth.jsonl` | one line per transmission: where every person and the phone were, and each packet's fate (lost, seq, rssi) |
+| `/tmp/bedroom.manifest.json` | `"label": "SIM"`, the scene's name and SHA-256, every configuration value, per-link and per-receiver rates, counts |
+
+Options: `--seed N`, `--duration S`, `--config CONFIG.json` (any parameter
+of spec §3.2, e.g. `{"loss_prob": 0.1, "roles": {"0": "tx"}}`, except
+`quantize: false`, which an export refuses because it emits no datagram).
+The same from Python:
+
+```python
+from wifisense.roomsim import load_scene, RoomSim, Config, export_run
+sim = RoomSim(load_scene("spec/scenes/bedroom.json"), Config(duration_s=60.0))
+export_run(sim, "/tmp/bedroom-py")      # byte-identical pcap to the CLI's
+```
+
+**Gateway-faithful exports.** The default is the planned all-node mesh:
+every node transmits in turn, so each receiver's datagrams interleave
+several transmitters with no transmitter id, and nothing downstream can
+split them per link (the CLI warns). Today's firmware is one transmitter
+at 20 Hz; to replay through the gateway or `wifisense replay`, export
+that (one transmitter at another rate also works, if the gateway's
+`raw.sample_rate_hz` is set to it; the CLI notes this):
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there
+echo '{"roles": {"0": "tx", "1": "rx", "2": "rx", "3": "rx"}, "slot_s": 0.05}' > /tmp/one-tx.json
+rust/target/release/saans roomsim-export spec/scenes/bedroom.json --out /tmp/bedroom-1tx --config /tmp/one-tx.json
+python3 -m wifisense stats /tmp/bedroom-1tx.sim.pcap     # prints a SIM banner first
+```
+
+Its `seq` has no gaps for lost packets, as on the real firmware, so
+`stats` shows 0 % loss; the manifest's `counts.lost` is the true figure.
+
+Tests (the standalone `-p saans-roomsim` build matters: inside the
+workspace cargo unifies features and would hide a dependency on
+`saans-scene`'s `write`):
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there/rust && cargo test -p saans-roomsim --locked && cargo test -p saans-cli
+cd .. && python3 -m unittest discover -s tests -p 'test_roomsim*'
+```
+
+`saans-roomsim/tests/golden.rs`, `saans-cli/tests/roomsim_export.rs` (the
+`roomsim_export` set) and `tests/test_roomsim_golden.py` check both
+implementations against `spec/golden/roomsim_*`. A physics change goes
+into `spec/roomsim.md`, the Python reference and the Rust crate together,
+then the vectors are regenerated **on CPython 3.14** and both tests must
+pass: `$(.venv/bin/uv python find 3.14) -I spec/golden/generate.py`, then
+`git status spec/golden` should show only the sets you meant to change.
+
+Speed (release, one thread): about 1 s of compute per minute of simulated
+bedroom, 3 s per minute of the 8-node hall, a few MB of memory however
+long the run; the Python reference takes about 15 s per 10 s of bedroom and
+is for checking, not for datasets.
 
 ## 5. Datasets
 
