@@ -13,4 +13,4 @@ path = "src/main.rs"
 saans-dsp = { path = "../saans-dsp" }
 saans-health = { path = "../saans-health" }
 saans-sim = { path = "../saans-sim" }
-saans-scene = { path = "../saans-scene" }
+saans-scene = { path = "../saans-scene", features = ["write"] }

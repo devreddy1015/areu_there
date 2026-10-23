@@ -37,10 +37,12 @@
 //! ```
 
 pub mod geom;
+#[cfg(feature = "write")]
 pub mod roomplan;
 pub mod scene;
 pub mod validate;
 
+#[cfg(feature = "write")]
 pub use roomplan::{import_roomplan_str, RoomPlanImport, RoomPlanWarning};
 pub use scene::{
     Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Point, Point3, Provenance, Room, Scene, Wall, WallMaterial,
@@ -113,13 +115,19 @@ impl Scene {
 
     /// Serialize as the pretty JSON a human will edit, with a trailing
     /// newline so the file ends the way every other text file does.
+    ///
+    /// Only with the `write` feature (ADR-008 decision 1): a crate that
+    /// carries CSI depends on this crate without it, so it cannot write a
+    /// scene by any route — the types do not even implement `Serialize`.
+    #[cfg(feature = "write")]
     pub fn to_json_pretty(&self) -> String {
         let mut s = serde_json::to_string_pretty(self).expect("a Scene always serializes");
         s.push('\n');
         s
     }
 
-    /// Write the scene to a file.
+    /// Write the scene to a file. Only with the `write` feature.
+    #[cfg(feature = "write")]
     pub fn save(&self, path: impl AsRef<Path>) -> std::io::Result<()> {
         std::fs::write(path, self.to_json_pretty())
     }

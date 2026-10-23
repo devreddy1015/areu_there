@@ -32,8 +32,8 @@
     { "id": 5, "pos": [3.0, 4.8, 1.5] }
   ],
   "people": [
-    { "id": "occupant-left", "start": [1.5, 2.5] },
-    { "id": "occupant-right", "start": [4.5, 2.5] }
+    { "id": "occupant-left", "start": [1.5, 2.1] },
+    { "id": "occupant-right", "start": [4.5, 2.1] }
   ],
   "phone": { "id": "phone", "start": [3.0, 2.5] }
 }

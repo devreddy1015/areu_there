@@ -5,6 +5,19 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+# Everything that writes a scene: Serialize on the scene types, Scene::save,
+# Scene::to_json_pretty and the RoomPlan importer. Off by default; only
+# human tools (saans-cli) enable it. A crate that carries CSI depends on
+# this crate WITHOUT it (ADR-008 decision 1, enforced by tests/boundary.rs).
+write = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: parse every number with correct rounding, as Python does
+# (spec/roomsim.md §1), so both simulators read identical doubles.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[dev-dependencies]
+# This crate's own tests round-trip and import scenes, so they need `write`.
+saans-scene = { path = ".", features = ["write"] }

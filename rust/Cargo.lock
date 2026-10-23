@@ -2014,6 +2014,7 @@ dependencies = [
 name = "saans-scene"
 version = "0.1.0"
 dependencies = [
+ "saans-scene",
  "serde",
  "serde_json",
 ]

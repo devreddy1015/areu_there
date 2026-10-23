@@ -363,3 +363,18 @@ fn every_scene_file_in_spec_scenes_loads_and_validates() {
     }
     assert!(n >= 3, "found only {n} scene files");
 }
+
+/// Test fixtures (spec/scenes/fixtures/, used by the Room Sim golden
+/// vectors) are not served by the gateway but must be valid scenes too.
+#[test]
+fn every_fixture_scene_loads_and_validates() {
+    let mut n = 0;
+    for entry in std::fs::read_dir(scenes_dir().join("fixtures")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "json") {
+            Scene::load(&path).unwrap_or_else(|e| panic!("{}:\n{e}", path.display()));
+            n += 1;
+        }
+    }
+    assert!(n >= 1, "found no fixture scenes");
+}

@@ -15,7 +15,9 @@
 //!
 //! Angles are DEGREES counter-clockwise about +z, measured from +x.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+#[cfg(feature = "write")]
+use serde::Serialize;
 
 /// A point on the floor plane, metres. Same convention as `saans_sim::Point`.
 pub type Point = (f64, f64);
@@ -30,7 +32,8 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub const DEFAULT_WALL_THICKNESS_M: f64 = 0.1;
 
 /// One room, everything in it, and where the radios are.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Scene {
     /// Format version. Readers reject a version they do not know.
     pub schema_version: u32,
@@ -58,7 +61,8 @@ pub struct Scene {
 }
 
 /// How a scene's geometry was obtained.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 #[serde(rename_all = "snake_case")]
 pub enum Provenance {
     /// Measured in the real room by a person with a tape or a laser.
@@ -73,7 +77,8 @@ pub enum Provenance {
 }
 
 /// The room shell: a box, or a box plus a floor outline for an L-shape.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Room {
     /// Extent along x, metres.
     pub w_m: f64,
@@ -97,7 +102,8 @@ pub struct Room {
 /// therefore half outside the room, and a door or window in it is centred
 /// on the same line (which is why validation only asks an opening's
 /// centre to be inside the footprint).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Wall {
     pub from: Point,
     pub to: Point,
@@ -118,7 +124,8 @@ pub struct Wall {
 /// model, and under ADR-002 any physics change starts in the Python
 /// reference and is then ported, so those numbers arrive with that work
 /// rather than here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 #[serde(rename_all = "snake_case")]
 pub enum WallMaterial {
     Concrete,
@@ -129,7 +136,8 @@ pub enum WallMaterial {
 }
 
 /// A piece of furniture or an opening, as an upright box.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Object {
     /// Serialized as `"type"`, which reads better in a hand-written scene.
     #[serde(rename = "type")]
@@ -151,7 +159,8 @@ pub struct Object {
 /// What a box is. Doors and windows are objects rather than wall
 /// attributes because the demo has to draw them and the simulator has to
 /// treat them as a different kind of obstacle from the wall they sit in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectKind {
     Bed,
@@ -166,7 +175,8 @@ pub enum ObjectKind {
 }
 
 /// Dominant surface material of an object.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectMaterial {
     Wood,
@@ -176,7 +186,8 @@ pub enum ObjectMaterial {
 }
 
 /// An ESP32 node.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Node {
     /// Node id, matching `saans_sim::scenario::Node::id` so a scene can
     /// drive the simulator without a lookup table.
@@ -186,7 +197,8 @@ pub struct Node {
 }
 
 /// A person the scene expects to be in the room.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Person {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -197,7 +209,8 @@ pub struct Person {
 }
 
 /// The one tracked phone.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "write", derive(Serialize))]
 pub struct Phone {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
