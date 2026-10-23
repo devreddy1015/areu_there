@@ -131,7 +131,7 @@
   <div class="chain" data-reveal="rise">
     <div><span class="label">reference</span><span class="lang">Python</span><p class="small muted">Standard library only. Every stage is plain float arithmetic.</p><dl><dt>numbers</dt><dd>f64</dd><dt>role</dt><dd>generates the golden vectors</dd></dl></div>
     <div><span class="label">gateway</span><span class="lang">Rust</span><p class="small muted">A dependency-free port of the whole reference.</p><dl><dt>tolerance</dt><dd>1e-9 relative</dd><dt>frames</dt><dd>672 / 672 byte-identical</dd></dl></div>
-    <div><span class="label">sensor</span><span class="lang">C++17</span><p class="small muted">Header-only, no heap after init, single-precision FPU.</p><dl><dt>tolerance</dt><dd>1e-4 relative</dd><dt>checks</dt><dd>669 golden checks pass</dd></dl></div>
+    <div><span class="label">sensor</span><span class="lang">C++17</span><p class="small muted">Header-only, no heap after init, single-precision FPU.</p><dl><dt>tolerance</dt><dd>1e-4 relative</dd><dt>checks</dt><dd>845 checks pass, g++ and clang++</dd></dl></div>
   </div>
   <p class="fine" style="margin-top:16px" data-reveal="rise">Pre-hardware: the golden vectors behind these counts, and the frames behind the bars below, come from the simulator rather than from a radio.</p>
   <div class="bars" id="bars">
@@ -163,9 +163,9 @@
     <p class="body muted" data-reveal="rise" style="--i:1">Every phase has an exit gate that is measured, not declared. Simulation is done. Real rooms need hardware, and that comes next.</p>
   </div>
   <ol class="roadmap" style="margin-top:clamp(28px,3vw,48px)">
-    <li data-reveal="rise"><span class="ph">S0</span><span class="title">Spec and golden vectors</span><span class="gate small muted">Wire format, decision records, 21 vector sets from the reference.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
+    <li data-reveal="rise"><span class="ph">S0</span><span class="title">Spec and golden vectors</span><span class="gate small muted">Wire format, decision records, 23 vector sets from the reference.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
     <li data-reveal="rise"><span class="ph">S1</span><span class="title">Rust parity</span><span class="gate small muted">All vectors at 1e-9. 672/672 frames byte-identical. Benchmark reported.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
-    <li data-reveal="rise"><span class="ph">S2</span><span class="title">C++ parity and firmware</span><span class="gate small muted">669 float32 golden checks. Firmware builds for esp32s3.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
+    <li data-reveal="rise"><span class="ph">S2</span><span class="title">C++ parity and firmware</span><span class="gate small muted">845 float32 checks, two compilers. Firmware builds for esp32s3.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
     <li data-reveal="rise"><span class="ph">S3</span><span class="title">Health detectors</span><span class="gate small muted">Event-level precision and recall on held-out scripted timelines, including false alarms per hour.</span><span class="chip st-ok"><span class="dot"></span>done · simulated</span></li>
     <li data-reveal="rise"><span class="ph">S4</span><span class="title">Gateway</span><span class="gate small muted">Replays a recording and a simulated 8-hour night end to end, with API, WebSocket and /metrics.</span><span class="chip st-ok"><span class="dot"></span>done</span></li>
     <li data-reveal="rise"><span class="ph">S5</span><span class="title">Hardware bring-up</span><span class="gate small muted">Presence F1, still person read as empty, breathing against a chest belt, in real rooms.</span><span class="chip st-sim"><span class="dot"></span>needs hardware</span></li>

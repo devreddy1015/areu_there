@@ -154,7 +154,7 @@ Event schema (versioned):
 | Phase | Scope | Exit gate (measured) |
 |---|---|---|
 | **P0** | No hardware. Add RespirFi subcarrier selection to `preprocess.py`, Fresnel nulls to the synthetic source, a multi-link synthetic source with a walking body, and the recorder/replayer | Tests pass. Synthetic RTI median error reported for 4/6/8/12 nodes |
-| **P1** | One room, 2 nodes (TX + RX), real CSI through `wifisense listen` | Presence F1 ≥ 0.95 over 48 h. Still-person false-empty < 5%. Breathing within ±1 BPM of the belt in ≥ 80% of 60 s windows (seated) |
+| **P1** | One room, 2 nodes (TX + RX), real CSI through `wifisense listen` | Presence F1 ≥ 0.95 over 48 h. Still-person false-empty < 5%. Breathing within ±1 BPM of the breathing reference (a belt, or paced breathing counted, as above) in ≥ 80% of 60 s windows (seated) |
 | **P2** | Same room, 8-node TDMA mesh | ≥ 20 Hz per link sustained with < 5% loss. RTI median and p90 error measured against UWB |
 | **P3** | Count model, leakage study between adjacent rooms, automatic re-calibration | Count ±1 accuracy reported leave-one-room-out. Leakage quantified |
 | **P4** | Building pilot of 10–20 rooms with gateway and dashboard, 2-week run | ≥ 99% node uptime. Drift alarms work. IT signs off on airtime use |

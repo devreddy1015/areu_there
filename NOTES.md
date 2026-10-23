@@ -190,6 +190,14 @@ Together: **12x realtime, 8.5% of one core**, pure Python at 20 Hz.
    why the nonlinearity in §4.6 bites. Unwrapped phase is linear in
    displacement and has no intermodulation problem — but needs CFO/SFO
    correction first. That is the highest-value next piece of work.
+
+   *Superseded, 2026-10-24.* Left as written because it was the right
+   reading at the time, but do not act on it. `docs/CAPABILITY_LIMITS.md`
+   §4 retires it: RespirFi's own footnote is that single-antenna CSI
+   phase is unreliable under CFO/SFO, which is why that paper is
+   amplitude-only, and this hardware is single-antenna. Phase comes back
+   only as a research item, once real recordings show where the
+   amplitude ceiling actually is.
 5. **Port the DSP to C** for the ESP32. It was written to make this easy:
    Goertzel and a biquad are a few dozen lines each.
 

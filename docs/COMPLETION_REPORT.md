@@ -189,6 +189,11 @@ make -C edge/dsp/test check
 There is **no CI in this repository** — no `.github/workflows` — so a
 pull request shows no checks. That is an absence, not a pass.
 
+> *Amended 2026-10-24:* true when written. `ci.yml` landed in `101639b`
+> and runs fmt, clippy, the Rust and Python suites, the C++ suite under
+> both compilers, and a numeric golden-drift check, on every push to
+> `main` and every pull request.
+
 **Manual verification** (no browser-test framework exists in this tree,
 so this is weaker than a suite and is recorded as such). Against a
 replayed synthetic night:

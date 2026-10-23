@@ -144,7 +144,7 @@ See `spec/wire.md`. Two datagram types share the sensor port:
 
 - **raw CSI** (existing, magic `0xC5110001`): debug and data
   collection only.
-- **FeatureFrame v1** (new, magic `0x534E4153`, ASCII "SANS" on the wire): ~64 bytes at 2 Hz
+- **FeatureFrame v1** (new, magic `0x534E4153`, ASCII "SANS" on the wire): 68 bytes, fixed size (`spec/wire.md` §2), at 2 Hz
   per link: motion energy, breathing-band RMS, breathing rate + confidence,
   heart rate + confidence (zeroed unless consented), presence state,
   calibration age, achieved CSI rate, loss, RSSI, noise floor, BNR of the
@@ -171,7 +171,7 @@ See `spec/wire.md`. Two datagram types share the sensor port:
 
 **Status (2026-10-14):** S0 done. S1 done (Rust, 672/672 frames
 byte-identical, 15x language / 144x total vs Python). S2 done (C++ float32:
-845 golden checks, firmware builds for esp32s3, 26k frames/s host). S3
+845 checks per compiler, firmware builds for esp32s3, 26k frames/s host). S3
 done in simulation (NOTES.md §8: held-out results, three bugs found and
 fixed). S4 done (gateway: API, WebSocket, /metrics, replay, dashboard;
 36 tests). S6 prep in progress (node memory, TDMA, reciprocal links).

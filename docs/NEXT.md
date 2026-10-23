@@ -48,6 +48,18 @@ measured, and what would make it wrong.
 
 ### 1.1 Fix the record: nine stale claims, half a day
 
+**Done**, on branch `saans/record`. Two corrections to the list below
+came out of doing it rather than reading it. The 845-vs-669 question is
+answered: 845 per compiler is right, re-counted; the site's 669 dates
+from the first landing-page commit. And a row this plan carried was
+wrong: an audit flagged `CAPABILITY_LIMITS.md` §2e as a mis-levelled
+heading, and it is not -- it is about room size, not through-wall, its
+own subtitle calls it a "*third* reason" alongside §1 and §2, and the
+"2e" label only avoids renumbering the §3–5 that other files cite.
+Demoting it would have filed room geometry under "Through-wall". The row
+is removed. README's legacy figures were re-run and reproduce exactly,
+so they gained a source rather than a warning.
+
 The adversarial audit in PR #5 found these and I fixed the ones in files
 I was already touching. These are the rest. Each is a line that says
 something the tree no longer does. None is a judgement call.
@@ -59,7 +71,6 @@ something the tree no longer does. None is a judgement call.
 | `edge/README.md:39, :91` | TX beacon default 50 Hz | Kconfig default is `SAANS_CSI_RATE_HZ` (`Kconfig.projbuild:40`), which defaults to 20 (`:73`). One of them is wrong and the firmware is the one that runs |
 | `docs/COMPLETION_REPORT.md:189` | "no CI in this repository" | `ci.yml` since `101639b`, four jobs, green on main |
 | `CAMPUS_SENSING_PROMPT.md:157` | S5 gate: "within ±1 BPM of **the belt**" | The same file's line 141 allows "a respiration belt, or breathing paced to a metronome and counted", and PROTOCOL_S5 uses a phone accelerometer. The gate should say "the reference" and match its own §141; as written it names a device nobody has |
-| `CAPABILITY_LIMITS.md:170` | `## 2e.` is an H2 | §2a–2d are H3 under `## 2.`; 2e is a sibling of 2, not a child. Anyone generating a ToC or resolving "§2" gets it wrong |
 | `CAPABILITY_LIMITS.md:189` vs `NOTES.md:217` | 17.19 MHz vs 17.5 MHz for "the ESP32 span" | Different quantities: 55 spacings edge-to-edge vs 56 × 312.5 kHz. Both right, never said side by side, so a reader thinks one is a typo |
 | `SAANS_PLAN.md:170`, `COMPLETION_REPORT.md:185` vs `site/evidence.html:134, :168` | 845 vs 669 C++ golden checks | Still unresolved. `make check` prints per-binary totals, not "golden checks"; whoever wrote each number should say what they counted |
 | `docs/adr/` | no index | Nine ADRs and a reader finds them by `ls`. The numbering gaps that would signal a missing decision go unnoticed |
