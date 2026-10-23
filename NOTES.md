@@ -612,3 +612,91 @@ is the opposite of what this layer is for.
   which. A subcarrier index may not mean the same thing on both sides.
 - No cross-subcarrier smoothing or LTF merge, deliberately: our capture
   path disables both.
+
+---
+
+## 10. The octave rule: a doubled breathing rate, fixed in fusion (Oct 2026)
+
+Everything here is **SYNTHETIC**.
+
+### Why the obvious fix could not work
+
+At a Fresnel null a link's first-order breathing sensitivity is zero, so
+its amplitude follows the *square* of chest displacement. A breather at
+`f` reads as `2f`, and because `sin²` is a clean tone it reads that way
+at high confidence. The full nulls sweep puts it at 16.9% of readings at
+whole-band nulls, 4.2% of them at confidence ≥ 0.7 (`docs/RESULTS.md`).
+
+The plan was a single-link guard: lower the confidence when there is a
+rival peak at `f/2`. Reading the simulator first killed it. The chest is
+driven by a pure sinusoid (`synthetic.py:332`), and `sin²(2πft)` has no
+energy at `f` at all. On one link, at a true null, a doubled reading is
+exactly what a person breathing twice as fast produces. A guard tuned to
+pass here would have been tuned to nothing. Real breathing is asymmetric
+-- inhale and exhale differ -- so a real null may leave energy at `f`;
+that is a question for the bench, not a parameter to fit.
+
+### The rule
+
+The physics is asymmetric between links even though one link cannot see
+it: a null turns `f` into `2f`, and nothing turns `f` into `f/2`. So in
+`SpaceFusion::sample`, a link whose rate is within 1 BPM of twice
+another link's is set aside before the most confident link is chosen,
+and hysteresis does not keep it. The lowest rate in a chain of octaves
+always survives, so the candidates never empty. One link alone is left
+alone. The tolerance is the definition `evaluate.py` already used for
+"2x rate"; nothing was tuned.
+
+### Measured
+
+`saans octave`: two links (one TX, two RX, the layout `docs/HARDWARE.md`
+says to buy), a seated breather at 8–14 BPM so that twice the rate stays
+inside the band, 300 s per case after an empty lead-in so presence
+calibrates on an empty room, through the production path. Cases are
+classed from ground-truth sensitivity *at the seat*. 200 per class,
+identical scenarios before and after:
+
+| case | within 1 BPM | 2x rate | 2x at conf ≥ 0.7 | breathing from the null link |
+|---|---|---|---|---|
+| one link null, one clear | 93.1% → **96.6%** | 6.9% → **3.4%** | 4.4% → **1.8%** | 10.7% → 8.1% |
+| both links clear | 98.9% → **99.8%** | 1.1% → **0.2%** | 1.1% → **0.2%** | — |
+| both links null | 74.8% → **83.5%** | 25.2% → **16.5%** | 19.1% → **10.9%** | — |
+
+Coverage is 100% / 100% / 96.7% before and after: the rule never
+removes the last candidate. In every class the gain in readings within
+1 BPM is exactly the fall in doubled ones (+3.5 / −3.5, +0.9 / −0.9,
++8.7 / −8.7), so no correct reading was broken to fix a doubled one.
+
+### Three things worth knowing about that number
+
+1. **A first run at 40 cases per class said the one-null class was only
+   2.5% doubled.** At 200 it is 6.9%. The small sample was one or two
+   unlucky runs, and a decision taken on it would have concluded the
+   rule was barely worth having.
+2. **Two mistakes in the measurement were caught before it ran.** The
+   first draft seated the person at t = 0, which would have calibrated
+   presence on the breather; and it classified cases with
+   `Simulator::sensitivity`, which uses the body's position *now* -- an
+   absent body parked somewhere -- rather than at the seat. Either would
+   have produced a confident, wrong table.
+3. **It does not touch the case where both links double together.**
+   Both nulls reading `2f` agree with each other, and agreement is not
+   evidence of anything. That residual 16.5% is what a third link, or a
+   moved node, is for.
+
+### What it did to the held-out S3 evaluation
+
+`saans eval`, six held-out seeds per cell, rerun with the rule. Exactly
+three lines of the table moved, and nothing got worse:
+
+| row | before | after |
+|---|---|---|
+| breathing within 1 BPM, 2 links | 99.9% | 100.0% |
+| reader: rate high/low alerts fired | 2/36 runs | **1/36** |
+| clear-LoS breathing within 1 BPM | 96.1% | 96.2% |
+
+The middle row is the one that matters most. A doubled breathing rate in
+someone sitting still *is* a tachypnea false alarm, so this rule removes
+false alerts, not only BPM error. True tachypnea detection is unchanged
+at 31/36, as are occupancy, pause detection and every other alert row:
+the rule did not suppress genuinely fast breathing.

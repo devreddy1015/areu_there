@@ -140,6 +140,15 @@ def suites() -> list[Suite]:
             "Takes minutes on a workstation, far longer on a CI runner.",
             scrub=[(r" in \d+ s \(", " (")],
         ),
+        Suite(
+            "octave", "Doubled breathing rate at a null, two links",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "octave",
+             "--per-class", "200", "--seeds", "40000"],
+            rust, "slow",
+            "The case the fusion octave rule exists for: one link in a "
+            "whole-band null reads 2f. NOTES.md §10 has the same table with "
+            "the rule off, on identical scenarios.",
+        ),
     ]
 
 
