@@ -30,6 +30,12 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++17>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+    # No floating-point contraction, for the reason in edge/dsp/test/Makefile:
+    # the ESP32-S3 FPU has a fused multiply-add (madd.s), gnu++17 leaves GCC
+    # at -ffp-contract=fast, and a fused a*b + c is not what the Python
+    # reference computes or what the host tests verified. Without this the
+    # node runs different arithmetic from the one the parity suite checks.
+    -ffp-contract=off
     -Wall
     -Wextra
 )

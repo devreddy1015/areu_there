@@ -14,8 +14,10 @@ name: ci
 on:
   push:
     branches: [main]
+  # Every pull request, not only those into main: a stacked PR whose base is
+  # another branch otherwise gets no checks at all, and reads as untested
+  # rather than as failing.
   pull_request:
-    branches: [main]
 
 # A second push to the same branch makes the first one's answer irrelevant.
 concurrency:
@@ -108,6 +110,15 @@ jobs:
       # benchmark driving a 3,267-frame recording.
       - name: make check
         run: make -C edge/dsp/test check
+
+      # The same suite built for a CPU with a fused multiply-add. The ESP32-S3
+      # has one; plain x86-64 does not, so the default build above cannot see
+      # contraction at all. The Makefile disables it (FPFLAGS); this step is
+      # what fails if anyone stops it doing so. It is how the problem was
+      # found: on Ubuntu 26.04 a bit-for-bit check in test_vitals failed under
+      # g++, and -march=x86-64-v3 reproduced it locally.
+      - name: make test, built with FMA available
+        run: make -C edge/dsp/test clean test OPT="-O2 -march=x86-64-v3"
 
   golden:
     name: golden-vector drift
