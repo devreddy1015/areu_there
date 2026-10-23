@@ -86,6 +86,26 @@ README as typed and unreproduced. Not left as they are.
 
 ### 1.2 Make the numbers self-checking
 
+**Done**, on branch `saans/results`. Three places it differs from the
+plan below, each for a measured reason:
+
+- README keeps its figures rather than replacing them with links. Each
+  one is registered in `tools/results.py` and checked against the table
+  on every push, which is stronger than a link (a link does not fail when
+  the prose is wrong) and keeps README readable.
+- The S3 detector table is in the slow tier, not CI. It takes ~160 s on
+  20 cores, so most of an hour on a 4-core runner, and the obvious
+  shortcut, `saans eval --quick`, uses seeds 0-1 -- the seeds the
+  thresholds were tuned on. A table on tuning data is not a result.
+- Integers are compared exactly. The first version allowed one unit in
+  the last place everywhere, and a hand edit of `51/64` to `52/64`
+  passed. Counts are not rounded floats.
+
+Before any of it was built, every suite was run twice and the nulls
+suite at 1, 4 and 20 workers: only wall-clock text and the printed worker
+count moved. README's figures, including the four from the full Fresnel
+sweep, all reproduce.
+
 The pattern in §1.1 is the pattern in every stale number PR #5 found:
 a figure typed into a document from memory of a result. The fix is
 structural, not another round of proofreading.
@@ -120,6 +140,40 @@ which `check_drift.py` has already shown to be settable with a measured
 margin on both sides.
 
 ### 1.3 The double-rate breathing failure, which the gate does not catch
+
+**Redesigned before building, 2026-10-24.** The single-link guard
+described below cannot work in this simulator, and finding that out by
+reading the code first is the reason to read the code first.
+`synthetic.py:332` drives the chest with a pure sinusoid. At a true
+stationary point the amplitude responds to the *square* of
+displacement, and `sin²(2πft)` is a pure sinusoid at `2f` with no energy
+at `f`. So at a whole-band null a doubled reading is bit-for-bit what a
+person breathing twice as fast produces, and a guard that looks for
+energy at `f/2` finds none to look at. Any guard tuned to pass here is
+tuned to nothing. (Real breathing is asymmetric, so a real null may
+leave energy at `f`; that is a question for the bench, not a parameter
+to fit to a simulator that cannot represent it.)
+
+What the physics does hand us is an asymmetry between links: a null
+turns `f` into `2f` by a known mechanism, and nothing turns `f` into
+`f/2`. **When two links disagree by 2:1, the lower one is right.** That
+is a fusion rule, it lives in `saans-health/src/fusion.rs`, and ADR-006
+already requires the second link it needs. Today fusion picks the
+highest-confidence link -- which at a null is often the doubled one,
+since it arrives at confidence near 1.0.
+
+Measured baseline, the full `evaluate.py --suite nulls` in
+`docs/RESULTS.md`, method `legacy`: at whole-band nulls **16.9% of
+readings are at twice the true rate and 4.2% are wrong at confidence
+>= 0.7**; partial nulls 5.3%; uniform placement 1.6%. (The quick sweep
+gives 20.5% on a quarter of the scenes; the full one is the figure to
+quote.)
+
+Revised order: (a) the cross-link octave rule in fusion, measured on
+two-link `saans-sim` runs with one link forced into a null; (b) only
+then, and only if a measurement shows separation, any single-link
+signal. The original text is kept below because the metrics in it are
+still the right ones.
 
 This is the one estimate-accuracy change that can be made and measured
 now, because the failure reproduces in the simulator.
