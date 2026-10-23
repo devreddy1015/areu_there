@@ -368,6 +368,818 @@ def gen_sim_geometric() -> None:
     })
 
 
+# --------------------------------------------------------------------------
+# Room Sim v1 (spec/roomsim.md §14). Everything below is SIM.
+#
+# Common conventions for every roomsim_* set:
+#   * scalars `scene` (repo-relative path), `scene_sha256`, `seed`,
+#     `duration_s` where a run is involved, and `cfg.<name>` for EVERY
+#     config value that differs from the §3.2 default (maps as
+#     `cfg.<name>.<key>`, pairs as `cfg.<name>.0` / `.1`, bools as 0/1);
+#     roomsim_physics_switches holds two runs and puts its run prefix in
+#     front of all but `scene`/`scene_sha256` (`a_seed`, `a_cfg.<name>`);
+#   * complex arrays are NAME_re / NAME_im; bins ascending k = -32..31;
+#     "packet-major" means packet 0's values first;
+#   * ints, bools and enums are float64: path kind codes 0 LoS, 1 order-1,
+#     2 order-2, 3 object specular, 4 object point, 5 clutter, 6 tail;
+#     posture codes 0 stand, 1 sit, 2 lie; -1 means "none";
+#   * material codes follow the §5.1 table: 0 concrete, 1 brick,
+#     2 drywall, 3 glass, 4 wood, 5 metal.
+# --------------------------------------------------------------------------
+
+ROOMSIM_MATERIALS = ("concrete", "brick", "drywall", "glass", "wood", "metal")
+ROOMSIM_REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
+
+
+def _roomsim_cfg_scalars(cfg) -> dict:
+    out = {}
+    for k, v in cfg.non_default().items():
+        if isinstance(v, dict):
+            for kk in sorted(v, key=str):
+                vv = v[kk]
+                out[f"cfg.{k}.{kk}"] = int(vv) if isinstance(vv, bool) else vv
+        elif isinstance(v, tuple):
+            for i, vv in enumerate(v):
+                out[f"cfg.{k}.{i}"] = vv
+        elif isinstance(v, bool):
+            out[f"cfg.{k}"] = int(v)
+        elif v is not None:
+            out[f"cfg.{k}"] = v
+    return out
+
+
+def _roomsim_run_scalars(rel_scene: str, sim, links=None) -> dict:
+    out = {"label": "SIM", "spec": "roomsim_v1", "scene": rel_scene, "scene_sha256": sim.scene.sha256,
+           "seed": sim.cfg.seed, "duration_s": sim.cfg.duration_s,
+           "carrier_hz": sim.world.carrier_hz, "lambda": sim.world.lam}
+    out.update(_roomsim_cfg_scalars(sim.cfg))
+    if links is not None:
+        out["n_links"] = len(links)
+        out["links"] = ",".join(f"{a}-{b}" for a, b in links)
+        for i, (a, b) in enumerate(links):
+            out[f"link{i}_tx"] = a
+            out[f"link{i}_rx"] = b
+    return out
+
+
+def _roomsim_paths_arrays(sim, links, prefix: str = "") -> dict:
+    """Static paths of `links` (see gen_roomsim_paths for the layout)."""
+    from wifisense.roomsim.paths import pair_index
+
+    a: dict = {k: [] for k in (
+        "path_link", "kind", "surf_i", "surf_j", "obj", "face", "clutter", "tail", "npts", "L",
+        "coef_re", "coef_im", "coef0_re", "coef0_im", "sigma", "pts_x", "pts_y", "pts_z",
+        "link_npaths", "H0_re", "H0_im", "tail_x", "tail_phi")}
+    for li, (tx, rx) in enumerate(links):
+        lm = sim.link_model(tx, rx)
+        allp = lm.paths + lm.tail
+        a["link_npaths"].append(len(allp))
+        for p in allp:
+            a["path_link"].append(li)
+            a["kind"].append(p.kind)
+            a["surf_i"].append(p.surf_i)
+            a["surf_j"].append(p.surf_j)
+            a["obj"].append(p.obj)
+            a["face"].append(p.face)
+            a["clutter"].append(p.clutter)
+            a["tail"].append(p.tail)
+            a["npts"].append(len(p.points))
+            a["L"].append(p.L)
+            a["coef_re"].append(p.coef[0])
+            a["coef_im"].append(p.coef[1])
+            a["coef0_re"].append(p.coef0[0])
+            a["coef0_im"].append(p.coef0[1])
+            a["sigma"].append(p.sigma)
+            for q in p.points:
+                a["pts_x"].append(q[0])
+                a["pts_y"].append(q[1])
+                a["pts_z"].append(q[2])
+        for h in lm.channel([]):
+            a["H0_re"].append(h[0])
+            a["H0_im"].append(h[1])
+        for x, phi in sim._tail_draws[pair_index(sim.world.node_ids, tx, rx)]:
+            a["tail_x"].append(x)
+            a["tail_phi"].append(phi)
+    a["clutter_x"] = [c.pos[0] for c in sim.clutter]
+    a["clutter_y"] = [c.pos[1] for c in sim.clutter]
+    a["clutter_z"] = [c.pos[2] for c in sim.clutter]
+    a["clutter_sigma"] = [c.sigma for c in sim.clutter]
+    return {prefix + k: v for k, v in a.items()}
+
+
+def gen_roomsim_materials() -> None:
+    """§5: every material x thickness x angle x polarisation, channel 6.
+
+    Inputs: `cos_t[4]` = cos((deg * PI) / 180.0) for deg = 0, 30, 60, 85
+    (use these values, do not recompute them); `thickness[2]` = 0.1, 0.23.
+    `eta_re/_im[6]`: eta per material code 0..5 (§5.1 table order).
+
+    Main table, 96 rows, row r = ((mat * 2 + ti) * 4 + ai) * 2 + pol
+    (pol 0 = TE, 1 = TM): columns `row_material`, `row_thickness`,
+    `row_cos_t`, `row_pol` and the coefficients `G`, `R`, `T` (each
+    _re/_im), where G is G_TE or G_TM by `pol` and R and T the slab of §5.1
+    with that G. R is referenced to the incident face and is what every
+    surface reflects with (walls included, §5.1); there is no R_wall.
+
+    Object single-interface G (§5.2), 24 rows, r = (om * 4 + ai) * 2 + pol
+    over object materials om = 0 metal, 1 wood, 2 glass: `obj_material`
+    (§5.1 material code), `obj_cos_t`, `obj_pol`, `obj_G_re/_im`.
+    """
+    from wifisense.roomsim.materials import eta, fresnel, slab
+    from wifisense.roomsim.numerics import C, carrier_hz
+
+    fc = carrier_hz(6)
+    lam = C / fc
+    degs = (0.0, 30.0, 60.0, 85.0)
+    cos_t = [math.cos((d * math.pi) / 180.0) for d in degs]
+    thick = (0.1, 0.23)
+    arr: dict = {"cos_t": cos_t, "thickness": list(thick), "eta_re": [], "eta_im": []}
+    for k in ("row_material", "row_thickness", "row_cos_t", "row_pol", "G_re", "G_im", "R_re", "R_im",
+              "T_re", "T_im"):
+        arr[k] = []
+    for mi, m in enumerate(ROOMSIM_MATERIALS):
+        et = eta(m, fc)
+        arr["eta_re"].append(et[0])
+        arr["eta_im"].append(et[1])
+        for t in thick:
+            for ct in cos_t:
+                s, g_te, g_tm = fresnel(et, ct)
+                for pol, G in ((0, g_te), (1, g_tm)):
+                    R, T, _q0 = slab(G, s, ct, t, lam)
+                    for k, v in (("row_material", mi), ("row_thickness", t), ("row_cos_t", ct), ("row_pol", pol),
+                                 ("G_re", G[0]), ("G_im", G[1]), ("R_re", R[0]), ("R_im", R[1]),
+                                 ("T_re", T[0]), ("T_im", T[1])):
+                        arr[k].append(v)
+    for k in ("obj_material", "obj_cos_t", "obj_pol", "obj_G_re", "obj_G_im"):
+        arr[k] = []
+    for m in ("metal", "wood", "glass"):
+        et = eta(m, fc)
+        for ct in cos_t:
+            _s, g_te, g_tm = fresnel(et, ct)
+            for pol, G in ((0, g_te), (1, g_tm)):
+                for k, v in (("obj_material", ROOMSIM_MATERIALS.index(m)), ("obj_cos_t", ct), ("obj_pol", pol),
+                             ("obj_G_re", G[0]), ("obj_G_im", G[1])):
+                    arr[k].append(v)
+    scalars = {"label": "SIM", "spec": "roomsim_v1", "channel": 6, "carrier_hz": fc, "lambda": lam,
+               "n_materials": len(ROOMSIM_MATERIALS), "n_angles": len(degs), "n_thickness": len(thick)}
+    for i, m in enumerate(ROOMSIM_MATERIALS):
+        scalars[f"material_{i}"] = m
+    for i, d in enumerate(degs):
+        scalars[f"angle_deg_{i}"] = d
+    emit("roomsim_materials", scalars, arr)
+
+
+def gen_roomsim_shadow() -> None:
+    """§8.5: the knife edge, the three-edge J and whole legs, LAMBDA at channel 6.
+
+    `nu[17]`, `J1[17]`: nu = -1.0 + 0.25 * float(n), n = 0..16.
+    Grid, 216 rows r = (a * 6 + b) * 6 + c over
+    v = (-1.0, -0.5, 0.0, 0.5, 1.0, 2.0): `grid_nu_1` = v[a] (near side
+    edge), `grid_nu_2` = v[b] (far side edge), `grid_nu_t` = v[c] (top),
+    `grid_J` = the three-edge J of §8.5 with cap `shadow_cap_db` (20.0).
+    Legs, one row each: inputs `leg_p1x/_p1y/_p1z`, `leg_p2x/_p2y/_p2z`,
+    cylinder centre `leg_cx/_cy`, `leg_top`, radius `body_radius_m`
+    (0.18); outputs `leg_J` (dB; 0.0 for "no loss") and
+    `leg_factor` = 10^(-J/20) (1.0 for "no loss").
+    """
+    from wifisense.roomsim.numerics import C, carrier_hz
+    from wifisense.roomsim.people import J1, shadow_J, three_edge_J
+
+    lam = C / carrier_hz(6)
+    nus = [-1.0 + 0.25 * float(n) for n in range(17)]
+    vals = (-1.0, -0.5, 0.0, 0.5, 1.0, 2.0)
+    arr = {"nu": nus, "J1": [J1(v) for v in nus], "grid_nu_1": [], "grid_nu_2": [], "grid_nu_t": [],
+           "grid_J": []}
+    for a in vals:
+        for b in vals:
+            for c in vals:
+                arr["grid_nu_1"].append(a)
+                arr["grid_nu_2"].append(b)
+                arr["grid_nu_t"].append(c)
+                arr["grid_J"].append(three_edge_J(a, b, c, 20.0))
+    legs = [
+        # (P1, P2, c, top)
+        ((0.15, 0.15, 1.2), (4.05, 0.15, 1.2), (2.1, 0.15), 1.7),     # on the axis, mid-way
+        ((0.15, 0.15, 1.2), (4.05, 0.15, 1.2), (1.0, 0.3), 1.7),      # beside the axis
+        ((0.15, 0.15, 1.2), (4.05, 0.15, 1.2), (3.0, 0.6), 1.6),      # further off
+        ((0.15, 0.15, 1.2), (4.05, 3.45, 1.2), (2.0, 1.8), 1.0),      # under the leg
+        ((0.3, 0.3, 1.6), (2.0, 5.0, 0.9), (1.2, 2.8), 1.75),         # sloping leg
+        ((0.3, 0.3, 1.6), (2.0, 5.0, 0.9), (2.05, 5.1), 1.75),        # end inside the cylinder
+        ((0.3, 0.3, 1.6), (2.0, 5.0, 0.9), (2.05, 5.1), 0.5),         # end above the top
+        ((0.3, 0.3, 1.6), (2.0, 5.0, 0.9), (0.2, 0.0), 1.75),         # behind the start
+        ((1.0, 1.0, 0.2), (1.0, 1.0, 2.5), (1.0, 1.0), 1.75),         # vertical leg: L2 == 0
+        ((5.7, 0.3, 1.4), (3.5, 5.0, 1.4), (4.6, 2.65), 1.62),        # exactly on the axis
+    ]
+    for k in ("leg_p1x", "leg_p1y", "leg_p1z", "leg_p2x", "leg_p2y", "leg_p2z", "leg_cx", "leg_cy", "leg_top",
+              "leg_J", "leg_factor"):
+        arr[k] = []
+    for P1, P2, c, top in legs:
+        J = shadow_J(P1, P2, c, top, 0.18, 20.0, lam)
+        for k, v in zip(("leg_p1x", "leg_p1y", "leg_p1z", "leg_p2x", "leg_p2y", "leg_p2z", "leg_cx", "leg_cy",
+                         "leg_top"), (*P1, *P2, *c, top)):
+            arr[k].append(v)
+        arr["leg_J"].append(0.0 if J is None else J)
+        arr["leg_factor"].append(1.0 if J is None else 10.0 ** (-J / 20.0))
+    emit("roomsim_shadow", {"label": "SIM", "spec": "roomsim_v1", "channel": 6, "lambda": lam,
+                            "shadow_cap_db": 20.0, "body_radius_m": 0.18, "n_legs": len(legs)}, arr)
+
+
+def _gen_roomsim_paths(name: str, rel_scene: str, links) -> None:
+    from wifisense.roomsim import Config, RoomSim, load_scene
+
+    sim = RoomSim(load_scene(os.path.join(ROOMSIM_REPO, rel_scene)), Config(duration_s=0.0))
+    scalars = _roomsim_run_scalars(rel_scene, sim, links)
+    scalars["n_clutter"] = len(sim.clutter)
+    scalars["n_surfaces"] = len(sim.world.surfaces)
+    scalars["n_walls"] = len(sim.world.walls)
+    scalars["implied_walls"] = int(sim.world.implied_walls)
+    emit(name, scalars, _roomsim_paths_arrays(sim, links))
+
+
+def gen_roomsim_paths() -> None:
+    """Bedroom static paths, links (0,1) and (0,3), default config.
+
+    One row per path, links in order, each link's paths in §6 order with
+    its tail terms (kind 6) last: `path_link` (index into the set's link
+    list), `kind`, `surf_i`, `surf_j` (§6.1 surface index: walls in order,
+    then floor, then ceiling; -1 unused), `obj`, `face` (object index and
+    face 0..4 = +x, -x, +y, -y, top, for kinds 3/4), `clutter` (kind 5),
+    `tail` (term n, kind 6), `npts`, `L`, `coef_re/_im` (the static
+    coefficient A_p after §6.9; tail: its coefficient), `coef0_re/_im`
+    (before §6.9), `sigma` (RCS for kinds 4/5, else 0). `pts_x/_y/_z`:
+    every path's points [Tp, ..., Rp] concatenated (npts each; 0 for the
+    tail). `link_npaths` per link. `H0_re/_im`: per link, 64 bins, the
+    channel with NO people (static paths and tail only). `tail_x`,
+    `tail_phi`: per link, the tail_count draws of its pair (§6.8).
+    `clutter_x/_y/_z/_sigma`: the run's kept clutter points (§6.7).
+    """
+    _gen_roomsim_paths("roomsim_paths", "spec/scenes/bedroom.json", [(0, 1), (0, 3)])
+
+
+def gen_roomsim_paths_hall() -> None:
+    """Hall static paths, links (1,6) and (0,7); layout as roomsim_paths."""
+    _gen_roomsim_paths("roomsim_paths_hall", "spec/scenes/hall-l-shaped.json", [(1, 6), (0, 7)])
+
+
+def gen_roomsim_paths_specular() -> None:
+    """Object-specular faces (§6.5 step 1, kind 3), which no other set has:
+    spec/scenes/fixtures/roomsim_specular.json (implied walls), links
+    (0,3), (3,0) and (1,2); layout as roomsim_paths. Link (0,3) and its
+    reverse reflect off a metal face at yaw 0 and one at yaw 80 (TE), a
+    glass table top at yaw 10 (TM) and a wood face at yaw -5 (TE).
+    """
+    _gen_roomsim_paths("roomsim_paths_specular", "spec/scenes/fixtures/roomsim_specular.json",
+                       [(0, 3), (3, 0), (1, 2)])
+
+
+def gen_roomsim_motion() -> None:
+    """Hall, people[0] walking, default config: §8.1, §9 and §8.3.
+
+    Samples n = 0..299 at `t` = float(n) / 10.0: `x`, `y`, `heading`,
+    `s` (walk flag), `v` (leg speed, 0 in a pause) and the body points
+    `body_x/_y/_z` (sample-major, `body_points` per sample, table order).
+    Segments generated by then, in order: `seg_walk` (1 walk, 0 pause),
+    `seg_t0`, `seg_t1`, `seg_x0`, `seg_y0` (from), `seg_x1`, `seg_y1` (to),
+    `seg_v`, `seg_heading`. Scalars: the §8.1 draws and the start.
+    """
+    from wifisense.roomsim import Config, RoomSim, load_scene
+
+    rel = "spec/scenes/hall-l-shaped.json"
+    sim = RoomSim(load_scene(os.path.join(ROOMSIM_REPO, rel)), Config(duration_s=0.0))
+    p = sim.people_template[0]
+    arr: dict = {k: [] for k in ("t", "x", "y", "heading", "s", "v", "body_x", "body_y", "body_z")}
+    for n in range(300):
+        t = float(n) / 10.0
+        st = p.state(t)
+        for k, v in zip(("t", "x", "y", "heading", "s", "v"), (t, *st)):
+            arr[k].append(v)
+        for q in p.body_points(t, st, sim.cfg.body_points):
+            arr["body_x"].append(q[0])
+            arr["body_y"].append(q[1])
+            arr["body_z"].append(q[2])
+    for k in ("seg_walk", "seg_t0", "seg_t1", "seg_x0", "seg_y0", "seg_x1", "seg_y1", "seg_v", "seg_heading"):
+        arr[k] = []
+    for g in p.trajectory.segs:
+        for k, v in zip(("seg_walk", "seg_t0", "seg_t1", "seg_x0", "seg_y0", "seg_x1", "seg_y1", "seg_v",
+                         "seg_heading"), (int(g.walk), g.t0, g.t1, g.frm[0], g.frm[1], g.to[0], g.to[1], g.v,
+                                          g.heading)):
+            arr[k].append(v)
+    scalars = _roomsim_run_scalars(rel, sim)
+    scalars.update({"person": 0, "walking": int(p.walking), "start_x": p.start[0], "start_y": p.start[1],
+                    "height": p.height, "f_b": p.f_b, "p2p": p.p2p, "phi_b": p.phi_b, "phi_g": p.phi_g,
+                    "n_samples": 300, "n_segments": len(p.trajectory.segs)})
+    emit("roomsim_motion", scalars, arr)
+
+
+def _roomsim_truth_arrays(trs, with_body: bool) -> dict:
+    a: dict = {k: [] for k in ("tr_t", "tr_m", "tr_slot", "tr_tx", "p_x", "p_y", "p_heading", "p_walking",
+                               "p_posture", "phone_x", "phone_y", "phone_z")}
+    if with_body:
+        a.update({"body_x": [], "body_y": [], "body_z": []})
+    code = {"stand": 0, "sit": 1, "lie": 2}
+    for tr in trs:
+        a["tr_t"].append(tr.t)
+        a["tr_m"].append(tr.m)
+        a["tr_slot"].append(tr.slot)
+        a["tr_tx"].append(tr.tx)
+        for p in tr.truth.people:
+            a["p_x"].append(p.x)
+            a["p_y"].append(p.y)
+            a["p_heading"].append(p.heading)
+            a["p_walking"].append(int(p.walking))
+            a["p_posture"].append(code[p.posture])
+        ph = tr.truth.phone
+        if ph is not None:
+            a["phone_x"].append(ph[0])
+            a["phone_y"].append(ph[1])
+            a["phone_z"].append(ph[2])
+        if with_body:
+            for snap in tr.snapshots:
+                for q in snap.points:
+                    a["body_x"].append(q[0])
+                    a["body_y"].append(q[1])
+                    a["body_z"].append(q[2])
+    return a
+
+
+def _roomsim_packet_arrays(pkts) -> dict:
+    a: dict = {k: [] for k in ("t", "m", "slot", "tx", "rx", "link_index", "H_re", "H_im")}
+    for p in pkts:
+        for k, v in (("t", p.t), ("m", p.m), ("slot", p.slot), ("tx", p.tx), ("rx", p.rx),
+                     ("link_index", p.link_index)):
+            a[k].append(v)
+        for h in p.H:
+            a["H_re"].append(h[0])
+            a["H_im"].append(h[1])
+    return a
+
+
+def _roomsim_bedroom_sim(impair: bool):
+    from wifisense.roomsim import Config, RoomSim, load_scene
+
+    rel = "spec/scenes/bedroom.json"
+    sim = RoomSim(load_scene(os.path.join(ROOMSIM_REPO, rel)), Config(seed=0, duration_s=0.5, impair=impair))
+    return rel, sim
+
+
+def gen_roomsim_channel() -> None:
+    """Bedroom, seed 0, people[0] stationary lying on the bed, 0.5 s,
+    `impair` false (so no packet is lost and every packet has H).
+
+    Per packet, §10 order (120 packets): `t`, `m`, `slot`, `tx`, `rx`,
+    `link_index`, `rssi_true`, `rssi`, `seq`; `H_re/_im` packet-major,
+    64 bins ascending k. Per transmission (40): `tr_t`, `tr_m`, `tr_slot`,
+    `tr_tx`, people[0]'s `p_x`, `p_y`, `p_heading`, `p_walking`,
+    `p_posture` (code), the phone `phone_x/_y/_z`, and the body points
+    `body_x/_y/_z` (transmission-major, `body_points` each, table order).
+    """
+    rel, sim = _roomsim_bedroom_sim(False)
+    trs = list(sim.transmissions())
+    pkts = [p for tr in trs for p in tr.packets]
+    arr = _roomsim_packet_arrays(pkts)
+    arr["rssi_true"] = [p.rssi_true for p in pkts]
+    arr["rssi"] = [p.rssi for p in pkts]
+    arr["seq"] = [p.seq for p in pkts]
+    arr.update(_roomsim_truth_arrays(trs, True))
+    scalars = _roomsim_run_scalars(rel, sim)
+    scalars.update({"n_packets": len(pkts), "n_transmissions": len(trs), "n_people": 1,
+                    "body_points": sim.cfg.body_points})
+    emit("roomsim_channel", scalars, arr)
+
+
+def gen_roomsim_impair() -> None:
+    """The roomsim_channel packets with the default impairments (smoothing
+    off): the same scene, seed, duration and (t, tx, rx) order.
+
+    Per packet (all 120, lost included): `t`, `tx`, `rx`, `link_index`,
+    `lost`, `agc_db` (after this packet's step), `seq` (-1 if lost),
+    `rssi` and `rssi_true` and `noise_floor` (0 if lost), the §12.2
+    draws `u_loss`, `u_jump`, `u_dir`, `phi0`, `tau`, `rj`, and `noise`
+    (256 per packet, packet-major: n_re, n_im per buffer entry).
+    Per received packet only, in order: `buffer_pre_re/_im` and
+    `buffer_re/_im` (128 entries each, buffer order: LLTF then HT-LTF, FFT
+    order k = 0..31, -32..-1), and the datagrams: `dgram` = every byte as
+    0..255, concatenated, with `dgram_len` per received packet.
+    `buffer_k[128]`, `buffer_active[128]`. Devices, per node id ascending
+    (`dev_node`): `dev_alpha/_beta/_gamma/_delta` (node-major,
+    ripple_harmonics each), `dev_g_db`, `dev_nf`, `dev_tau`, `dev_rdev_re/_im`
+    (node-major, 64 bins ascending k).
+    """
+    from wifisense.roomsim import BUFFER_ACTIVE, BUFFER_K
+
+    rel, sim = _roomsim_bedroom_sim(True)
+    pkts = list(sim.packets())
+    a: dict = {k: [] for k in ("t", "tx", "rx", "link_index", "lost", "agc_db", "seq", "rssi", "rssi_true",
+                               "noise_floor", "u_loss", "u_jump", "u_dir", "phi0", "tau", "rj", "noise",
+                               "buffer_pre_re", "buffer_pre_im", "buffer_re", "buffer_im", "dgram", "dgram_len")}
+    for p in pkts:
+        d = p.draws
+        for k, v in (("t", p.t), ("tx", p.tx), ("rx", p.rx), ("link_index", p.link_index), ("lost", int(p.lost)),
+                     ("agc_db", p.agc_db), ("seq", -1 if p.lost else p.seq), ("rssi", 0 if p.lost else p.rssi),
+                     ("rssi_true", 0.0 if p.lost else p.rssi_true),
+                     ("noise_floor", 0 if p.lost else p.noise_floor), ("u_loss", d.u_loss), ("u_jump", d.u_jump),
+                     ("u_dir", d.u_dir), ("phi0", d.phi0), ("tau", d.tau), ("rj", d.rj)):
+            a[k].append(v)
+        a["noise"].extend(d.noise)
+        if p.lost:
+            continue
+        for re, im in p.buffer_pre:
+            a["buffer_pre_re"].append(re)
+            a["buffer_pre_im"].append(im)
+        for re, im in p.buffer:
+            a["buffer_re"].append(re)
+            a["buffer_im"].append(im)
+        a["dgram"].extend(p.datagram)
+        a["dgram_len"].append(len(p.datagram))
+    a["buffer_k"] = list(BUFFER_K)
+    a["buffer_active"] = [int(x) for x in BUFFER_ACTIVE]
+    for k in ("dev_node", "dev_alpha", "dev_beta", "dev_gamma", "dev_delta", "dev_g_db", "dev_nf", "dev_tau",
+              "dev_rdev_re", "dev_rdev_im"):
+        a[k] = []
+    for nid in sorted(sim.devices):
+        dv = sim.devices[nid]
+        a["dev_node"].append(nid)
+        a["dev_alpha"].extend(dv.alpha)
+        a["dev_beta"].extend(dv.beta)
+        a["dev_gamma"].extend(dv.gamma)
+        a["dev_delta"].extend(dv.delta)
+        a["dev_g_db"].append(dv.g_dev_db)
+        a["dev_nf"].append(dv.nf_dbm)
+        a["dev_tau"].append(dv.tau_dev)
+        for z in dv.rdev:
+            a["dev_rdev_re"].append(z[0])
+            a["dev_rdev_im"].append(z[1])
+    scalars = _roomsim_run_scalars(rel, sim)
+    scalars.update({"n_packets": len(pkts), "n_received": len(a["dgram_len"]), "n_lost": sum(a["lost"]),
+                    "n_nodes": len(sim.devices)})
+    emit("roomsim_impair", scalars, a)
+
+
+def gen_roomsim_multi() -> None:
+    """spec/scenes/fixtures/roomsim_multi.json: no walls (implied walls), a
+    30-degree metal cabinet, a door, 3 walking people ("third" enters at
+    the door); tx_period {1: 2}, 2 s, `impair` false (so every packet has H).
+
+    Packets of links (0,1), (1,2), (2,0) only, in §10 order: `t`, `m`,
+    `slot`, `tx`, `rx`, `link_index` (in the run's link list), `H_re/_im`
+    packet-major. Truth, every transmission: `tr_t`, `tr_m`, `tr_slot`,
+    `tr_tx`; people (transmission-major, 3 each): `p_x`, `p_y`,
+    `p_heading`, `p_walking`, `p_posture`; `phone_x/_y/_z`. Static paths
+    of the same three links with the prefix `paths_` in the roomsim_paths
+    layout. Scalars: each person's start and §8.1 draws.
+    """
+    from wifisense.roomsim import Config, RoomSim, load_scene
+
+    rel = "spec/scenes/fixtures/roomsim_multi.json"
+    links = [(0, 1), (1, 2), (2, 0)]
+    sim = RoomSim(load_scene(os.path.join(ROOMSIM_REPO, rel)),
+                  Config(seed=0, duration_s=2.0, tx_period={1: 2}, impair=False))
+    trs = list(sim.transmissions())
+    pkts = [p for tr in trs for p in tr.packets if (p.tx, p.rx) in links]
+    arr = _roomsim_packet_arrays(pkts)
+    arr.update(_roomsim_truth_arrays(trs, False))
+    arr.update(_roomsim_paths_arrays(sim, links, prefix="paths_"))
+    scalars = _roomsim_run_scalars(rel, sim, links)
+    scalars.update({"n_packets": len(pkts), "n_transmissions": len(trs), "n_people": len(sim.people_template),
+                    "implied_walls": int(sim.world.implied_walls), "n_walls": len(sim.world.walls)})
+    for p in sim.people_template:
+        i = p.index
+        scalars.update({f"person{i}_start_x": p.start[0], f"person{i}_start_y": p.start[1],
+                        f"person{i}_walking": int(p.walking), f"person{i}_height": p.height,
+                        f"person{i}_f_b": p.f_b, f"person{i}_p2p": p.p2p, f"person{i}_phi_b": p.phi_b,
+                        f"person{i}_phi_g": p.phi_g})
+    emit("roomsim_multi", scalars, arr)
+
+def _roomsim_switches_config(**kw):
+    """The roomsim_switches configuration: its non-default impairment,
+    scheduling and output branches."""
+    from wifisense.roomsim import Config
+
+    base = dict(
+        seed=5, duration_s=0.5, channel=11, fw_subcarriers=64, body_points=16,
+        roles={0: "tx", 7: "rx"}, tx_period={3: 2}, loss_prob_link={"0,7": 1.0, "2,1": 0.5},
+        phone_carrier=1, start_heading_rad={1: 0.7},
+        smoothing=True, cpe=False, ripple=False, ltf_merge=False, snr_noise=False,
+        timing_offset_dev_s=(-2e-08, 3e-08),
+    )
+    base.update(kw)
+    return Config(**base)
+
+
+def _roomsim_received_arrays(pkts, prefix: str = "") -> dict:
+    """Per packet (lost included) and per received packet arrays shared by
+    roomsim_switches (see its docstring)."""
+    a: dict = {k: [] for k in ("t", "m", "slot", "tx", "rx", "link_index", "lost", "agc_db", "seq", "rssi",
+                               "rssi_true", "noise_floor", "buffer_pre_re", "buffer_pre_im", "buffer_re",
+                               "buffer_im", "dgram", "dgram_len")}
+    for p in pkts:
+        for k, v in (("t", p.t), ("m", p.m), ("slot", p.slot), ("tx", p.tx), ("rx", p.rx),
+                     ("link_index", p.link_index), ("lost", int(p.lost)), ("agc_db", p.agc_db),
+                     ("seq", -1 if p.lost else p.seq), ("rssi", 0 if p.lost else p.rssi),
+                     ("rssi_true", 0.0 if p.lost else p.rssi_true),
+                     ("noise_floor", 0 if p.lost else p.noise_floor)):
+            a[k].append(v)
+        if p.lost:
+            continue
+        for re, im in p.buffer_pre:
+            a["buffer_pre_re"].append(re)
+            a["buffer_pre_im"].append(im)
+        for re, im in p.buffer:
+            a["buffer_re"].append(re)
+            a["buffer_im"].append(im)
+        if p.datagram is not None:
+            a["dgram"].extend(p.datagram)
+            a["dgram_len"].append(len(p.datagram))
+    return {prefix + k: v for k, v in a.items()}
+
+
+def gen_roomsim_switches() -> None:
+    """Hall-l-shaped, impaired, with the non-default impairment, scheduling
+    and output branches the other sets leave at their defaults (the
+    geometry, object, tail, shadowing and people switches are in
+    roomsim_physics_switches): `seed` 5, `channel` 11, `fw_subcarriers`
+    64, `body_points` 16, `roles` {0: tx, 7: rx} (nodes 1..6 txrx, so
+    transmitters 0..6 and receivers 1..7), `tx_period` {3: 2},
+    `loss_prob_link` {"0,7": 1.0, "2,1": 0.5}, `phone_carrier` 1 (the
+    seated people[1], on the sofa: stationary, `sit`), `start_heading_rad`
+    {1: 0.7}, `smoothing` true, `cpe`, `ripple`, `ltf_merge` and
+    `snr_noise` false, `timing_offset_dev_s` (-2e-08, 3e-08); 0.5 s. The
+    `cfg.*` scalars rebuild it.
+
+    Per packet (all, lost included), §10 order: `t`, `m`, `slot`, `tx`,
+    `rx`, `link_index`, `lost`, `agc_db` (after this packet's step), `seq`
+    (-1 if lost), `rssi` (0 if lost), `rssi_true` (0.0 if lost),
+    `noise_floor` (0 if lost). Per received packet only, in order:
+    `buffer_pre_re/_im` and `buffer_re/_im` (128 entries each, buffer
+    order: LLTF then HT-LTF, FFT order), `dgram` (every datagram byte as
+    0..255, concatenated) with `dgram_len` per received packet.
+    Truth, per transmission: `tr_t`, `tr_m`, `tr_slot`, `tr_tx`; people
+    (transmission-major, 2 each): `p_x`, `p_y`, `p_heading`, `p_walking`,
+    `p_posture` (code); the phone `phone_x/_y/_z` (one per transmission);
+    body points `body_x/_y/_z` (transmission-major, people in order, 16
+    each, table order). Devices, node id ascending (`dev_node`):
+    `dev_g_db`, `dev_nf`, `dev_tau` (`ripple` is off, so `Rdev = (1, 0)`).
+
+    The `nq_` arrays are a second run of the same configuration with
+    `quantize` false and `duration_s` = `nq_duration_s` (0.05): per packet
+    `nq_t`, `nq_m`, `nq_slot`, `nq_tx`, `nq_rx`, `nq_link_index`,
+    `nq_lost`, `nq_agc_db`, `nq_seq`, `nq_rssi`, `nq_rssi_true`,
+    `nq_noise_floor` (lost as above); per received packet
+    `nq_buffer_pre_re/_im` and `nq_buffer_re/_im` (the float buffer, equal
+    to buffer_pre). It emits no datagram: `nq_dgram` and `nq_dgram_len`
+    are empty (zero-length files) and `nq_n_datagrams` is 0. Its truth is
+    the first `nq_duration_s` of the main run's and is not stored again.
+
+    Scalars besides `cfg.*`: `n_packets`, `n_received`, `n_lost`,
+    `n_transmissions`, `n_people`, `n_nodes`, `n_links`, `n_transmitters`,
+    `body_points`; `nq_duration_s`, `nq_quantize` (0), `nq_n_packets`,
+    `nq_n_received`, `nq_n_datagrams`; per person `person{i}_walking`
+    (0/1), `person{i}_posture` (word), `person{i}_height`. Link (0,7) has
+    `loss_prob_link` 1.0, so every packet on it is lost.
+    """
+    from wifisense.roomsim import RoomSim, load_scene
+
+    rel = "spec/scenes/hall-l-shaped.json"
+    scene = load_scene(os.path.join(ROOMSIM_REPO, rel))
+    sim = RoomSim(scene, _roomsim_switches_config())
+    trs = list(sim.transmissions())
+    pkts = [p for tr in trs for p in tr.packets]
+    arr = _roomsim_received_arrays(pkts)
+    arr.update(_roomsim_truth_arrays(trs, True))
+    for k in ("dev_node", "dev_g_db", "dev_nf", "dev_tau"):
+        arr[k] = []
+    for nid in sorted(sim.devices):
+        dv = sim.devices[nid]
+        arr["dev_node"].append(nid)
+        arr["dev_g_db"].append(dv.g_dev_db)
+        arr["dev_nf"].append(dv.nf_dbm)
+        arr["dev_tau"].append(dv.tau_dev)
+    nq_duration = 0.05
+    nq = RoomSim(scene, _roomsim_switches_config(quantize=False, duration_s=nq_duration))
+    nq_pkts = list(nq.packets())
+    arr.update(_roomsim_received_arrays(nq_pkts, prefix="nq_"))
+    scalars = _roomsim_run_scalars(rel, sim)
+    scalars.update({
+        "n_packets": len(pkts), "n_received": len(arr["dgram_len"]), "n_lost": sum(arr["lost"]),
+        "n_transmissions": len(trs), "n_people": len(sim.people_template), "n_nodes": len(sim.devices),
+        "n_links": len(sim.links), "n_transmitters": len(sim.transmitters),
+        "body_points": sim.cfg.body_points,
+        "nq_duration_s": nq_duration, "nq_quantize": 0, "nq_n_packets": len(nq_pkts),
+        "nq_n_received": sum(1 for p in nq_pkts if not p.lost),
+        "nq_n_datagrams": sum(1 for p in nq_pkts if p.datagram is not None),
+    })
+    for p in sim.people_template:
+        i = p.index
+        scalars.update({f"person{i}_walking": int(p.walking), f"person{i}_posture": p.posture,
+                        f"person{i}_height": p.height})
+    emit("roomsim_switches", scalars, arr)
+
+
+def gen_roomsim_export() -> None:
+    """`export_run` on the bedroom, seed 0, 0.25 s, `loss_prob` 0.25 (the
+    rest default): what `saans-cli/tests/roomsim_export.rs` compares with
+    `saans roomsim-export spec/scenes/bedroom.json` on the same config.
+
+    `pcap`: every byte of PREFIX.sim.pcap as 0..255 (`pcap_len` bytes).
+    The truth file's values, one row per line (transmission, §10 order):
+    `tr_m`, `tr_slot`, `tr_t`, `tr_tx`, `tr_npackets` (its packet
+    records), `has_phone` (1, or 0 for `"phone": null`) and
+    `phone_x/_y/_z` (0.0 when there is none); people, transmission-major
+    (`n_people` each): `p_x`, `p_y`, `p_heading`, `p_walking` (0/1),
+    `p_posture` (code 0 stand, 1 sit, 2 lie); packets, transmission-major
+    (`tr_npackets` each, receivers in id order): `pk_rx`,
+    `pk_link_index`, `pk_lost` (0/1), `pk_seq`, `pk_rssi`, `pk_rssi_true`
+    (for a lost packet, whose three JSON values are null, the sentinels
+    are `pk_seq` -1, `pk_rssi` 0 and `pk_rssi_true` 0.0; `pk_lost` says
+    which). Every truth line also has `"label": "SIM"` and each person
+    `"name": "people[i]"` (checked here, not stored).
+
+    The manifest, as scalars: `counts_transmissions`, `counts_packets`,
+    `counts_lost`, `counts_datagrams`; `gateway_faithful` (0/1);
+    `receivers` (the `receiver_rate_hz` keys in file order, ascending,
+    comma-separated, e.g. "0,1,2,3"), `n_receivers`, and
+    `receiver_rate_hz.<rx>` per receiver (Hz). As arrays, per link in link
+    order: `link_tx`, `link_rx`, `link_rate_hz` (`per_link_rate_hz`),
+    `link_packets`, `link_lost`, `link_datagrams`. Scalars `pcap_len`,
+    `n_transmissions` (truth lines), `n_people`, `n_packets` (packet
+    records).
+    """
+    import tempfile
+
+    from wifisense.roomsim import Config, RoomSim, export_run, load_scene
+
+    rel = "spec/scenes/bedroom.json"
+    sim = RoomSim(load_scene(os.path.join(ROOMSIM_REPO, rel)), Config(duration_s=0.25, loss_prob=0.25))
+    code = {"stand": 0, "sit": 1, "lie": 2}
+    with tempfile.TemporaryDirectory() as d:
+        info = export_run(sim, os.path.join(d, "export"))
+        with open(info["pcap"], "rb") as fh:
+            pcap = fh.read()
+        with open(info["truth"], encoding="utf-8") as fh:
+            lines = [json.loads(x) for x in fh]
+        with open(info["manifest"], encoding="utf-8") as fh:
+            man = json.load(fh)
+    arr: dict = {"pcap": list(pcap)}
+    for k in ("tr_m", "tr_slot", "tr_t", "tr_tx", "tr_npackets", "has_phone", "phone_x", "phone_y", "phone_z",
+              "p_x", "p_y", "p_heading", "p_walking", "p_posture",
+              "pk_rx", "pk_link_index", "pk_lost", "pk_seq", "pk_rssi", "pk_rssi_true"):
+        arr[k] = []
+    for rec in lines:
+        assert rec["label"] == "SIM"
+        for k in ("m", "slot", "t", "tx"):
+            arr["tr_" + k].append(rec[k])
+        arr["tr_npackets"].append(len(rec["packets"]))
+        ph = rec["phone"]
+        arr["has_phone"].append(0 if ph is None else 1)
+        for i, k in enumerate(("phone_x", "phone_y", "phone_z")):
+            arr[k].append(0.0 if ph is None else ph[i])
+        for i, p in enumerate(rec["people"]):
+            assert p["name"] == f"people[{i}]"
+            for k in ("x", "y", "heading"):
+                arr["p_" + k].append(p[k])
+            arr["p_walking"].append(int(p["walking"]))
+            arr["p_posture"].append(code[p["posture"]])
+        for pk in rec["packets"]:
+            arr["pk_rx"].append(pk["rx"])
+            arr["pk_link_index"].append(pk["link_index"])
+            arr["pk_lost"].append(int(pk["lost"]))
+            arr["pk_seq"].append(-1 if pk["seq"] is None else pk["seq"])
+            arr["pk_rssi"].append(0 if pk["rssi"] is None else pk["rssi"])
+            arr["pk_rssi_true"].append(0.0 if pk["rssi_true"] is None else pk["rssi_true"])
+    for k in ("link_tx", "link_rx", "link_rate_hz", "link_packets", "link_lost", "link_datagrams"):
+        arr[k] = []
+    for lk in man["links"]:
+        for k, v in (("link_tx", lk["tx"]), ("link_rx", lk["rx"]), ("link_rate_hz", lk["per_link_rate_hz"]),
+                     ("link_packets", lk["packets"]), ("link_lost", lk["lost"]),
+                     ("link_datagrams", lk["datagrams"])):
+            arr[k].append(v)
+    assert man["label"] == "SIM" and man["scene_sha256"] == sim.scene.sha256
+    scalars = _roomsim_run_scalars(rel, sim)
+    scalars.update({"pcap_len": len(pcap), "n_transmissions": len(lines),
+                    "n_people": len(lines[0]["people"]) if lines else 0,
+                    "n_packets": len(arr["pk_rx"])})
+    for k in ("transmissions", "packets", "lost", "datagrams"):
+        scalars["counts_" + k] = man["counts"][k]
+    scalars["gateway_faithful"] = int(man["gateway_faithful"])
+    rates = man["receiver_rate_hz"]
+    scalars["receivers"] = ",".join(rates)
+    scalars["n_receivers"] = len(rates)
+    for k, v in rates.items():
+        scalars[f"receiver_rate_hz.{k}"] = v
+    emit("roomsim_export", scalars, arr)
+
+
+#: The roomsim_physics_switches runs: (prefix, config keywords, links).
+ROOMSIM_PHYSICS_RUNS = (
+    ("a", dict(seed=1, duration_s=0.5, impair=False, reflection_order=1, floor_ceiling=False,
+               object_specular=False, object_scatter_scale=0.5, clutter_count=5, tail=False,
+               n_people=3, people_mode={2: "stationary"}, people_posture={1: "stand"},
+               start_heading_rad={2: 2.0}),
+     ((4, 6), (0, 1), (0, 5))),
+    ("b", dict(seed=2, duration_s=0.5, impair=False, reflection_order=0, transmission=False,
+               object_scatter=False, object_blockage=False, shadowing=False),
+     ((5, 7), (1, 6), (0, 1))),
+)
+
+
+def gen_roomsim_physics_switches() -> None:
+    """The non-default geometry, object, tail, shadowing and people
+    branches, on spec/scenes/hall-l-shaped.json with `impair` false (so
+    every packet has H): two runs, variant `a` and variant `b`, 0.5 s each.
+
+    Variant `a` (seed 1): `reflection_order` 1, `floor_ceiling` false (6
+    surfaces, the walls), `object_specular` false (the long table's top,
+    specular on link (4,6) by default, becomes a kind-4 point),
+    `object_scatter_scale` 0.5, `clutter_count` 5, `tail` false,
+    `n_people` 3 (people[2] has no scene start and enters at the door, at
+    (0.4, 1.5)), `people_mode` {2: stationary} (it stays there, standing),
+    `start_heading_rad` {2: 2.0}, `people_posture` {1: stand} (the sitter
+    on the sofa stands on it, so the sofa now blocks its body legs);
+    links (4,6), (0,1), (0,5). Variant `b` (seed 2): `reflection_order` 0,
+    `transmission` false (link (1,6) crosses the re-entrant walls),
+    `object_scatter` false (only the table top's kind-3 path is left of
+    the objects, link (5,7)), `object_blockage` false, `shadowing` false;
+    the scene's two people (people[0] walks, people[1] sits on the sofa);
+    links (5,7), (1,6), (0,1). Every switch changes H on at least one of
+    its run's links. The rest is default in both.
+
+    Layout. Top-level scalars: `label`, `spec`, `scene`, `scene_sha256`,
+    `carrier_hz`, `lambda` (both runs are on channel 6), `n_variants` (2),
+    `variants` ("a,b", the prefixes in order). Everything else belongs to
+    one run and carries its prefix `V_` (V = a or b): scalars and arrays
+    alike, so `a_kind` is run a's `kind`. Per run, scalars `V_seed`,
+    `V_duration_s`, `V_cfg.*` (every non-default value of that run, by
+    the common convention with the prefix in front: `a_cfg.n_people 3`,
+    `a_cfg.people_mode.2 stationary`, `b_cfg.transmission 0`, ...; they
+    rebuild the run's Config), `V_n_links`, `V_links` ("4-6,0-1,0-5"),
+    `V_link{i}_tx`, `V_link{i}_rx`, `V_n_clutter`, `V_n_surfaces`,
+    `V_n_walls`, `V_n_packets` (stored packets, below),
+    `V_n_transmissions`, `V_n_people`, `V_body_points`, and per person i:
+    `V_person{i}_start_x`, `_start_y`, `_walking` (0/1, the §8.2 mode),
+    `_posture` (word), `_on_object` (§8.2 object index in file order, -1
+    none; -1 for a walking person), `_heading0` (`start_heading_rad`,
+    default 0.0), `_height`, `_f_b`, `_p2p`, `_phi_b`, `_phi_g` (§8.1).
+
+    Per run, arrays:
+    * static paths of its links, in the roomsim_paths layout with the
+      prefix: `V_path_link`, `V_kind`, `V_surf_i`, `V_surf_j`, `V_obj`,
+      `V_face`, `V_clutter`, `V_tail`, `V_npts`, `V_L`, `V_coef_re/_im`,
+      `V_coef0_re/_im`, `V_sigma`, `V_pts_x/_y/_z`, `V_link_npaths`,
+      `V_H0_re/_im` (64 per link, no people), `V_tail_x`, `V_tail_phi`
+      (`tail_count` = 40 draws per link, made whether or not `tail` is on,
+      §6.8), `V_clutter_x/_y/_z/_sigma` (the run's kept clutter points);
+    * every packet of its links, §10 order (transmissions in order, then
+      receivers by id): `V_t`, `V_m`, `V_slot`, `V_tx`, `V_rx`,
+      `V_link_index` (in the run's full link list), `V_H_re/_im`
+      (packet-major, 64 bins ascending k);
+    * truth, every transmission of the run (all transmitters): `V_tr_t`,
+      `V_tr_m`, `V_tr_slot`, `V_tr_tx`; people (transmission-major,
+      `V_n_people` each): `V_p_x`, `V_p_y`, `V_p_heading`, `V_p_walking`
+      (the §8.3 walk flag at that instant), `V_p_posture` (code); the
+      phone `V_phone_x/_y/_z` (one per transmission; carried by people[0]);
+      body points `V_body_x/_y/_z` (transmission-major, people in order,
+      `V_body_points` each, table order).
+    """
+    from wifisense.roomsim import Config, RoomSim, load_scene
+
+    rel = "spec/scenes/hall-l-shaped.json"
+    scene = load_scene(os.path.join(ROOMSIM_REPO, rel))
+    scalars: dict = {"label": "SIM", "spec": "roomsim_v1", "scene": rel, "scene_sha256": scene.sha256}
+    runs = []
+    for v, kw, links in ROOMSIM_PHYSICS_RUNS:
+        sim = RoomSim(scene, Config(**kw))
+        runs.append((v, sim, list(links)))
+    scalars.update({"carrier_hz": runs[0][1].world.carrier_hz, "lambda": runs[0][1].world.lam,
+                    "n_variants": len(runs), "variants": ",".join(v for v, _s, _l in runs)})
+    arr: dict = {}
+    for v, sim, links in runs:
+        assert sim.world.carrier_hz == scalars["carrier_hz"] and sim.world.lam == scalars["lambda"]
+        trs = list(sim.transmissions())
+        pkts = [p for tr in trs for p in tr.packets if (p.tx, p.rx) in links]
+        a = _roomsim_paths_arrays(sim, links)
+        a.update(_roomsim_packet_arrays(pkts))
+        a.update(_roomsim_truth_arrays(trs, True))
+        sc = {"seed": sim.cfg.seed, "duration_s": sim.cfg.duration_s}
+        sc.update(_roomsim_cfg_scalars(sim.cfg))
+        sc.update({"n_links": len(links), "links": ",".join(f"{x}-{y}" for x, y in links)})
+        for i, (x, y) in enumerate(links):
+            sc[f"link{i}_tx"] = x
+            sc[f"link{i}_rx"] = y
+        sc.update({"n_clutter": len(sim.clutter), "n_surfaces": len(sim.world.surfaces),
+                   "n_walls": len(sim.world.walls), "n_packets": len(pkts), "n_transmissions": len(trs),
+                   "n_people": len(sim.people_template), "body_points": sim.cfg.body_points})
+        for p in sim.people_template:
+            i = p.index
+            sc.update({f"person{i}_start_x": p.start[0], f"person{i}_start_y": p.start[1],
+                       f"person{i}_walking": int(p.walking), f"person{i}_posture": p.posture,
+                       f"person{i}_on_object": p.on_object, f"person{i}_heading0": p.heading0,
+                       f"person{i}_height": p.height, f"person{i}_f_b": p.f_b, f"person{i}_p2p": p.p2p,
+                       f"person{i}_phi_b": p.phi_b, f"person{i}_phi_g": p.phi_g})
+        scalars.update({f"{v}_{k}": x for k, x in sc.items()})
+        arr.update({f"{v}_{k}": x for k, x in a.items()})
+    emit("roomsim_physics_switches", scalars, arr)
+
+
 def main() -> None:
     for f in os.listdir(HERE):
         if f.endswith((".kv", ".f64", ".json")):
@@ -385,6 +1197,18 @@ def main() -> None:
     gen_codec()
     gen_features()
     gen_sim_geometric()
+    gen_roomsim_materials()
+    gen_roomsim_shadow()
+    gen_roomsim_paths()
+    gen_roomsim_paths_hall()
+    gen_roomsim_paths_specular()
+    gen_roomsim_motion()
+    gen_roomsim_channel()
+    gen_roomsim_impair()
+    gen_roomsim_multi()
+    gen_roomsim_switches()
+    gen_roomsim_export()
+    gen_roomsim_physics_switches()
     with open(os.path.join(HERE, "MANIFEST"), "w") as fh:
         fh.write("\n".join(MANIFEST) + "\n")
     print(f"{len(MANIFEST)} vector sets")

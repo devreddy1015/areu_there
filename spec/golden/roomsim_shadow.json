@@ -1,0 +1,82 @@
+{
+ "name": "roomsim_shadow",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "channel": 6,
+  "lambda": 0.1230170118998769,
+  "shadow_cap_db": 20.0,
+  "body_radius_m": 0.18,
+  "n_legs": 10
+ },
+ "arrays": {
+  "nu": [
+   "roomsim_shadow__nu.f64",
+   17
+  ],
+  "J1": [
+   "roomsim_shadow__J1.f64",
+   17
+  ],
+  "grid_nu_1": [
+   "roomsim_shadow__grid_nu_1.f64",
+   216
+  ],
+  "grid_nu_2": [
+   "roomsim_shadow__grid_nu_2.f64",
+   216
+  ],
+  "grid_nu_t": [
+   "roomsim_shadow__grid_nu_t.f64",
+   216
+  ],
+  "grid_J": [
+   "roomsim_shadow__grid_J.f64",
+   216
+  ],
+  "leg_p1x": [
+   "roomsim_shadow__leg_p1x.f64",
+   10
+  ],
+  "leg_p1y": [
+   "roomsim_shadow__leg_p1y.f64",
+   10
+  ],
+  "leg_p1z": [
+   "roomsim_shadow__leg_p1z.f64",
+   10
+  ],
+  "leg_p2x": [
+   "roomsim_shadow__leg_p2x.f64",
+   10
+  ],
+  "leg_p2y": [
+   "roomsim_shadow__leg_p2y.f64",
+   10
+  ],
+  "leg_p2z": [
+   "roomsim_shadow__leg_p2z.f64",
+   10
+  ],
+  "leg_cx": [
+   "roomsim_shadow__leg_cx.f64",
+   10
+  ],
+  "leg_cy": [
+   "roomsim_shadow__leg_cy.f64",
+   10
+  ],
+  "leg_top": [
+   "roomsim_shadow__leg_top.f64",
+   10
+  ],
+  "leg_J": [
+   "roomsim_shadow__leg_J.f64",
+   10
+  ],
+  "leg_factor": [
+   "roomsim_shadow__leg_factor.f64",
+   10
+  ]
+ }
+}

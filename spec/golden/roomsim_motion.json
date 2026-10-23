@@ -1,0 +1,99 @@
+{
+ "name": "roomsim_motion",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "seed": 0,
+  "duration_s": 0.0,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.0,
+  "person": 0,
+  "walking": 1,
+  "start_x": 2.0,
+  "start_y": 5.8,
+  "height": 1.7022870812878115,
+  "f_b": 0.1442728947159291,
+  "p2p": 0.008426304671717007,
+  "phi_b": 4.737529375076669,
+  "phi_g": 3.1188954134807716,
+  "n_samples": 300,
+  "n_segments": 8
+ },
+ "arrays": {
+  "t": [
+   "roomsim_motion__t.f64",
+   300
+  ],
+  "x": [
+   "roomsim_motion__x.f64",
+   300
+  ],
+  "y": [
+   "roomsim_motion__y.f64",
+   300
+  ],
+  "heading": [
+   "roomsim_motion__heading.f64",
+   300
+  ],
+  "s": [
+   "roomsim_motion__s.f64",
+   300
+  ],
+  "v": [
+   "roomsim_motion__v.f64",
+   300
+  ],
+  "body_x": [
+   "roomsim_motion__body_x.f64",
+   3000
+  ],
+  "body_y": [
+   "roomsim_motion__body_y.f64",
+   3000
+  ],
+  "body_z": [
+   "roomsim_motion__body_z.f64",
+   3000
+  ],
+  "seg_walk": [
+   "roomsim_motion__seg_walk.f64",
+   8
+  ],
+  "seg_t0": [
+   "roomsim_motion__seg_t0.f64",
+   8
+  ],
+  "seg_t1": [
+   "roomsim_motion__seg_t1.f64",
+   8
+  ],
+  "seg_x0": [
+   "roomsim_motion__seg_x0.f64",
+   8
+  ],
+  "seg_y0": [
+   "roomsim_motion__seg_y0.f64",
+   8
+  ],
+  "seg_x1": [
+   "roomsim_motion__seg_x1.f64",
+   8
+  ],
+  "seg_y1": [
+   "roomsim_motion__seg_y1.f64",
+   8
+  ],
+  "seg_v": [
+   "roomsim_motion__seg_v.f64",
+   8
+  ],
+  "seg_heading": [
+   "roomsim_motion__seg_heading.f64",
+   8
+  ]
+ }
+}

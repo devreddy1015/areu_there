@@ -1,0 +1,140 @@
+{
+ "name": "roomsim_export",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "seed": 0,
+  "duration_s": 0.25,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.25,
+  "cfg.loss_prob": 0.25,
+  "pcap_len": 7768,
+  "n_transmissions": 20,
+  "n_people": 1,
+  "n_packets": 60,
+  "counts_transmissions": 20,
+  "counts_packets": 60,
+  "counts_lost": 16,
+  "counts_datagrams": 44,
+  "gateway_faithful": 0,
+  "receivers": "0,1,2,3",
+  "n_receivers": 4,
+  "receiver_rate_hz.0": 60.0,
+  "receiver_rate_hz.1": 60.0,
+  "receiver_rate_hz.2": 60.0,
+  "receiver_rate_hz.3": 60.0
+ },
+ "arrays": {
+  "pcap": [
+   "roomsim_export__pcap.f64",
+   7768
+  ],
+  "tr_m": [
+   "roomsim_export__tr_m.f64",
+   20
+  ],
+  "tr_slot": [
+   "roomsim_export__tr_slot.f64",
+   20
+  ],
+  "tr_t": [
+   "roomsim_export__tr_t.f64",
+   20
+  ],
+  "tr_tx": [
+   "roomsim_export__tr_tx.f64",
+   20
+  ],
+  "tr_npackets": [
+   "roomsim_export__tr_npackets.f64",
+   20
+  ],
+  "has_phone": [
+   "roomsim_export__has_phone.f64",
+   20
+  ],
+  "phone_x": [
+   "roomsim_export__phone_x.f64",
+   20
+  ],
+  "phone_y": [
+   "roomsim_export__phone_y.f64",
+   20
+  ],
+  "phone_z": [
+   "roomsim_export__phone_z.f64",
+   20
+  ],
+  "p_x": [
+   "roomsim_export__p_x.f64",
+   20
+  ],
+  "p_y": [
+   "roomsim_export__p_y.f64",
+   20
+  ],
+  "p_heading": [
+   "roomsim_export__p_heading.f64",
+   20
+  ],
+  "p_walking": [
+   "roomsim_export__p_walking.f64",
+   20
+  ],
+  "p_posture": [
+   "roomsim_export__p_posture.f64",
+   20
+  ],
+  "pk_rx": [
+   "roomsim_export__pk_rx.f64",
+   60
+  ],
+  "pk_link_index": [
+   "roomsim_export__pk_link_index.f64",
+   60
+  ],
+  "pk_lost": [
+   "roomsim_export__pk_lost.f64",
+   60
+  ],
+  "pk_seq": [
+   "roomsim_export__pk_seq.f64",
+   60
+  ],
+  "pk_rssi": [
+   "roomsim_export__pk_rssi.f64",
+   60
+  ],
+  "pk_rssi_true": [
+   "roomsim_export__pk_rssi_true.f64",
+   60
+  ],
+  "link_tx": [
+   "roomsim_export__link_tx.f64",
+   12
+  ],
+  "link_rx": [
+   "roomsim_export__link_rx.f64",
+   12
+  ],
+  "link_rate_hz": [
+   "roomsim_export__link_rate_hz.f64",
+   12
+  ],
+  "link_packets": [
+   "roomsim_export__link_packets.f64",
+   12
+  ],
+  "link_lost": [
+   "roomsim_export__link_lost.f64",
+   12
+  ],
+  "link_datagrams": [
+   "roomsim_export__link_datagrams.f64",
+   12
+  ]
+ }
+}

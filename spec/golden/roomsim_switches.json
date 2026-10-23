@@ -1,0 +1,274 @@
+{
+ "name": "roomsim_switches",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "seed": 5,
+  "duration_s": 0.5,
+  "carrier_hz": 2462000000.0,
+  "lambda": 0.12176785458976441,
+  "cfg.seed": 5,
+  "cfg.duration_s": 0.5,
+  "cfg.channel": 11,
+  "cfg.roles.0": "tx",
+  "cfg.roles.7": "rx",
+  "cfg.tx_period.3": 2,
+  "cfg.start_heading_rad.1": 0.7,
+  "cfg.body_points": 16,
+  "cfg.phone_carrier": 1,
+  "cfg.loss_prob_link.0,7": 1.0,
+  "cfg.loss_prob_link.2,1": 0.5,
+  "cfg.cpe": 0,
+  "cfg.timing_offset_dev_s.0": -2e-08,
+  "cfg.timing_offset_dev_s.1": 3e-08,
+  "cfg.ripple": 0,
+  "cfg.snr_noise": 0,
+  "cfg.ltf_merge": 0,
+  "cfg.smoothing": 1,
+  "cfg.fw_subcarriers": 64,
+  "n_packets": 228,
+  "n_received": 211,
+  "n_lost": 17,
+  "n_transmissions": 37,
+  "n_people": 2,
+  "n_nodes": 8,
+  "n_links": 43,
+  "n_transmitters": 7,
+  "body_points": 16,
+  "nq_duration_s": 0.05,
+  "nq_quantize": 0,
+  "nq_n_packets": 25,
+  "nq_n_received": 23,
+  "nq_n_datagrams": 0,
+  "person0_walking": 1,
+  "person0_posture": "stand",
+  "person0_height": 1.6845483331516742,
+  "person1_walking": 0,
+  "person1_posture": "sit",
+  "person1_height": 1.6892075840218783
+ },
+ "arrays": {
+  "t": [
+   "roomsim_switches__t.f64",
+   228
+  ],
+  "m": [
+   "roomsim_switches__m.f64",
+   228
+  ],
+  "slot": [
+   "roomsim_switches__slot.f64",
+   228
+  ],
+  "tx": [
+   "roomsim_switches__tx.f64",
+   228
+  ],
+  "rx": [
+   "roomsim_switches__rx.f64",
+   228
+  ],
+  "link_index": [
+   "roomsim_switches__link_index.f64",
+   228
+  ],
+  "lost": [
+   "roomsim_switches__lost.f64",
+   228
+  ],
+  "agc_db": [
+   "roomsim_switches__agc_db.f64",
+   228
+  ],
+  "seq": [
+   "roomsim_switches__seq.f64",
+   228
+  ],
+  "rssi": [
+   "roomsim_switches__rssi.f64",
+   228
+  ],
+  "rssi_true": [
+   "roomsim_switches__rssi_true.f64",
+   228
+  ],
+  "noise_floor": [
+   "roomsim_switches__noise_floor.f64",
+   228
+  ],
+  "buffer_pre_re": [
+   "roomsim_switches__buffer_pre_re.f64",
+   27008
+  ],
+  "buffer_pre_im": [
+   "roomsim_switches__buffer_pre_im.f64",
+   27008
+  ],
+  "buffer_re": [
+   "roomsim_switches__buffer_re.f64",
+   27008
+  ],
+  "buffer_im": [
+   "roomsim_switches__buffer_im.f64",
+   27008
+  ],
+  "dgram": [
+   "roomsim_switches__dgram.f64",
+   31228
+  ],
+  "dgram_len": [
+   "roomsim_switches__dgram_len.f64",
+   211
+  ],
+  "tr_t": [
+   "roomsim_switches__tr_t.f64",
+   37
+  ],
+  "tr_m": [
+   "roomsim_switches__tr_m.f64",
+   37
+  ],
+  "tr_slot": [
+   "roomsim_switches__tr_slot.f64",
+   37
+  ],
+  "tr_tx": [
+   "roomsim_switches__tr_tx.f64",
+   37
+  ],
+  "p_x": [
+   "roomsim_switches__p_x.f64",
+   74
+  ],
+  "p_y": [
+   "roomsim_switches__p_y.f64",
+   74
+  ],
+  "p_heading": [
+   "roomsim_switches__p_heading.f64",
+   74
+  ],
+  "p_walking": [
+   "roomsim_switches__p_walking.f64",
+   74
+  ],
+  "p_posture": [
+   "roomsim_switches__p_posture.f64",
+   74
+  ],
+  "phone_x": [
+   "roomsim_switches__phone_x.f64",
+   37
+  ],
+  "phone_y": [
+   "roomsim_switches__phone_y.f64",
+   37
+  ],
+  "phone_z": [
+   "roomsim_switches__phone_z.f64",
+   37
+  ],
+  "body_x": [
+   "roomsim_switches__body_x.f64",
+   1184
+  ],
+  "body_y": [
+   "roomsim_switches__body_y.f64",
+   1184
+  ],
+  "body_z": [
+   "roomsim_switches__body_z.f64",
+   1184
+  ],
+  "dev_node": [
+   "roomsim_switches__dev_node.f64",
+   8
+  ],
+  "dev_g_db": [
+   "roomsim_switches__dev_g_db.f64",
+   8
+  ],
+  "dev_nf": [
+   "roomsim_switches__dev_nf.f64",
+   8
+  ],
+  "dev_tau": [
+   "roomsim_switches__dev_tau.f64",
+   8
+  ],
+  "nq_t": [
+   "roomsim_switches__nq_t.f64",
+   25
+  ],
+  "nq_m": [
+   "roomsim_switches__nq_m.f64",
+   25
+  ],
+  "nq_slot": [
+   "roomsim_switches__nq_slot.f64",
+   25
+  ],
+  "nq_tx": [
+   "roomsim_switches__nq_tx.f64",
+   25
+  ],
+  "nq_rx": [
+   "roomsim_switches__nq_rx.f64",
+   25
+  ],
+  "nq_link_index": [
+   "roomsim_switches__nq_link_index.f64",
+   25
+  ],
+  "nq_lost": [
+   "roomsim_switches__nq_lost.f64",
+   25
+  ],
+  "nq_agc_db": [
+   "roomsim_switches__nq_agc_db.f64",
+   25
+  ],
+  "nq_seq": [
+   "roomsim_switches__nq_seq.f64",
+   25
+  ],
+  "nq_rssi": [
+   "roomsim_switches__nq_rssi.f64",
+   25
+  ],
+  "nq_rssi_true": [
+   "roomsim_switches__nq_rssi_true.f64",
+   25
+  ],
+  "nq_noise_floor": [
+   "roomsim_switches__nq_noise_floor.f64",
+   25
+  ],
+  "nq_buffer_pre_re": [
+   "roomsim_switches__nq_buffer_pre_re.f64",
+   2944
+  ],
+  "nq_buffer_pre_im": [
+   "roomsim_switches__nq_buffer_pre_im.f64",
+   2944
+  ],
+  "nq_buffer_re": [
+   "roomsim_switches__nq_buffer_re.f64",
+   2944
+  ],
+  "nq_buffer_im": [
+   "roomsim_switches__nq_buffer_im.f64",
+   2944
+  ],
+  "nq_dgram": [
+   "roomsim_switches__nq_dgram.f64",
+   0
+  ],
+  "nq_dgram_len": [
+   "roomsim_switches__nq_dgram_len.f64",
+   0
+  ]
+ }
+}

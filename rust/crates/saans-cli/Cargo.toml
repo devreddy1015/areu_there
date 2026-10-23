@@ -14,3 +14,10 @@ saans-dsp = { path = "../saans-dsp" }
 saans-health = { path = "../saans-health" }
 saans-sim = { path = "../saans-sim" }
 saans-scene = { path = "../saans-scene", features = ["write"] }
+# Room Sim v1 (spec/roomsim.md), for `saans roomsim-export`. Everything it
+# produces is SIM.
+saans-roomsim = { path = "../saans-roomsim" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# scene_sha256 in the roomsim-export manifest (the digest of the file's bytes).
+sha2 = "0.10"

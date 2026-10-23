@@ -1,0 +1,125 @@
+{
+ "name": "roomsim_channel",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "seed": 0,
+  "duration_s": 0.5,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.5,
+  "cfg.impair": 0,
+  "n_packets": 120,
+  "n_transmissions": 40,
+  "n_people": 1,
+  "body_points": 10
+ },
+ "arrays": {
+  "t": [
+   "roomsim_channel__t.f64",
+   120
+  ],
+  "m": [
+   "roomsim_channel__m.f64",
+   120
+  ],
+  "slot": [
+   "roomsim_channel__slot.f64",
+   120
+  ],
+  "tx": [
+   "roomsim_channel__tx.f64",
+   120
+  ],
+  "rx": [
+   "roomsim_channel__rx.f64",
+   120
+  ],
+  "link_index": [
+   "roomsim_channel__link_index.f64",
+   120
+  ],
+  "H_re": [
+   "roomsim_channel__H_re.f64",
+   7680
+  ],
+  "H_im": [
+   "roomsim_channel__H_im.f64",
+   7680
+  ],
+  "rssi_true": [
+   "roomsim_channel__rssi_true.f64",
+   120
+  ],
+  "rssi": [
+   "roomsim_channel__rssi.f64",
+   120
+  ],
+  "seq": [
+   "roomsim_channel__seq.f64",
+   120
+  ],
+  "tr_t": [
+   "roomsim_channel__tr_t.f64",
+   40
+  ],
+  "tr_m": [
+   "roomsim_channel__tr_m.f64",
+   40
+  ],
+  "tr_slot": [
+   "roomsim_channel__tr_slot.f64",
+   40
+  ],
+  "tr_tx": [
+   "roomsim_channel__tr_tx.f64",
+   40
+  ],
+  "p_x": [
+   "roomsim_channel__p_x.f64",
+   40
+  ],
+  "p_y": [
+   "roomsim_channel__p_y.f64",
+   40
+  ],
+  "p_heading": [
+   "roomsim_channel__p_heading.f64",
+   40
+  ],
+  "p_walking": [
+   "roomsim_channel__p_walking.f64",
+   40
+  ],
+  "p_posture": [
+   "roomsim_channel__p_posture.f64",
+   40
+  ],
+  "phone_x": [
+   "roomsim_channel__phone_x.f64",
+   40
+  ],
+  "phone_y": [
+   "roomsim_channel__phone_y.f64",
+   40
+  ],
+  "phone_z": [
+   "roomsim_channel__phone_z.f64",
+   40
+  ],
+  "body_x": [
+   "roomsim_channel__body_x.f64",
+   400
+  ],
+  "body_y": [
+   "roomsim_channel__body_y.f64",
+   400
+  ],
+  "body_z": [
+   "roomsim_channel__body_z.f64",
+   400
+  ]
+ }
+}

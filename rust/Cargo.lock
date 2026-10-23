@@ -1973,8 +1973,12 @@ version = "0.1.0"
 dependencies = [
  "saans-dsp",
  "saans-health",
+ "saans-roomsim",
  "saans-scene",
  "saans-sim",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -2008,6 +2012,17 @@ version = "0.1.0"
 dependencies = [
  "saans-dsp",
  "serde",
+]
+
+[[package]]
+name = "saans-roomsim"
+version = "0.1.0"
+dependencies = [
+ "saans-scene",
+ "saans-sim",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

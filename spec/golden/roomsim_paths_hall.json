@@ -1,0 +1,134 @@
+{
+ "name": "roomsim_paths_hall",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "seed": 0,
+  "duration_s": 0.0,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.0,
+  "n_links": 2,
+  "links": "1-6,0-7",
+  "link0_tx": 1,
+  "link0_rx": 6,
+  "link1_tx": 0,
+  "link1_rx": 7,
+  "n_clutter": 24,
+  "n_surfaces": 8,
+  "n_walls": 6,
+  "implied_walls": 0
+ },
+ "arrays": {
+  "path_link": [
+   "roomsim_paths_hall__path_link.f64",
+   175
+  ],
+  "kind": [
+   "roomsim_paths_hall__kind.f64",
+   175
+  ],
+  "surf_i": [
+   "roomsim_paths_hall__surf_i.f64",
+   175
+  ],
+  "surf_j": [
+   "roomsim_paths_hall__surf_j.f64",
+   175
+  ],
+  "obj": [
+   "roomsim_paths_hall__obj.f64",
+   175
+  ],
+  "face": [
+   "roomsim_paths_hall__face.f64",
+   175
+  ],
+  "clutter": [
+   "roomsim_paths_hall__clutter.f64",
+   175
+  ],
+  "tail": [
+   "roomsim_paths_hall__tail.f64",
+   175
+  ],
+  "npts": [
+   "roomsim_paths_hall__npts.f64",
+   175
+  ],
+  "L": [
+   "roomsim_paths_hall__L.f64",
+   175
+  ],
+  "coef_re": [
+   "roomsim_paths_hall__coef_re.f64",
+   175
+  ],
+  "coef_im": [
+   "roomsim_paths_hall__coef_im.f64",
+   175
+  ],
+  "coef0_re": [
+   "roomsim_paths_hall__coef0_re.f64",
+   175
+  ],
+  "coef0_im": [
+   "roomsim_paths_hall__coef0_im.f64",
+   175
+  ],
+  "sigma": [
+   "roomsim_paths_hall__sigma.f64",
+   175
+  ],
+  "pts_x": [
+   "roomsim_paths_hall__pts_x.f64",
+   311
+  ],
+  "pts_y": [
+   "roomsim_paths_hall__pts_y.f64",
+   311
+  ],
+  "pts_z": [
+   "roomsim_paths_hall__pts_z.f64",
+   311
+  ],
+  "link_npaths": [
+   "roomsim_paths_hall__link_npaths.f64",
+   2
+  ],
+  "H0_re": [
+   "roomsim_paths_hall__H0_re.f64",
+   128
+  ],
+  "H0_im": [
+   "roomsim_paths_hall__H0_im.f64",
+   128
+  ],
+  "tail_x": [
+   "roomsim_paths_hall__tail_x.f64",
+   80
+  ],
+  "tail_phi": [
+   "roomsim_paths_hall__tail_phi.f64",
+   80
+  ],
+  "clutter_x": [
+   "roomsim_paths_hall__clutter_x.f64",
+   24
+  ],
+  "clutter_y": [
+   "roomsim_paths_hall__clutter_y.f64",
+   24
+  ],
+  "clutter_z": [
+   "roomsim_paths_hall__clutter_z.f64",
+   24
+  ],
+  "clutter_sigma": [
+   "roomsim_paths_hall__clutter_sigma.f64",
+   24
+  ]
+ }
+}

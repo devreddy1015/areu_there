@@ -1,0 +1,160 @@
+{
+ "name": "roomsim_impair",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "seed": 0,
+  "duration_s": 0.5,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.5,
+  "n_packets": 120,
+  "n_received": 113,
+  "n_lost": 7,
+  "n_nodes": 4
+ },
+ "arrays": {
+  "t": [
+   "roomsim_impair__t.f64",
+   120
+  ],
+  "tx": [
+   "roomsim_impair__tx.f64",
+   120
+  ],
+  "rx": [
+   "roomsim_impair__rx.f64",
+   120
+  ],
+  "link_index": [
+   "roomsim_impair__link_index.f64",
+   120
+  ],
+  "lost": [
+   "roomsim_impair__lost.f64",
+   120
+  ],
+  "agc_db": [
+   "roomsim_impair__agc_db.f64",
+   120
+  ],
+  "seq": [
+   "roomsim_impair__seq.f64",
+   120
+  ],
+  "rssi": [
+   "roomsim_impair__rssi.f64",
+   120
+  ],
+  "rssi_true": [
+   "roomsim_impair__rssi_true.f64",
+   120
+  ],
+  "noise_floor": [
+   "roomsim_impair__noise_floor.f64",
+   120
+  ],
+  "u_loss": [
+   "roomsim_impair__u_loss.f64",
+   120
+  ],
+  "u_jump": [
+   "roomsim_impair__u_jump.f64",
+   120
+  ],
+  "u_dir": [
+   "roomsim_impair__u_dir.f64",
+   120
+  ],
+  "phi0": [
+   "roomsim_impair__phi0.f64",
+   120
+  ],
+  "tau": [
+   "roomsim_impair__tau.f64",
+   120
+  ],
+  "rj": [
+   "roomsim_impair__rj.f64",
+   120
+  ],
+  "noise": [
+   "roomsim_impair__noise.f64",
+   30720
+  ],
+  "buffer_pre_re": [
+   "roomsim_impair__buffer_pre_re.f64",
+   14464
+  ],
+  "buffer_pre_im": [
+   "roomsim_impair__buffer_pre_im.f64",
+   14464
+  ],
+  "buffer_re": [
+   "roomsim_impair__buffer_re.f64",
+   14464
+  ],
+  "buffer_im": [
+   "roomsim_impair__buffer_im.f64",
+   14464
+  ],
+  "dgram": [
+   "roomsim_impair__dgram.f64",
+   14916
+  ],
+  "dgram_len": [
+   "roomsim_impair__dgram_len.f64",
+   113
+  ],
+  "buffer_k": [
+   "roomsim_impair__buffer_k.f64",
+   128
+  ],
+  "buffer_active": [
+   "roomsim_impair__buffer_active.f64",
+   128
+  ],
+  "dev_node": [
+   "roomsim_impair__dev_node.f64",
+   4
+  ],
+  "dev_alpha": [
+   "roomsim_impair__dev_alpha.f64",
+   12
+  ],
+  "dev_beta": [
+   "roomsim_impair__dev_beta.f64",
+   12
+  ],
+  "dev_gamma": [
+   "roomsim_impair__dev_gamma.f64",
+   12
+  ],
+  "dev_delta": [
+   "roomsim_impair__dev_delta.f64",
+   12
+  ],
+  "dev_g_db": [
+   "roomsim_impair__dev_g_db.f64",
+   4
+  ],
+  "dev_nf": [
+   "roomsim_impair__dev_nf.f64",
+   4
+  ],
+  "dev_tau": [
+   "roomsim_impair__dev_tau.f64",
+   4
+  ],
+  "dev_rdev_re": [
+   "roomsim_impair__dev_rdev_re.f64",
+   256
+  ],
+  "dev_rdev_im": [
+   "roomsim_impair__dev_rdev_im.f64",
+   256
+  ]
+ }
+}

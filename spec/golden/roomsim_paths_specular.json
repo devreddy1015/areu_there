@@ -1,0 +1,136 @@
+{
+ "name": "roomsim_paths_specular",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/fixtures/roomsim_specular.json",
+  "scene_sha256": "d88b800be0a4e6cbb353092c7bba2e0fa864ea067c584cc9153feb7e8fad194f",
+  "seed": 0,
+  "duration_s": 0.0,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.0,
+  "n_links": 3,
+  "links": "0-3,3-0,1-2",
+  "link0_tx": 0,
+  "link0_rx": 3,
+  "link1_tx": 3,
+  "link1_rx": 0,
+  "link2_tx": 1,
+  "link2_rx": 2,
+  "n_clutter": 24,
+  "n_surfaces": 6,
+  "n_walls": 4,
+  "implied_walls": 1
+ },
+ "arrays": {
+  "path_link": [
+   "roomsim_paths_specular__path_link.f64",
+   279
+  ],
+  "kind": [
+   "roomsim_paths_specular__kind.f64",
+   279
+  ],
+  "surf_i": [
+   "roomsim_paths_specular__surf_i.f64",
+   279
+  ],
+  "surf_j": [
+   "roomsim_paths_specular__surf_j.f64",
+   279
+  ],
+  "obj": [
+   "roomsim_paths_specular__obj.f64",
+   279
+  ],
+  "face": [
+   "roomsim_paths_specular__face.f64",
+   279
+  ],
+  "clutter": [
+   "roomsim_paths_specular__clutter.f64",
+   279
+  ],
+  "tail": [
+   "roomsim_paths_specular__tail.f64",
+   279
+  ],
+  "npts": [
+   "roomsim_paths_specular__npts.f64",
+   279
+  ],
+  "L": [
+   "roomsim_paths_specular__L.f64",
+   279
+  ],
+  "coef_re": [
+   "roomsim_paths_specular__coef_re.f64",
+   279
+  ],
+  "coef_im": [
+   "roomsim_paths_specular__coef_im.f64",
+   279
+  ],
+  "coef0_re": [
+   "roomsim_paths_specular__coef0_re.f64",
+   279
+  ],
+  "coef0_im": [
+   "roomsim_paths_specular__coef0_im.f64",
+   279
+  ],
+  "sigma": [
+   "roomsim_paths_specular__sigma.f64",
+   279
+  ],
+  "pts_x": [
+   "roomsim_paths_specular__pts_x.f64",
+   528
+  ],
+  "pts_y": [
+   "roomsim_paths_specular__pts_y.f64",
+   528
+  ],
+  "pts_z": [
+   "roomsim_paths_specular__pts_z.f64",
+   528
+  ],
+  "link_npaths": [
+   "roomsim_paths_specular__link_npaths.f64",
+   3
+  ],
+  "H0_re": [
+   "roomsim_paths_specular__H0_re.f64",
+   192
+  ],
+  "H0_im": [
+   "roomsim_paths_specular__H0_im.f64",
+   192
+  ],
+  "tail_x": [
+   "roomsim_paths_specular__tail_x.f64",
+   120
+  ],
+  "tail_phi": [
+   "roomsim_paths_specular__tail_phi.f64",
+   120
+  ],
+  "clutter_x": [
+   "roomsim_paths_specular__clutter_x.f64",
+   24
+  ],
+  "clutter_y": [
+   "roomsim_paths_specular__clutter_y.f64",
+   24
+  ],
+  "clutter_z": [
+   "roomsim_paths_specular__clutter_z.f64",
+   24
+  ],
+  "clutter_sigma": [
+   "roomsim_paths_specular__clutter_sigma.f64",
+   24
+  ]
+ }
+}

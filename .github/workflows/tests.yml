@@ -38,6 +38,14 @@ jobs:
       # is not switched on here by accident.
       - run: cargo test -p saans-gateway --features roomsim --locked
         working-directory: rust
+      # saans-roomsim by itself (spec/roomsim.md §14). In the workspace
+      # build above, cargo unifies features, and saans-cli switches on
+      # saans-scene's `write`; only a standalone build proves the
+      # simulator compiles and passes without it (ADR-008 decision 1).
+      - run: cargo check -p saans-roomsim --locked
+        working-directory: rust
+      - run: cargo test -p saans-roomsim --locked
+        working-directory: rust
 
   python:
     name: Python reference (unittest)

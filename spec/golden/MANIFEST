@@ -21,3 +21,15 @@ feature_codec
 features_vitals
 features_private
 sim_geometric
+roomsim_materials
+roomsim_shadow
+roomsim_paths
+roomsim_paths_hall
+roomsim_paths_specular
+roomsim_motion
+roomsim_channel
+roomsim_impair
+roomsim_multi
+roomsim_switches
+roomsim_export
+roomsim_physics_switches

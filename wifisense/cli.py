@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import errno
+import json
 import math
+import os
 import signal
 import sys
 import threading
@@ -26,6 +28,7 @@ from .sources.recorder import (
     RecordStats,
     iter_frames,
     link_stats,
+    read_pcap,
     record_udp,
     replay_udp,
 )
@@ -232,10 +235,83 @@ def _read_summary(read: ReadStats) -> str:
     return ", ".join(parts)
 
 
+def _pcap_records(path: str) -> int | None:
+    """How many pcap records the file holds, counted by the reader `stats`
+    uses; None when it cannot be read as a pcap."""
+    read = ReadStats()
+    try:
+        for _ in read_pcap(path, stats=read):
+            pass
+    except (OSError, ValueError):
+        return None
+    return read.records
+
+
+def _sim_banner(path: str) -> str | None:
+    """The SIM banner for a Room Sim export (spec/roomsim.md §13, §15): a
+    path ending in `.sim.pcap`, or one whose sibling `PREFIX.manifest.json`
+    says `"label": "SIM"` and whose `counts.datagrams` equals the file's
+    pcap record count (so a real capture that merely shares an export's
+    prefix is not labelled SIM). None for anything else."""
+    path = os.fspath(path)
+    sim_name = path.endswith(".sim.pcap")
+    if sim_name:
+        prefix = path[: -len(".sim.pcap")]
+    elif path.endswith(".pcap"):
+        prefix = path[: -len(".pcap")]
+    else:
+        prefix = path
+    man = None
+    try:
+        with open(prefix + ".manifest.json", encoding="utf-8") as fh:
+            doc = json.load(fh)
+        if isinstance(doc, dict):
+            man = doc
+    except (OSError, ValueError):
+        pass
+    counts = man.get("counts") if man is not None else None
+    if not isinstance(counts, dict):
+        counts = {}
+    if not sim_name:
+        if man is None or man.get("label") != "SIM":
+            return None
+        datagrams = counts.get("datagrams")
+        if not isinstance(datagrams, int) or isinstance(datagrams, bool):
+            return None
+        if _pcap_records(path) != datagrams:
+            return None
+    line = (
+        f"SIM: {path} is a Room Sim export, not a measurement; its seq-based loss "
+        f"cannot see simulated loss (spec/roomsim.md §12.4)"
+    )
+    lost = counts.get("lost")
+    if isinstance(lost, int) and not isinstance(lost, bool):
+        line += f" — the manifest's counts.lost is {lost}"
+    if man is not None and man.get("gateway_faithful") is False:
+        links = man.get("links")
+        txs = {
+            ln.get("tx")
+            for ln in (links if isinstance(links, list) else [])
+            if isinstance(ln, dict) and type(ln.get("tx")) is int
+        }
+        if len(txs) >= 2:
+            line += (
+                f"; {len(txs)} transmitters interleave in each receiver's stream with no "
+                f"transmitter id, so a replay treats them as one link (spec/roomsim.md §12.4)"
+            )
+    return line
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
+    banner = _sim_banner(args.file)
+    if banner is not None:
+        print(banner)
     read = ReadStats()
     links = link_stats(args.file, port=args.port, stats=read)
-    print(f"per-node delivery measured at the gateway: {args.file}")
+    if banner is not None:
+        print(f"per-node delivery computed from a SIM export (not a measurement): {args.file}")
+    else:
+        print(f"per-node delivery measured at the gateway: {args.file}")
     print(
         "  rate = received packets / time span of receive timestamps; "
         "loss = raw-CSI sequence gaps;"
@@ -325,6 +401,9 @@ def _replay_send(args: argparse.Namespace) -> int:
 
 
 def cmd_replay(args: argparse.Namespace) -> int:
+    banner = _sim_banner(args.file)
+    if banner is not None:
+        print(banner)
     if args.speed < 0:
         print("--speed must be >= 0", file=sys.stderr)
         return 2
