@@ -311,6 +311,68 @@ dither          moves %      empty     seated  threshold occupied %
 ```
 <!-- results:end impairment -->
 
+<!-- results:begin corrections -->
+## AGC gain-step corrections, measured and rejected
+
+`cd rust && cargo run -q --release -p saans-sim --example impairment_cost -- --corrections` — checked by CI on every push
+
+Two candidate corrections and an oracle that undoes the model's true gain. NOTES.md §9 'Correcting it' reads this: only the oracle restores presence, so the fix is reading the gain register, not a DSP stage.
+
+```text
+saans-sim AGC corrections. SYNTHETIC; the receiver model is UNVERIFIED (src/impair.rs).
+5 room seeds; the seated scenario of the main table (14 BPM, 180 s after a 120 s empty lead-in),
+20 Hz. Each correction is applied to the frames a consumer sees, before the node's own
+FeatureExtractor. Neither is in the production DSP. Median over seeds.
+
+correction: none
+                                                  clean        esp32  esp32 d.002
+presence: frames reporting occupied, %           100.00         0.00         0.00
+presence: motion energy, empty room               0.129        1.018        0.185
+presence: motion energy, person seated            0.351        0.882        0.329
+presence: calibrated threshold                    0.185        2.251        0.959
+breathing BPM (truth 14.0)                        14.00          NaN          NaN
+frames within 2 BPM of truth, %                  100.00         0.00         0.00
+
+correction: common-mode
+                                                  clean        esp32  esp32 d.002
+presence: frames reporting occupied, %             0.00         0.00         0.00
+presence: motion energy, empty room               0.200        0.246        0.249
+presence: motion energy, person seated            0.162        0.233        0.234
+presence: calibrated threshold                    0.315        0.358        0.351
+breathing BPM (truth 14.0)                          NaN          NaN          NaN
+frames within 2 BPM of truth, %                    0.00         0.00         0.00
+
+correction: step (t >= 5, as chosen before measuring)
+                                                  clean        esp32  esp32 d.002
+presence: frames reporting occupied, %           100.00         0.00         0.00
+presence: motion energy, empty room               0.129        0.816        0.161
+presence: motion energy, person seated            0.288        0.500        0.276
+presence: calibrated threshold                    0.185        1.898        0.948
+breathing BPM (truth 14.0)                        14.00          NaN          NaN
+frames within 2 BPM of truth, %                  100.00         0.00         0.00
+
+correction: oracle: the model's true gain undone (NOT a method; the bound on any step correction)
+                                                  clean        esp32  esp32 d.002
+presence: frames reporting occupied, %           100.00       100.00       100.00
+presence: motion energy, empty room               0.129        0.145        0.148
+presence: motion energy, person seated            0.351        0.351        0.353
+presence: calibrated threshold                    0.185        0.210        0.212
+breathing BPM (truth 14.0)                        14.00        14.00        14.00
+frames within 2 BPM of truth, %                  100.00       100.00       100.00
+
+step detector threshold sweep, against the model's own record of its AGC moves
+(esp32 column; a detection within one frame of a move counts as catching it):
+    t >=     moves caught   detections    not at a move   clean detections    occupied, %
+     2.0          689/702         1987             1298                942           0.00
+     3.0          631/702          778              147                171           0.00
+     4.0          509/702          481                0                 29           0.00
+     5.0          355/702          297                0                  7           0.00
+
+'esp32 d.002' is the receiver model with agc_dither_prob = 0.002, the low end of the
+bracket in which presence fails; 'esp32' is the committed 0.020.
+```
+<!-- results:end corrections -->
+
 <!-- results:begin nulls -->
 ## Fresnel blind spots, full
 

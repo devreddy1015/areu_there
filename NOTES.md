@@ -600,6 +600,66 @@ something the DSP could normalise away, and the static suppressor
 cannot. Changing the detectors on the strength of an uncalibrated model
 is the opposite of what this layer is for.
 
+### Correcting it: the only fix that works needs the radio's own gain
+
+Measured 2026-10-24, `cargo run --release -p saans-sim --example
+impairment_cost -- --corrections`, the seated scenario above, 5 seeds.
+**SYNTHETIC.** Each candidate is applied to the frames a consumer sees,
+before the unchanged production `FeatureExtractor`; none is in the DSP.
+
+| correction | esp32: occupied | esp32: within 2 BPM | clean arm: occupied |
+|---|---|---|---|
+| none | 0% | 0% | 100% |
+| common-mode (per-frame median removed) | 0% | 0% | **0%** |
+| step detector, t ≥ 5 | 0% | 0% | 100% |
+| **oracle: the model's true gain undone** | **100%** | **100%** | 100% |
+
+What each row says:
+
+- **Common-mode removal is ruled out.** It kills the clean arm too. At
+  ESP32 bandwidth the static phase barely rotates across the band (§6.3),
+  so nearly all of a breather's signal is common to every subcarrier;
+  removing what is common removes the person.
+- **The oracle is the answer to "is the AGC the whole problem".** Undo
+  the true gain exactly and presence and breathing recover completely,
+  at both `agc_dither_prob` 0.020 and 0.002, with empty-room motion
+  energy back to 0.145 against no-agc's 0.152. In this model the gain
+  steps are the entire failure.
+- **No estimate of the steps from the CSI gets there.** The detector
+  (a common frame-to-frame jump, many standard errors clear of the
+  per-subcarrier scatter) measures each step fairly well -- +0.39 to
+  +0.53 dB against a true +0.50 -- but its standard error at a move is
+  0.10–0.15 dB, not the ~0.03 I estimated from quantization alone, since
+  many bins sit at low counts in frequency-selective fades. Sweeping the
+  threshold instead of refitting it:
+
+  | t ≥ | moves caught | detections not at a move | on the clean stream | esp32 occupied |
+  |---|---|---|---|---|
+  | 2 | 689 / 702 | 1298 | 942 | 0% |
+  | 3 | 631 / 702 | 147 | 171 | 0% |
+  | 4 | 509 / 702 | 0 | 29 | 0% |
+  | 5 | 355 / 702 | 0 | 7 | 0% |
+
+  Even catching 98% of moves leaves presence at 0%. Each correction uses
+  the *measured* step, wrong by ~0.1 dB, and seven hundred residual
+  0.1 dB steps are seven hundred small transients. A higher threshold
+  trades them for missed moves and arrives at the same place.
+
+**So the fix is not a DSP algorithm; it is reading the gain register.**
+The oracle row is exactly what a node would get if the firmware logged
+the true AGC gain per packet and divided it out. That moves
+`docs/PROTOCOL_S5.md` §1.1 route 1 -- read the gain from
+`wifi_pkt_rx_ctrl_t`, if the S3 exposes it -- from "a way to count the
+moves" to "the fix, if the moves turn out to matter". [UNVERIFIED:
+whether the ESP32-S3's rx_ctrl carries an AGC gain field; the ESP-IDF
+headers have not been read.] If it does not, presence on real hardware
+depends on how rarely the real AGC moves, which only a bench answers.
+
+One caveat about the oracle's clean result: in this model the gain step
+is the only impairment that varies packet to packet in amplitude, so
+undoing it returns to the no-agc arm by construction. A real radio may
+have others.
+
 ### Known gaps in the layer itself
 
 - `first_word_invalid` is not modelled. Its real effect is a two-bin
