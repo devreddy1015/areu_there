@@ -30,6 +30,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub const HISTORY_SAVE_S: f64 = 600.0;
+/// How often changed replay floors are written. A crash loses at most
+/// this much: those frames could be replayed once after a restart, and
+/// only until their link's next real frame arrives.
+pub const FRAME_FLOORS_SAVE_S: f64 = 10.0;
 pub const RETENTION_CHECK_S: f64 = 3600.0;
 pub const ADVISORY: &str = "advisory — not a medical device";
 
@@ -99,6 +103,8 @@ pub struct Hub {
     t_start: f64,
     now_t: f64,
     history_saved_t: Option<f64>,
+    floors_saved_t: f64,
+    floors_errors: u64,
     history_errors: u64,
     history_last_error: Option<String>,
     retention_t: Option<f64>,
@@ -133,6 +139,8 @@ impl Hub {
             t_start,
             now_t: t_start,
             history_saved_t: None,
+            floors_saved_t: t_start,
+            floors_errors: 0,
             history_errors: 0,
             history_last_error: None,
             retention_t: None,
@@ -163,6 +171,11 @@ impl Hub {
                 dir.display()
             )),
         }
+        let (floors, err) = store::load_frame_floors(&dir);
+        if let Some(e) = err {
+            self.notes.push(e);
+        }
+        self.engine.replay = crate::frameauth::ReplayGuard::from_floors(&floors);
         let (mut history, err) = store::load_history(&dir);
         if let Some(e) = err {
             self.notes.push(e);
@@ -311,6 +324,24 @@ impl Hub {
         if t_s - since >= HISTORY_SAVE_S {
             self.save_history(t_s);
         }
+        if t_s - self.floors_saved_t >= FRAME_FLOORS_SAVE_S {
+            self.save_frame_floors(t_s);
+        }
+    }
+
+    /// Write the replay floors if any changed since the last write.
+    pub fn save_frame_floors(&mut self, t_s: f64) {
+        self.floors_saved_t = t_s;
+        if !self.engine.replay.take_dirty() {
+            return;
+        }
+        let time = iso8601(self.wall.unix_ms(t_s, t_s), self.cfg.utc_offset_minutes);
+        if let Err(e) =
+            store::save_frame_floors(&self.cfg.data_dir, &self.engine.replay.floors(), &time)
+        {
+            self.floors_errors += 1;
+            crate::log(&format!("cannot save frame counters: {e}"));
+        }
     }
 
     pub fn save_history(&mut self, t_s: f64) {
@@ -342,6 +373,7 @@ impl Hub {
     pub fn shutdown(&mut self, t_s: f64) {
         if self.persist {
             self.save_history(t_s);
+            self.save_frame_floors(t_s);
         }
         if let Some(out) = &mut self.out {
             let _ = out.flush();
@@ -573,6 +605,12 @@ impl Hub {
                 "capacity_per_series": self.cfg.history.capacity(),
             },
             "notes": &self.notes,
+            "frame_auth": {
+                "required": e.frame_auth_required(),
+                "key_ids": e.frame_key_ids(),
+                "links_with_a_floor": e.replay.links(),
+                "floor_write_errors": self.floors_errors,
+            },
         });
         if let Some(log) = &self.log {
             h["event_log"] = json!({
@@ -833,6 +871,23 @@ impl Hub {
                     *n as f64,
                 );
             }
+        }
+        let a = &e.stats.frame_auth;
+        p.family(
+            "saans_frame_auth_total",
+            "counter",
+            "Signed-frame outcomes (ADR-012): accepted, and refused by reason.",
+        );
+        for (result, n) in [
+            ("accepted", a.accepted),
+            ("bad_tag", a.bad_tag),
+            ("unknown_key", a.unknown_key),
+            ("replayed", a.replayed),
+            ("unsigned_refused", a.unsigned_refused),
+            ("raw_refused", a.raw_refused),
+            ("no_key", a.no_key),
+        ] {
+            p.sample("saans_frame_auth_total", &[("result", result)], n as f64);
         }
         p.family("saans_ws_clients", "gauge", "Connected WebSocket clients.");
         p.sample("saans_ws_clients", &[], shared.ws_clients() as f64);

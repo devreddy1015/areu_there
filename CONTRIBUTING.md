@@ -71,9 +71,10 @@ change.
   an environment variable instead, and startup checks that it is set. The
   value is read at the point of use. Never keep one in a struct that can
   reach a log, and never format such a type with `{:?}`. CodeQL's
-  `rust/cleartext-logging` found exactly that once (#13). The one place a
-  secret has to be held, the MQTT client's reconnect credentials, says
-  so where it lives.
+  `rust/cleartext-logging` found exactly that once (#13). The two
+  places a secret has to be held say so where they live: the MQTT client's
+  reconnect credentials, and the frame site keys (`frameauth.rs`), whose
+  types print nothing.
 - **Every outbound path goes through `privacy.rs`.** Apply the consent
   gate first, then the role. A new output is filtered as an existing role
   sees the API, using the same functions.

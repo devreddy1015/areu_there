@@ -293,6 +293,68 @@ pub fn save_history(
     fs::rename(&tmp, history_path(dir))
 }
 
+/// The replay floors of signed frames (ADR-012), so a gateway restart does
+/// not reopen frames it has already accepted.
+pub const FRAME_COUNTERS_FILE: &str = "frame_counters.json";
+
+/// The floors in `data_dir`, or none. An unreadable file is moved aside
+/// and reported, not trusted: starting empty reopens replay only for links
+/// whose node is silent, and each link's next real frame closes it again.
+pub fn load_frame_floors(dir: &Path) -> (Vec<crate::frameauth::Floor>, Option<String>) {
+    let path = dir.join(FRAME_COUNTERS_FILE);
+    let text = match fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return (Vec::new(), None),
+        Err(e) => return (Vec::new(), Some(format!("{}: {e}", path.display()))),
+    };
+    let parsed = serde_json::from_str::<Value>(&text)
+        .ok()
+        .and_then(|v| serde_json::from_value(v.get("links")?.clone()).ok());
+    match parsed {
+        Some(floors) => (floors, None),
+        None => {
+            let aside = dir.join(format!(
+                "{FRAME_COUNTERS_FILE}.unreadable-{}",
+                crate::timefmt::now_unix_ms()
+            ));
+            let what = if fs::rename(&path, &aside).is_ok() {
+                format!("moved to {}", aside.display())
+            } else {
+                "left in place".into()
+            };
+            (
+                Vec::new(),
+                Some(format!(
+                    "{} is unreadable ({what}); replay floors start empty, so until each link sends a frame, frames it sent before can be replayed once",
+                    path.display()
+                )),
+            )
+        }
+    }
+}
+
+/// Write the floors atomically (temp file + rename).
+pub fn save_frame_floors(
+    dir: &Path,
+    floors: &[crate::frameauth::Floor],
+    saved_time: &str,
+) -> io::Result<()> {
+    fs::create_dir_all(dir)?;
+    let doc = serde_json::json!({ "version": 1, "saved": saved_time, "links": floors });
+    let tmp = dir.join(format!("{FRAME_COUNTERS_FILE}.tmp"));
+    {
+        let mut f = File::create(&tmp)?;
+        f.write_all(
+            serde_json::to_string(&doc)
+                .map_err(io::Error::other)?
+                .as_bytes(),
+        )?;
+        f.write_all(b"\n")?;
+        f.sync_all()?;
+    }
+    fs::rename(&tmp, dir.join(FRAME_COUNTERS_FILE))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

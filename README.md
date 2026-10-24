@@ -336,6 +336,35 @@ down or never answers costs ingest nothing (tested), events during an
 outage are dropped and counted, and the retained topics are republished on
 reconnect. `/api/health` and `/metrics` show the connection.
 
+### Signed frames
+
+FeatureFrame v2 carries a tag that only a node holding its key can
+produce, and a counter the gateway will not accept twice
+([ADR-012](docs/adr/012-authenticated-frames.md), `spec/wire.md` §2b).
+To turn it on:
+
+```bash
+saans-gateway --new-site-key           # 64 hex digits; keep it secret
+export SAANS_FRAME_KEY=<that key>      # the gateway reads it at startup
+saans-gateway --config saans.toml --node-key 3   # the key to flash into node 3
+```
+
+and name the variable in `saans.toml` (`[[frame_key]] id = 0`,
+`env = "SAANS_FRAME_KEY"`). With a key configured, the gateway accepts
+signed frames only: unsigned (v1) frames and raw CSI are refused, and so
+are a forged or corrupted tag, an unknown `key_id`, and a frame that is
+not newer than one already accepted on its link. Each refusal is
+counted in `/api/health` (`ingest.frame_auth`) and `/metrics`
+(`saans_frame_auth_total`). The newest counter per link is kept in
+`data_dir/frame_counters.json`, so a restart does not reopen old frames.
+Two `[[frame_key]]`s with different ids let nodes move to a new site key
+one at a time.
+
+**Not yet usable end to end:** the gateway checks signed frames, but the
+node firmware does not send them yet (NEXT.md §1.11). It is off by
+default, and until a key is configured the gateway behaves as before and
+notes at startup that frames are not authenticated.
+
 ### Recording and replay
 
     python3 -m wifisense record --port 5566 --out run.pcap [--duration-s 600]
