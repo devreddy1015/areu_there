@@ -1,6 +1,7 @@
 //! `saans`: simulate, evaluate and benchmark the Saans pipeline.
 //!
 //!     saans eval [--quick] [--seeds N] [--threads N] [--room-height M]
+//!     saans lying [--spots N] [--threads N]
 //!     saans export SCENARIO --out FILE.pcap [--seed N] [--vitals]
 //!
 //! `export` runs a simulated scenario through the node-side FeatureExtractor
@@ -9,6 +10,7 @@
 
 mod eval;
 mod links;
+mod lying;
 mod octave;
 mod pcap;
 mod score;
@@ -19,7 +21,7 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]"
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]"
     );
     ExitCode::from(2)
 }
@@ -83,6 +85,12 @@ fn main() -> ExitCode {
                 arg(&args, "--per-class").unwrap_or(40),
                 threads,
             );
+            ExitCode::SUCCESS
+        }
+        Some("lying") => {
+            let threads = arg(&args, "--threads")
+                .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get()));
+            lying::run(arg(&args, "--spots").unwrap_or(60), threads);
             ExitCode::SUCCESS
         }
         Some("export") => export(&args),
