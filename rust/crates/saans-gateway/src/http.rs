@@ -17,6 +17,7 @@
 //! | `GET /roomsim` | the room demo page (ADR-008); `roomsim` feature only | anyone |
 //! | `GET /roomsim/roomsim.js`, `/roomsim/roomsim.css` | the demo's own script and stylesheet | anyone |
 //! | `GET /roomsim/vendor/{rev}/{file}` | vendored three.js, three named files, cached immutable | anyone |
+//! | `GET /roomsim/sim/{rev}/roomsim-sim.js` | the page's SIM layer, named by its own digest, cached immutable | anyone |
 //! | `GET /roomsim/scenes` | `{"label":"SCENE","scenes":[{id, name, provenance, sha256}]}` | anyone |
 //! | `GET /roomsim/scenes/{id}` | one example scene, allowlisted keys only (no people, no phone) | anyone |
 //! | `GET /api/roomsim?scene=&variant=&seed=&replay=` | WebSocket: a simulated (SIM) or recorded (REPLAY) room run, 10 Hz; `roomsim` feature only (spec/livedemo.md) | admin, safety; same origin |
@@ -651,10 +652,14 @@ mod tests {
     #[cfg(feature = "roomsim")]
     #[test]
     fn every_page_the_gateway_authors_has_no_external_urls() {
-        use crate::roomsim::{ROOMSIM_CSS, ROOMSIM_HTML, ROOMSIM_JS};
-        for (name, body) in
-            [("dashboard.html", DASHBOARD_HTML), ("roomsim.html", ROOMSIM_HTML), ("roomsim.js", ROOMSIM_JS), ("roomsim.css", ROOMSIM_CSS)]
-        {
+        use crate::roomsim::{ROOMSIM_CSS, ROOMSIM_HTML, ROOMSIM_JS, ROOMSIM_SIM_JS};
+        for (name, body) in [
+            ("dashboard.html", DASHBOARD_HTML),
+            ("roomsim.html", ROOMSIM_HTML),
+            ("roomsim.js", ROOMSIM_JS),
+            ("roomsim-sim.js", ROOMSIM_SIM_JS),
+            ("roomsim.css", ROOMSIM_CSS),
+        ] {
             assert_no_external_urls(name, body);
         }
     }

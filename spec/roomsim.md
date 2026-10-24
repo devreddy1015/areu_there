@@ -1081,6 +1081,8 @@ proves the crate compiles without `saans-scene`'s `write`.
 - A replayed export carries no SIM marker inside the pcap (the wire format
   has no room for one); its name, `.sim.pcap`, and its manifest are the
   label. `wifisense stats`/`replay` print a SIM banner for it; the
-  gateway's replay labels it only once Phase 5's `Mode::Sim` exists.
+  gateway's pcap replay is labelled SIM only when `hello`, `/api/me` and
+  `/api/health` gain a `label` (later work, spec/livedemo.md §1): it
+  cannot tell an export from a capture.
 
 None of this is a measurement. Every number from it is SIM.

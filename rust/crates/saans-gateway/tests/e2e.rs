@@ -523,10 +523,15 @@ async fn websocket_streams_state_and_events() {
 /// ADR-008 decision 12: the room demo is its own page, served from the
 /// binary, under a CSP stricter than the dashboard's, and does not ship
 /// without a self-containment check. This is that check, against a real
-/// gateway rather than the constants.
+/// gateway rather than the constants, over the page, its script, its
+/// stylesheet and its simulation module (spec/livedemo.md §9.5).
+///
+/// The scenes these routes serve carry no one: people and estimates
+/// appear only in the page's SIM view, from the room stream
+/// (`/api/roomsim`, tested in `roomstream_*.rs`), never from here.
 #[cfg(feature = "roomsim")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn room_demo_is_served_self_contained_and_draws_no_one() {
+async fn room_demo_is_served_self_contained_and_its_scenes_carry_no_one() {
     use sha2::{Digest, Sha256};
     let g = TestGw::start(config("roomsim", LAB)).await;
 
@@ -554,6 +559,24 @@ async fn room_demo_is_served_self_contained_and_draws_no_one() {
         assert!((v.starts_with('/') && !v.starts_with("//")) || v.starts_with("data:"), "{v} is not same-origin");
     }
     assert_nothing_foreign("roomsim.html", &page.body);
+
+    // What the page says it draws (§9.5): the room is declared, and
+    // people and estimates appear only in the SIM view. Nothing on it
+    // still claims that no one is drawn or nothing is inferred, and no
+    // text calls the room stream live (§9.1).
+    assert!(page.body.contains("appear only in the SIM view"), "the page does not say where people appear");
+    assert!(page.body.contains("Run simulation (SIM)"));
+    assert!(page.body.contains("SIM · simulated people, estimates from simulated WiFi"));
+    for stale in ["no people, no estimates", "Nothing here is measured by WiFi", "nothing on this page is inferred from WiFi"] {
+        assert!(!page.body.contains(stale), "the page still says {stale:?}");
+    }
+    let words = lower.replace("aria-live", "");
+    for (i, _) in words.match_indices("live") {
+        let alpha = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphabetic());
+        let (before, after) = (words[..i].chars().next_back(), words[i + 4..].chars().next());
+        let at: String = words[i..].chars().take(40).collect();
+        assert!(alpha(before) || alpha(after), "the page calls something live: {at}");
+    }
 
     for (path, ctype) in [("/roomsim/roomsim.js", "text/javascript"), ("/roomsim/roomsim.css", "text/css")] {
         let r = g.get(path).await;
@@ -583,6 +606,34 @@ async fn room_demo_is_served_self_contained_and_draws_no_one() {
         seen += 1;
     }
     assert!(seen >= 3, "the page's module graph was not found ({seen} modules)");
+
+    // The simulation layer is the page's second module (§9.5): served
+    // from the binary like the vendored files, cached as immutable under
+    // a path that names its bytes, importing nothing, and as
+    // self-contained as everything else here.
+    let sim_specs: Vec<String> =
+        import_specifiers(&js).into_iter().filter(|s| s.ends_with("/roomsim-sim.js")).collect();
+    assert_eq!(sim_specs.len(), 1, "roomsim.js imports the simulation module once: {sim_specs:?}");
+    let sim_url = format!("/roomsim/{}", sim_specs[0].trim_start_matches("./"));
+    assert!(sim_url.starts_with("/roomsim/sim/"), "{sim_url}");
+    let sim = g.get(&sim_url).await;
+    assert_eq!(sim.status, 200, "{sim_url}");
+    assert!(sim.header("content-type").unwrap().starts_with("text/javascript"), "{sim_url}");
+    assert_eq!(sim.header("x-content-type-options"), Some("nosniff"), "{sim_url}");
+    assert!(sim.header("cache-control").unwrap().contains("immutable"), "{sim_url}");
+    assert_nothing_foreign(&sim_url, &sim.body);
+    assert!(import_specifiers(&sim.body).is_empty(), "the simulation module imports nothing");
+    let rev = sim_url.split('/').nth(3).unwrap();
+    let digest: String = Sha256::digest(sim.body.as_bytes()).iter().map(|b| format!("{b:02x}")).collect();
+    assert!(digest.starts_with(rev), "{sim_url} does not name its own bytes ({digest})");
+    for bad in ["/roomsim/sim/000000000000/roomsim-sim.js".to_string(), sim_url.replace("roomsim-sim.js", "roomsim.js")] {
+        let r = g.get(&bad).await;
+        assert_eq!(r.status, 404, "{bad}");
+        if bad.ends_with("roomsim-sim.js") {
+            assert_eq!(r.header("x-content-type-options"), Some("nosniff"), "{bad} was not answered by the module route");
+            assert_eq!(r.header("cache-control"), Some("no-store"), "{bad}");
+        }
+    }
 
     // The vendor route answers from its own allowlist (nosniff proves it
     // was this handler, not the router's fallback), whatever the path.

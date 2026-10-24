@@ -1,11 +1,16 @@
 // Saans room demo (ADR-008): draws a DECLARED scene with three.js.
 //
-// Everything drawn here comes from a scene file and is labelled SCENE.
-// Nothing is measured by WiFi, nothing is estimated, and no person is
-// drawn: the gateway serves a scene through an allowlist that leaves out
-// the simulator's people and phone, and this page would not draw them if
-// they arrived. A value the scene does not declare is shown as "not
+// The room comes from a scene file and is labelled SCENE: it is declared,
+// never measured by WiFi. The gateway serves a scene through an allowlist
+// that leaves out the simulator's people and phone, so the static view
+// draws no one. A value the scene does not declare is shown as "not
 // declared", never as a number.
+//
+// People and estimates appear only in the simulation view (SIM), which
+// roomsim-sim.js draws over this room from the room stream when the
+// viewer asks for it ("Run simulation (SIM)" or #sim=1): simulated
+// people, estimated from simulated WiFi. This file hands that layer the
+// view, places its labels with the room's, and frames its rings.
 //
 // Rules this file keeps (the dashboard's, plus the demo page's CSP):
 //   * no innerHTML anywhere — the page's CSP turns on Trusted Types with
@@ -22,6 +27,9 @@
 
 import * as THREE from './vendor/0.186.1-saans1/three.module.js';
 import { OrbitControls } from './vendor/0.186.1-saans1/OrbitControls.js';
+// Named by the digest of its bytes, because it is cached as immutable;
+// src/roomsim.rs pins the two together.
+import { createSim } from './sim/32c8ff29371a/roomsim-sim.js';
 
 // ---------------------------------------------------------------- helpers
 
@@ -88,6 +96,7 @@ function area(poly) {
 const viewport = $('viewport');
 const labelLayer = $('labels');
 const notice = $('notice');
+const simOverlay = $('sim-overlay');
 const ui = {
   picker: $('scene-picker'),
   view: $('view-toggle'),
@@ -155,7 +164,8 @@ try {
   console.warn('WebGL unavailable:', err);
   renderer = null;
   showNotice('WebGL is not available in this browser, so the 3-D view cannot be drawn. ' +
-    'The scene details and the list beside this message still describe the room.', 'webgl');
+    'The scene details and the list beside this message still describe the room, ' +
+    'and the simulation view (SIM) lists every estimate there as text.', 'webgl');
 }
 
 const world = new THREE.Scene();
@@ -218,13 +228,20 @@ function clearRoom() {
   }
   roomGroup = dimGroup = floorMesh = null;
   pickables.length = 0;
+  // Only the room's labels: the simulation layer clears its own.
+  for (const L of labels) L.el.remove();
   labels.length = 0;
-  labelLayer.replaceChildren();
   state.selected = null;
 }
 
-/** Label priority when two would overlap: higher wins, then nearer. */
-const PRIORITY = { dim: 3, node: 2, object: 1 };
+/**
+ * Label priority when two would overlap: higher wins, then nearer. A
+ * simulated estimate's label (`est`) outranks everything but the
+ * selection; truth and error labels come next. None of the three is ever
+ * hidden: a ring without its radius, or a cross or segment without its
+ * name, would read as a point estimate (ADR-008 d5).
+ */
+const PRIORITY = { est: 8, truth: 7, err: 7, dim: 3, node: 2, object: 1 };
 
 /**
  * `at` is one anchor, or a list of candidate anchors tried in order when
@@ -413,6 +430,15 @@ function buildDimensions(sc, fp) {
 
 // ---------------------------------------------------------------- cameras
 
+/**
+ * What the plan view was last fitted to ({w, d, cx, cy}), and the plan
+ * camera as that fit left it ({x, y, zoom}): while the camera is still
+ * there, the viewer has not moved the view, and the fit may grow to take
+ * in a new ring (simDrawn).
+ */
+let fitted = null;
+let planAuto = null;
+
 /** Fit the canvas and both projections to the viewport. */
 function frame() {
   if (!renderer) return;
@@ -428,29 +454,94 @@ function frame() {
   const sc = state.current;
   if (!sc) return;
   const r = sc.room;
+  const box = fitted || fitBox(sc);
   // Plan view: fit the footprint plus the dimension lines and their
   // labels. A proportional margin alone clips a small room's overlay.
   const pad = 2 * (dimOffset(r) * 1.25 + 0.2);
-  let vw = Math.max(r.w_m * 1.35, r.w_m + pad);
-  let vh = Math.max(r.d_m * 1.35, r.d_m + pad);
+  let vw = Math.max(box.w * 1.35, box.w + pad);
+  let vh = Math.max(box.d * 1.35, box.d + pad);
   if (vw / vh < aspect) vw = vh * aspect; else vh = vw / aspect;
   ortho.left = -vw / 2; ortho.right = vw / 2; ortho.top = vh / 2; ortho.bottom = -vh / 2;
   ortho.updateProjectionMatrix();
 }
 
+/**
+ * What the views fit: the room's box, and while the simulation view is
+ * on, every ring it has drawn too (spec/livedemo.md §9.3), which may
+ * reach far outside the room.
+ */
+function fitBox(sc) {
+  const r = sc.room;
+  let [x0, y0, x1, y1] = [0, 0, r.w_m, r.d_m];
+  const b = sim.bounds();
+  if (b) {
+    x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]);
+    x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]);
+  }
+  return { w: x1 - x0, d: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+}
+
+/** Centre the plan view on a box, at zoom 1, and size it to fit. */
+function fitPlan(box) {
+  fitted = box;
+  frame();
+  ortho.position.set(box.cx, box.cy, state.current.room.h_m + 20);
+  ortho.zoom = 1;
+  ortho.updateProjectionMatrix();
+  plan.target.set(box.cx, box.cy, 0);
+  ortho.lookAt(box.cx, box.cy, 0);
+  plan.update();
+  planAuto = { x: ortho.position.x, y: ortho.position.y, zoom: ortho.zoom };
+}
+
+/** Let the plan view follow the rings again, from wherever it is now. */
+function armPlanFit() {
+  if (renderer) planAuto = { x: ortho.position.x, y: ortho.position.y, zoom: ortho.zoom };
+}
+
+/**
+ * After every simulation frame. While the simulation view is on, the
+ * plan view fits the footprint and every drawn ring (spec/livedemo.md
+ * §9.3), and rings arrive after the room is framed: so it grows to take
+ * in a ring that reaches past it. Grow-only, so the zoom never pumps from
+ * frame to frame, and only while the viewer has not panned or zoomed it;
+ * Reset view and entering the plan view fit afresh.
+ */
+function simDrawn() {
+  const b = sim.bounds();
+  if (renderer && state.current && state.topDown && b && fitted && planAuto
+      && ortho.zoom === planAuto.zoom && ortho.position.x === planAuto.x && ortho.position.y === planAuto.y) {
+    const f = [fitted.cx - fitted.w / 2, fitted.cy - fitted.d / 2, fitted.cx + fitted.w / 2, fitted.cy + fitted.d / 2];
+    if (b[0] < f[0] || b[1] < f[1] || b[2] > f[2] || b[3] > f[3]) {
+      const u = [Math.min(f[0], b[0]), Math.min(f[1], b[1]), Math.max(f[2], b[2]), Math.max(f[3], b[3])];
+      fitPlan({ w: u[2] - u[0], d: u[3] - u[1], cx: (u[0] + u[2]) / 2, cy: (u[1] + u[3]) / 2 });
+    }
+  }
+  // For automated checks: in the plan view, does every drawn ring fit in it?
+  let fit = '';
+  if (renderer && state.topDown && b) {
+    const z = ortho.zoom;
+    const inView = b[0] >= ortho.position.x + ortho.left / z && b[2] <= ortho.position.x + ortho.right / z
+      && b[1] >= ortho.position.y + ortho.bottom / z && b[3] <= ortho.position.y + ortho.top / z;
+    fit = inView ? 'all' : 'clipped';
+  }
+  document.body.dataset.simPlanFit = fit;
+}
+
 function resetView() {
   const sc = state.current;
   if (!sc || !renderer) return;
-  frame();
   const r = sc.room;
-  const cx = r.w_m / 2;
-  const cy = r.d_m / 2;
+  const box = fitBox(sc);
+  fitPlan(box); // sizes both projections first
+  const cx = box.cx;
+  const cy = box.cy;
   // A three-quarter view from the south-west, far enough back to fit the
   // room and its dimension lines in the narrower of the two fields of
   // view. The target sits a quarter of the way up the room, so the top
   // corners are 0.75 h above it.
   const m = 2 * dimOffset(r) * 1.3;
-  const radius = Math.hypot((r.w_m + m) / 2, (r.d_m + m) / 2, r.h_m * 0.75);
+  const radius = Math.hypot((box.w + m) / 2, (box.d + m) / 2, r.h_m * 0.75);
   const vfov = THREE.MathUtils.degToRad(persp.fov);
   const hfov = 2 * Math.atan(Math.tan(vfov / 2) * persp.aspect);
   const dist = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * 1.08;
@@ -458,13 +549,6 @@ function resetView() {
   orbit.target.set(cx, cy, r.h_m * 0.25);
   persp.position.copy(orbit.target).addScaledVector(dir, dist);
   orbit.update();
-
-  ortho.position.set(cx, cy, r.h_m + 20);
-  ortho.zoom = 1;
-  ortho.updateProjectionMatrix();
-  plan.target.set(cx, cy, 0);
-  ortho.lookAt(cx, cy, 0);
-  plan.update();
 }
 
 /** Zoom by a factor from the keyboard: > 1 zooms in. */
@@ -486,22 +570,64 @@ function zoomBy(f) {
 
 const _v = new THREE.Vector3();
 
+/** How much two rectangles ({l, t, r, b}) overlap, px²; touching is 0. */
+const overlap = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l))
+  * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+
+/**
+ * The boxes over the view's corners (the dimension key, the simulation's
+ * status), in label-layer pixels. They paint over the labels, so while
+ * the simulation view is on no label is placed under them: one there
+ * would be hidden by CSS, which an estimate's radius never may be (d5).
+ */
+function cornerBoxes() {
+  if (!sim.isOn()) return [];
+  const v = viewport.getBoundingClientRect();
+  return [ui.key, simOverlay].filter((e) => e.getClientRects().length).map((e) => {
+    const r = e.getBoundingClientRect();
+    return { l: r.left - v.left, t: r.top - v.top, r: r.right - v.left, b: r.bottom - v.top };
+  });
+}
+
+/** The screen box of a simulation mark (a truth cross), or null if behind the camera. */
+function markBox(m, cam, w, h) {
+  const box = { l: Infinity, t: Infinity, r: -Infinity, b: -Infinity };
+  for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    _v.set(m.at.x + dx * m.half, m.at.y + dy * m.half, m.at.z).project(cam);
+    if (_v.z < -1 || _v.z > 1) return null;
+    const x = (_v.x * 0.5 + 0.5) * w;
+    const y = (-_v.y * 0.5 + 0.5) * h;
+    box.l = Math.min(box.l, x); box.r = Math.max(box.r, x);
+    box.t = Math.min(box.t, y); box.b = Math.max(box.b, y);
+  }
+  return box;
+}
+
 /**
  * Position every label over its 3-D anchor, then declutter: labels are
- * placed in priority order (the selection, then room dimensions, then
- * nodes, then objects; nearer first within a rank) and any label that
- * would overlap one already placed is hidden (a dimension label first
- * tries other spots along its line, above and below it). Nothing hidden is lost —
- * every object, node and wall is in the list beside the view, and
- * selecting one puts its label on top. Labels are clamped inside the view
- * so a node near the edge is never cut in half.
+ * placed in priority order (the selection, then the simulation's
+ * estimates, truth and errors, then room dimensions, nodes and objects;
+ * nearer first within a rank) and any label that would overlap one
+ * already placed is hidden (a dimension label first tries other spots
+ * along its line, above and below it). Nothing hidden is lost — every
+ * object, node and wall is in the list beside the view, and selecting
+ * one puts its label on top. Labels are clamped inside the view so a node
+ * near the edge is never cut in half.
+ *
+ * A label that must stay (`keep`: the selection's, and every simulation
+ * label) is never hidden: it takes the least-covered spot it can find,
+ * and never one under a corner box while any other exists. Labels keep
+ * off a truth cross (`mark`) before they keep off each other, so a cross
+ * is seen beside its name.
  */
 function placeLabels() {
   const cam = camera();
   const w = viewport.clientWidth;
   const h = viewport.clientHeight;
+  const boxes = cornerBoxes();
+  const marks = [];
   const cands = [];
-  for (const L of labels) {
+  for (const L of [...labels, ...sim.labels()]) {
     const sel = state.selected != null && L.obj === state.selected;
     L.el.classList.toggle('selected', sel);
     if (L.dim && !state.dims) {
@@ -512,16 +638,26 @@ function placeLabels() {
     const pts = [];
     for (const a of L.at) {
       _v.copy(a).project(cam);
-      if (_v.z >= -1 && _v.z <= 1 && _v.x >= -1.1 && _v.x <= 1.1 && _v.y >= -1.1 && _v.y <= 1.1) {
-        pts.push({ x: (_v.x * 0.5 + 0.5) * w, y: (-_v.y * 0.5 + 0.5) * h, z: _v.z });
-      }
+      const on = _v.z >= -1 && _v.z <= 1 && _v.x >= -1.1 && _v.x <= 1.1 && _v.y >= -1.1 && _v.y <= 1.1;
+      // An estimate's label is clamped into the view even when its anchor
+      // is not on screen (its ring may be); its on-screen anchors first.
+      if (on || L.clamp) pts.push({ x: (_v.x * 0.5 + 0.5) * w, y: (-_v.y * 0.5 + 0.5) * h, z: _v.z, on });
     }
+    if (L.clamp) pts.sort((a, b) => b.on - a.on);
     if (!pts.length) {
       L.el.classList.add('hidden');
       L.el.dataset.why = 'off-screen';
       continue;
     }
-    cands.push({ L, pts, z: pts[0].z, pri: sel ? 9 : PRIORITY[L.kind] });
+    // A mark is kept clear of every label; its own sits just outside it.
+    let gap = 4;
+    const mb = L.mark && markBox(L.mark, cam, w, h);
+    if (mb) {
+      marks.push(mb);
+      const p = pts[0];
+      gap = Math.max(p.x - mb.l, mb.r - p.x, p.y - mb.t, mb.b - p.y) + 3;
+    }
+    cands.push({ L, pts, gap, keep: !!L.keep || sel, z: pts[0].z, pri: sel ? 9 : PRIORITY[L.kind] });
   }
   cands.sort((a, b) => b.pri - a.pri || a.z - b.z);
   const placed = [];
@@ -529,21 +665,45 @@ function placeLabels() {
   for (const c of cands) {
     const e = c.L.el;
     e.classList.remove('hidden');
-    const bw = e.offsetWidth;
-    const bh = e.offsetHeight;
+    // Fractional sizes: a rounded one lets a label reach a pixel under a box.
+    const { width: bw, height: bh } = e.getBoundingClientRect();
+    const g = c.gap;
     // An object's or node's label sits above it. A dimension's may also
-    // sit just below its line: it still reads as that line's measure.
-    const tops = c.L.dim ? (p) => [p.y - bh - 2, p.y + 2] : (p) => [p.y - bh - 2];
+    // sit just below its line: it still reads as that line's measure. A
+    // simulation label tries above, below, right and left of its anchor,
+    // then a row further out, up to three. An estimate's then tries just
+    // clear of each corner box (its ring is large and still names it); a
+    // truth or error label stays by its mark, or it would name nothing.
+    const spots = c.L.keep
+      ? (p) => [0, 1, 2, 3].flatMap((k) => [
+        [p.x - bw / 2, p.y - g - bh - k * (bh + 4)], [p.x - bw / 2, p.y + g + k * (bh + 4)],
+        [p.x + g, p.y - bh / 2 + k * (bh + 4)], [p.x - g - bw, p.y - bh / 2 + k * (bh + 4)]])
+      : c.L.dim ? (p) => [[p.x - bw / 2, p.y - bh - 2], [p.x - bw / 2, p.y + 2]] : (p) => [[p.x - bw / 2, p.y - bh - 2]];
+    const tries = c.pts.flatMap(spots);
+    if (c.L.clamp) for (const q of boxes) tries.push([c.pts[0].x - bw / 2, q.b + 2], [c.pts[0].x - bw / 2, q.t - bh - 2]);
     let spot = null;
-    for (const [p, y] of c.pts.flatMap((p) => tops(p).map((y) => [p, y]))) {
-      const left = Math.min(Math.max(p.x - bw / 2, pad), Math.max(pad, w - bw - pad));
+    let best = null;
+    let bestCost = Infinity;
+    for (const [x, y] of tries) {
+      const left = Math.min(Math.max(x, pad), Math.max(pad, w - bw - pad));
       const top = Math.min(Math.max(y, pad), Math.max(pad, h - bh - pad));
       const r = { l: left, t: top, r: left + bw, b: top + bh };
-      if (!placed.some((q) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t)) {
+      const under = boxes.reduce((s, q) => s + overlap(r, q), 0);
+      const onMark = marks.reduce((s, q) => s + overlap(r, q), 0);
+      const over = placed.reduce((s, q) => s + overlap(r, q), 0);
+      if (!under && !onMark && !over) {
         spot = r;
         break;
       }
+      // Never under a corner box if any spot is not; then rather over
+      // another label's edge than over a small cross, which it would hide.
+      const cost = under * 1e6 + onMark * 10 + over;
+      if (cost < bestCost) {
+        best = r;
+        bestCost = cost;
+      }
     }
+    if (!spot && c.keep) spot = best;
     if (!spot) {
       e.classList.add('hidden');
       e.dataset.why = 'overlap';
@@ -578,6 +738,26 @@ function watchPixelRatio() {
   mq.addEventListener('change', () => { frame(); render(); watchPixelRatio(); }, { once: true });
 }
 watchPixelRatio();
+
+// ---------------------------------------------------------------- simulation
+
+/** The view the simulation layer draws into; it imports nothing itself. */
+const sim = createSim({
+  THREE,
+  el,
+  colour,
+  world,
+  labelLayer,
+  render: () => render(),
+  gl: () => renderer !== null,
+  scene: () => ({ sc: state.current, entry: state.entry }),
+  footprint,
+  provenanceText: (p) => PROVENANCE[p] || String(p),
+  writeHash: () => writeHash(),
+  textChanged: () => simTextChanged(),
+  drawn: () => simDrawn(),
+  simStarted: () => armPlanFit(),
+});
 
 // ---------------------------------------------------------------- selection
 
@@ -720,6 +900,31 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') select(nul
 
 // ---------------------------------------------------------------- panel
 
+/**
+ * The texts that say what is drawn. The room is declared; people and
+ * estimates appear only in the SIM view (spec/livedemo.md §9.5), so
+ * none of these may say that nothing is inferred or no one is drawn.
+ */
+let peopleDd = null;
+function peopleText() {
+  return sim.isOn()
+    ? 'simulated (SIM): estimates of simulated people are drawn, and with Truth on the simulated people too'
+    : 'appear only in the SIM view (Run simulation): simulated, never sensed';
+}
+function viewLabel(sc) {
+  const r = sc.room;
+  return `${sc.name}: a ${r.w_m.toFixed(2)} by ${r.d_m.toFixed(2)} by ${r.h_m.toFixed(2)} metre room with ` +
+    `${(sc.objects || []).length} objects and ${(sc.nodes || []).length} ESP32 nodes. The room is declared in a scene file. ` +
+    (sim.isOn()
+      ? 'Simulation view on: estimates from simulated WiFi (SIM) are drawn over it, and listed as text beside the view.'
+      : 'People and estimates appear only in the SIM view.');
+}
+/** The simulation view was turned on or off. */
+function simTextChanged() {
+  if (peopleDd) peopleDd.textContent = peopleText();
+  if (renderer && state.current) renderer.domElement.setAttribute('aria-label', viewLabel(state.current));
+}
+
 function kv(pairs) {
   return pairs.flatMap(([k, v, cls]) => [el('dt', { text: k }), el('dd', { text: v, class: cls })]);
 }
@@ -740,15 +945,14 @@ function fillPanel(sc, entry) {
     ['Walls', `${ws.length}${ws.some((w) => w.implied) ? ' (implied by the footprint)' : ''} — ${matText}`],
     ['Objects', String((sc.objects || []).length)],
     ['ESP32 nodes', String((sc.nodes || []).length)],
-    ['People', 'not drawn — this is a static view of the room'],
   ]));
+  peopleDd = el('dd', { text: peopleText() });
+  ui.info.append(el('dt', { text: 'People' }), peopleDd);
   const shaDd = el('dd', { class: 'mono', title: hash, text: hash ? `${hash.slice(0, 16)}…` : '—' });
   ui.info.append(el('dt', { text: 'Scene file sha256' }), shaDd);
 
   if (renderer) {
-    renderer.domElement.setAttribute('aria-label',
-      `${sc.name}: a ${r.w_m.toFixed(2)} by ${r.d_m.toFixed(2)} by ${r.h_m.toFixed(2)} metre room with ` +
-      `${(sc.objects || []).length} objects and ${(sc.nodes || []).length} ESP32 nodes. Declared geometry, not sensed.`);
+    renderer.domElement.setAttribute('aria-label', viewLabel(sc));
     // The list is the keyboard and screen-reader way to select anything.
     const items = [];
     for (const obj of pickables) {
@@ -801,6 +1005,7 @@ function showMissing(id) {
   select(null, { write: false });
   showNotice(`No scene named "${id}" is served by this gateway. Choose one from the list above.`, 'scene');
   document.body.dataset.scene = '';
+  sim.sceneChanged();
   render();
 }
 
@@ -817,6 +1022,10 @@ function hashFor({ scene, topDown, dims, select: sel }) {
   if (topDown) p.set('view', 'top');
   if (dims === false) p.set('dims', 'off');
   if (sel) p.set('select', sel);
+  // The simulation view's keys (sim, replay, and outside REPLAY variant
+  // and seed) survive every rewrite. Never a position or a time: history
+  // keeps URLs (d11).
+  sim.writeParams(p);
   return `#${p}`;
 }
 
@@ -864,6 +1073,10 @@ async function show(id) {
   state.entry = entry;
   state.requested = entry.id;
   ui.picker.value = entry.id;
+  // A new room: the simulation layer closes its stream, clears, and
+  // opens one for this scene if its view is on (spec/livedemo.md §9.2).
+  // First, so the new room is framed without the old room's rings.
+  sim.sceneChanged();
   if (renderer) {
     buildRoom(sc);
     resetView();
@@ -876,12 +1089,16 @@ async function show(id) {
 }
 
 function setTopDown(on) {
+  const entering = on && !state.topDown;
   state.topDown = on;
   ui.view.setAttribute('aria-pressed', String(on));
   if (orbit) {
     orbit.enabled = !on;
     plan.enabled = on;
   }
+  // With the simulation view on, the plan view fits the room and every
+  // drawn ring as it opens (spec/livedemo.md §9.3).
+  if (entering && renderer && sim.isOn()) resetView();
   writeHash();
   render();
 }
@@ -908,6 +1125,7 @@ function setDims(on) {
  */
 async function applyHash() {
   const h = readHash();
+  sim.readParams(new URLSearchParams(location.hash.slice(1)));
   state.dims = h.dims !== 'off';
   state.topDown = h.view === 'top';
   const want = h.scene || (state.entry ? state.entry.id : state.scenes[0].id);
@@ -919,12 +1137,16 @@ async function applyHash() {
     return;
   }
   if (!state.entry || state.entry.id !== want) {
-    if (!(await show(want))) return;
+    if (!(await show(want))) {
+      sim.sync();
+      return;
+    }
   } else {
     // Already drawn: any load still in flight is for a scene the viewer
     // has navigated away from, and any load error is about it too.
     loadSeq++;
     clearNotice('load', 'scene');
+    sim.sync();
   }
   setDims(state.dims);
   setTopDown(state.topDown);
@@ -959,6 +1181,7 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
   const key = state.selected && keyOf(state.selected);
   buildRoom(state.current);
   fillPanel(state.current, state.entry);
+  sim.retheme();
   select(key ? pickables.find((o) => keyOf(o) === key) || null : null);
 });
 

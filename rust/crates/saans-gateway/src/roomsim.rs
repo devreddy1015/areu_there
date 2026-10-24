@@ -1,18 +1,29 @@
-//! The static room demo (ADR-008): a three.js view of a declared scene.
+//! The room demo (ADR-008): a three.js view of a declared scene, and the
+//! page's simulation layer.
 //!
 //! Compiled only with the `roomsim` cargo feature, which is off by
 //! default (ADR-008 decision 13): a production gateway does not carry a
 //! room view nobody asked for. The decision's other half — refusing at
-//! config load to serve the view LIVE without the feature — arrives with
-//! the Phase 5 live mode; today there is nothing live to refuse.
+//! config load to serve the view LIVE without the feature — waits for a
+//! LIVE source; there is none (spec/livedemo.md §7), so there is nothing
+//! live to refuse.
 //!
 //! Everything this module serves is SCENE data — room geometry written by
 //! hand or imported from a scan, never inferred from WiFi — plus the code
 //! that draws it. It serves no sensor data, no estimate and no person:
 //! a scene is served through an allowlist of keys, so the people and
 //! phone a scene file may carry for the simulator never leave the gateway
-//! (decision 3), and neither does any key added to the format later until
-//! someone decides it should. The page draws no one.
+//! through these routes (decision 3), and neither does any key added to
+//! the format later until someone decides it should. The static view
+//! draws no one.
+//!
+//! People and estimates appear only in the page's simulation view (SIM,
+//! spec/livedemo.md §9), which the viewer turns on. Its code,
+//! `roomsim-sim.js`, is served here like the page's own script, but the
+//! simulated people and their estimates come from the room stream
+//! (`crate::roomstream`, `GET /api/roomsim`), which checks the origin, the
+//! principal and `can_see_position` before it sends anything. Nothing
+//! these routes serve carries a position.
 //!
 //! The scenes are the hand-written examples in `spec/scenes/`, embedded at
 //! build time, so the demo needs no configuration and no file system.
@@ -38,6 +49,17 @@ use serde_json::{json, Map, Value};
 pub(crate) const ROOMSIM_HTML: &str = include_str!("../assets/roomsim.html");
 pub(crate) const ROOMSIM_JS: &str = include_str!("../assets/roomsim.js");
 pub(crate) const ROOMSIM_CSS: &str = include_str!("../assets/roomsim.css");
+/// The simulation layer (spec/livedemo.md §9.5), a second ES module that
+/// roomsim.js imports. It imports nothing itself: roomsim.js hands it
+/// three.js.
+pub(crate) const ROOMSIM_SIM_JS: &str = include_str!("../assets/roomsim-sim.js");
+
+/// The simulation module's identity in its served path: the first 12 hex
+/// digits of its SHA-256. It is cached as immutable like the vendored
+/// files, so any change to it must change its path, or browsers keep the
+/// old file for a year. A test pins this to the bytes, and another pins
+/// roomsim.js's import to this, so neither can be forgotten.
+pub(crate) const SIM_REV: &str = "32c8ff29371a";
 
 /// The vendored bytes' identity in the served path: the upstream three.js
 /// version plus a local revision. The files are cached as immutable, so
@@ -84,6 +106,7 @@ pub(crate) fn routes<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/roomsim/roomsim.js", get(|| async { asset(ROOMSIM_JS, "text/javascript; charset=utf-8", false) }))
         .route("/roomsim/roomsim.css", get(|| async { asset(ROOMSIM_CSS, "text/css; charset=utf-8", false) }))
         .route("/roomsim/vendor/{rev}/{file}", get(vendor))
+        .route("/roomsim/sim/{rev}/roomsim-sim.js", get(sim_module))
         .route("/roomsim/scenes", get(scene_list))
         .route("/roomsim/scenes/{id}", get(scene))
 }
@@ -136,6 +159,14 @@ async fn vendor(Path((rev, file)): Path<(String, String)>) -> Response {
         _ => return not_found(),
     };
     asset(body, "text/javascript; charset=utf-8", true)
+}
+
+/// The simulation module, at the one revision this binary carries.
+async fn sim_module(Path(rev): Path<String>) -> Response {
+    if rev != SIM_REV {
+        return not_found();
+    }
+    asset(ROOMSIM_SIM_JS, "text/javascript; charset=utf-8", true)
 }
 
 /// A scene as served: only the `SERVED_KEYS` of the file. (Key order in
@@ -256,14 +287,79 @@ mod tests {
         assert!(module_specifiers(THREE_CORE).is_empty());
     }
 
+    /// The page's module graph, exactly: the two vendored files at the
+    /// revision the gateway serves, and the simulation module at its own
+    /// (spec/livedemo.md §9.5). Widened on purpose from the two vendored
+    /// imports when the simulation layer arrived; any other import fails.
     #[test]
     fn the_page_imports_exactly_the_vendored_revision_the_gateway_serves() {
         let specs = module_specifiers(ROOMSIM_JS);
         assert_eq!(
             specs,
-            [format!("./vendor/{VENDOR_REV}/three.module.js"), format!("./vendor/{VENDOR_REV}/OrbitControls.js")],
-            "roomsim.js and VENDOR_REV disagree; the page would 404 on its own library"
+            [
+                format!("./vendor/{VENDOR_REV}/three.module.js"),
+                format!("./vendor/{VENDOR_REV}/OrbitControls.js"),
+                format!("./sim/{SIM_REV}/roomsim-sim.js"),
+            ],
+            "roomsim.js, VENDOR_REV and SIM_REV disagree; the page would 404 on its own code"
         );
+        assert!(
+            module_specifiers(ROOMSIM_SIM_JS).is_empty(),
+            "roomsim-sim.js imports something; roomsim.js hands it three.js instead"
+        );
+    }
+
+    /// The simulation module is cached as immutable, so its path names its
+    /// bytes. Changing roomsim-sim.js fails this test until `SIM_REV` (and
+    /// roomsim.js's import, by the test above) take the new digest.
+    #[test]
+    fn the_simulation_module_is_named_by_its_own_digest() {
+        let digest = sha256_hex(ROOMSIM_SIM_JS);
+        assert_eq!(SIM_REV.len(), 12, "SIM_REV is 12 hex digits");
+        assert!(
+            digest.starts_with(SIM_REV),
+            "roomsim-sim.js changed: set SIM_REV and roomsim.js's import to {}",
+            &digest[..12]
+        );
+    }
+
+    /// Trusted Types `'none'` makes the browser refuse HTML sinks, and the
+    /// CSP refuses inline style; the page's scripts use neither, so the
+    /// refusal is a backstop, not the design. Comment lines are skipped:
+    /// they name the rules.
+    #[test]
+    fn the_page_scripts_use_no_html_sink_no_inline_style_and_no_eval() {
+        for (name, js) in [("roomsim.js", ROOMSIM_JS), ("roomsim-sim.js", ROOMSIM_SIM_JS)] {
+            let code: String = js
+                .lines()
+                .filter(|l| {
+                    let t = l.trim_start();
+                    !(t.starts_with("//") || t.starts_with('*') || t.starts_with("/*"))
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            for banned in [
+                "innerHTML",
+                "outerHTML",
+                "insertAdjacentHTML",
+                "document.write",
+                "setAttribute('style'",
+                "setAttribute(\"style\"",
+                "cssText",
+                "eval(",
+                "new Function",
+                "import(",
+                "localStorage",
+                "sessionStorage",
+                "indexedDB",
+            ] {
+                assert!(!code.contains(banned), "{name} uses {banned:?}");
+            }
+            // String timers are code too.
+            for timer in ["setTimeout('", "setTimeout(\"", "setInterval('", "setInterval(\""] {
+                assert!(!code.contains(timer), "{name} passes a string to a timer");
+            }
+        }
     }
 
     #[test]

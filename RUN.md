@@ -235,11 +235,12 @@ Edit the file, then re-run the schema check above against it.
 
 ## 4b. The room demo (Phase 2)
 
-A static three.js view of the example scenes, served by the gateway at
-`/roomsim` (ADR-008). It draws declared geometry only: no people, no
-estimates, no sensor data. It is compiled in only with the `roomsim`
-cargo feature, which is off by default (ADR-008 decision 13); a normal
-build answers 404 there, and a test proves it.
+A three.js view of the example scenes, served by the gateway at
+`/roomsim` (ADR-008). Its static view draws declared geometry only: no
+people, no estimates, no sensor data. People and estimates appear only in
+its SIM view, from simulated WiFi (§4e). It is compiled in only with the
+`roomsim` cargo feature, which is off by default (ADR-008 decision 13); a
+normal build answers 404 there, and a test proves it.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -268,8 +269,13 @@ download is needed:
 
 ```bash
 .venv/bin/pip install playwright pillow
-.venv/bin/python -I rust/crates/saans-gateway/tests/browser/roomsim_check.py --base http://127.0.0.1:18080
+.venv/bin/python -I rust/crates/saans-gateway/tests/browser/roomsim_check.py --base http://127.0.0.1:18080 --base-auth http://127.0.0.1:18081
 ```
+
+It needs two gateways from a release build: the page's, started with a
+recorded hall run (`--room-replay`, §4e), and a second one with
+authentication on for the signed-out checks. The script's header gives
+the exact commands and configs. It runs 233 checks in about 80 s.
 
 It exits non-zero on any failure and writes screenshots to
 `roomsim-shots` in Python's temp directory (`/tmp` here; pass `--out` to
@@ -401,6 +407,82 @@ implementations to `spec/golden/localize_*` and `locate_*`. A change to an
 estimator goes into `spec/locate.md`, the Python and the Rust together,
 then the vectors are regenerated on CPython 3.14 (`generate.py` refuses
 any other version).
+
+## 4e. The live demo (Phase 5)
+
+The SIM view of `/roomsim` (`spec/livedemo.md`): the gateway runs Room
+Sim and Locate for each viewer and streams 10 frames a second over
+`/api/roomsim`. Links are coloured by disturbance, people and the phone
+are circles whose size is the (uncalibrated) model radius, the phone's
+RTT and RSSI estimates leave trails, and true positions with the error
+in metres can be switched on. Everything it shows is **SIM**: simulated
+people, estimated from simulated WiFi. There is no LIVE room view and no
+LIVE phone (ADR-008 d13, d16).
+
+Use a release build: a session calibrates for about 1.3 s (bedroom) to
+3.3 s (hall) before its first frame, against 2.2-5.2 s in the dev profile.
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+cd /home/Aman/are_u_theone/are_U_there/rust
+cargo run --release -p saans-gateway --features roomsim -- --config crates/saans-gateway/roomsim-demo.toml
+```
+
+Open `http://127.0.0.1:18080/roomsim` and press **Run simulation (SIM)**,
+or go straight to `#scene=hall-l-shaped&sim=1`. The run is chosen by
+`#variant=` (`declared`, the scene's people; `with_walker`, plus one
+person who walks and carries the phone, the page's default; `empty`,
+nobody) and `#seed=N`. Play, pause, six speeds (0.25x-8x), restart, and a
+**Truth (SIM)** toggle. A run is 120 s of SIM time.
+
+Who may watch: on this loopback config authentication is off and every
+caller is the local admin. With `[auth] required = true` only `admin` and
+`safety` accounts get the stream (ADR-008 d10); sign in at `/` first, the
+room page has no login of its own. At most 4 simulations run at once
+across all viewers; a fifth is told so. Behind a reverse proxy, forward
+the browser's `Host` unchanged (nginx: `proxy_set_header Host $host;`,
+plus the usual WebSocket `Upgrade`/`Connection` headers): the stream
+refuses a handshake whose `Origin` does not match `Host`.
+
+**The same numbers without a browser**, from the same code (spec §10):
+
+```bash
+cargo run --release -p saans-cli -- roomsim-eval --scene ../spec/scenes/bedroom.json --variant with_walker
+cargo run --release -p saans-cli -- roomsim-eval --scene ../spec/scenes/bedroom.json --variant with_walker --json
+```
+
+Every line is labelled SIM: per estimator the published count and
+coverage, median and p90 error, radius median and the fraction of truths
+inside the radius, the same for the footprint's centroid (an estimator
+that knows nothing), the empty-room false alarms per hour, and a
+suggested radius scale (reported, not applied). With `--seconds 120` (the
+default) and the same scene, variant and seed, the figures equal the
+page's at the end of the run.
+
+**REPLAY** plays a recorded run instead of simulating one, with the truth
+and error figures removed:
+
+```bash
+cargo run --release -p saans-cli -- roomsim-eval --scene ../spec/scenes/hall-l-shaped.json --variant with_walker --seed 0 --records-out /tmp/hall.jsonl
+cargo run --release -p saans-gateway --features roomsim -- --config crates/saans-gateway/roomsim-demo.toml --room-replay /tmp/hall.jsonl
+```
+
+then tick **Recorded run (REPLAY)** on the hall, or add `#replay=1`.
+`--room-replay` may be repeated, one file per scene; the file must come
+from a byte-identical copy of an embedded scene, and `--check` validates
+it. Records are SIM, of simulated people; nothing from the stream itself
+is ever written to disk.
+
+Tests:
+
+```bash
+cargo test -p saans-gateway --features roomsim --locked
+cargo test -p saans-locate --features roomsim --locked
+cargo test -p saans-cli --locked
+```
+
+The browser check (§4b) now covers the SIM view too; its header gives the
+two gateways and the recorded run it needs.
 
 ## 5. Datasets
 

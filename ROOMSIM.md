@@ -18,12 +18,13 @@ scene numbers are labelled as such.
 | 1 | Scene format | **Done.** `saans-scene` crate, JSON Schema, 3 example scenes, `saans import-roomplan`. |
 | 2 | Static web demo | **Done.** |
 | 3 | Simulator upgrade | **Done.** Room Sim v1: `spec/roomsim.md`, the Python reference `wifisense/roomsim/` and the Rust crate `saans-roomsim`, bit-identical; `saans roomsim-export`. Three decisions need the owner (*Open items* 7). |
-| 4 | Localisation and phone tracking | **Done — waiting for the owner's review.** Locate v1: `spec/locate.md`, Python additions in `wifisense/localize/` and the Rust crate `saans-locate` (the existing RTI ported, a baseline that abstains, a simulated phone tracked by RTT and RSSI), bit-identical on 24 golden sets; measured on Room Sim. Decisions for the owner: *Open items* 12. |
-| 5–7 | Live demo, dataset, preprocessing | Not started. |
+| 4 | Localisation and phone tracking | **Done.** Locate v1: `spec/locate.md`, Python additions in `wifisense/localize/` and the Rust crate `saans-locate` (the existing RTI ported, a baseline that abstains, a simulated phone tracked by RTT and RSSI), bit-identical on 24 golden sets; measured on Room Sim. Decisions for the owner: *Open items* 12. |
+| 5 | Live demo | **Done — waiting for the owner's review.** `spec/livedemo.md`: the `/roomsim` page's SIM view over a 10 Hz room stream (`/api/roomsim`, admin and safety only), Room Sim and Locate run per viewer in the gateway, REPLAY of recorded runs, `saans roomsim-eval`; `Mode { Sim, Replay, Live }`. No LIVE room view exists. Decisions for the owner: *Open items* 13. |
+| 6–7 | Dataset, preprocessing | Not started. |
 | 8–12 | Model, real data, Sionna/calibration, recordings, export | Not started. **Blocked on an ADR** for learned models (see *Open items*). |
 
 The working rule is to stop after each phase for review. That is why
-nothing past Phase 4 has been started, not lack of time.
+nothing past Phase 5 has been started, not lack of time.
 
 ## What exists
 
@@ -42,6 +43,11 @@ nothing past Phase 4 has been started, not lack of time.
 | `rust/crates/saans-locate/` | The Rust crate: the RTI port (`pynum`, `geometry`, `invert`, `measure`, `track`, with a bit-exact port of CPython's `math.hypot`), the new pieces, the Room Sim pipeline behind the `roomsim` feature, and `examples/locate_measure.rs`, which prints the measured numbers. |
 | `spec/golden/localize_*`, `locate_*` | 24 golden sets (2.1 MB) pinning the ported RTI, the new estimators and the Room Sim pipeline. |
 | `rust/crates/saans-gateway/src/roomsim.rs` + `assets/roomsim.*` | The `/roomsim` demo page: routes, its own stricter CSP, embedded scenes served without people or phone. |
+| `spec/livedemo.md` | **Live Demo v1**, the normative spec of Phase 5: the room stream's access, sessions, clock and frames; statistics; the REPLAY records file; the page's drawing rules; `roomsim-eval`. |
+| `rust/crates/saans-locate/src/{variant,stream,score,records}.rs` | The run variants; `RoomSimSetup`/`RoomSimStream`, a streaming driver equal to `run_roomsim` record for record (which now runs on it); the §5 statistics; the records file and the JSON encodings the gateway's frames share. |
+| `rust/crates/saans-gateway/src/roomstream/` | The room stream: handshake checks, one session thread per viewer, a socket-free engine with an injected clock, frame building and redaction, REPLAY loading (`--room-replay`). |
+| `rust/crates/saans-gateway/assets/roomsim-sim.js` | The page's SIM layer: the one function that draws an estimate, links, trails, truth, controls and the statistics panel. Served under a path named by its own digest (`SIM_REV` in `roomsim.rs`). |
+| `rust/crates/saans-cli` → `saans roomsim-eval` | The page's statistics without a browser, every line SIM, or one JSON object; `--records-out` writes a REPLAY file. RUN.md §4e. |
 | `rust/crates/saans-gateway/assets/vendor/three-0.186.1/` | Vendored three.js, integrity-checked, pinned by SHA-256, one documented one-line change (VENDOR.md). |
 | `rust/crates/saans-gateway/roomsim-demo.toml` | Loopback config to run the demo. |
 | `rust/crates/saans-gateway/tests/browser/roomsim_check.py` | **The repo's first browser end-to-end test.** Drives Chrome: render, CSP, clicks, toggles, phone width. |
@@ -54,7 +60,7 @@ nothing past Phase 4 has been started, not lack of time.
 | When | Decision | By |
 |---|---|---|
 | 2026-10-21 | ADR-008 accepted: geometry is declared, never inferred; the room may be drawn, a person only as an estimate with an uncertainty radius, gated by role and consent; LIVE gated by a mechanism. | Owner |
-| 2026-10-21 | `Shared::mode` becomes `Mode { Sim, Replay, Live }` (a public-API change to saans-gateway) — **for Phase 5, not yet done.** | Owner |
+| 2026-10-21 | `Shared::mode` becomes `Mode { Sim, Replay, Live }` (a public-API change to saans-gateway). Done in Phase 5; the wire spelling stays `live`/`replay`. | Owner |
 | 2026-10-21 | The phone is simulated only; a LIVE phone needs its own ADR. | Owner |
 | 2026-10-21 | Static demo now; mode enum and scene-to-space binding left for Phase 5. | Owner |
 | 2026-10-21 | `provenance` is a required scene field; the examples say `hand_written`. | Implements ADR-008 decision 4 |
@@ -64,13 +70,15 @@ nothing past Phase 4 has been started, not lack of time.
 | 2026-10-21 | `saans-cli` is both the scene writer and a SIM CSI producer (`export` already was; `roomsim-export` now too). No command writes a scene from CSI; nothing structural stops a future one. | **Proposed — owner to confirm**, or split `roomsim-export` into its own binary |
 | 2026-10-21 | Scene fixes in files this work wrote: bedroom almirah centre x 3.5 → 3.3 (node 1 was inside it); hall "sitter" (7.0, 1.8) → (7.0, 0.6), onto the sofa; office occupants y 2.5 → 2.1, onto their chairs (they were frozen standing behind them). | Fixes found by the Phase 3 reviews |
 | 2026-10-24 | Locate v1 (spec/locate.md header): Python first, then Rust (ADR-002); the person estimators read RSSI variance on Room Sim data because Room Sim's AGC normalises CSI power away; the radius is a model flagged `radius_calibrated: false` until Phase 5 measures coverage; the baseline abstains rather than guessing the room centre; the phone is SIM only and its radio model lives in `saans-locate`, not Room Sim; one person estimate per estimator; scenes with `roles` or stacked nodes refused by the person pipeline. | **Proposed — owner to confirm** (open item 12) |
+| 2026-10-24 | Phase 5 (spec/livedemo.md header): the additive APIs (`can_see_position`, a room handle on `Shared`, the streaming driver, score and records in `saans-locate`); the frame adapted to ADR-008 (per-estimator estimates with radii or abstentions, truth by index in SIM only, phone RTT and RSSI each with a radius, a timestamp per block); SIM plus REPLAY of recorded runs, no LIVE; RTI never drawn without the baseline, the baseline may be drawn alone. | Owner |
+| 2026-10-24 | Phase 5 choices made here (spec/livedemo.md *Decisions taken here*): `/api/roomsim` checks `Origin` and, on an auth-off gateway, a loopback `Host`; one thread per session, at most 4; frames never dropped; radii shown as uncalibrated models; truth drawn from each record's own truth; an empty-room run per session so coverage always sits beside the false-alarm rate; variants named `declared`/`with_walker`/`empty`, the page defaulting to `with_walker`; `can_see_position(Some(_))` false until a per-space opt-in exists; the simulation crates at `opt-level = 2` in the dev profile; the pcap `--replay` left unlabelled. | **Proposed — owner to confirm** (open item 13) |
 | 2026-10-21 | ESP32 defaults follow the firmware where it says: `ltf_merge` on, smoothing **off** (`channel_filter_en = false`), 56 forwarded entries. TDMA (`slot_s` 12.5 ms) is the *planned* schedule, labelled SIM; today's one-transmitter firmware is a documented config (RUN.md §4c). | Spec §3.2, §10 |
 
 ## How it was verified
 
 All on the GPU box. The rows above **Phase 3** are the Phase 2 record
 (2026-10-21, commit `ce115fa`); the Phase 3 rows are from 2026-10-23 and
-the Phase 4 rows are current (2026-10-24).
+the Phase 4 and Phase 5 rows are from 2026-10-24.
 
 | Suite | Command | Result |
 |---|---|---|
@@ -95,6 +103,13 @@ the Phase 4 rows are current (2026-10-24).
 | Locate parity | `saans-locate/tests/golden.rs` against `spec/golden/localize_*`, `locate_*` | all 24 sets agree **bit for bit** (0 values differ); `py_hypot` bit-exact against CPython 3.14 on 1,403 edge pairs and 10^6 drawn pairs (SHA-256); a mutation in each kind of check fails it |
 | Locate, Python | `tests/test_locate_*.py` and `tests/test_localize_*.py` | 136 locate tests pass on 3.10.12, 3.11.5, 3.12.15 and 3.14.8 (the golden test re-runs every generator and compares every stored array); the full suite runs **695** (559 + 136): on 3.12.15 only the known UDP-buffer error, on 3.11.5 and 3.10.12 that plus the two known pre-3.12 failures — the pre-Phase 4 baseline |
 | Measured (SIM) | `cargo run --release -p saans-locate --features roomsim --example locate_measure` | 45 runs of 120 s in about 12 s; figures in spec/locate.md §13 |
+| **Phase 5** | | |
+| Stream, score, records | `cargo test -p saans-locate --features roomsim --locked` | 254 pass (1 ignored); `RoomSimStream` equals `run_roomsim` record for record for every shipped scene, variant and step size, `run_roomsim` now runs on it and every golden set is still bit-identical; standalone 167 |
+| Room stream | `cargo test -p saans-gateway --features roomsim --locked` | 132 pass: Origin/Host and role refusals, audit, sessions and the cap, the clock to the quantum, pause/speed/restart, frames never dropped, REPLAY without truth, no `Person.id`/`Phone.id` anywhere (JSON walk), nothing on `live_tx`; a default build serves no `/api/roomsim` |
+| `roomsim-eval` | `cargo test -p saans-cli --locked` | 33 pass; its `--json` statistics equal `score(run_roomsim(..))` plus the empty-room run |
+| Browser, real Chrome | `tests/browser/roomsim_check.py` against release builds, two gateways and a recorded hall run | **233/233** (119 static + 114 SIM view) in about 83 s, in three runs |
+| Measured (SIM) | `saans roomsim-eval` on each scene, `declared` and `with_walker`, 120 s, seed 0 | 3-12 s per run in release; figures in spec/livedemo.md §13, every line SIM |
+| Whole suites (Phase 5, from a clean build) | workspace `cargo test --locked`; gateway with `roomsim`; clippy with and without `roomsim`; full Python suite on 3.10.12, 3.11.5, 3.12.15; `make -C edge/dsp/test check`; golden regeneration | Rust workspace 560 pass (1 ignored), gateway with `roomsim` 132; clippy shows only the 4 earlier warnings; Python 695 at the pre-Phase 5 baseline (3.12.15: only the UDP-buffer error; 3.11.5 and 3.10.12: that plus the two known pre-3.12 failures); edge PASS; a full regeneration on CPython 3.14.8 changes 0 of 59 sets' files |
 | Whole suites (Phase 4, from a clean build) | workspace `cargo test --locked`; gateway with `roomsim`; full Python suite on 3.10.12, 3.11.5, 3.12.15; `make -C edge/dsp/test check`; golden regeneration | Rust workspace 446 pass (1 ignored, the optional hypot dump), gateway with `roomsim` 79; Python 695 at the pre-Phase 4 baseline (row above); edge PASS (g++); a full regeneration on CPython 3.14.8 changes 0 of 59 sets' files |
 | Whole suites (Phase 3 record) | workspace `cargo test --locked`; full Python suite on 3.11.5 and 3.12.15; `make -C edge/dsp/test check` | Rust workspace 279 pass, gateway with `roomsim` 79 pass; Python **559** run (459 + 100 Room Sim): on 3.12.15 only the known UDP-buffer error, on 3.11.5 and 3.10.12 that plus the two known pre-3.12 failures — exactly the pre-Phase 3 baseline; edge PASS (g++) |
 
@@ -166,7 +181,42 @@ Room Sim output REAL; and the measurement printout lacked the reference
 point, the radius sizes and the empty-room rates needed to read it
 honestly. All are fixed except the regeneration hints in `edge/dsp/bench/` (open item 12). A second round (fix audit, regression hunt with differential checks, docs fact-check; each finding again checked by a refuting agent) confirmed 19 and partly confirmed 9 more, all fixed: the collinear test still let through anchors collinear to rounding on an axis-aligned line (a node at `0.1+0.2` published a mirror fix 8.4 m off), now replaced by a test that does not depend on the line's direction; a library caller could still publish a zero radius; Python checked a far-away phone only at epochs; the two implementations resolved phone defaults differently outside Room Sim runs; and several §13 sentences overstated what the measurements show.
 
-**GPU.** Phases 0–4 used none. The only GPU work so far was the fp16/bf16
+**Phase 5 review.** Before any code, a four-lens review of
+`spec/livedemo.md` (rules and ADR-008, gateway, protocol, page), with a
+refuting verifier per finding, confirmed or partly confirmed 46 of 48
+findings. Among them:
+- a browser cannot see why a WebSocket handshake was refused, so the
+  page's sign-in message must come from `/api/me`;
+- coverage shown without the empty-room false-alarm rate breaks ADR-005
+  §5;
+- truth drawn at the frame's time but scored at the tick's made the drawn
+  gap disagree with the printed error by up to 0.6 m;
+- the phone's `blocked` flags were ground truth outside the truth key,
+  so REPLAY leaked them;
+- `Origin == Host` alone does not stop DNS rebinding;
+- the streaming driver as first specified could not be written in safe
+  Rust.
+
+Each part was then built and attacked by one or two reviewers who ran
+experiments and mutation tests, and the confirmed defects were fixed:
+- the stream: 5, including a refusal test that compared the code with
+  itself;
+- the score: 5, including nulls that were never told apart from absent
+  keys;
+- the records reader: 4, including repeated JSON keys accepted and tick
+  truth not checked against the run's people;
+- the gateway groundwork: 5;
+- `roomsim-eval`: 4;
+- the room stream: 7, including a restart late in calibration that was
+  still applied, a restart flood starving frames, a 10 s stall rule that
+  fired after 41 s, and two frames in flight;
+- the page: 18, including truth crosses and error segments drawn without
+  their labels, estimate labels under the view's corner boxes, a plan
+  view opened from the URL that did not fit room-sized rings, REPLAY
+  controls showing the requested run instead of the recorded one, and a
+  LIVE `state` message accepted.
+
+**GPU.** Phases 0–5 used none. The only GPU work so far was the fp16/bf16
 benchmark in RUN.md §1.
 
 ## Open items for the owner
@@ -192,7 +242,9 @@ benchmark in RUN.md §1.
    configured `http_addr`, or an explicitly configured public host name
    (needed behind a reverse proxy, or every proxied request would be
    refused), and `403` to a foreign `Origin` on the WebSocket and on every
-   POST, with e2e cases for both.
+   POST, with e2e cases for both. Phase 5's `/api/roomsim` already
+   checks `Origin` and, on an auth-off gateway, a loopback `Host`, so
+   rebinding is closed for that endpoint only (spec/livedemo.md §2.2).
 3. **An ADR for learned models, before Phase 8.** ADR-007 keeps neural
    networks and trained classifiers out of the S0–S5 path until the DSP
    is measured on real rooms. Offline training and evaluation can sit
@@ -252,8 +304,11 @@ benchmark in RUN.md §1.
    remove it (and change the scene hashes and golden vectors).
 10. **SIM labelling of replays.** A `.sim.pcap` carries no label inside
     (the wire format must match the firmware). `wifisense stats` and
-    `replay` now print a SIM banner for one; the gateway's replay labels
-    it only once Phase 5's `Mode::Sim` lands.
+    `replay` now print a SIM banner for one. The gateway's pcap replay is
+    labelled SIM only when `hello`, `/api/me` and `/api/health` gain a
+    `label` (later work, spec/livedemo.md §1): it cannot tell an export
+    from a capture, so Phase 5 keeps it plain `replay`, and the
+    dashboard's tooltip says a `.sim.pcap` is simulated.
 11. **What Phase 10 must calibrate.** Every SIM-labelled parameter in spec
     §3.2 is a guess: transmit power, the tail's power and decay, object
     scatter and blockage constants, AGC, ripple, chip noise and the noise
@@ -275,6 +330,8 @@ benchmark in RUN.md §1.
       false-alarms on 17.6% of the hall's empty-room ticks (spec §13, SIM).
       ADR-008 d9's "both or neither" would then hide the baseline whenever
       RTI abstains; Phase 5 must decide how the demo treats that.
+      (Decided 2026-10-24: RTI is never drawn without the baseline; the
+      baseline may be drawn alone, with RTI's abstention shown.)
     - *The baseline's radius is room-sized* (3.4–6.3 m, SIM) and very
       conservative: no estimate's error exceeds 0.43–0.69 of its radius,
       so a Phase 5 calibration to 95% coverage would set
@@ -290,6 +347,45 @@ benchmark in RUN.md §1.
     - `edge/dsp/bench/run_bench.sh` and `run_size_report.sh` still print
       `python3 spec/golden/generate.py`, which `generate.py` now refuses
       (it runs only on CPython 3.14); `edge/` was left untouched.
+
+13. **Phase 5 decisions and findings for the owner.**
+    - *Decisions* (spec/livedemo.md *Decisions taken here*):
+      - the room stream checks `Origin`, and on an auth-off gateway a
+        loopback `Host`;
+      - one thread per session, at most 4;
+      - frames are never dropped, and a slow client slows only its own
+        session;
+      - an empty-room run per SIM session, so coverage always sits beside
+        the false-alarm rate;
+      - the variants are named `declared`/`with_walker`/`empty`, and the
+        page defaults to `with_walker`, because the shipped bedroom and
+        office people are still;
+      - `can_see_position(Some(_))` is false until a per-space opt-in
+        exists;
+      - the pcap `--replay` stays unlabelled;
+      - `opt-level = 2` in the dev profile for the five simulation
+        crates.
+    - *The session cap of 4 is not measured on the target gateway.* On
+      this Xeon a hall session at 8x costs about 59 ms of every 100 ms in
+      release, so 4 sessions cost about 2.4 cores. A Raspberry Pi 5 needs
+      measuring before the cap is relied on; a slower host shows up as
+      `effective_speed` below the requested speed.
+    - *Memory per session.* Each setup keeps its calibration frames so a
+      restart and the empty-room run need no second calibration: 3.5 MB
+      (bedroom), 5.8 MB (office), 8.1 MB (hall). Keeping only the int8
+      pairs would cut the hall to about 1.2 MB.
+    - *`SIM_REV`.* The page's SIM module is served under its own digest
+      (`roomsim.rs`) so it can be cached immutably. Any edit to
+      `roomsim-sim.js` must update `SIM_REV` and the import line in
+      `roomsim.js`; the tests fail until both match.
+    - *The radius scales are still uncalibrated.* `roomsim-eval` prints a
+      suggested scale per estimator (the 95th percentile of error over
+      radius, SIM) without applying it. Choosing and applying them is
+      later work.
+    - *What the demo shows honestly:* in `declared` most bedroom and
+      office ticks are abstentions, and WLM's circle usually covers the
+      whole room. The page says so in words ("covers the whole room"),
+      not by shrinking it.
 
 ## Changing the simulator
 

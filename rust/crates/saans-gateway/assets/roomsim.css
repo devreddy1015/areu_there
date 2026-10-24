@@ -18,6 +18,15 @@
   --k-bed: #7c8fd6; --k-table: #b0875a; --k-chair: #c79b62; --k-almirah: #8c6a45;
   --k-sofa: #6f9ad1; --k-door: #a9784b; --k-window: #9fd8f0;
   --k-wall: #8b9ab1; --k-floor: #1f2a3c; --k-node: #e2a63c; --k-pick: #2ec7c9;
+  /* The simulation layer (SIM). Read by roomsim-sim.js for its meshes,
+     so a key swatch and its ring in the view cannot disagree. One
+     sequential scale for links, from the empty room (0) through the WLM
+     gate (1) to twice the gate (2); one colour per estimator; truth and
+     its error segments apart from every estimate. */
+  --link-0: #3a4862; --link-1: #b45aa0; --link-2: #ffb0d4;
+  --est-wlm: #64b5ff; --est-rti: #b9e36a; --est-rtt: #c99bf2; --est-rssi: #ff9474;
+  --truth: #f4f7fb; --truth-err: #ef6a60;
+  --sim: #c99bf2; --sim-bg: #241b33;
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -32,6 +41,10 @@
     --none: #5b6878; --none-bg: #eceff4;
     --focus: #0b63c5;
     --k-wall: #5b6878; --k-floor: #e3e8f0; --k-node: #8a5a05; --k-pick: #0f7f86;
+    --link-0: #c7d0dd; --link-1: #b0458c; --link-2: #5a0c43;
+    --est-wlm: #1d5fc4; --est-rti: #4b7a00; --est-rtt: #7340b8; --est-rssi: #b8401c;
+    --truth: #11161d; --truth-err: #b02a22;
+    --sim: #6a35b0; --sim-bg: #f1eafb;
   }
 }
 * { box-sizing: border-box; }
@@ -54,6 +67,15 @@ body { display: flex; flex-direction: column; min-height: 100%; overflow-x: hidd
   border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line2); }
 .badge.scene { color: var(--accent); background: var(--card); border-color: var(--accent); }
 .badge.scene::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.badge.sim { color: var(--sim); background: var(--sim-bg); border-color: var(--sim); }
+/* The mode badge is the stream's own word (spec/livedemo.md §9.4): one
+   class per mode, and an unknown mode is an error, never a mode. No LIVE
+   source exists (§7), so a stream that says LIVE is stopped and its
+   badge reads as the error it is. */
+.badge.mode-sim { color: var(--sim); background: var(--sim-bg); border-color: var(--sim); }
+.badge.mode-replay { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+.badge.mode-live { color: var(--bad); background: var(--bad-bg); border-color: var(--bad); }
+.badge.mode-unknown { color: var(--bad); background: var(--bad-bg); border-color: var(--bad); }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--sp) * 2); margin-left: auto; }
 .controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
 select, button { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--card);
@@ -62,6 +84,10 @@ button { cursor: pointer; }
 button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button:hover, select:hover { border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: not-allowed; }
+#sim-toggle[aria-pressed="true"] { background: var(--sim); border-color: var(--sim); color: var(--bg); }
+input[type="text"] { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--card);
+  border: 1px solid var(--line2); border-radius: 8px; padding: 5px 8px; min-height: 34px; }
+input[type="checkbox"] { accent-color: var(--sim); width: 16px; height: 16px; margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
@@ -81,6 +107,22 @@ main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-
 .label.selected { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .label.dim { color: var(--accent); border-color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .label.node { color: var(--warn); border-color: var(--warn); }
+/* Simulation labels. An estimate's label is never decluttered away
+   (spec/livedemo.md §9.3) and is long, so it wraps instead of running
+   off the view; its border is its estimator's colour. */
+.label.est { white-space: normal; max-width: min(280px, calc(100% - 8px)); text-align: left; }
+.label.est-wlm { border-color: var(--est-wlm); }
+.label.est-rti { border-color: var(--est-rti); }
+.label.est-rtt { border-color: var(--est-rtt); }
+.label.est-rssi { border-color: var(--est-rssi); }
+.label.truth { border-color: var(--truth); color: var(--ink); }
+.label.err { border-color: var(--truth-err); color: var(--ink); }
+/* Simulation labels are never hidden, so in a crowded view two may
+   touch: an estimate's radius then paints over truth and errors, and
+   only the selection paints over it (§9.3). */
+.label.truth, .label.err { z-index: 1; }
+.label.est { z-index: 2; }
+.label.selected { z-index: 3; }
 .label.hidden { display: none; }
 .overlay-key { position: absolute; left: calc(var(--sp) * 3); bottom: calc(var(--sp) * 3);
   font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line);
@@ -89,6 +131,15 @@ main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-
 .notice { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   padding: 24px; text-align: center; color: var(--warn); background: var(--bg); }
 .notice.hidden { display: none; }
+/* What the simulation layer is doing, over the view's top-left corner:
+   its state, abstentions and refusals. The panel says the same, for
+   assistive technology; this copy is aria-hidden. */
+.sim-overlay { position: absolute; left: calc(var(--sp) * 3); top: calc(var(--sp) * 3);
+  max-width: calc(100% - 24px); display: flex; flex-direction: column; gap: 2px;
+  font-size: 12px; color: var(--ink2); background: var(--card); border: 1px solid var(--sim);
+  border-radius: 8px; padding: 4px 8px; pointer-events: none; }
+.sim-overlay .warn { color: var(--warn); }
+.sim-overlay .bad { color: var(--bad); }
 
 .panel { border-left: 1px solid var(--line); background: var(--bg2); overflow-y: auto;
   padding: calc(var(--sp) * 4); display: flex; flex-direction: column; gap: calc(var(--sp) * 4); }
@@ -96,6 +147,42 @@ main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-
 .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
   margin: 0 0 8px; font-weight: 650; }
 .card .tag { color: var(--accent); }
+.card h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  margin: 12px 0 6px; font-weight: 650; }
+.card.sim { border-color: var(--sim); }
+.card.sim .tag { color: var(--sim); }
+.mode-line { margin: 0 0 8px; }
+.sim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 8px; }
+.sim-row label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; max-width: 100%; }
+.sim-row select { min-width: 0; max-width: 100%; }
+.sim-row input[type="text"] { width: 9ch; }
+.sim-row label.check { color: var(--ink2); }
+.sim-row .none { color: var(--muted); font-size: 13px; font-style: italic; }
+.sim-msg { margin: 0 0 8px; font-size: 13.5px; color: var(--ink2); }
+.sim-msg:empty { display: none; }
+.card h3:has(+ ul:empty) { display: none; }
+.sim-msg.warn { color: var(--warn); }
+.sim-msg.bad { color: var(--bad); }
+ul.sim-now, ul.sim-key { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+  gap: 4px; font-size: 13px; }
+ul.sim-now li { overflow-wrap: anywhere; }
+ul.sim-now .why { color: var(--warn); }
+ul.sim-key li { display: flex; align-items: center; gap: 8px; color: var(--ink2); }
+ul.sim-key svg { flex: none; width: 34px; height: 12px; }
+.k-wlm { color: var(--est-wlm); } .k-rti { color: var(--est-rti); } .k-rtt { color: var(--est-rtt); }
+.k-rssi { color: var(--est-rssi); } .k-truth { color: var(--truth); } .k-err { color: var(--truth-err); }
+.ramp { flex: none; width: 34px; height: 8px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--link-0), var(--link-1), var(--link-2)); }
+/* One block per estimator; side by side where there is room, stacked
+   at phone width and in the side panel. */
+.est-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.est-block { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--card2); min-width: 0; }
+.est-block h4 { margin: 0 0 4px; font-size: 13px; font-weight: 650; color: var(--ink); }
+.est-block ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px;
+  font-size: 12.5px; color: var(--ink2); }
+.est-block li { overflow-wrap: anywhere; }
+.est-block .ref { color: var(--muted); }
+.est-block .none { color: var(--muted); font-style: italic; }
 dl.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 13.5px; }
 dl.kv dt { color: var(--muted); }
 dl.kv dd { margin: 0; overflow-wrap: anywhere; }
@@ -127,6 +214,8 @@ footer { padding: 8px 16px; font-size: 12.5px; color: var(--muted); border-top: 
   .controls { margin-left: 0; width: 100%; }
   .controls label { flex: 1 1 100%; }
   .controls select { flex: 1; min-width: 0; }
+  .est-blocks { grid-template-columns: minmax(0, 1fr); }
+  .sim-overlay { font-size: 11px; }
   /* Smaller labels on a phone: the room is small on screen, and a label
      that cannot be placed without overlapping is hidden. */
   .label { font-size: 10.5px; padding: 0 4px; }

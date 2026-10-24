@@ -11,26 +11,67 @@
 <body>
 <header class="bar">
   <h1>Room demo</h1>
-  <span class="badge scene" title="Everything on this page is declared in a scene file. Nothing here is measured by WiFi.">SCENE · declared, not sensed</span>
+  <span class="badge scene" title="The room (walls, objects and nodes) is declared in a scene file, not measured. People and estimates appear only in the SIM view, where they are simulated.">SCENE · declared, not sensed</span>
+  <span class="badge sim" id="sim-badge" hidden>SIM · simulated people, estimates from simulated WiFi</span>
   <div class="controls">
     <label for="scene-picker">Scene <select id="scene-picker" aria-describedby="scene-help"></select></label>
     <button id="view-toggle" type="button" aria-pressed="false">Top-down 2D</button>
     <button id="dims-toggle" type="button" aria-pressed="true">Dimensions</button>
     <button id="reset-view" type="button">Reset view</button>
+    <button id="sim-toggle" type="button" aria-pressed="false">Run simulation (SIM)</button>
   </div>
 </header>
 <main>
   <div class="viewport" id="viewport">
     <div class="labels" id="labels" aria-hidden="true"></div>
     <div class="overlay-key" id="overlay-key">Dimensions · <strong>SCENE</strong> · metres, as declared in the scene file</div>
+    <div class="sim-overlay" id="sim-overlay" aria-hidden="true" hidden></div>
     <div class="notice hidden" id="notice" role="alert"></div>
     <p class="sr-only" id="view-help">3-D view of the room. With the view focused: arrow keys pan, Shift or Ctrl with arrow keys rotate, plus and minus zoom, 0 resets the view. Every object, node and wall can also be selected from the list beside the view.</p>
   </div>
   <aside class="panel" aria-label="Scene details">
+    <section class="card sim" id="sim-card" aria-labelledby="h-sim" hidden>
+      <h2 id="h-sim">Simulation <span class="tag">· SIM</span></h2>
+      <p class="mode-line"><span class="badge mode" id="mode-badge" hidden></span></p>
+      <div class="sim-row" role="group" aria-label="What to run">
+        <label for="sim-variant">Variant <select id="sim-variant">
+          <option value="with_walker">with_walker (the scene's people and a walker)</option>
+          <option value="declared">declared (the scene's people as written)</option>
+          <option value="empty">empty (nobody in the room)</option>
+        </select></label>
+        <label for="sim-seed">Seed <input id="sim-seed" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="0"></label>
+        <label class="check" for="sim-replay"><input id="sim-replay" type="checkbox"> Recorded run (REPLAY)</label>
+      </div>
+      <div class="sim-row" role="group" aria-label="Playback">
+        <button id="sim-play" type="button">Pause</button>
+        <label for="sim-speed">Speed <select id="sim-speed">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+        </select></label>
+        <button id="sim-restart" type="button">Restart</button>
+        <button id="sim-truth" type="button" aria-pressed="false">Truth (SIM)</button>
+        <span class="none" id="sim-notruth" hidden>no truth in REPLAY</span>
+      </div>
+      <p class="sim-msg" id="sim-msg"></p>
+      <dl class="kv" id="sim-facts"></dl>
+      <h3>Estimates at this frame</h3>
+      <ul class="sim-now" id="sim-now"></ul>
+      <h3>Key</h3>
+      <ul class="sim-key" id="sim-key"></ul>
+    </section>
+    <section class="card sim" id="sim-stats-card" aria-labelledby="h-stats" hidden>
+      <h2 id="h-stats">Run statistics <span class="tag">· SIM</span></h2>
+      <div class="est-blocks" id="sim-stats"></div>
+    </section>
+    <p class="sr-only" id="sim-announce" role="status" aria-live="polite"></p>
     <section class="card" aria-labelledby="h-scene">
       <h2 id="h-scene">Room <span class="tag">· SCENE</span></h2>
       <dl class="kv" id="scene-info"><dt>Loading</dt><dd>…</dd></dl>
-      <p class="empty" id="scene-help">Room geometry comes from a scene file written by a person or imported from a scan. An ESP32 at 20 MHz with one antenna cannot measure a room, so nothing on this page is inferred from WiFi.</p>
+      <p class="empty" id="scene-help">Room geometry comes from a scene file written by a person or imported from a scan: the room is declared, not measured, because an ESP32 at 20 MHz with one antenna cannot measure a room. People and estimates appear only in the SIM view, where the people are simulated and the estimates come from simulated WiFi.</p>
     </section>
     <section class="card" aria-labelledby="h-sel" aria-live="polite">
       <h2 id="h-sel">Selected <span class="tag">· SCENE</span></h2>
@@ -43,7 +84,7 @@
     </section>
   </aside>
 </main>
-<footer>Static demo of declared geometry only: no people, no estimates, no sensor data. See ADR-008 for what this view may and may not draw.</footer>
+<footer>The room is declared geometry from a scene file. People and estimates appear only in the SIM view: simulated people, estimated from simulated WiFi, never sensor data. See ADR-008 for what this view may and may not draw.</footer>
 <noscript><p>This demo draws the room with JavaScript and WebGL. The scene files are also available as JSON at /roomsim/scenes.</p></noscript>
 </body>
 </html>

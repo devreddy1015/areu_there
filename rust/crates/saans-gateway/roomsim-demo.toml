@@ -13,8 +13,9 @@
 #   ssh -N -L 18080:127.0.0.1:18080 <user>@<gpu-box>
 #
 # Ports and data_dir differ from saans.example.toml so this can run beside
-# a real gateway. No sensor is expected on the UDP port; the demo draws declared
-# scenes only and needs no live data.
+# a real gateway. No sensor is expected on the UDP port; the demo draws
+# declared scenes, and its SIM view simulated people (RUN.md §4e, built
+# with --release for short calibrations), and needs no live data.
 udp_port = 15566
 udp_bind = "127.0.0.1"
 http_addr = "127.0.0.1:18080"

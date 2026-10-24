@@ -1058,3 +1058,43 @@ script's own refusal checks, matched by URL.
 - **Memory.** The calibration frames each setup keeps (§8.1) cost memory
   per session; the phase report measures it.
 - **DNS rebinding** is closed for this endpoint only (§2.2).
+
+## 13. Measured (SIM)
+
+`saans roomsim-eval --scene <scene> --variant <v> --seconds 120 --seed 0`,
+release build, 2026-10-24: 3-12 s of wall time per run. Every figure is
+SIM: simulated people and a simulated phone in simulated WiFi, one seed.
+Errors are median / p90 in metres; "ref" is the footprint centroid
+scored on the same records (an estimator that knows nothing); "empty" is
+the same scene and seed with nobody in it, in published ticks per hour.
+
+| Scene, variant | WLM published | WLM error (ref) | WLM empty | RTI published | RTI error (ref) | RTI empty | RTT published | RTT error (ref) | RSSI published | RSSI error (ref) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| bedroom, declared | 16/238 (6.7%) | 1.49 / 1.92 (1.28 / 1.28) | 0 /h | 0/238 | — | 60.5 /h | 378/600 (63.0%) | 1.78 / 3.03 (1.10 / 1.10) | 586/600 (97.7%) | 1.40 / 1.55 (1.10 / 1.10) |
+| bedroom, with_walker | 85/238 (35.7%) | 0.79 / 1.16 (0.93 / 1.28) | 0 /h | 1/238 (0.4%) | 1.26 (0.95) | 60.5 /h | 344/600 (57.3%) | 1.80 / 3.06 (1.51 / 1.93) | 587/600 (97.8%) | 2.96 / 4.70 (1.43 / 1.93) |
+| office, declared | 14/238 (5.9%) | 1.50 / 1.67 (1.55 / 1.55) | 0 /h | 0/238 | — | 121.0 /h | 410/600 (68.3%) | 1.17 / 1.99 (1.59 / 1.59) | 600/600 (100%) | 1.54 / 2.11 (1.59 / 1.59) |
+| office, with_walker | 86/238 (36.1%) | 1.25 / 1.50 (1.55 / 1.55) | 0 /h | 10/238 (4.2%) | 1.02 / 1.81 (1.55 / 1.55) | 121.0 /h | 477/600 (79.5%) | 1.07 / 1.89 (2.53 / 3.08) | 597/600 (99.5%) | 0.79 / 1.58 (2.53 / 3.08) |
+| hall, declared | 148/238 (62.2%) | 2.19 / 3.47 (2.96 / 3.86) | 423.5 /h | 78/238 (32.8%) | 1.64 / 3.35 (2.77 / 3.54) | 665.5 /h | 537/600 (89.5%) | 1.03 / 1.62 (3.03 / 4.21) | 589/600 (98.2%) | 1.72 / 3.41 (3.03 / 4.17) |
+| hall, with_walker | 169/238 (71.0%) | 1.86 / 3.02 (1.97 / 3.03) | 423.5 /h | 107/238 (45.0%) | 1.82 / 3.11 (2.25 / 3.03) | 665.5 /h | 544/600 (90.7%) | 0.83 / 1.48 (2.71 / 3.25) | 583/600 (97.2%) | 0.87 / 3.47 (2.71 / 3.25) |
+
+What they show, read with spec/locate.md §13 (which averages several
+seeds; these are seed 0 only):
+
+- **People.** In the bedroom and office the baseline publishes on about
+  6% of ticks with the declared (still) people, and on about a third with
+  a walker. Its error is at best slightly below the reference point's
+  (0.79 m against 0.93 m with a walker in the bedroom; 1.49 m against
+  1.28 m without). In the hall it publishes most of the time and beats
+  the reference only modestly. That is also where it
+  false-alarms most: 423.5 published ticks per hour in the empty room
+  (302.5 events per hour). RTI is no better: it publishes on 33-45% of
+  occupied hall ticks and on 9.2% of empty ones (665.5 per hour).
+- **Phone.** RTT beats the reference clearly in the office and hall
+  (median 0.8-1.2 m against 1.6-3.0 m), and not in the bedroom (1.8 m
+  against 1.1-1.5 m). Its truth falls inside its radius for only 47-82%
+  of estimates; its suggested radius scale is about 1.6 in the bedroom
+  (SIM). RSSI is no better than the reference in the bedroom or the
+  declared office; it beats it in the office with a walker and in the
+  hall.
+- These are the numbers the page shows at the end of a run of the same
+  scene, variant and seed.
