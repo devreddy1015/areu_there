@@ -519,6 +519,9 @@ helper, each tested without a board. What each one changes in this plan:
 - **B1 (noise floor)** replaces the simulator's noise constant with a
   measured one, and `evaluate.py --suite nulls` is re-run at it. The
   old table stays, next to the new one, labelled.
+- **B2** runs the gateway for real. It can run as a systemd service
+  (`deploy/README.md`): the unit is checked, sandboxed and tested as a
+  user service, but not yet installed system-wide on any machine.
 - **B3** produces the first REAL column in any table in the tree.
   Until then §1.2's `RESULTS.md` is entirely SYNTHETIC and says so in
   every row.
