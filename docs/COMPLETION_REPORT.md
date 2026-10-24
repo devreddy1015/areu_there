@@ -231,6 +231,7 @@ See `UI_GAP_ANALYSIS.md` §3 for the full list. The ones that matter:
   *Closed 2026-10-24: built (`mqtt.rs`), tested against an embedded
   broker, and `[mqtt]` is accepted again.*
 - **Browser end-to-end tests** — none exist; the above was manual.
+  *Closed 2026-10-24: `saans-gateway/tests/browser/`, Playwright, in CI.*
 - **Audit log retention** — not swept. Audit records usually outlive
   the events they describe, but "forever" is not a policy either.
   *Closed 2026-10-24 by ADR-010: swept on `audit_retention_days`.*
