@@ -376,6 +376,17 @@ tuning problem when it is not:
   empty.
 - **Breathing needs ~30 s of history** before the first estimate (three
   cycles at the slow end of the band); heart rate needs ~60 s.
+- **The sensor network must be trusted.** FeatureFrames arrive over UDP
+  with a CRC-32, which catches corruption, not forgery, and debug raw CSI
+  has no check at all: anything that can reach the gateway's UDP port can
+  send either, for any link. That could fake occupancy, hide a person, or, for a
+  consented space, fake breathing and so raise or suppress a health alert.
+  Put the nodes on their own VLAN or network, set `udp_bind` (or
+  `--host` for `wifisense listen` / `record`) to the address on that
+  network, and firewall the port everywhere else. The default binds every
+  interface because the nodes are remote; that is a choice to narrow,
+  not a safe default. Authenticating frames is a decision owed
+  ([docs/NEXT.md](docs/NEXT.md) §1.11).
 
 ## Hardware
 

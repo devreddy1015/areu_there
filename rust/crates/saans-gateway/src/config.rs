@@ -21,6 +21,8 @@ pub struct GatewayConfig {
     pub udp_port: u16,
     /// Address the UDP socket binds to. Sensors are remote, so the default
     /// is every interface; set the sensor-VLAN address to narrow it.
+    /// Frames are not authenticated, so this and the network are the only
+    /// things deciding who may send them.
     pub udp_bind: String,
     /// HTTP API and dashboard. Localhost by default: exposing the API is
     /// the operator's explicit choice.

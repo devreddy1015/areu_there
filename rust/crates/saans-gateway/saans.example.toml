@@ -4,7 +4,9 @@
 # UDP port the sensors send FeatureFrames (and debug raw CSI) to.
 udp_port = 5566
 # Interface to receive on. Sensors are remote, so all interfaces by default;
-# put the gateway's sensor-VLAN address here to narrow it.
+# put the gateway's sensor-VLAN address here to narrow it. Frames carry a
+# CRC, not a signature: anything that can reach this port can send them
+# (README, "Operating requirements").
 udp_bind = "0.0.0.0"
 # HTTP API + dashboard. Localhost by default, where every request is
 # treated as a local admin. Binding wider (for example "0.0.0.0:8080")

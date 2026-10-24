@@ -427,7 +427,8 @@ def main(argv: list[str] | None = None) -> int:
 
     listen = sub.add_parser("listen", help="consume live CSI from ESP32 nodes over UDP")
     listen.add_argument("--port", type=int, default=5566)
-    listen.add_argument("--host", default="0.0.0.0")
+    listen.add_argument("--host", default="0.0.0.0",
+                        help="address to receive on. All interfaces by default, because the nodes are on the network; pass the address of the interface the nodes reach to narrow it. Datagrams are not authenticated (see README, \"Operating requirements\")")
     listen.add_argument("--rate", type=float, default=20.0, help="CSI frames/sec")
     listen.add_argument("--subcarriers", type=int, default=56)
     listen.add_argument("--calibration-s", type=float, default=30.0)
@@ -441,7 +442,8 @@ def main(argv: list[str] | None = None) -> int:
         "record", help="record raw UDP datagrams (malformed ones too) to a pcap file"
     )
     record.add_argument("--port", type=int, default=5566)
-    record.add_argument("--host", default="0.0.0.0")
+    record.add_argument("--host", default="0.0.0.0",
+                        help="address to receive on. All interfaces by default, because the nodes are on the network; pass the address of the interface the nodes reach to narrow it. Datagrams are not authenticated (see README, \"Operating requirements\")")
     record.add_argument("--out", required=True, help="pcap file to create")
     record.add_argument("--duration-s", type=float, default=None)
     record.add_argument(
