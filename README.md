@@ -423,6 +423,9 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `docs/EVIDENCE.md` | What this project has actually demonstrated, and what it has not |
 | `docs/UI_GAP_ANALYSIS.md` | What the interface can show, what the gateway publishes, and where they disagree |
 | `docs/UI_IMPLEMENTATION_PLAN.md` | The design the dashboard was built to, and the rules it keeps |
+| `docs/NEXT.md` | The plan: what is done, what is next, what waits for hardware |
+| `CONTRIBUTING.md` | The rules every change is held to, and the commands that check them |
+| `rust/crates/saans-gateway/tests/browser/` | Playwright smoke tests for the dashboard, against a SYNTHETIC replay |
 
 ## Licence
 

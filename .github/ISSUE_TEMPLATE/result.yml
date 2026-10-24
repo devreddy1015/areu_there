@@ -1,0 +1,49 @@
+name: A measured result
+description: A number from an evaluation or a bench session, to be recorded or checked.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        "Measured or silent": a result is a table, a command that
+        produced it, and how confident it is. Recording anyone who is not
+        you needs ethics committee approval first (docs/HARDWARE.md,
+        "Consent and ethics").
+  - type: dropdown
+    id: data
+    attributes:
+      label: SYNTHETIC or REAL?
+      options:
+        - SYNTHETIC — simulator or fixture
+        - REAL — measured on hardware
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: The command that produced it
+      placeholder: python3 evaluate.py --suite nulls
+    validations:
+      required: true
+  - type: textarea
+    id: table
+    attributes:
+      label: The table, as printed
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup (REAL only)
+      description: Boards, firmware commit, room, distances and orientation, what the reference was (belt, metronome, phone), and who was in the room with what consent.
+  - type: textarea
+    id: meaning
+    attributes:
+      label: What it changes
+      description: Which document or number it confirms or contradicts (README, NOTES, CAPABILITY_LIMITS, RESULTS.md).

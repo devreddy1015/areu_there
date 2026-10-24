@@ -418,7 +418,7 @@ and its Signals panel rather than for one number.
 
 Each is small. Each has cost someone time in this project already.
 
-- `CONTRIBUTING.md`: the ten rules from the master prompt, so the next
+- `CONTRIBUTING.md`: the master prompt's rules, so the next
   contributor -- or the next agent -- reads them before the code. Today
   they are in a chat message.
 - `docs/adr/README.md`: an index. See §1.1.
@@ -428,6 +428,28 @@ Each is small. Each has cost someone time in this project already.
   appears. The file says why it is `stable` today.
 - `/api/health` reports every retention key. §1.7.
 - Issue templates that ask for the SYNTHETIC / REAL label up front.
+
+**Done**, on branch `saans/basics`, except the toolchain pin, whose
+trigger (a second contributor) has not happened:
+
+- `CONTRIBUTING.md` holds the brief's six rules (there were six, not ten:
+  "ten" above came from a ten-bullet summary of them), the working
+  method and every suite's command. It also has what the work since
+  added, each with the PR it came from: a test must be able to fail;
+  quoted numbers go through `results.py`; a platform-dependent failure
+  is a finding, not a tolerance; how secrets are handled; withheld is
+  not absent.
+- `.editorconfig` states what the tree already does, from a file-by-file
+  survey: LF, no trailing whitespace, a final newline, 4 / 2 / tab
+  indents. Golden vectors and the vendored font licence are exempt,
+  because those must stay byte-exact.
+- `/api/health` already reported all three retention periods. What was
+  missing was a test that would notice a fourth. It now walks the config
+  for every `*_retention_days` key and fails until health reports it.
+  Checked by removing one from health, and by adding a key to the
+  config.
+- Issue templates for a problem and for a result. The first field of
+  each is SYNTHETIC or REAL, and it is required. Blank issues are off.
 
 ---
 

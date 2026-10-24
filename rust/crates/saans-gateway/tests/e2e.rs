@@ -1525,3 +1525,63 @@ async fn sim_routes_are_absent_outside_simulate_mode() {
     assert_eq!(g.json("/api/me").await["mode"], "live");
     g.stop().await;
 }
+
+/// Every retention period the config can set is visible in `/api/health`
+/// (NEXT.md §1.10): an operator who can see what was written but not how
+/// long it is kept cannot check that a retention ADR is in force. The keys
+/// are found in the config itself, so one added later fails here until
+/// health reports it too.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn health_reports_every_retention_key_the_config_has() {
+    // Distinct values, so each one found in health names its key.
+    let cfg = config(
+        "retention",
+        &format!("event_retention_days = 31\nhistory_retention_days = 47\naudit_retention_days = 400\n{LAB}"),
+    );
+    fn walk(v: &Value, path: &str, pick: &dyn Fn(&str) -> bool, out: &mut Vec<(String, Value)>) {
+        match v {
+            Value::Object(m) => {
+                for (k, x) in m {
+                    let p = format!("{path}.{k}");
+                    if pick(k) {
+                        out.push((p.clone(), x.clone()));
+                    }
+                    walk(x, &p, pick, out);
+                }
+            }
+            Value::Array(a) => a
+                .iter()
+                .enumerate()
+                .for_each(|(i, x)| walk(x, &format!("{path}[{i}]"), pick, out)),
+            _ => {}
+        }
+    }
+    let mut keys = Vec::new();
+    walk(
+        &serde_json::to_value(&cfg).unwrap(),
+        "config",
+        &|k| k.ends_with("retention_days"),
+        &mut keys,
+    );
+    // A changed count means a key was added or removed: report it in
+    // /api/health, give it a distinct value above, then change the count.
+    assert_eq!(keys.len(), 3, "the config's retention keys: {keys:?}");
+
+    let g = TestGw::start(cfg).await;
+    let health = g.json("/api/health").await;
+    let mut reported = Vec::new();
+    walk(&health, "health", &|k| k == "retention_days", &mut reported);
+    for (key, value) in &keys {
+        let at: Vec<&String> = reported
+            .iter()
+            .filter(|(_, v)| v == value)
+            .map(|(p, _)| p)
+            .collect();
+        assert_eq!(
+            at.len(),
+            1,
+            "{key} = {value}: reported at {at:?}; all: {reported:?}"
+        );
+    }
+    g.stop().await;
+}
