@@ -30,7 +30,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..", "..")))
 
 from wifisense.dsp import BiquadBandpass, band_peak, goertzel_power, sideband_peak  # noqa: E402
-from wifisense.features import FeatureExtractor, FeatureFrame  # noqa: E402
+import hashlib  # noqa: E402
+
+from wifisense.features import (  # noqa: E402
+    FeatureExtractor,
+    FeatureFrame,
+    derive_node_key,
+    encode_signed,
+)
 from wifisense.preprocess import (  # noqa: E402
     StaticSuppressor,
     _fft,
@@ -336,6 +343,35 @@ def gen_codec() -> None:
     emit("feature_codec", {"frames": len(frames), "frame_size": 68, "magic": 0x534E4153}, arrays)
 
 
+def gen_codec_signed() -> None:
+    """FeatureFrame v2 (ADR-012): node-key derivation and signed frames,
+    byte-exact. The site key is a fixed hash so the vectors are stable;
+    per frame, key_id and boot cover 0 and the top of their ranges."""
+    site_key = hashlib.sha256(b"saans golden site key").digest()
+    frames = [
+        FeatureFrame(),
+        FeatureFrame(node_id=12, tx_id=3, flags=0b0011_0111, seq=0xFFFFFFFF, uptime_ms=123456789,
+                     csi_rate_chz=1987, loss_permille=31, motion_energy=0.15625, presence_threshold=0.05,
+                     gross_motion=0.0625, breath_rms=0.2, breathing_bpm=15.25, breathing_conf=0.93,
+                     heart_bpm=68.5, heart_conf=0.41, best_bnr=42.0, calib_age_s=3600, rssi_dbm=-61,
+                     noise_floor_dbm=-95, n_subcarriers=56),
+    ]
+    key_ids, boots = [0, 255], [0, 0xFFFFFFFF]
+    node_keys = [derive_node_key(site_key, fr.node_id) for fr in frames]
+    signed = [encode_signed(fr, node_key=k, key_id=i, boot=b)
+              for fr, k, i, b in zip(frames, node_keys, key_ids, boots)]
+    arrays = {k: [float(getattr(fr, k)) for fr in frames] for k in FEATURE_FIELDS}
+    arrays.update({
+        "site_key": list(site_key),
+        "node_keys": [b for k in node_keys for b in k],
+        "key_id": key_ids,
+        "boot": boots,
+        "bytes": [b for d in signed for b in d],
+    })
+    emit("feature_codec_signed", {"frames": len(frames), "frame_size": 84, "tag_size": 16,
+                                  "magic": 0x534E4153, "version": 2}, arrays)
+
+
 def gen_sim_geometric() -> None:
     """The geometric scene's physics, noise-free, for the Rust simulator.
 
@@ -383,6 +419,7 @@ def main() -> None:
     gen_extractors()
     gen_gapfill()
     gen_codec()
+    gen_codec_signed()
     gen_features()
     gen_sim_geometric()
     with open(os.path.join(HERE, "MANIFEST"), "w") as fh:
