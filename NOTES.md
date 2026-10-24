@@ -366,7 +366,8 @@ captures.
 
 - RespirFi's breathing-phase identification (paper IV-D, inhale vs
   exhale) is not ported; rate estimation does not need it.
-- The geometric scene is 2-D, has no LoS shadowing by the body, no AGC,
+- The geometric scene is 2-D (a box with floor, ceiling and heights is
+  now an option, §13), has no LoS shadowing by the body, no AGC,
   no CFO, and a rigid chest. Real ESP32 amplitude noise is unmeasured;
   P1 sets the noise level the table should be read at.
 - `listen` feeds every node_id into one pipeline. Fine for P1's single
@@ -900,3 +901,137 @@ nulls on purpose, so those are shown apart rather than mixed in.
    measured one rather than an assumed one.
 
 Measurement only: nothing in the DSP changed.
+
+---
+
+## 13. Floor, ceiling and heights: the simulator as a box (Oct 2026)
+
+Everything here is **SYNTHETIC**. `evaluate.py --suite height` and
+`evaluate.py --suite nulls --room-height 2.7`, both in `docs/RESULTS.md`.
+
+The geometric scene was a horizontal slice at chest height: four walls,
+and the nodes, the chest and the furniture all at one height. A real room
+has a floor and a ceiling at least as reflective as its walls, nodes on a
+shelf and a chest somewhere else. `SyntheticConfig(room_height_m=...)`
+makes the room a box:
+
+- the image method runs over all six faces, each image once (below);
+- tx, rx, chest and furniture get heights (`tx_z_m`, `rx_z_m`,
+  `body_z_m`, `scatterer_z_m`), and every distance is 3-D;
+- the chest breathes horizontally, along the horizontal part of the
+  tx-chest-rx bisector. Level with the link this is the old
+  `2 cos(beta/2)`; a chest directly below the link's midpoint has no
+  first-order path change at all;
+- the floor and ceiling default to concrete, 0.395 from the ITU-R P.2040
+  row in `scenes/materials.json`.
+
+Without `room_height_m` the 2-D model is unchanged to the last bit: the
+regenerated golden vectors did not move at all. The box has its own
+golden set, `sim_geometric_3d`.
+
+### What the box assumes
+
+- **A rectangle.** `hall-l`'s L-shaped polygon is not modelled, as it
+  was not in 2-D.
+- **One |Gamma| per surface at every angle**, as the walls always had.
+  For the floor this is the weakest assumption in the model. On a 3 m
+  link at 1.2 m the floor bounce arrives 51° from normal, where concrete
+  reflects 0.55 of the field polarised along the floor and 0.21 of the
+  other; on a 5 m link, 0.66 and 0.05 (half-space Fresnel equations,
+  same permittivity). The 0.395 sits between, so the box is right on
+  average and wrong for any one antenna orientation.
+- **The torso** is still points spread horizontally, now at chest height,
+  each moving along its own bisector as in 2-D. It has no vertical
+  extent and casts no shadow.
+- **Furniture heights**, uniform 0.3-1.8 m, are a guess. They are drawn
+  after every 2-D draw, so one seed gives the same furniture footprint
+  in both models and the comparisons below are paired.
+
+### A bug the box found in the 2-D model
+
+The 2-D image search mirrors breadth-first, refusing only to mirror
+straight back. At order 2 it reaches each of the four corner images
+(one bounce off an x wall, one off a y wall) twice, x-then-y and
+y-then-x, and adds both. That gives 12 order-2 paths where there are 8
+images. A corner reflection is one specular path, so in 2-D every corner
+path is twice as strong as it should be. The box enumerates the image
+lattice instead, and `test_order_two_counts_each_corner_once` pins the
+difference to exactly one copy of each corner path.
+
+Every scene with `reflection_order >= 2` has the bug:
+
+- the attenuated-LoS and rich-NLoS rooms in `nulls`;
+- three of the four `headroom` rooms;
+- the `sim_geometric` golden set;
+- in Rust, which copies the search, the order-2 rooms in
+  `saans-sim/src/scenarios.rs` and `saans eval`.
+
+**It is not fixed here.** Fixing it moves every published number those
+rooms produce, and that is a separate decision. The `height` table's
+second row isolates what it does. In the order-2 room:
+
+- mixed-sign positions go from 2.6% to 4.8%;
+- the 10th-percentile plain-average efficiency goes from 1.00 to 0.91.
+
+In the order-1 room nothing changes, as it should not.
+
+### Measured: ground truth
+
+Paired: 1000 positions, the same furniture in each row
+(`--suite height`).
+
+| clear-LoS room (order 1) | mixed-sign | whole-band null | avg-eff p10 | K, median |
+|---|---|---|---|---|
+| 2-D slice | 4.4% | 4.4% | 0.94 | 5.3 dB |
+| box, heights, floor and ceiling absorbing | 4.5% | 3.6% | 0.96 | 5.8 dB |
+| box, concrete floor and ceiling | **13.0%** | **1.8%** | **0.67** | **3.6 dB** |
+
+Of the 2-D slice's 44 whole-band blind spots, **none** is still one in
+the box, which has 18 of its own. Chest height matters less than the
+floor does. In the full box, a chest at 0.6 m (lying down) gives 16.6%
+mixed-sign and 1.4% whole-band nulls; at 1.0 m and at 1.3 m, 13.0% and
+1.8%.
+
+### Measured: breathing, end to end
+
+`--suite nulls`, the same 960 case seeds. The box run kept 953: seven
+cells found no whole-band null in 5000 tries.
+
+| within 0.5 BPM | 2-D slice | box, 2.7 m |
+|---|---|---|
+| uniform placement, default fusion | 95.1% | **95.8%** |
+| uniform placement, RespirFi | 95.7% | **96.7%** |
+| uniform placement, PCA | 94.9% | **96.9%** |
+| whole-band nulls, default / RespirFi | 64.5% / 68.1% | **60.2% / 62.0%** |
+| mixed-sign scenes, count | 59 | **98** |
+| mixed-sign scenes, default / RespirFi / PCA | 61.0% / 67.8% / 80.5% | 65.3% / 73.0% / **92.9%** |
+| clear-LoS room, default / PCA | 97.8% / 97.7% | 95.3% / **98.6%** |
+
+### What it says
+
+1. **The floor and ceiling are not a detail.** In the clear-LoS room
+   they triple the positions where subcarriers disagree in sign, take
+   1.7 dB off the K-factor, and move every blind spot. A whole-band blind
+   spot is rarer in the box, but it still exists.
+2. **The README's headline survives.** Default fusion reads 95.8%
+   against 95.1%. RespirFi is still never worse than the default on a
+   reading: paired +16/-0 at uniform placement and +18/-0 at nulls. At
+   whole-band nulls every method except the oracle reads lower.
+3. **The ranking of fusion methods does not survive.** In 2-D, PCA was
+   level with the default (94.9%, paired +33/-35). In the box it is the
+   best real method (96.9%, +54/-33), because the box makes the
+   mixed-sign case common, and there PCA reads 92.9% to RespirFi's
+   73.0%. Which fusion wins depends on how much multipath the room has,
+   and here that is a property of the model. The choice stays with the
+   S5 recordings, as RespirFi's off-by-default status already says.
+   Nothing in the pipeline changes on the strength of this.
+
+### Not done
+
+- **The Rust simulator** (`saans-sim`) is still 2-D. Porting the box
+  changes `saans-sim`'s public types and is waiting on that decision.
+  `sim_geometric_3d` is ready for its parity test.
+- **The 2-D corner bug**, above.
+- **Angle- and polarisation-dependent reflection.**
+- **The scenes in `scenes/`** already carry room and node heights. The
+  Rust loader drops them until the port.

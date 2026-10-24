@@ -114,6 +114,15 @@ def suites() -> list[Suite]:
             "in a blind spot. Bounds what any subcarrier fusion could gain.",
         ),
         Suite(
+            "height", "Height: the 2-D slice against the box, ground truth only",
+            [PY, "evaluate.py", "--suite", "height"], ROOT, "ci",
+            "The same positions and furniture in every row, one change per row: "
+            "the box with every height equal and floor and ceiling absorbing (which "
+            "differs from the 2-D slice only by counting each corner reflection "
+            "once), then real heights, then a concrete floor and ceiling. "
+            "NOTES.md §13 reads this.",
+        ),
+        Suite(
             "nulls-quick", "Fresnel blind spots, small",
             [PY, "evaluate.py", "--suite", "nulls", "--quick"], ROOT, "ci",
             "A smaller sample of the geometric-scene study. Checked on every "
@@ -141,6 +150,14 @@ def suites() -> list[Suite]:
             "nulls", "Fresnel blind spots, full",
             [PY, "evaluate.py", "--suite", "nulls"], ROOT, "slow",
             "README's 95.1% / 95.7% / 64.5% / 68.1% come from this.",
+        ),
+        Suite(
+            "nulls-box", "Fresnel blind spots, full, in a 2.7 m box",
+            [PY, "evaluate.py", "--suite", "nulls", "--room-height", "2.7"], ROOT, "slow",
+            "The full study above, rerun in the box model: concrete floor and "
+            "ceiling, nodes at 1.2 m, seated chests at 1.0 m. Same case seeds, so "
+            "the furniture footprints match; body positions are drawn afresh. "
+            "NOTES.md §13 reads this.",
         ),
         Suite(
             "detectors", "S3 health detectors, held-out seeds",
@@ -209,6 +226,12 @@ QUOTES = [
            r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%",
            r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
            r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%"]),
+    Quote("README.md", "nulls-box",
+          r"\(`--room-height 2\.7`\), the same study\ngives \*\*([\d.]+)%\*\* / \*\*([\d.]+)%\*\*, and \*\*([\d.]+)%\*\* / \*\*([\d.]+)%\*\* at blind spots",
+          [r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
+           r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%",
+           r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
+           r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%"]),
     Quote("NOTES.md", "nulls",
           r"\| expected calibration error \| \*\*([\d.]+)\*\* \| \*\*([\d.]+)\*\* \|",
           [r"RELIABILITY, uniform placement[\s\S]*?expected calibration error: ([\d.]+)",
@@ -217,6 +240,58 @@ QUOTES = [
           r"\| at confidence 0\.9–1\.0 \| (\d+) readings, stated ([\d.]+), right 100% \| (\d+) readings, stated ([\d.]+), right [\d.]+% \|",
           [r"RELIABILITY, uniform placement[\s\S]*?0\.9-1\.0\s+(\d+)\s+([\d.]+)",
            r"RELIABILITY, whole-band nulls[\s\S]*?0\.9-1\.0\s+(\d+)\s+([\d.]+)"]),
+    # NOTES.md §13: the box model. `height` is CI-tier; the end-to-end
+    # table is slow-tier, one quote per column because each column comes
+    # from a different suite.
+    Quote("NOTES.md", "height",
+          r"\| 2-D slice \| ([\d.]+)% \| ([\d.]+)% \| ([\d.]+) \| ([\d.]+) dB \|",
+          [r"clear LoS[\s\S]*?2-D slice \(published model\)\s+([\d.]+)%\s+([\d.]+)%\s+([\d.]+)\s+[\d.]+\s+([\d.]+)dB"]),
+    Quote("NOTES.md", "height",
+          r"\| box, heights, floor and ceiling absorbing \| ([\d.]+)% \| ([\d.]+)% \| ([\d.]+) \| ([\d.]+) dB \|",
+          [r"clear LoS[\s\S]*?\+ chest 1\.0 m, furniture 0\.3-1\.8 m\s+([\d.]+)%\s+([\d.]+)%\s+([\d.]+)\s+[\d.]+\s+([\d.]+)dB"]),
+    Quote("NOTES.md", "height",
+          r"\| box, concrete floor and ceiling \| \*\*([\d.]+)%\*\* \| \*\*([\d.]+)%\*\* \| \*\*([\d.]+)\*\* \| \*\*([\d.]+) dB\*\* \|",
+          [r"clear LoS[\s\S]*?\+ concrete floor and ceiling\s+([\d.]+)%\s+([\d.]+)%\s+([\d.]+)\s+[\d.]+\s+([\d.]+)dB"]),
+    Quote("NOTES.md", "height",
+          r"Of the 2-D slice's (\d+) whole-band blind spots, \*\*none\*\* is still one in\s+the box, which has (\d+) of its own",
+          [r"clear LoS[\s\S]*?full box: 0 of (\d+) and (\d+)"]),
+    Quote("NOTES.md", "height",
+          r"mixed-sign positions go from ([\d.]+)% to ([\d.]+)%;\n- the 10th-percentile plain-average efficiency goes from ([\d.]+) to ([\d.]+)\.",
+          [r"order 2[\s\S]*?2-D slice \(published model\)\s+([\d.]+)%",
+           r"order 2[\s\S]*?box, all at 1\.2 m, floor\+ceiling 0\s+([\d.]+)%",
+           r"order 2[\s\S]*?2-D slice \(published model\)\s+[\d.]+%\s+[\d.]+%\s+([\d.]+)",
+           r"order 2[\s\S]*?box, all at 1\.2 m, floor\+ceiling 0\s+[\d.]+%\s+[\d.]+%\s+([\d.]+)"]),
+    Quote("NOTES.md", "height",
+          r"a chest at 0\.6 m \(lying down\) gives ([\d.]+)%\nmixed-sign and ([\d.]+)% whole-band nulls; at 1\.0 m and at 1\.3 m, ([\d.]+)% and\n([\d.]+)%",
+          [r"lying, 0\.6 m\s+([\d.]+)%\s+([\d.]+)%", r"seated, 1\.0 m\s+([\d.]+)%\s+([\d.]+)%"]),
+    Quote("NOTES.md", "nulls-box",
+          r"\| uniform placement, default fusion \| [\d.]+% \| \*\*([\d.]+)%\*\* \|\n"
+          r"\| uniform placement, RespirFi \| [\d.]+% \| \*\*([\d.]+)%\*\* \|\n"
+          r"\| uniform placement, PCA \| [\d.]+% \| \*\*([\d.]+)%\*\* \|\n"
+          r"\| whole-band nulls, default / RespirFi \| [\d.]+% / [\d.]+% \| \*\*([\d.]+)% / ([\d.]+)%\*\* \|\n"
+          r"\| mixed-sign scenes, count \| \d+ \| \*\*(\d+)\*\* \|",
+          [r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
+           r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%",
+           r"UNIFORM PLACEMENT[^\n]*\n(?:[^\n]*\n){4}  pca\s+([\d.]+)%",
+           r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
+           r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%",
+           r"mixed-sign subcarriers (\d+) of"]),
+    Quote("NOTES.md", "nulls",
+          r"\| uniform placement, default fusion \| ([\d.]+)% \|[^\n]*\n"
+          r"\| uniform placement, RespirFi \| ([\d.]+)% \|[^\n]*\n"
+          r"\| uniform placement, PCA \| ([\d.]+)% \|[^\n]*\n"
+          r"\| whole-band nulls, default / RespirFi \| ([\d.]+)% / ([\d.]+)% \|[^\n]*\n"
+          r"\| mixed-sign scenes, count \| (\d+) \|",
+          [r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
+           r"UNIFORM PLACEMENT[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%",
+           r"UNIFORM PLACEMENT[^\n]*\n(?:[^\n]*\n){4}  pca\s+([\d.]+)%",
+           r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n  legacy\s+([\d.]+)%",
+           r"WHOLE-BAND NULL[^\n]*\n[^\n]*\n[^\n]*\n  respirfi\s+([\d.]+)%",
+           r"mixed-sign subcarriers (\d+) of"]),
+    Quote("NOTES.md", "nulls-box",
+          r"paired \+(\d+)/-(\d+) at uniform placement and \+(\d+)/-(\d+) at nulls",
+          [r"PAIRED vs legacy[^\n]*\n  uniform\s+respirfi \+(\d+)/-(\d+)",
+           r"PAIRED vs legacy[\s\S]*?\n  null\s+respirfi \+(\d+)/-(\d+)"]),
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",
           [r"breathing BNR, best subcarrier, dB\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)"]),

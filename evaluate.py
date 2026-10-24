@@ -23,7 +23,12 @@ Two suites:
           subcarriers disagree in sign, or all sit in a blind spot? Bounds
           what any subcarrier-fusion method could gain.
 
-    python3 evaluate.py [--suite all|legacy|nulls|headroom] [--quick] [--workers N]
+  height  Ground truth only: the same questions in the box model
+          (room_height_m), paired position for position with the 2-D
+          scene, one change at a time: the corner-image fix, the heights,
+          then the floor and ceiling.
+
+    python3 evaluate.py [--suite all|legacy|nulls|headroom|height] [--quick] [--workers N]
     python3 evaluate.py --suite legacy [--fusion legacy|respirfi] [--window-s 60] [--duration-s 120]
 """
 
@@ -217,19 +222,21 @@ def oracle_weights(src: SyntheticCsiSource) -> list[float]:
     return [x / total for x in out] if total > 0.0 else [1.0 / len(out)] * len(out)
 
 
-def _scene_config(room: str, body: str, noise: float, seed: int, xy, bpm: float) -> SyntheticConfig:
+def _scene_config(room: str, body: str, noise: float, seed: int, xy, bpm: float,
+                  room_height_m: float | None = None) -> SyntheticConfig:
     return SyntheticConfig(
         scene="geometric",
         body_xy_m=xy,
         breathing_bpm=bpm,
         noise_std=noise,
         seed=seed,
+        room_height_m=room_height_m,
         **ROOMS[room],
         **BODIES[body],
     )
 
 
-def make_cases(n_random: int, n_null: int, n_partial: int) -> list[dict]:
+def make_cases(n_random: int, n_null: int, n_partial: int, room_height_m: float | None = None) -> list[dict]:
     """Uniformly placed scenes, plus scenes *forced* into blind spots.
 
     Uniform placement lands in a whole-band null only ~3-6% of the time,
@@ -253,17 +260,19 @@ def make_cases(n_random: int, n_null: int, n_partial: int) -> list[dict]:
                 xy = (rng.uniform(0.6, 5.4), rng.uniform(0.6, 4.4))
                 if band is None:
                     break
-                src = SyntheticCsiSource(_scene_config(room, body, noise, seed, xy, bpm))
+                src = SyntheticCsiSource(_scene_config(room, body, noise, seed, xy, bpm, room_height_m))
                 if band[0] <= max(src.sensitivity()) < band[1]:
                     break
             else:
                 continue
-            cases.append(dict(room=room, body=body, noise=noise, seed=seed, xy=xy, bpm=bpm, kind=kind))
+            cases.append(dict(room=room, body=body, noise=noise, seed=seed, xy=xy, bpm=bpm, kind=kind,
+                              room_height_m=room_height_m))
     return cases
 
 
 def run_null_case(case: dict) -> dict:
-    cfg = _scene_config(case["room"], case["body"], case["noise"], case["seed"], case["xy"], case["bpm"])
+    cfg = _scene_config(case["room"], case["body"], case["noise"], case["seed"], case["xy"], case["bpm"],
+                        case["room_height_m"])
     src = SyntheticCsiSource(cfg)
     fs = cfg.sample_rate_hz
     n = cfg.n_subcarriers
@@ -416,9 +425,9 @@ def _paired(results: list[dict], a: str, b: str) -> tuple[int, int, int]:
 
 def nulls_suite(args: argparse.Namespace) -> None:
     if args.quick:
-        cases = make_cases(3, 2, 2)
+        cases = make_cases(3, 2, 2, args.room_height)
     else:
-        cases = make_cases(args.scenes, args.scenes // 2, args.scenes // 2)
+        cases = make_cases(args.scenes, args.scenes // 2, args.scenes // 2, args.room_height)
     workers = args.workers or min(len(cases), os.cpu_count() or 1)
     print("=" * 72)
     print("SUITE nulls -- SYNTHETIC. Fresnel blind spots in geometric rooms, ESP32 HT20")
@@ -426,6 +435,10 @@ def nulls_suite(args: argparse.Namespace) -> None:
     print(f"bodies {list(BODIES)}, noise {list(NOISES)}; breathing U(8, 24) BPM;")
     print("per cell: uniform positions plus positions forced into (partial) nulls;")
     print(f"readings at t = {', '.join(f'{t:g}' for t in EVAL_TIMES_S)} s. Workers: {workers}.")
+    if args.room_height is not None:
+        print(f"BOX MODEL: rooms {args.room_height:g} m high, concrete floor and ceiling, nodes at")
+        print("1.2 m, chests at 1.0 m (seated), furniture 0.3-1.8 m. Same seeds as the 2-D")
+        print("study, so the furniture footprints match; positions are drawn afresh.")
     print("=" * 72)
 
     t0 = time.time()
@@ -529,6 +542,91 @@ def headroom_suite(args: argparse.Namespace) -> None:
     print()
 
 
+HEIGHT_ROOMS = {
+    "clear LoS (order 1, 6 scatterers)": dict(n_scatterers=6),
+    "order 2, LoS -6 dB, 12 scatterers": dict(n_scatterers=12, reflection_order=2, los_attenuation_db=6.0),
+}
+ROOM_HEIGHT_M = 2.7  # scenes/bedroom.json
+# One change per row, so each row's difference from the one above is that
+# change alone.
+HEIGHT_MODELS = {
+    "2-D slice (published model)": {},
+    "box, all at 1.2 m, floor+ceiling 0": dict(
+        room_height_m=ROOM_HEIGHT_M, tx_z_m=1.2, rx_z_m=1.2, body_z_m=1.2,
+        floor_reflection=0.0, ceiling_reflection=0.0, scatterer_z_m=(1.2, 1.2)),
+    "+ chest 1.0 m, furniture 0.3-1.8 m": dict(
+        room_height_m=ROOM_HEIGHT_M, floor_reflection=0.0, ceiling_reflection=0.0),
+    "+ concrete floor and ceiling": dict(room_height_m=ROOM_HEIGHT_M),
+}
+CHEST_HEIGHTS = {"lying, 0.6 m": 0.6, "seated, 1.0 m": 1.0, "standing, 1.3 m": 1.3}
+
+
+def _ground_truth(src: SyntheticCsiSource) -> tuple[bool, bool, float, float]:
+    """(mixed sign, whole-band null, average efficiency, Rician K in dB)."""
+    sens = src.sensitivity()
+    signed = [math.copysign(m, w) for m, w in zip(sens, oracle_weights(src))]
+    pos = sum(1 for v in signed if v > NULL_SENS)
+    neg = sum(1 for v in signed if v < -NULL_SENS)
+    eff = abs(sum(signed)) / max(sum(sens), 1e-12)
+    los = src.static_paths[0][0] ** 2
+    rest = sum(a * a for a, _ in src.static_paths[1:])
+    k_db = 10.0 * math.log10(los / rest) if rest > 0.0 else float("inf")
+    return bool(pos and neg), max(sens) < NULL_SENS, eff, k_db
+
+
+def height_suite(args: argparse.Namespace) -> None:
+    n = 300 if args.quick else 1000
+    print("=" * 72)
+    print(f"SUITE height -- SYNTHETIC ground truth, {n} uniform positions per room,")
+    print(f"the same positions and furniture in every row; box {ROOM_HEIGHT_M} m high,")
+    print("nodes at 1.2 m unless a row says otherwise")
+    print("=" * 72)
+    for room, kw in HEIGHT_ROOMS.items():
+        rng = random.Random(0)
+        positions = [(rng.uniform(0.6, 5.4), rng.uniform(0.6, 4.4)) for _ in range(n)]
+        print(f"\n{room}")
+        print(f"  {'model':38s} {'mixed-sign':>10s} {'whole-null':>10s} {'avg-eff p10':>11s} {'p50':>5s} {'K p50':>7s}")
+        nulls = {}
+        for name, model in HEIGHT_MODELS.items():
+            rows = [
+                _ground_truth(SyntheticCsiSource(SyntheticConfig(scene="geometric", body_xy_m=xy, seed=1000 + i, **kw, **model)))
+                for i, xy in enumerate(positions)
+            ]
+            nulls[name] = {i for i, r in enumerate(rows) if r[1]}
+            eff = sorted(r[2] for r in rows)
+            k = sorted(r[3] for r in rows)
+            print(
+                f"  {name:38s} {100*sum(r[0] for r in rows)/n:9.1f}% {100*len(nulls[name])/n:9.1f}% "
+                f"{eff[n//10]:11.2f} {eff[n//2]:5.2f} {k[n//2]:5.1f}dB"
+            )
+        first, last = list(HEIGHT_MODELS)[0], list(HEIGHT_MODELS)[-1]
+        print(f"  whole-band nulls in both the 2-D slice and the full box: {len(nulls[first] & nulls[last])} "
+              f"of {len(nulls[first])} and {len(nulls[last])}")
+
+    print(f"\nCHEST HEIGHT, full box (concrete floor and ceiling), {list(HEIGHT_ROOMS)[0]}")
+    print(f"  {'chest':38s} {'mixed-sign':>10s} {'whole-null':>10s} {'avg-eff p10':>11s} {'p50':>5s}")
+    rng = random.Random(0)
+    positions = [(rng.uniform(0.6, 5.4), rng.uniform(0.6, 4.4)) for _ in range(n)]
+    for name, z in CHEST_HEIGHTS.items():
+        rows = [
+            _ground_truth(SyntheticCsiSource(SyntheticConfig(
+                scene="geometric", body_xy_m=xy, seed=1000 + i, room_height_m=ROOM_HEIGHT_M, body_z_m=z,
+                **list(HEIGHT_ROOMS.values())[0])))
+            for i, xy in enumerate(positions)
+        ]
+        eff = sorted(r[2] for r in rows)
+        print(f"  {name:38s} {100*sum(r[0] for r in rows)/n:9.1f}% {100*sum(r[1] for r in rows)/n:9.1f}% "
+              f"{eff[n//10]:11.2f} {eff[n//2]:5.2f}")
+    print()
+    print("Columns as in the headroom suite. K: line-of-sight power over the summed")
+    print("power of every other static path (walls, floor, ceiling, furniture), the")
+    print("median over positions. The floor and ceiling use one |Gamma| at every angle")
+    print("of incidence, as the walls always have; a real floor bounce at these angles")
+    print("depends on polarisation. SYNTHETIC: this compares two models of a room, not")
+    print("a model with a room.")
+    print()
+
+
 def _random_scene_efficiency() -> float:
     src = SyntheticCsiSource(SyntheticConfig())
     sens = src.sensitivity()
@@ -541,7 +639,7 @@ def _random_scene_efficiency() -> float:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--suite", choices=("all", "legacy", "nulls", "headroom"), default="all")
+    ap.add_argument("--suite", choices=("all", "legacy", "nulls", "headroom", "height"), default="all")
     ap.add_argument("--fusion", choices=("legacy", "respirfi"), default="legacy",
                     help="subcarrier fusion for the legacy suite")
     ap.add_argument("--window-s", type=float, default=60.0)
@@ -550,12 +648,16 @@ def main() -> None:
                     help="nulls suite: uniform scenes per room/body/noise cell (plus half as many forced into nulls and partial nulls)")
     ap.add_argument("--quick", action="store_true", help="nulls suite: 3 uniform + 2 null + 2 partial per cell")
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--room-height", type=float, default=None, metavar="M",
+                    help="nulls suite: run in the box model, rooms M metres high (default: the 2-D slice)")
     args = ap.parse_args()
 
     if args.suite in ("all", "legacy"):
         legacy_suite(args)
     if args.suite in ("all", "headroom"):
         headroom_suite(args)
+    if args.suite in ("all", "height"):
+        height_suite(args)
     if args.suite in ("all", "nulls"):
         nulls_suite(args)
 

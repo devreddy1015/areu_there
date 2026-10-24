@@ -103,7 +103,10 @@ blind spot can cover every subcarrier at once. In 480 uniformly placed
 geometric scenes (`evaluate.py --suite nulls`), breathing is within
 0.5 BPM in **95.1%** of readings by default and **95.7%** with RespirFi
 selection; at whole-band blind spots it drops to 64.5% / 68.1%, typically
-by locking onto twice the true rate.
+by locking onto twice the true rate. Rerun in a 2.7 m box with a floor, a
+ceiling and real mounting heights (`--room-height 2.7`), the same study
+gives **95.8%** / **96.7%**, and **60.2%** / **62.0%** at blind spots, and
+ranks the fusion methods differently ([NOTES.md](NOTES.md) §13).
 
 These are synthetic-data numbers. They establish that the DSP is sound.
 They say nothing about real hardware, real rooms, or real bodies — see
@@ -452,7 +455,7 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/vitals.py` | Breathing and heart-rate extractors |
 | `wifisense/presence.py` | Ambient-calibrated occupancy |
 | `wifisense/pipeline.py` | The stages wired together |
-| `wifisense/sources/synthetic.py` | Physics-based CSI generator; `scene="geometric"` models Fresnel-zone blind spots |
+| `wifisense/sources/synthetic.py` | Physics-based CSI generator; `scene="geometric"` models Fresnel-zone blind spots, and `room_height_m` adds floor, ceiling and heights |
 | `wifisense/sources/esp32_udp.py` | ESP32 wire format, UDP listener, sequence-gap filling |
 | `wifisense/sources/recorder.py` | Raw-datagram pcap recorder, replayer, per-node link stats |
 | `scenes/` | Scene files: the room as DEFINED. Schema, the ITU-R P.2040 material table, three example rooms |

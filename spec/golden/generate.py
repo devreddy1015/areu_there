@@ -404,6 +404,45 @@ def gen_sim_geometric() -> None:
     })
 
 
+def gen_sim_geometric_3d() -> None:
+    """The geometric scene in a box (room_height_m set), noise-free.
+
+    Exercises what the 2-D set cannot: floor and ceiling bounces with
+    different Gammas, order-2 images across all six faces, nodes at two
+    heights, a chest below both, furniture at drawn heights.
+    """
+    cfg = SyntheticConfig(
+        scene="geometric", n_subcarriers=56, noise_std=0.0, seed=11, n_scatterers=4,
+        reflection_order=2, los_attenuation_db=3.0, wall_reflection=0.45,
+        body_points=3, body_width_m=0.3, body_xy_m=(2.6, 3.4), breathing_bpm=14.0,
+        room_height_m=2.7, tx_z_m=1.2, rx_z_m=0.8, body_z_m=1.0,
+        floor_reflection=0.395, ceiling_reflection=0.247,
+    )
+    src = SyntheticCsiSource(cfg)
+    frames = src.frames(200)
+    emit("sim_geometric_3d", {
+        "n_subcarriers": 56, "fs": cfg.sample_rate_hz, "carrier_hz": cfg.carrier_hz,
+        "subcarrier_spacing_hz": cfg.subcarrier_spacing_hz, "room_w": cfg.room_m[0], "room_h": cfg.room_m[1],
+        "room_z": cfg.room_height_m, "tx_x": cfg.tx_xy_m[0], "tx_y": cfg.tx_xy_m[1], "tx_z": cfg.tx_z_m,
+        "rx_x": cfg.rx_xy_m[0], "rx_y": cfg.rx_xy_m[1], "rx_z": cfg.rx_z_m,
+        "body_x": cfg.body_xy_m[0], "body_y": cfg.body_xy_m[1], "body_z": cfg.body_z_m,
+        "body_points": cfg.body_points, "body_width_m": cfg.body_width_m, "body_rcs_m2": cfg.body_rcs_m2,
+        "wall_reflection": cfg.wall_reflection, "floor_reflection": cfg.floor_reflection,
+        "ceiling_reflection": cfg.ceiling_reflection, "reflection_order": cfg.reflection_order,
+        "los_attenuation_db": cfg.los_attenuation_db, "static_magnitude": cfg.static_magnitude,
+        "breathing_bpm": cfg.breathing_bpm, "breathing_amplitude_m": cfg.breathing_amplitude_m,
+        "heart_bpm": cfg.heart_bpm, "heart_amplitude_m": cfg.heart_amplitude_m,
+        "excess_path_m": src.excess_path_m, "n_static_paths": len(src.static_paths),
+    }, {
+        "scatterer_x": [p[0] for p in src.scatterers], "scatterer_y": [p[1] for p in src.scatterers],
+        "scatterer_z": [p[2] for p in src.scatterers], "scatterer_rcs": src.scatterer_rcs,
+        "body_gain": src._body_gains,
+        "amplitudes": [a for f in frames for a in f.amplitudes],
+        "phases": [a for f in frames for a in f.phases],
+        "sensitivity": src.sensitivity(),
+    })
+
+
 def main() -> None:
     for f in os.listdir(HERE):
         if f.endswith((".kv", ".f64", ".json")):
@@ -422,6 +461,7 @@ def main() -> None:
     gen_codec_signed()
     gen_features()
     gen_sim_geometric()
+    gen_sim_geometric_3d()
     with open(os.path.join(HERE, "MANIFEST"), "w") as fh:
         fh.write("\n".join(MANIFEST) + "\n")
     print(f"{len(MANIFEST)} vector sets")
