@@ -1,6 +1,7 @@
 """FeatureFrame v1: what a Saans sensor node sends instead of raw CSI.
 
-Reference implementation of `spec/wire.md` §2. The C++ edge firmware and
+Reference implementation of `spec/wire.md` §2, and of §2b, FeatureFrame
+v2: the same fields, signed (ADR-012). The C++ edge firmware and
 the Rust gateway must produce the same frames from the same input; the
 golden vectors in `spec/golden/` are generated from this file.
 
@@ -14,9 +15,13 @@ zeroed on the node unless the space has opted in.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import math
 import struct
 import zlib
+from collections.abc import Callable
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -33,6 +38,16 @@ __all__ = [
     "FeatureFrame",
     "FeatureExtractor",
     "decode_feature_frame",
+    "FEATURE_VERSION_SIGNED",
+    "SIGNED_FRAME_SIZE",
+    "TAG_SIZE",
+    "NODE_KEY_LABEL",
+    "FrameAuthError",
+    "SignedFrame",
+    "ReplayGuard",
+    "derive_node_key",
+    "encode_signed",
+    "decode_signed",
 ]
 
 FEATURE_MAGIC = 0x534E4153  # bytes on the wire: b"SANS"
@@ -41,6 +56,15 @@ FEATURE_FRAME_SIZE = 68
 _BODY = struct.Struct("<IBBBBIIHH9fIbbBB")  # 64 bytes, then u32 CRC
 _CRC = struct.Struct("<I")
 assert _BODY.size == 64
+
+# FeatureFrame v2 (ADR-012): v1's first 63 bytes with version 2, then
+# key_id in v1's reserved byte, the node's boot counter, and a tag.
+FEATURE_VERSION_SIGNED = 2
+SIGNED_FRAME_SIZE = 84
+SIGNED_BODY_SIZE = 68  # what the tag covers
+TAG_SIZE = 16
+NODE_KEY_LABEL = b"saans frame key v1"
+_BOOT = struct.Struct("<I")
 
 FLAG_CALIBRATED = 1 << 0
 FLAG_OCCUPIED = 1 << 1
@@ -103,9 +127,15 @@ class FeatureFrame:
         return bool(self.flags & bit)
 
     def encode(self) -> bytes:
-        body = _BODY.pack(
+        body = self._body(self.version, 0)
+        return body + _CRC.pack(zlib.crc32(body) & 0xFFFFFFFF)
+
+    def _body(self, version: int, last_byte: int) -> bytes:
+        """Bytes 0..63: every field, clamped as the spec says. The last byte
+        is v1's `reserved` (0) or v2's `key_id`."""
+        return _BODY.pack(
             FEATURE_MAGIC,
-            self.version,
+            version,
             self.node_id & 0xFF,
             self.tx_id & 0xFF,
             self.flags & 0xFF,
@@ -126,9 +156,8 @@ class FeatureFrame:
             max(-128, min(127, self.rssi_dbm)),
             max(-128, min(127, self.noise_floor_dbm)),
             max(0, min(255, self.n_subcarriers)),
-            0,
+            last_byte,
         )
-        return body + _CRC.pack(zlib.crc32(body) & 0xFFFFFFFF)
 
     def as_dict(self) -> dict:
         return {k: getattr(self, k) for k in self.__dataclass_fields__}
@@ -146,6 +175,10 @@ def decode_feature_frame(data: bytes) -> FeatureFrame:
         raise ValueError(f"bad magic 0x{v[0]:08X}")
     if v[1] != FEATURE_VERSION:
         raise ValueError(f"unsupported FeatureFrame version {v[1]}")
+    return _fields(v)
+
+
+def _fields(v: tuple) -> FeatureFrame:
     return FeatureFrame(
         version=v[1], node_id=v[2], tx_id=v[3], flags=v[4], seq=v[5], uptime_ms=v[6],
         csi_rate_chz=v[7], loss_permille=v[8], motion_energy=v[9], presence_threshold=v[10],
@@ -153,6 +186,117 @@ def decode_feature_frame(data: bytes) -> FeatureFrame:
         heart_bpm=v[15], heart_conf=v[16], best_bnr=v[17], calib_age_s=v[18],
         rssi_dbm=v[19], noise_floor_dbm=v[20], n_subcarriers=v[21],
     )
+
+
+# ---------------------------------------------------------------- v2, signed
+
+
+class FrameAuthError(ValueError):
+    """A v2 frame refused. `reason` is one of: size, magic, version, key
+    (no site key with this key_id), tag (forged, corrupted, or signed with
+    another key). The gateway counts each separately."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+@dataclass(frozen=True)
+class SignedFrame:
+    frame: FeatureFrame
+    key_id: int
+    boot: int
+
+
+def derive_node_key(site_key: bytes, node_id: int) -> bytes:
+    """The key node `node_id` is flashed with: HMAC-SHA256(site key,
+    label || node_id). The gateway holds only site keys and derives these,
+    so one node's key signs for that node and nothing else."""
+    if len(site_key) != 32:
+        raise ValueError(f"a site key is 32 bytes, got {len(site_key)}")
+    if not 0 <= node_id <= 0xFF:
+        raise ValueError(f"node_id must fit a byte, got {node_id}")
+    return hmac.new(site_key, NODE_KEY_LABEL + bytes([node_id]), hashlib.sha256).digest()
+
+
+def _tag(node_key: bytes, body: bytes) -> bytes:
+    return hmac.new(node_key, body, hashlib.sha256).digest()[:TAG_SIZE]
+
+
+def encode_signed(frame: FeatureFrame, *, node_key: bytes, key_id: int, boot: int) -> bytes:
+    """FeatureFrame v2: the frame's fields, `key_id`, `boot`, and the first
+    16 bytes of HMAC-SHA256 over everything before the tag. `frame.version`
+    is ignored; the result is always version 2."""
+    if len(node_key) != 32:
+        raise ValueError(f"a node key is 32 bytes, got {len(node_key)}")
+    if not 0 <= key_id <= 0xFF:
+        raise ValueError(f"key_id must fit a byte, got {key_id}")
+    if not 0 <= boot <= 0xFFFFFFFF:
+        raise ValueError(f"boot must fit a u32, got {boot}")
+    body = frame._body(FEATURE_VERSION_SIGNED, key_id) + _BOOT.pack(boot)
+    return body + _tag(node_key, body)
+
+
+def decode_signed(
+    data: bytes, node_key_for: Callable[[int, int], bytes | None]
+) -> SignedFrame:
+    """Check, then parse, one v2 datagram.
+
+    `node_key_for(key_id, node_id)` returns that node's key under that
+    site key, or None if no such site key is held. Fields are read only
+    after the tag matches, and the replay floor is the caller's
+    (`ReplayGuard`), applied after this.
+    """
+    if len(data) != SIGNED_FRAME_SIZE:
+        raise FrameAuthError("size", f"a signed FeatureFrame is {SIGNED_FRAME_SIZE} bytes, got {len(data)}")
+    (magic,) = struct.unpack_from("<I", data, 0)
+    if magic != FEATURE_MAGIC:
+        raise FrameAuthError("magic", f"bad magic 0x{magic:08X}")
+    if data[4] != FEATURE_VERSION_SIGNED:
+        raise FrameAuthError("version", f"expected FeatureFrame version {FEATURE_VERSION_SIGNED}, got {data[4]}")
+    key_id, node_id = data[63], data[5]
+    node_key = node_key_for(key_id, node_id)
+    if node_key is None:
+        raise FrameAuthError("key", f"no site key with key_id {key_id}")
+    body, tag = data[:SIGNED_BODY_SIZE], data[SIGNED_BODY_SIZE:]
+    if not hmac.compare_digest(_tag(node_key, body), tag):
+        raise FrameAuthError("tag", "the tag does not match")
+    (boot,) = _BOOT.unpack_from(data, 64)
+    return SignedFrame(frame=_fields(_BODY.unpack_from(data, 0)), key_id=key_id, boot=boot)
+
+
+class ReplayGuard:
+    """The highest (boot, seq) accepted per link (node_id, tx_id).
+
+    A frame is fresh only if its pair is strictly greater, boot first: a
+    replay is never greater than a frame already accepted, and a reboot
+    raises `boot`, so `seq` restarting from 0 is fresh. A node whose boot
+    counter goes backwards is refused until its floor is cleared, which is
+    deliberate: from here it is indistinguishable from a replay.
+    """
+
+    def __init__(self, floors: dict[tuple[int, int], tuple[int, int]] | None = None) -> None:
+        self._floors: dict[tuple[int, int], tuple[int, int]] = dict(floors or {})
+
+    def accept(self, node_id: int, tx_id: int, *, boot: int, seq: int) -> bool:
+        link, pair = (node_id, tx_id), (boot, seq)
+        floor = self._floors.get(link)
+        if floor is not None and pair <= floor:
+            return False
+        self._floors[link] = pair
+        return True
+
+    def floors(self) -> dict[tuple[int, int], tuple[int, int]]:
+        return dict(self._floors)
+
+    def to_json(self) -> str:
+        return json.dumps(
+            [{"node_id": n, "tx_id": t, "boot": b, "seq": q} for (n, t), (b, q) in sorted(self._floors.items())]
+        )
+
+    @classmethod
+    def from_json(cls, text: str) -> ReplayGuard:
+        return cls({(e["node_id"], e["tx_id"]): (e["boot"], e["seq"]) for e in json.loads(text)})
 
 
 class _RollingRms:

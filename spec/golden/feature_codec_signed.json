@@ -1,0 +1,112 @@
+{
+ "name": "feature_codec_signed",
+ "scalars": {
+  "frames": 2,
+  "frame_size": 84,
+  "tag_size": 16,
+  "magic": 1397637459,
+  "version": 2
+ },
+ "arrays": {
+  "node_id": [
+   "feature_codec_signed__node_id.f64",
+   2
+  ],
+  "tx_id": [
+   "feature_codec_signed__tx_id.f64",
+   2
+  ],
+  "flags": [
+   "feature_codec_signed__flags.f64",
+   2
+  ],
+  "seq": [
+   "feature_codec_signed__seq.f64",
+   2
+  ],
+  "uptime_ms": [
+   "feature_codec_signed__uptime_ms.f64",
+   2
+  ],
+  "csi_rate_chz": [
+   "feature_codec_signed__csi_rate_chz.f64",
+   2
+  ],
+  "loss_permille": [
+   "feature_codec_signed__loss_permille.f64",
+   2
+  ],
+  "motion_energy": [
+   "feature_codec_signed__motion_energy.f64",
+   2
+  ],
+  "presence_threshold": [
+   "feature_codec_signed__presence_threshold.f64",
+   2
+  ],
+  "gross_motion": [
+   "feature_codec_signed__gross_motion.f64",
+   2
+  ],
+  "breath_rms": [
+   "feature_codec_signed__breath_rms.f64",
+   2
+  ],
+  "breathing_bpm": [
+   "feature_codec_signed__breathing_bpm.f64",
+   2
+  ],
+  "breathing_conf": [
+   "feature_codec_signed__breathing_conf.f64",
+   2
+  ],
+  "heart_bpm": [
+   "feature_codec_signed__heart_bpm.f64",
+   2
+  ],
+  "heart_conf": [
+   "feature_codec_signed__heart_conf.f64",
+   2
+  ],
+  "best_bnr": [
+   "feature_codec_signed__best_bnr.f64",
+   2
+  ],
+  "calib_age_s": [
+   "feature_codec_signed__calib_age_s.f64",
+   2
+  ],
+  "rssi_dbm": [
+   "feature_codec_signed__rssi_dbm.f64",
+   2
+  ],
+  "noise_floor_dbm": [
+   "feature_codec_signed__noise_floor_dbm.f64",
+   2
+  ],
+  "n_subcarriers": [
+   "feature_codec_signed__n_subcarriers.f64",
+   2
+  ],
+  "site_key": [
+   "feature_codec_signed__site_key.f64",
+   32
+  ],
+  "node_keys": [
+   "feature_codec_signed__node_keys.f64",
+   64
+  ],
+  "key_id": [
+   "feature_codec_signed__key_id.f64",
+   2
+  ],
+  "boot": [
+   "feature_codec_signed__boot.f64",
+   2
+  ],
+  "bytes": [
+   "feature_codec_signed__bytes.f64",
+   168
+  ]
+ }
+}

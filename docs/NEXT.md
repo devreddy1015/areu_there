@@ -474,6 +474,20 @@ alone does not stop a recorded frame being sent again. Worth deciding
 before B2 puts frames on a real network, not after. Not started: the
 wire format is a decision, not a task.
 
+**Decided 2026-10-24: [ADR-012](adr/012-authenticated-frames.md).** It
+uses HMAC-SHA256, not an AEAD: the Python reference stays standard-library
+only, and a lost boot counter fails closed instead of repeating a nonce.
+Off by default until nodes send v2. In ADR-002's order:
+
+1. **Done:** the Python reference (`encode_signed`, `decode_signed`,
+   `derive_node_key`, `ReplayGuard` in `wifisense/features.py`) and
+   golden vectors (`spec/golden/feature_codec_signed`).
+2. The Rust codec and the gateway: the `[[frame_key]]` config, verification,
+   replay floors persisted in `data_dir`, counters in `/api/health`, and
+   a way to derive a node's key for flashing.
+3. The C++ codec with its own SHA-256 (RFC 4231 vectors), held to the
+   golden bytes, and the firmware's key and boot counter in NVS.
+
 ---
 
 ## 2. Start when the boards land

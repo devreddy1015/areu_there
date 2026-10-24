@@ -18,6 +18,7 @@ presence
 extractors
 gapfill
 feature_codec
+feature_codec_signed
 features_vitals
 features_private
 sim_geometric
