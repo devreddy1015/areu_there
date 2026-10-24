@@ -168,6 +168,16 @@ def suites() -> list[Suite]:
             scrub=[(r" in \d+ s \(", " (")],
         ),
         Suite(
+            "detectors-box", "S3 health detectors, held-out seeds, in a 2.7 m box",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "eval",
+             "--room-height", "2.7"],
+            rust, "slow",
+            "The same runs as the section above, every room a box: concrete floor "
+            "and ceiling, nodes at 1.2 m, chest at 1.0 m for the whole timeline (so "
+            "a fall does not lower it). NOTES.md §13 reads this.",
+            scrub=[(r" in \d+ s \(", " (")],
+        ),
+        Suite(
             "links", "What each extra link buys, one transmitter",
             [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "links",
              "--seats", "600", "--blind-seats", "5000"],
@@ -292,6 +302,38 @@ QUOTES = [
           r"paired \+(\d+)/-(\d+) at uniform placement and \+(\d+)/-(\d+) at nulls",
           [r"PAIRED vs legacy[^\n]*\n  uniform\s+respirfi \+(\d+)/-(\d+)",
            r"PAIRED vs legacy[\s\S]*?\n  null\s+respirfi \+(\d+)/-(\d+)"]),
+    # NOTES.md §13, the S3 detectors in a box: the slice column checks
+    # against `detectors`, the box column against `detectors-box`.
+    *[Quote("NOTES.md", suite,
+            # One row pattern per table row; `col` picks the column's cell.
+            "".join(r"\| " + row + r" \| " + (r"[^|]*\| " if col else "") + cell
+                    + (r" \|" if col else r" \| [^\n]*") + r"\n"
+                    for row, cell in [
+                        (r"occupancy accuracy, 1 / 2 / 3 links", r"([\d.]+) / ([\d.]+) / ([\d.]+)%"),
+                        (r"breathing within 1 BPM, 1 / 2 / 3 links", r"([\d.]+) / \**([\d.]+)\** / ([\d.]+)%"),
+                        (r"breathing within 1 BPM, clear-LoS room", r"\**([\d.]+)%\**"),
+                        (r"pause sensitivity, 1 / 2 / 3 links", r"([\d.]+) / ([\d.]+) / ([\d.]+)%"),
+                        (r"pauses reported on timelines with none", r"\**(\d+)\** in ([\d.]+) h"),
+                        (r"rate alerts in runs whose rate never changes: reader / night / sit-down",
+                         r"(\d+) / \**(\d+)\** / (\d+)"),
+                        (r"Check alerts per hour on a night, as shipped", r"\**([\d.]+)\**"),
+                    ]),
+            [r"OCCUPANCY[^\n]*\n[^\n]*\n  1 link\s+([\d.]+)%",
+             r"OCCUPANCY[^\n]*\n(?:[^\n]*\n){2}  2 links\s+([\d.]+)%",
+             r"OCCUPANCY[^\n]*\n(?:[^\n]*\n){3}  3 links\s+([\d.]+)%",
+             r"BREATHING RATE[^\n]*\n[^\n]*\n  1 link\s+[\d.]+%\s+([\d.]+)%",
+             r"BREATHING RATE[^\n]*\n(?:[^\n]*\n){2}  2 links\s+[\d.]+%\s+([\d.]+)%",
+             r"BREATHING RATE[^\n]*\n(?:[^\n]*\n){3}  3 links\s+[\d.]+%\s+([\d.]+)%",
+             r"clear-LoS\s+still false-empty\s+[\d.]+%\s+breathing coverage\s+[\d.]+% \(within 1 BPM\s+([\d.]+)%",
+             r"BREATHING PAUSES[^\n]*\n[^\n]*\n  1 link\s+\d+\s+\d+\s+([\d.]+)%",
+             r"BREATHING PAUSES[^\n]*\n(?:[^\n]*\n){2}  2 links\s+\d+\s+\d+\s+([\d.]+)%",
+             r"BREATHING PAUSES[^\n]*\n(?:[^\n]*\n){3}  3 links\s+\d+\s+\d+\s+([\d.]+)%",
+             r"pauses reported on timelines with none: (\d+) in ([\d.]+) h",
+             r"^  reader\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36",
+             r"^  night\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36",
+             r"^  sit_down\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36",
+             r"^  night\s+36\b.*\s([\d.]+)$"])
+      for suite, col in (("detectors", 0), ("detectors-box", 1))],
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",
           [r"breathing BNR, best subcarrier, dB\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)"]),

@@ -12,7 +12,9 @@ use saans_dsp::features::{FeatureExtractor, FeatureExtractorConfig};
 use saans_health::{
     EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceFusion, SpaceMonitor,
 };
-use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment, TruthKind, NODE_Z_M};
+use saans_sim::scenario::{
+    Activity, Node, Point, Room, Scenario, Segment, TruthKind, Vertical, NODE_Z_M,
+};
 use saans_sim::Simulator;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -24,6 +26,10 @@ pub struct EvalOptions {
     /// default); full runs start at 2 so the reported numbers are held out.
     pub seed_offset: u64,
     pub threads: usize,
+    /// Run every room as a box this high (`Room::vertical`, the
+    /// [`Vertical`] defaults otherwise: concrete floor and ceiling, nodes
+    /// at 1.2 m, chest at 1.0 m). `None` is the 2-D slice.
+    pub room_height_m: Option<f64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -263,7 +269,11 @@ pub fn jobs(opts: &EvalOptions) -> Vec<Job> {
         Kind::Tachypnea,
     ];
     let mut out = Vec::new();
-    for (room_name, room) in rooms() {
+    for (room_name, mut room) in rooms() {
+        room.vertical = opts.room_height_m.map(|height_m| Vertical {
+            height_m,
+            ..Vertical::default()
+        });
         for (layout_name, nodes, links) in layouts() {
             for &kind in &kinds {
                 for s in opts.seed_offset..opts.seed_offset + opts.seeds {
@@ -376,8 +386,13 @@ struct Done {
     run: Run,
 }
 
-pub fn evaluate(opts: &EvalOptions) {
+pub fn evaluate(opts: &EvalOptions) -> Result<(), String> {
     let jobs = jobs(opts);
+    // Every job shares its room's settings with others, so checking each
+    // distinct (room, layout) once catches a bad box before hours of runs.
+    for job in &jobs {
+        Simulator::try_new(&job.scenario).map_err(|e| format!("{}: {e}", job.scenario.name))?;
+    }
     let n = jobs.len();
     eprintln!(
         "saans eval: {n} simulated runs on {} threads ({})",
@@ -417,6 +432,7 @@ pub fn evaluate(opts: &EvalOptions) {
     done.sort_by(|a, b| (a.kind, a.room, a.layout).cmp(&(b.kind, b.room, b.layout)));
     let hours: f64 = done.iter().map(|d| d.run.hours).sum();
     report(&done, opts, hours, start.elapsed().as_secs_f64());
+    Ok(())
 }
 
 fn select<'a>(
@@ -448,6 +464,14 @@ fn report(done: &[Done], opts: &EvalOptions, hours: f64, wall_s: f64) {
     }
     println!("Rooms: clear-LoS, rich-NLoS (6 x 5 m). 56 subcarriers, 20 Hz, noise 2.0 vs |LoS| 40, 2% loss,");
     println!("3-point torso. Production path: FeatureExtractor -> SpaceFusion -> SpaceMonitor.");
+    if let Some(h) = opts.room_height_m {
+        let v = Vertical::default();
+        println!(
+            "BOX MODEL: rooms {h} m high, floor and ceiling |Gamma| {} / {}, nodes at {} m, chest at {} m",
+            v.floor_reflection, v.ceiling_reflection, NODE_Z_M, v.chest_z_m
+        );
+        println!("for the whole timeline: a fall moves the chest sideways but does not lower it.");
+    }
     println!("==========================================================================");
 
     println!(
