@@ -352,6 +352,55 @@ def _table(title: str, results: list[dict]) -> None:
         )
 
 
+#: "Right", for the reliability tables: the S5 gate's tolerance.
+RELIABILITY_TOL_BPM = 1.0
+RELIABILITY_BINS = 10
+
+
+def reliability(pairs: list[tuple[float, bool]], bins: int = RELIABILITY_BINS) -> tuple[list[tuple], float]:
+    """How far a confidence is from a probability.
+
+    `pairs` is (confidence, was_right) per reading. Returns one row per
+    non-empty bin -- (lo, hi, n, mean confidence, share right) -- and the
+    expected calibration error: the reading-weighted mean of
+    |share right - mean confidence| over the bins. 0 is a confidence that
+    means what it says; the breathing confidence is the fraction of in-band
+    energy at the peak, which was never built to be a probability, and this
+    measures by how much it is not one.
+    """
+    acc = [[0, 0.0, 0] for _ in range(bins)]
+    for conf, ok in pairs:
+        b = min(max(int(conf * bins), 0), bins - 1)
+        acc[b][0] += 1
+        acc[b][1] += conf
+        acc[b][2] += bool(ok)
+    total = sum(a[0] for a in acc)
+    rows, ece = [], 0.0
+    for b, (n, csum, right) in enumerate(acc):
+        if not n:
+            continue
+        mean_conf, share = csum / n, right / n
+        rows.append((b / bins, (b + 1) / bins, n, mean_conf, share))
+        ece += n / total * abs(share - mean_conf)
+    return rows, ece
+
+
+def _reliability_table(title: str, results: list[dict], method: str = "legacy") -> None:
+    pairs = [
+        (conf, abs(bpm - r["bpm"]) < RELIABILITY_TOL_BPM)
+        for r in results
+        for bpm, conf in r["estimates"][method]
+    ]
+    if not pairs:
+        return
+    rows, ece = reliability(pairs)
+    print(f"\n{title}: {len(pairs)} readings, fusion {method}, right = within {RELIABILITY_TOL_BPM:g} BPM")
+    print(f"  {'confidence':>12s} {'readings':>9s} {'mean conf':>10s} {'share right':>12s} {'gap':>7s}")
+    for lo, hi, n, mc, sh in rows:
+        print(f"  {lo:5.1f}-{hi:<5.1f}  {n:9d} {mc:10.3f} {sh:12.3f} {sh - mc:+7.3f}")
+    print(f"  expected calibration error: {ece:.3f}")
+
+
 def _paired(results: list[dict], a: str, b: str) -> tuple[int, int, int]:
     """(a right & b wrong, b right & a wrong, both) over all readings."""
     a_only = b_only = both = 0
@@ -421,6 +470,14 @@ def nulls_suite(args: argparse.Namespace) -> None:
             a, b, _ = _paired(subset, m, "legacy")
             cells.append(f"{m} +{a}/-{b}")
         print(f"  {title:10s}  " + "   ".join(cells))
+
+    print("\nCONFIDENCE vs ACCURACY. The breathing confidence is the share of in-band")
+    print("energy at the peak, a gate rather than a probability; these tables measure")
+    print("how far it is from one. 'gap' = share right - mean confidence: negative is")
+    print("overconfident. Uniform placement is the honest population; the forced nulls")
+    print("are over-sampled by design and shown apart, where overconfidence would live.")
+    _reliability_table("RELIABILITY, uniform placement", uniform)
+    _reliability_table(f"RELIABILITY, whole-band nulls", nulls)
 
     print()
     print("Columns: '2x rate' = estimate within 1 BPM of twice the truth (the")

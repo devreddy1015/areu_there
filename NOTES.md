@@ -846,3 +846,50 @@ more than 10% of the time: the person, not the sample.
   mark this one occupied, and the simulator has no next room. The
   quorum-1 row looks nearly free; in a building it is not, and its real
   cost is a bench measurement.
+
+---
+
+## 12. How far the breathing confidence is from a probability (Oct 2026)
+
+Everything here is **SYNTHETIC**. `evaluate.py --suite nulls`, the
+reliability tables in `docs/RESULTS.md`.
+
+`CAPABILITY_LIMITS.md` §5 already says the confidence "is a gate, not a
+calibrated probability". Nobody had measured how far. The breathing
+confidence is the share of in-band spectral energy at the peak; nothing
+about that construction makes 0.7 mean "right 70% of the time". A
+reliability table bins readings by stated confidence and compares each
+bin's mean confidence with the share of its readings that were right --
+here, within 1 BPM, the S5 gate's tolerance. The expected calibration
+error (ECE) is the reading-weighted mean gap.
+
+Uniform placement is the honest population. The suite over-samples
+nulls on purpose, so those are shown apart rather than mixed in.
+
+| | uniform placement | whole-band nulls |
+|---|---|---|
+| readings | 1920 | 1068 |
+| expected calibration error | **0.064** | **0.154** |
+| at confidence 0.9–1.0 | 1534 readings, stated 0.988, right 100% | 290 readings, stated 0.980, right 94.1% |
+| at confidence 0.3–0.5 | stated ~0.40, right 88–96% | stated ~0.40, right 56–60% |
+
+### What it says
+
+1. **It is wrong in opposite directions in different rooms.** In
+   ordinary placement it is *under*confident below 0.9: a reading at
+   0.4 is right about nine times in ten. At whole-band nulls the top
+   bins are *over*confident, and those are the doubled readings of §10
+   sitting at high confidence.
+2. **So no recalibration can fix it.** Any monotone map from confidence
+   to probability sees 0.98 in both populations -- right 100% of the time
+   in one and 94% in the other -- and cannot separate them. The missing
+   information is *whether the link is at a null*, which is what the
+   cross-link octave rule (§10) supplies and a single link's confidence
+   does not. Fitting such a map to simulator output would in any case be
+   fitting the simulator; calibration waits for the S5 recordings.
+3. **The 0.4 gate is conservative in ordinary rooms.** It discards
+   readings that are right most of the time. For an advisory system that
+   abstains rather than guesses, that is a defensible trade; it is now a
+   measured one rather than an assumed one.
+
+Measurement only: nothing in the DSP changed.

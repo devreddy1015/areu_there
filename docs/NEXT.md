@@ -288,6 +288,13 @@ default until a board has been listened to.
 
 ### 1.5 Measure how far the confidence is from a probability
 
+**Done**, on branch `saans/reliability` (NOTES §12). Expected calibration
+error 0.064 in uniform placement, 0.154 at whole-band nulls --
+underconfident in one, overconfident at the top in the other, which means
+no calibration map could fix it: the same 0.98 is right 100% of the time
+in one population and 94% in the other. Calibration stays where this plan
+put it, behind real recordings.
+
 `CAPABILITY_LIMITS.md:324-333`: the confidence "is a gate, not a
 calibrated probability". Nobody has measured how far. A reliability
 diagram -- bin by reported confidence, plot fraction actually within
