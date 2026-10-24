@@ -1,0 +1,47 @@
+name: Something is wrong
+description: A crash, a wrong value, a view that misleads, a doc that disagrees with the code.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste anything that identifies a person, and no raw CSI
+        recorded in a room where someone was without their consent.
+        Breathing and heart data are health data (ADR-005).
+  - type: dropdown
+    id: data
+    attributes:
+      label: Where did the data come from?
+      description: The same symptom means different things for each.
+      options:
+        - SYNTHETIC — the simulator, a fixture, or --simulate
+        - REAL — a board in a room
+        - No data involved (build, config, docs)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      description: "`git rev-parse --short HEAD`, or the version in the dashboard footer."
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: Commands, config (secrets removed), and for REAL data the hardware, room and firmware commit.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output
+      description: Logs, `/api/health`, a test failure. Pasted as text.
+      render: text

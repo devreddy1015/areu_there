@@ -1,0 +1,32 @@
+# What the tree already does, surveyed file by file on 2026-10-24, so an
+# editor that honours this never reformats a line nobody meant to touch:
+# LF everywhere, no trailing whitespace, a final newline, four-space
+# indents (Rust, Python, C++, shell), two for the web, YAML and Markdown,
+# tabs in Makefiles. rustfmt still owns Rust; this covers the files it
+# never sees.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{html,css,js,mjs,json,yml,yaml,md}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+# Written by spec/golden/generate.py and compared byte for byte by its
+# readers: an editor "fixing" a final newline here would be drift.
+[spec/golden/**]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+# Vendored licence text, kept exactly as published.
+[rust/crates/saans-gateway/assets/site/fonts/**]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
