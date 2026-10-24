@@ -451,6 +451,29 @@ trigger (a second contributor) has not happened:
 - Issue templates for a problem and for a result. The first field of
   each is SYNTHETIC or REAL, and it is required. Blank issues are off.
 
+### 1.11 Frame authentication: a decision owed
+
+Found triaging CodeQL's two `py/bind-socket-all-network-interfaces`
+alerts on 2026-10-24. The bind is not the problem: the nodes are
+remote, so something must listen on a network interface, and `--host` /
+`udp_bind` narrow it. The problem is what the listener believes.
+FeatureFrame v1 carries a CRC-32 (ADR-004), which catches corruption,
+not forgery. Anything that can reach the UDP port can send frames for
+any link: fake occupancy, hide a person, or for a consented space fake
+breathing and so raise or suppress a health alert. For an advisory
+health system that is the gap that matters.
+
+Mitigation today: a sensor VLAN, a narrowed bind, a firewall. README
+"Operating requirements" now says so; it said nothing before.
+
+The fix would be a per-node key and a truncated HMAC-SHA256 tag in each
+frame, which means FeatureFrame v2. That is a new ADR, the Python
+reference, regenerated golden vectors, the Rust and C++ ports, key
+provisioning in the firmware, and replay protection, because `seq`
+alone does not stop a recorded frame being sent again. Worth deciding
+before B2 puts frames on a real network, not after. Not started: the
+wire format is a decision, not a task.
+
 ---
 
 ## 2. Start when the boards land
@@ -513,6 +536,7 @@ measured or decided against.
 8. §1.5 reliability diagram — folded into §1.2's table
 9. §1.9 MQTT, browser tests — A3, A4
 10. §1.10 as they come up
+11. §1.11 frame authentication — a decision first, before B2
 
 Boards arrive → §2, which pre-empts everything after item 4.
 
