@@ -1048,12 +1048,57 @@ and has an arm:
   ends with the chest at 1.0 m. A chest that drops is the obvious next
   model change, and per ADR-002 it starts in the reference.
 
-Nothing uses the box yet. Every built-in scenario, `saans eval`,
-`links`, `octave` and the gateway's `--simulate` are still the slice.
+Every built-in scenario, `links`, `octave` and the gateway's
+`--simulate` are still the slice; `saans eval --room-height` is the one
+way in, below.
+
+### Measured: the S3 detectors in a box
+
+`saans eval --room-height 2.7`: the same 252 held-out runs and seeds as
+`saans eval`, every room a box. Both tables are in `docs/RESULTS.md`;
+the slice's reproduced exactly on this code, so the two columns differ
+only by the box.
+
+| held out, 252 runs | slice | box, 2.7 m |
+|---|---|---|
+| occupancy accuracy, 1 / 2 / 3 links | 98.2 / 99.5 / 98.9% | 98.7 / 99.7 / 98.7% |
+| breathing within 1 BPM, 1 / 2 / 3 links | 93.9 / 100.0 / 100.0% | 91.7 / **96.5** / 100.0% |
+| breathing within 1 BPM, clear-LoS room | 96.2% | **92.3%** |
+| pause sensitivity, 1 / 2 / 3 links | 81.5 / 89.9 / 88.7% | 87.9 / 87.9 / 92.7% |
+| pauses reported on timelines with none | 0 in 70.6 h | **2** in 70.6 h |
+| rate alerts in runs whose rate never changes: reader / night / sit-down | 1 / 0 / 3 | 0 / **3** / 0 |
+| Check alerts per hour on a night, as shipped | 2.88 | **3.34** |
+
+What it says:
+
+1. **Occupancy holds.** It is within half a point either way on every
+   layout.
+2. **Breathing rate loses accuracy where the slice was easiest.** In
+   the clear-LoS room it drops from 96.2% to 92.3% within 1 BPM, and the
+   2-link layout from 100% to 96.5%. This is consistent with the
+   ground truth above: in that room the box triples the positions where
+   subcarriers disagree in sign.
+3. **False alarms move to the night.**
+   - Runs with a rate alert and no rate change go from 4 to 3, but all
+     three are now normal nights, where a false alert wakes somebody.
+   - Pauses on pause-free timelines go from 0 to 2 in 70.6 h.
+   - The Check rate on a night, as shipped, rises from 2.88 to 3.34 an
+     hour.
+4. **Pause detection improves.** It improves most in the rich-NLoS room
+   (82.8% to 93.0%).
+5. **The collapse detector is not tested by this.** The chest stays at
+   1.0 m through a fall, so the box adds nothing about height to the
+   collapse runs.
+
+Nothing is retuned on the strength of this. The thresholds were tuned
+on the slice's development seeds, and retuning them on the box would
+fit a different model rather than a room. What the two columns give is
+a spread: how far the simulator's own answer moves when the room
+model does. The S5 recordings decide.
 
 ### Not done
 
-- **The detectors in a box.** Whether the S3 results (`saans eval`)
-  hold there is the next measurement.
+- **A chest that drops in a fall.** Without it the collapse detector
+  has not met height.
 - **The 2-D corner bug**, above.
 - **Angle- and polarisation-dependent reflection.**

@@ -1,6 +1,6 @@
 //! `saans`: simulate, evaluate and benchmark the Saans pipeline.
 //!
-//!     saans eval [--quick] [--seeds N] [--threads N]
+//!     saans eval [--quick] [--seeds N] [--threads N] [--room-height M]
 //!     saans export SCENARIO --out FILE.pcap [--seed N] [--vitals]
 //!
 //! `export` runs a simulated scenario through the node-side FeatureExtractor
@@ -19,7 +19,7 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]"
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]"
     );
     ExitCode::from(2)
 }
@@ -40,13 +40,30 @@ fn main() -> ExitCode {
                 .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get()));
             let seeds = arg(&args, "--seeds").unwrap_or(if quick { 2 } else { 6 });
             let seed_offset = arg(&args, "--seed-offset").unwrap_or(if quick { 0 } else { 2 });
-            eval::evaluate(&eval::EvalOptions {
+            // Strict: a typo here must not quietly evaluate the slice.
+            let room_height_m = match args.iter().position(|a| a == "--room-height") {
+                None => None,
+                Some(i) => match args.get(i + 1).and_then(|v| v.parse::<f64>().ok()) {
+                    Some(h) => Some(h),
+                    None => {
+                        eprintln!("--room-height needs a height in metres");
+                        return ExitCode::FAILURE;
+                    }
+                },
+            };
+            match eval::evaluate(&eval::EvalOptions {
                 quick,
                 seeds,
                 seed_offset,
                 threads,
-            });
-            ExitCode::SUCCESS
+                room_height_m,
+            }) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("saans eval: {e}");
+                    ExitCode::FAILURE
+                }
+            }
         }
         Some("links") => {
             let threads = arg(&args, "--threads")
@@ -89,6 +106,7 @@ fn trace(args: &[String]) -> ExitCode {
         seeds,
         seed_offset: 0,
         threads: 1,
+        room_height_m: None,
     });
     let Some(job) = jobs.into_iter().find(|j| &j.scenario.name == name) else {
         eprintln!("no job named {name}; names look like reader/clear-LoS/1 link/0");
@@ -168,6 +186,7 @@ fn export(args: &[String]) -> ExitCode {
         seeds: seed + 1,
         seed_offset: 0,
         threads: 1,
+        room_height_m: None,
     });
     let layout_name = ["1 link", "2 links", "3 links"][layout.clamp(1, 3) - 1];
     let Some(job) = jobs.into_iter().find(|j| {
