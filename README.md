@@ -360,10 +360,13 @@ counted in `/api/health` (`ingest.frame_auth`) and `/metrics`
 Two `[[frame_key]]`s with different ids let nodes move to a new site key
 one at a time.
 
-**Not yet usable end to end:** the gateway checks signed frames, but the
-node firmware does not send them yet (NEXT.md §1.11). It is off by
-default, and until a key is configured the gateway behaves as before and
-notes at startup that frames are not authenticated.
+The node signs once it has a key: `edge/build.sh provision` writes one
+into its `saanskey` partition (docs/HARDWARE.md, "Signing the frames").
+The firmware is built and the signing is checked byte for byte against the
+reference, but **no board has sent a signed frame yet**: nothing in this
+tree has run on hardware. It is off by default, and until a key is
+configured the gateway behaves as before and notes at startup that frames
+are not authenticated.
 
 ### Recording and replay
 

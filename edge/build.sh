@@ -34,6 +34,12 @@ run_idf() {
     # a small thing that wastes real time the first time you hit it.
     local docker_args=(--rm -v "${repo_root}":/project -w /project/edge/firmware
                        --user "$(id -u):$(id -g)" -e HOME=/tmp)
+    # Variables passed through by NAME (`-e VAR`), so a value such as a key
+    # never appears on a command line or in `ps`.
+    local v
+    for v in ${IDF_ENV:-}; do
+        docker_args+=(-e "${v}")
+    done
     if [ -n "${PORT:-}" ]; then
         docker_args+=(--device "${PORT}")
     fi
@@ -74,8 +80,74 @@ case "${CMD}" in
         # compiles, built with g++ against the golden vectors.
         make -C "${HERE}/dsp/test" check
         ;;
+    provision)
+        # Write a node's frame key (ADR-012) into its `saanskey` partition:
+        #
+        #   export SAANS_NODE_KEY=$(saans-gateway -c saans.toml --node-key 3)
+        #   KEY_ID=0 PORT=/dev/ttyUSB0 ./build.sh provision
+        #
+        # DRY_RUN=1 builds the image and prints what is in it, key redacted,
+        # without a board. The image is built in the container's own /tmp,
+        # which is not the mounted repository, so the key never lands on this
+        # disk; it reaches the container by variable name, never by value.
+        #
+        # The boot counter starts at the Unix time now. Each boot adds one, so
+        # a node provisioned again later starts above every frame the gateway
+        # has accepted from it, and no replay floor needs clearing.
+        if ! [[ "${SAANS_NODE_KEY:-}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+            echo "error: set SAANS_NODE_KEY to the 64 hex digits saans-gateway --node-key prints" >&2
+            exit 1
+        fi
+        KEY_ID="${KEY_ID:-0}"
+        if ! [[ "${KEY_ID}" =~ ^[0-9]+$ ]] || [ "${KEY_ID}" -gt 255 ]; then
+            echo "error: KEY_ID must be 0..255, the id of the gateway's [[frame_key]]" >&2
+            exit 1
+        fi
+        if [ -z "${DRY_RUN:-}" ] && [ -z "${PORT:-}" ]; then
+            echo "error: set PORT, e.g. PORT=/dev/ttyUSB0 (or DRY_RUN=1 to only build the image)" >&2
+            exit 1
+        fi
+        export KEY_ID DRY_RUN="${DRY_RUN:-}" BOOT_START="$(date +%s)" ESPPORT="${PORT:-}"
+        IDF_ENV="SAANS_NODE_KEY KEY_ID DRY_RUN BOOT_START ESPPORT" run_idf sh -c '
+            set -eu
+            d=$(mktemp -d)
+            trap "rm -rf $d" EXIT
+            {
+                echo "key,type,encoding,value"
+                echo "frameauth,namespace,,"
+                echo "key,data,hex2bin,${SAANS_NODE_KEY}"
+                echo "key_id,data,u8,${KEY_ID}"
+                echo "boot,data,u32,${BOOT_START}"
+            } > "$d/saanskey.csv"
+            python "$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py" \
+                generate "$d/saanskey.csv" "$d/saanskey.bin" 0x3000 >/dev/null
+            if [ -n "${DRY_RUN}" ]; then
+                python "$IDF_PATH/components/nvs_flash/nvs_partition_tool/nvs_tool.py" \
+                    -f json "$d/saanskey.bin" > "$d/dump.json"
+                python - "$d/dump.json" <<"PY"
+import json, sys
+# What a node will read, without printing the key itself. The "raw" fields
+# of the dump hold the key bytes, so only these three fields are printed.
+# (No apostrophes anywhere in here: this is inside a single-quoted sh -c.)
+for page in json.load(open(sys.argv[1]))["pages"]:
+    for e in page.get("entries", []):
+        name, kind = e.get("key"), e.get("metadata", {}).get("type")
+        if not name or e.get("state") != "Written" or kind == "blob_data":
+            continue
+        value = e.get("data", {}).get("value")
+        if name == "key":
+            value = "<%s bytes, redacted>" % e["data"].get("size")
+        print(f"  {name:10} {kind:10} {value}")
+PY
+                echo "dry run: image built, nothing flashed"
+            else
+                python -m esptool --chip esp32s3 -p "${ESPPORT}" write_flash 0x12000 "$d/saanskey.bin"
+                echo "provisioned: key_id ${KEY_ID}, boot counter starts at ${BOOT_START}"
+            fi
+        '
+        ;;
     *)
-        echo "usage: $0 {build|menuconfig|clean|size|flash|monitor|flash-monitor|tests}" >&2
+        echo "usage: $0 {build|menuconfig|clean|size|flash|monitor|flash-monitor|tests|provision}" >&2
         exit 2
         ;;
 esac

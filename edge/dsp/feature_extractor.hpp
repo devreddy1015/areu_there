@@ -623,10 +623,21 @@ class BasicFeatureExtractor {
     /// one call a sender can reach for without having to have got `_emit`
     /// right. See feature_frame.hpp.
     void encode(const FeatureFrame& f, std::uint8_t* out) const {
-        VitalsConsent consent;
-        consent.vitals_enabled = cfg_.vitals_enabled;
-        consent.heart_enabled  = cfg_.heart_enabled;
-        encode_feature_frame_gated(f, consent, out);
+        encode_feature_frame_gated(f, consent(), out);
+    }
+
+    /// Encode one emitted frame signed (84 bytes, FeatureFrame v2,
+    /// ADR-012), behind the same consent gate as `encode`.
+    void encode_signed(const FeatureFrame& f, const std::uint8_t* node_key,
+                       std::uint8_t key_id, std::uint32_t boot, std::uint8_t* out) const {
+        encode_signed_frame_gated(f, consent(), node_key, key_id, boot, out);
+    }
+
+    VitalsConsent consent() const {
+        VitalsConsent c;
+        c.vitals_enabled = cfg_.vitals_enabled;
+        c.heart_enabled  = cfg_.heart_enabled;
+        return c;
     }
 
     /// Everything back to construction except the configuration.

@@ -1,9 +1,13 @@
 # ADR-012: FeatureFrame v2 — authenticated frames
 
-**Status:** accepted, 2026-10-24. **Decided, not built** until all three
-parts are in. Done: the Python reference and golden vectors, and the
-gateway's verification in Rust (`saans-gateway/src/frameauth.rs`). To
-come: the C++ node and its firmware. `docs/NEXT.md` §1.11 tracks them.
+**Status:** accepted, 2026-10-24; **built** 2026-10-24 in all three
+implementations:
+- the Python reference and golden vectors;
+- the gateway (`saans-gateway/src/frameauth.rs`);
+- the node (`edge/dsp/sha256.hpp`, `feature_frame.hpp`,
+  `edge/firmware/main/frame_auth.cpp`, and `edge/build.sh provision`).
+
+The firmware compiles for the ESP32-S3 but has not run on a board.
 
 ## Context
 FeatureFrame v1 (ADR-004) ends in a CRC-32. A CRC catches a flipped bit;

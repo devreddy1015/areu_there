@@ -54,11 +54,7 @@ esp_err_t common_init() {
     if (s_common_started) {
         return ESP_OK;
     }
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
+    const esp_err_t err = nvs_init();
     if (err != ESP_OK) {
         return err;
     }
@@ -69,6 +65,22 @@ esp_err_t common_init() {
 }
 
 }  // namespace
+
+esp_err_t nvs_init() {
+    static bool s_done = false;
+    if (s_done) {
+        return ESP_OK;
+    }
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // Erases the default `nvs` partition only: the frame key lives in
+        // `saanskey` (frame_auth.cpp) so that this cannot take it.
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    s_done = (err == ESP_OK);
+    return err;
+}
 
 esp_err_t wifi_start_tx_only() {
     ESP_ERROR_CHECK(common_init());

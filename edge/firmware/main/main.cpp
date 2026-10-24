@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "net.h"
 #include "roles.h"
 #include "saans_config.h"
 #include "telemetry.h"
@@ -50,6 +51,10 @@ void log_banner() {
 
 extern "C" void app_main(void) {
     log_banner();
+    // Before telemetry::init, which reads and advances the reboot count in
+    // NVS. It used to run first, against an uninitialised NVS, so nvs_open
+    // failed and every boot reported reboot count 0.
+    ESP_ERROR_CHECK(saans::net::nvs_init());
     saans::telemetry::init();
 
     // The watchdog subscribes the sensing task, so a wedged DSP loop reboots

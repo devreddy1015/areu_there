@@ -490,8 +490,16 @@ Off by default until nodes send v2. In ADR-002's order:
    in `/api/health` and `/metrics`, and `--new-site-key` and `--node-key N`
    for provisioning. It is held byte for byte to the Python reference's
    golden frames.
-3. The C++ codec with its own SHA-256 (RFC 4231 vectors), held to the
-   golden bytes, and the firmware's key and boot counter in NVS.
+3. **Done:** the node. `edge/dsp/sha256.hpp` implements SHA-256 and HMAC
+   itself, held to the NIST and RFC 4231 vectors. The C++ codec is held
+   byte for byte to the golden frames, with every flipped byte refused, and
+   gates consent on the signed path as on the unsigned one. The firmware
+   reads its key, `key_id` and boot counter from a `saanskey` NVS
+   partition and signs every frame when it has one.
+   `edge/build.sh provision` writes that partition. The counter starts at
+   the Unix time, so re-provisioning never needs a replay floor cleared.
+   The firmware builds for the ESP32-S3 with no warnings. It has not run on
+   a board: that is B1/B2.
 
 ---
 

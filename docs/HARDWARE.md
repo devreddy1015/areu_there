@@ -283,6 +283,30 @@ value in `menuconfig`, not the README.
 **`./build.sh clean` deletes `sdkconfig`** (`edge/build.sh:58`), which
 means it deletes your `menuconfig` answers along with the build output.
 
+### Signing the frames (ADR-012)
+
+**Not for the bring-up session.** Raw CSI is never signed, and a gateway
+with a `[[frame_key]]` refuses it, so §6 runs with no key anywhere. Before
+frames go onto a network anyone else can reach (B2 onward), give each RX
+board its key:
+
+```bash
+saans-gateway --new-site-key                         # once per site; keep it secret
+export SAANS_FRAME_KEY=<that key>                    # where the gateway runs
+export SAANS_NODE_KEY=$(saans-gateway -c saans.toml --node-key 1)
+KEY_ID=0 PORT=/dev/ttyUSB0 ./build.sh provision      # RX A; then --node-key 2 for RX B
+```
+
+`provision` writes the key, its `key_id` and a boot counter into the
+`saanskey` partition (`edge/firmware/partitions.csv`). The counter starts
+at the Unix time, so re-provisioning a board never trips the gateway's
+replay check. `./build.sh flash` does not touch that partition, so
+reflashing the app keeps the key. `DRY_RUN=1` builds the image and shows
+what is in it, key redacted, without a board. At boot an RX logs
+`frames are SIGNED: key_id 0, boot …`. A board without a key logs
+`frames are UNSIGNED` at every telemetry report, and a gateway with a
+`[[frame_key]]` refuses its frames (`/api/health` → `ingest.frame_auth`).
+
 ### The uplink channel
 
 `run_rx_role` associates to the AP, waits up to 30 s for an IP, opens

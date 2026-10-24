@@ -9,6 +9,7 @@ idf_component_register(
         "rx_role.cpp"
         "telemetry.cpp"
         "csi_capture.cpp"
+        "frame_auth.cpp"
     INCLUDE_DIRS
         "."
         "../../dsp"
