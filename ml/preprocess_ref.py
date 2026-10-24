@@ -44,7 +44,7 @@ import math
 from fractions import Fraction
 
 __all__ = [
-    "GRID_K", "SHARED44", "REF_BINS", "PHASE_MIN_AMP", "angle", "magnitude", "reference_bins",
+    "GRID_K", "SHARED44", "REF_BINS", "PHASE_MIN_AMP", "DOMAIN", "angle", "magnitude", "reference_bins",
     "consecutive_pairs", "bin_layout", "normalise", "sanitise", "mean", "zscore", "preprocess_ref",
 ]
 
@@ -55,6 +55,8 @@ SHARED44 = tuple(range(-26, -8)) + tuple(range(1, 27))
 REF_BINS = ("shared44", "carried")
 #: §5: a bin whose normalised amplitude is below this has no phase (20 dB below the packet's mean).
 PHASE_MIN_AMP = 0.1
+#: §2: a non-zero CSI component lies in [2^-32, 2^32) in magnitude (outside it §4's products overflow or underflow).
+DOMAIN = (2.0 ** -32, 2.0 ** 32)
 _NS_PER_S = 1_000_000_000
 
 
@@ -234,6 +236,12 @@ def preprocess_ref(win: dict, phase: bool = False, bin_hz=None, ref_bins: str = 
     length_ns = win["length_ns"]
     n_links = len(csi)
     n_pk = len(csi[0]) if n_links else 0
+    for link in csi:                                      # §2's domain, so every step below stays finite
+        for packet in link:
+            for re, im in packet:
+                for v in (re, im):
+                    if not math.isfinite(v) or (v != 0.0 and not DOMAIN[0] <= abs(v) < DOMAIN[1]):
+                        raise ValueError(f"CSI component {v!r} is not 0 or finite in [2^-32, 2^32) (§2)")
 
     # §3: the grid, the carried bins and the reference bins R.
     carried_idx = [b for b in range(52) if carried[b]]

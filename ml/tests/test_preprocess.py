@@ -32,6 +32,7 @@ import tempfile
 import unittest
 import warnings
 from fractions import Fraction
+from unittest import mock
 
 import numpy as np
 
@@ -145,6 +146,8 @@ def random_window(rng, n_links=6, n_pk=20, carried=FW56, kind="channel", quantis
         t_rel[link, n_pk - n:] = times
         rssi_mask[link, n_pk - n:] = rng.random(n) < 0.9
         rssi[link, n_pk - n:] = np.where(rssi_mask[link, n_pk - n:], rng.integers(-90, -30, n), 0)
+    keep = n_pk - int(received.sum(axis=1).max(initial=0))          # §2: P is the most packets any link has
+    csi, received, t_rel, rssi, rssi_mask = (a[:, keep:] for a in (csi, received, t_rel, rssi, rssi_mask))
     links = [(tx, rx) for tx in range(4) for rx in range(4) if rx != tx][:n_links]
     return pp.CsiWindow(
         label="SIM", source="test:random", window_end="k=0", links=np.array(links, np.int16),
@@ -354,6 +357,86 @@ class TestRecord(Case):
             with self.subTest(what=what), self.assertRaises(ValueError):
                 pp.CsiWindow(**dict(good, **change))
 
+    def test_domain(self):
+        """§2: a non-zero component lies in [2^-32, 2^32) in magnitude, real
+        or imaginary, either sign; 0 is fine. At the domain's corners every
+        output stays finite in float32 (a tiny reference bin beside a huge
+        one, phase on)."""
+        below = np.nextafter(2.0 ** 32, 0)
+        for v, ok in ((2.0 ** -32, True), (-below, True), (0.0, True), (2.0 ** 32, False), (-(2.0 ** 32), False),
+                      (np.nextafter(2.0 ** -32, 0), False), (-1e-300, False), (5e-324, False)):
+            for part in ("real", "imag"):
+                csi = np.ones((1, 3, 52), np.complex128) * (3 + 4j)
+                getattr(csi, part)[0, 1, 7] = v
+                with self.subTest(v=v, part=part):
+                    if ok:
+                        window(csi, carried=ALL52)
+                    else:
+                        with self.assertRaisesRegex(ValueError, r"outside \[2\^-32, 2\^32\)"):
+                            window(csi, carried=ALL52)
+        csi = np.zeros((1, 4, 52), np.complex128)
+        csi[0, :, gi(1)] = 2.0 ** -32                       # the only non-zero reference bin: g is tiny
+        csi[0, :, gi(-5)] = complex(below, -below)          # a non-reference bin near the top
+        csi[0, 1:, gi(2)] = 2.0 ** -31
+        csi[0, 2, gi(-5)] *= 0.5
+        for cfg in (pp.PreprocessConfig(phase=True), pp.PreprocessConfig(phase=True, bin_hz=2)):
+            out = pp.preprocess(window(csi, carried=ALL52), cfg)
+            for key, v in out.items():
+                if isinstance(v, np.ndarray) and v.dtype.kind == "f":
+                    self.assertTrue(np.isfinite(v).all(), (key, cfg))
+            self.assertTrue(out["sample_mask"].any())
+
+    def test_p_and_unknown_tx_position(self):
+        """P no larger than the most received packets of any link; a link
+        whose tx is unknown cannot have a known tx position."""
+        csi = np.ones((2, 3, 52)) * (3 + 4j)
+        with self.assertRaisesRegex(ValueError, "P = 3 slots, but the most received packets of any link is 2"):
+            window(csi, received=[[False, True, True], [False, False, True]])
+        win = window(np.ones((1, 3, 52)), links=[(-1, 4)])
+        fields = {f: getattr(win, f) for f in pp.CsiWindow.__dataclass_fields__}
+        pos = np.zeros((1, 2, 3))
+        pos[0, 0] = (1.0, 2.0, 3.0)
+        with self.assertRaisesRegex(ValueError, "tx is unknown"):
+            pp.CsiWindow(**dict(fields, link_pos=pos, link_pos_known=np.array([[True, False]])))
+        pos = np.zeros((1, 2, 3))
+        pos[0, 1] = (1.0, 2.0, 3.0)
+        self.assertTrue(pp.CsiWindow(**dict(fields, link_pos=pos, link_pos_known=np.array([[False, True]])))
+                        .link_pos_known[0, 1])
+
+    def test_arrays_copied_and_frozen(self):
+        """A window keeps its own read-only copies: the caller's arrays may
+        change afterwards without changing it, and its arrays cannot be
+        written."""
+        win = window(np.ones((2, 3, 52)) * (3 + 4j), carried=ALL52)
+        mine = {f: (np.array(v) if isinstance(v, np.ndarray) else v) for f, v in
+                ((f, getattr(win, f)) for f in pp.CsiWindow.__dataclass_fields__)}
+        kept = pp.CsiWindow(**mine)
+        for name in pp._ARRAYS:
+            arr = getattr(kept, name)
+            self.assertFalse(arr.flags.writeable, name)
+            self.assertFalse(np.shares_memory(arr, mine[name]), name)
+        mine["csi"][0, 0, 0] = 99
+        self.assertEqual(kept.csi[0, 0, 0], 3 + 4j)
+        with self.assertRaises(ValueError):
+            kept.csi[0, 0, 0] = 1
+        out = pp.preprocess(kept)
+        out["amp"][0, 0, 0] = 1.0                           # outputs are the caller's to change
+        out["links"][0, 0] = 9
+
+    def test_left_aligned_but_time_ordered(self):
+        """Received packets in time order and every other invariant met, but
+        sitting left (padding last): refused by the alignment check alone."""
+        csi = np.zeros((2, 3, 52), np.complex128)
+        csi[0, :2][:, FW56] = 5
+        csi[1][:, FW56] = 5
+        received = [[True, True, False], [True, True, True]]
+        t_rel = [[-1_500_000_000, -1_000_000_000, 0], [-1_500_000_000, -1_000_000_000, -500_000_000]]
+        with self.assertRaisesRegex(ValueError, "right-aligned"):
+            window(csi, received=received, t_rel_ns=t_rel, carried=FW56)
+        right = window(csi[:, ::-1].copy(), received=[[False, True, True], [True] * 3],
+                       t_rel_ns=[[0, -1_500_000_000, -1_000_000_000], t_rel[1]], carried=FW56)
+        self.assertEqual(right.received.sum(), 5)                     # the same packets, right-aligned: kept
+
     def test_messages_name_the_problem(self):
         win = window(**self.base())
         good = {f: getattr(win, f) for f in pp.CsiWindow.__dataclass_fields__}
@@ -416,6 +499,18 @@ class TestReference(Case):
             self.assertAlmostEqual(out["gain_db"][0, p], 20 * math.log10(11 * (43 + v) / 44), delta=1e-12)
         self.assertEqual(out["n_packets"].tolist(), [3])
         self.assertTrue((out["amp"][0, ~FW56] == 0).all() and (out["mu"][0, ~FW56] == 0).all())
+
+    def test_large_z(self):
+        """One outlier packet among 40 gives |z| above 5 at its bins (at
+        most (n - 1)/sqrt(n) = 6.2 here); the implementations agree there."""
+        rng = np.random.default_rng(21)
+        csi = rng.normal(20.0, 1.0, (1, 40, 52)) + 1j * rng.normal(0.0, 1.0, (1, 40, 52))
+        csi[0, 17, 5:9] *= 3.0
+        win = window(csi, carried=ALL52)
+        for cfg in (pp.PreprocessConfig(phase=True, ref_bins="carried"), pp.PreprocessConfig()):
+            out, ref = self.assert_matches_ref(win, cfg)
+            self.assertGreater(np.abs(out["amp"]).max(), 5.0)
+            self.assertGreater(np.abs(np.asarray(ref["amp"])).max(), 5.0)
 
     def test_reference_is_stdlib_only(self):
         """ml/preprocess_ref.py imports no numpy (the golden generator's
@@ -756,6 +851,32 @@ class TestBinning(Case):
         single = pp.preprocess(window(csi[:, :2], carried=FW56), pp.PreprocessConfig(phase=True, min_packets=2))
         np.testing.assert_allclose(out["phase"][0, :, 0], single["phase"][0, :, 0], atol=1e-6)
 
+    def test_equal_value_mean(self):
+        """§7: a mean of exactly equal values is that value (fsum([x]*n)/n
+        need not be x), checked on the bin values themselves, not through
+        §6's guard: three identical packets in a bin give a bin amplitude of
+        exactly their a' (0.1 at k = -5), unequal ones fsum / n."""
+        self.assertNotEqual(math.fsum([0.1] * 3) / 3, 0.1)
+        self.assertEqual(pr.mean([0.1] * 3), 0.1)
+        self.assertEqual(pr.mean([0.1, 0.2]), math.fsum([0.1, 0.2]) / 2)
+        values = np.array([[0.1, 0.1, 0.1, 7.0], [0.1, 0.2, 0.0, 0.0], [5.0, 5.0, 5.0, 5.0]])
+        filled = np.array([[True, True, True, False], [True, True, False, False], [False] * 4])
+        np.testing.assert_array_equal(pp._mean(values, filled), [0.1, math.fsum([0.1, 0.2]) / 2, 0.0])
+        csi = np.zeros((1, 4, 52), np.complex128)
+        csi[0][:, FW56] = 10.0
+        csi[0][:, ALL52 & ~FW56] = 1.0                 # a' = 1 / 10 = 0.1 on the non-reference bins
+        csi[0, 3, gi(-5)] = 2.0                        # the fourth packet differs at k = -5
+        times = [[-1_900_000_000, -1_800_000_000, -1_700_000_000, -1_600_000_000]]
+        win = window(csi, t_rel_ns=times, carried=ALL52)
+        a1 = np.where(win.received[..., None] & ALL52, np.abs(win.csi) / 10.0, 0.0)
+        bins = pp._binned(win, 1, 2_000_000_000, win.received, a1, np.zeros(win.received.shape), win.rssi,
+                          win.rssi_mask, None)
+        self.assertEqual(bins["x"][0, 0, gi(-6)], 0.1)                       # four equal values
+        self.assertEqual(bins["x"][0, 0, gi(-5)], math.fsum([0.1, 0.1, 0.1, 0.2]) / 4)
+        two = pp._binned(win, 2, 1_000_000_000, win.received, a1, np.zeros(win.received.shape), win.rssi,
+                         win.rssi_mask, None)
+        self.assertEqual(two["count"].tolist(), [[4, 0]])
+
     def test_refused_rates(self):
         win = window(np.ones((1, 3, 52)), carried=FW56, length_ns=1_000_000_000)
         for bin_hz, why in ((3, "not a multiple"), (0.3, "not a positive integer"), (1e-10, "not a positive integer")):
@@ -841,6 +962,41 @@ class TestShardAdapter(unittest.TestCase):
         self.assertEqual(early.csi.shape[:2], (132, 4))
         self.assertTrue((early.t_rel_ns[early.received] >= -500_000_000).all())
 
+    def test_rssi(self):
+        """The shard's RSSI reaches the window, and the default output, on
+        each packet's own slot (every column's RSSI differs here); lost
+        packets carry none."""
+        arrays = trd.make_arrays(n_nodes=4, lost=[(1, 60), (4, 77)])
+        n_links, cols = arrays["csi_mask"].shape
+        varied = -(30 + (np.arange(n_links)[:, None] * 7 + np.arange(cols)[None, :]) % 60)
+        arrays["rssi"] = np.where(arrays["csi_mask"] != 0, varied, 0).astype(np.int8)
+        root = os.path.join(self._tmp.name, "rssi-set")
+        trd.write_dataset(root, [arrays])
+        win = pp.from_roomsim_shard(root, 0, 7, 2.0)
+        out = pp.preprocess(win)
+        np.testing.assert_array_equal(win.rssi_mask, win.received)
+        for link in range(n_links):
+            got = win.received[link]
+            m = win.csi[link][got][:, gi(1)].real.astype(int) - 1            # the column, from the CSI
+            want = arrays["rssi"][link, m].astype(np.float64)
+            np.testing.assert_array_equal(win.rssi[link][got], want)
+            self.assertTrue((win.rssi[link][~got] == 0).all())
+            np.testing.assert_array_equal(out["rssi"][link][out["sample_mask"][link]], want.astype(np.float32))
+            np.testing.assert_array_equal(out["rssi_mask"][link], out["sample_mask"][link])
+        self.assertGreater(len(np.unique(win.rssi[win.received])), 30)
+
+    def test_layout_check(self):
+        """A shard whose subcarrier_k or subcarrier_active is not the
+        esp32-fw56 layout is refused, by index."""
+        for member, entry, value in (("subcarrier_active", 27, 1), ("subcarrier_active", 1, 0),
+                                     ("subcarrier_k", 40, -23)):              # entry 40 is k = -24
+            arrays = trd.make_arrays(n_nodes=4)
+            arrays[member][entry] = value
+            root = os.path.join(self._tmp.name, f"bad-{member}-{entry}")
+            trd.write_dataset(root, [arrays])
+            with self.subTest(member=member, entry=entry), self.assertRaisesRegex(ValueError, "not the esp32-fw56"):
+                pp.from_roomsim_shard(root, 0, 3, 2.0)
+
     def test_refusals_and_profile(self):
         with self.assertRaises(ValueError):
             pp.from_roomsim_shard(self.dir, 0, 7, 1.25)
@@ -875,11 +1031,18 @@ def datagram(rx, seq, rssi=-50, entries=56, n_antennas=1, value=None, guard=0):
     return build_esp32_frame(iq, node_id=rx, sequence=seq, rssi_dbm=rssi, n_antennas=n_antennas)
 
 
-def write_pcap(path, records):
-    """records: (t_ns, payload[, dport])."""
+def write_pcap(path, records, sim_addresses=False):
+    """records: (t_ns, payload[, dport[, (source ip, port)]]). A datagram
+    comes from its node's own address (the payload's node_id byte): a
+    board's 192.168.7.<node> from an ephemeral port, or with
+    `sim_addresses` Room Sim's 10.1.<node>.1:5566."""
     with PcapWriter(path) as pw:
-        for t_ns, payload, *port in records:
-            pw.write(t_ns, ("10.1.1.1", 5566), ("10.0.0.1", port[0] if port else 5566), payload)
+        for t_ns, payload, *rest in records:
+            node = payload[4] if len(payload) > 4 else 0
+            src = (f"10.1.{node}.1", 5566) if sim_addresses else (f"192.168.7.{node}", 50000 + node)
+            if len(rest) > 1:
+                src = rest[1]
+            pw.write(t_ns, src, ("10.0.0.1", rest[0] if rest else 5566), payload)
 
 
 class TestPcapAdapter(Case):
@@ -943,12 +1106,20 @@ class TestPcapAdapter(Case):
         ]
         path = os.path.join(self.dir, "bad.pcap")
         write_pcap(path, records)
-        st = ReadStats()
+        st = pp.PcapStats()
         win = pp.from_pcap(path, 1.0, T_REAL + 100, label="REAL", single_tx=True, stats=st)
-        self.assertEqual((st.malformed, st.other_port, int(win.received.sum())), (5, 1, 2))
-        full = pp.from_pcap(path, 1.0, T_REAL + 100, layout="esp32-lltf64", label="REAL", single_tx=True,
-                            stats=ReadStats(), port=None)
-        self.assertEqual((int(full.received.sum()), int(full.carried.sum())), (1, 52))
+        self.assertEqual((st.malformed, st.wrong_count, st.other_port, st.duplicates, int(win.received.sum())),
+                         (5, 2, 1, 0, 2))
+        self.assertEqual(st.subcarrier_counts, {56: 3, 0: 1, 64: 1})
+        with self.assertRaisesRegex(TypeError, "PcapStats"):
+            pp.from_pcap(path, 1.0, T_REAL + 100, label="REAL", single_tx=True, stats=ReadStats())
+        # Read as the 64-entry layout from every port, receiver 3 has five datagrams of other counts and one of 64.
+        with self.assertRaisesRegex(ValueError, "receiver 3: 5 datagrams with another n_subcarriers against 1 with 64"):
+            pp.from_pcap(path, 1.0, T_REAL + 100, layout="esp32-lltf64", label="REAL", single_tx=True, port=None)
+        clean = os.path.join(self.dir, "full.pcap")
+        write_pcap(clean, [(T_REAL + i, datagram(3, i, entries=64)) for i in range(3)])
+        full = pp.from_pcap(clean, 1.0, T_REAL + 100, layout="esp32-lltf64", label="REAL", single_tx=True)
+        self.assertEqual((int(full.received.sum()), int(full.carried.sum())), (3, 52))
 
     def test_label_rules(self):
         """A .sim.pcap is SIM whatever the caller says (REAL refused); a
@@ -957,7 +1128,7 @@ class TestPcapAdapter(Case):
         rec = self.recording()
         with self.assertRaisesRegex(ValueError, "label='REAL'"):
             pp.from_pcap(rec, 1.0, T_REAL, single_tx=True)
-        with self.assertRaisesRegex(ValueError, "not 'SIM->REAL'"):
+        with self.assertRaisesRegex(ValueError, "SIM->REAL labels results, never windows"):
             pp.from_pcap(rec, 1.0, T_REAL, single_tx=True, label="SIM->REAL")
         sim = os.path.join(self.dir, "run.sim.pcap")
         shutil.copy(rec, sim)
@@ -1027,6 +1198,172 @@ class TestPcapAdapter(Case):
         write_pcap(dead, [(T_REAL, datagram(3, 0, value=(0, 0)))])
         with self.assertRaisesRegex(ValueError, "no energy on the active entries"):
             pp.from_pcap(dead, 1.0, T_REAL + 1, label="REAL", single_tx=True)
+
+    def test_guard_range_is_27_to_37(self):
+        """The check reads exactly entries 27..37: energy only at 27 and 37
+        (the range's ends) is refused, so a narrower range would miss it; a
+        clean file with strong active entries 26 and 38 beside the guards
+        passes, so a wider range would refuse it."""
+        def rec(name, edge=0, beside=None):
+            records = []
+            for i in range(4):
+                payload = bytearray(datagram(3, i, value=(0, 10)))
+                for e in (27, 37):
+                    payload[20 + 2 * e + 1] = edge                         # (imag, real) = (0, edge)
+                if beside is not None:
+                    for e in (26, 38):
+                        payload[20 + 2 * e + 1] = beside
+                records.append((T_REAL + i, bytes(payload)))
+            path = os.path.join(self.dir, name)
+            write_pcap(path, records)
+            return path
+        with self.assertRaisesRegex(ValueError, "receiver 3: guard entries 27..37 only"):
+            pp.from_pcap(rec("edges.pcap", edge=30), 1.0, T_REAL + 100, label="REAL", single_tx=True)
+        ok = pp.from_pcap(rec("beside.pcap", beside=120), 1.0, T_REAL + 100, label="REAL", single_tx=True)
+        self.assertEqual(ok.csi[0, -1, gi(26)], 120 + 0j)
+
+    def test_time_order_sorted_and_clock_steps_refused(self):
+        """In file order, a datagram 0.5 ms before an earlier one is kept and
+        sorted into time order within its link; 2 ms before is a clock step,
+        refused naming its receiver."""
+        records = [(T_REAL + i * 100_000_000, datagram(3, i)) for i in range(5)]
+        records.append((T_REAL + 400_000_000 - 500_000, datagram(3, 5)))    # seq 5, 0.5 ms before seq 4
+        path = os.path.join(self.dir, "jitter.pcap")
+        write_pcap(path, records)
+        win = pp.from_pcap(path, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True)
+        np.testing.assert_array_equal(win.t_rel_ns[0, -3:], [-700_000_000, -600_500_000, -600_000_000])
+        self.assertEqual([int(v.real) for v in win.csi[0, -2:, gi(1)]], [6, 5])  # seq 5 (real 6) before seq 4
+        step = records[:5] + [(T_REAL + 400_000_000 - 2_000_000, datagram(7, 0))]
+        path = os.path.join(self.dir, "step.pcap")
+        write_pcap(path, step)
+        with self.assertRaisesRegex(ValueError, r"receiver 7's datagram .* 2.000 ms before an earlier one"):
+            pp.from_pcap(path, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True)
+
+    def test_link_map_rx_mismatch(self):
+        rec = self.recording()
+        link_map = {(3, i): (5, 3) for i in range(30)}
+        link_map.update({(7, 100 + i): (5, 7) for i in range(30)})
+        link_map[(3, 4)] = (5, 4)
+        with self.assertRaisesRegex(ValueError, r"the link map sends rx 3's seq 4 to link \(5, 4\)"):
+            pp.from_pcap(rec, 1.0, T_REAL, link_map=link_map)
+
+    def test_sim_by_link_map_or_addresses(self):
+        """SIM-as-REAL is refused: a pcap read with a link map is SIM
+        (truth_link_map tags its map SIM), and so is one whose every
+        datagram comes from Room Sim's 10.1.<rx>.1:5566, renamed and without
+        a manifest; label='REAL' is refused either way. A file with one
+        datagram from a board's address is the caller's to label."""
+        rec = self.recording()                                              # boards' addresses
+        link_map = {(3, i): (5, 3) for i in range(30)}
+        link_map.update({(7, 100 + i): (5, 7) for i in range(30)})
+        self.assertEqual(pp.from_pcap(rec, 1.0, T_REAL, link_map=link_map).label, "SIM")
+        with self.assertRaisesRegex(ValueError, "read with a link map .* so its label is SIM; label 'REAL' refused"):
+            pp.from_pcap(rec, 1.0, T_REAL, link_map=link_map, label="REAL")
+        tagged = pp.SimLinkMap(link_map)
+        self.assertEqual((tagged.label, pp.from_pcap(rec, 1.0, T_REAL, link_map=tagged).label), ("SIM", "SIM"))
+
+        class Elsewhere(dict):
+            label = "REAL"
+        with self.assertRaisesRegex(ValueError, "a link map labelled 'REAL'"):
+            pp.from_pcap(rec, 1.0, T_REAL, link_map=Elsewhere(link_map))
+        records = [(T_REAL + i * 50_000_000, datagram(3 + i % 2, i)) for i in range(20)]
+        renamed = os.path.join(self.dir, "renamed.pcap")
+        write_pcap(renamed, records, sim_addresses=True)
+        renamed_map = {(3 + i % 2, i): (1, 3 + i % 2) for i in range(20)}
+        for kw in ({"single_tx": True}, {"link_map": renamed_map}):
+            with self.subTest(kw=list(kw)), self.assertRaisesRegex(ValueError, "so its label is SIM; label 'REAL' refused"):
+                pp.from_pcap(renamed, 1.0, T_REAL + 1_000_000_000, label="REAL", **kw)
+        with self.assertRaisesRegex(ValueError, r"10\.1\.<rx>\.1:5566, so its label is SIM"):
+            pp.from_pcap(renamed, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True)
+        self.assertEqual(pp.from_pcap(renamed, 1.0, T_REAL + 1_000_000_000, single_tx=True).label, "SIM")
+        mixed = os.path.join(self.dir, "mixed.pcap")                        # one datagram from a board
+        write_pcap(mixed, records + [(T_REAL + 10 ** 9, datagram(9, 0), 5566, ("192.168.7.9", 50009))],
+                   sim_addresses=True)
+        self.assertEqual(pp.from_pcap(mixed, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True).label, "REAL")
+        wrong_rx = os.path.join(self.dir, "wrong-rx.pcap")                  # node 3 from 10.1.4.1: not the convention
+        write_pcap(wrong_rx, [(T_REAL + i, datagram(3, i), 5566, ("10.1.4.1", 5566)) for i in range(4)])
+        self.assertEqual(pp.from_pcap(wrong_rx, 1.0, T_REAL + 100, label="REAL", single_tx=True).label, "REAL")
+
+    def test_node_from_two_addresses_refused(self):
+        records = [(T_REAL + i * 100_000_000, datagram(3, i)) for i in range(5)]
+        records.append((T_REAL + 600_000_000, datagram(3, 5), 5566, ("192.168.7.33", 50003)))
+        path = os.path.join(self.dir, "two.pcap")
+        write_pcap(path, records)
+        with self.assertRaisesRegex(ValueError, r"node 3 arrived from 2 addresses \(192\.168\.7\.3, 192\.168\.7\.33\)"):
+            pp.from_pcap(path, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True)
+
+    def test_exact_duplicates_dropped(self):
+        """An exact duplicate of (rx, seq, payload) is dropped and counted;
+        the same (rx, seq) with another payload is another datagram, kept."""
+        records = [(T_REAL + i * 100_000_000, datagram(3, i)) for i in range(5)]
+        records.insert(3, (T_REAL + 200_000_010, datagram(3, 2)))           # seq 2 again, 10 ns later
+        records.append((T_REAL + 600_000_000, datagram(3, 4, rssi=-70)))     # seq 4 again, another RSSI
+        path = os.path.join(self.dir, "dup.pcap")
+        write_pcap(path, records)
+        st = pp.PcapStats()
+        win = pp.from_pcap(path, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True, stats=st)
+        self.assertEqual((st.duplicates, int(win.received.sum())), (1, 6))
+        np.testing.assert_array_equal(win.t_rel_ns[0], np.array([0, 1, 2, 3, 4, 6]) * 100_000_000 - 1_000_000_000)
+        self.assertEqual(win.rssi[0].tolist(), [-50.0] * 5 + [-70.0])
+
+    def test_nothing_survives_or_wrong_counts_dominate(self):
+        """A file from which no datagram survives is refused with the counts
+        and the n_subcarriers seen; on REAL data a receiver whose wrong-count
+        datagrams outnumber its good ones is refused (on SIM they are
+        skipped and counted)."""
+        wide = os.path.join(self.dir, "wide.pcap")
+        write_pcap(wide, [(T_REAL + i, build_esp32_frame([(0, 1)] * 128, node_id=3, sequence=i)) for i in range(4)])
+        with self.assertRaisesRegex(ValueError, r"no datagram survives: 4 records, 4 UDP datagrams \(port 5566\), 0 to "
+                                                r"other ports, 4 malformed, 0 duplicates; n_subcarriers: all have 128; "
+                                                r"layout esp32-fw56 wants 56"):
+            pp.from_pcap(wide, 1.0, T_REAL + 100, label="REAL", single_tx=True)
+        empty = os.path.join(self.dir, "empty.pcap")
+        write_pcap(empty, [])
+        with self.assertRaisesRegex(ValueError, "no datagram survives: 0 records.*n_subcarriers: none parsed"):
+            pp.from_pcap(empty, 1.0, T_REAL, label="REAL", single_tx=True)
+        records = [(T_REAL + i * 10_000_000, datagram(3, i)) for i in range(2)]
+        records += [(T_REAL + (2 + i) * 10_000_000, datagram(3, 2 + i, entries=64)) for i in range(3)]
+        records += [(T_REAL + (5 + i) * 10_000_000, datagram(7, i)) for i in range(5)]
+        records += [(T_REAL + 100_000_000, datagram(7, 9, entries=64))]
+        path = os.path.join(self.dir, "mixed-count.pcap")
+        write_pcap(path, records)
+        with self.assertRaisesRegex(ValueError, "receiver 3: 3 datagrams with another n_subcarriers against 2 with 56"):
+            pp.from_pcap(path, 1.0, T_REAL + 1_000_000_000, label="REAL", single_tx=True)
+        sim = os.path.join(self.dir, "mixed-count.sim.pcap")
+        shutil.copy(path, sim)
+        st = pp.PcapStats()
+        win = pp.from_pcap(sim, 1.0, T_REAL + 1_000_000_000, single_tx=True, stats=st)
+        self.assertEqual((win.received.sum(axis=1).tolist(), st.wrong_count), ([2, 5], 4))
+
+    def test_missing_file(self):
+        with self.assertRaisesRegex(FileNotFoundError, "does not exist"):
+            pp.from_pcap(os.path.join(self.dir, "nowhere.pcap"), 1.0, T_REAL, label="REAL", single_tx=True)
+
+    def test_hashes_the_bytes_it_parses(self):
+        """The file is read once: a recorder appending while it is parsed
+        changes neither the windows nor the hash, which is that of the bytes
+        parsed."""
+        path = self.recording()
+        with open(path, "rb") as fh:
+            before = fh.read()
+        extra_file = os.path.join(self.dir, "extra.pcap")
+        write_pcap(extra_file, [(T_REAL + 2_990_000_000, datagram(3, 30))])      # inside the window below
+        with open(extra_file, "rb") as fh:
+            extra = fh.read()[24:]                                                # its one record
+        real_read = pp.read_pcap
+
+        def growing(p, port=None, stats=None):
+            with open(path, "ab") as fh:
+                fh.write(extra)
+            yield from real_read(p, port, stats)
+        with mock.patch.object(pp, "read_pcap", growing):
+            win = pp.from_pcap(path, 1.0, T_REAL + 3_000_000_000, label="REAL", single_tx=True)
+        self.assertEqual(win.source, "pcap:" + hashlib.sha256(before).hexdigest()[:12])
+        self.assertEqual(win.received.sum(axis=1).tolist(), [10, 10])
+        with open(path, "rb") as fh:
+            self.assertEqual(fh.read(), before + extra)
+        self.assertEqual(pp.from_pcap(path, 1.0, T_REAL + 3_000_000_000, label="REAL", single_tx=True)
+                         .received.sum(axis=1).tolist(), [11, 10])
 
     def test_positions_from_a_declared_scene_only(self):
         rec = self.recording()
@@ -1196,13 +1533,23 @@ class TestCrossPath(Case):
 
     def test_refusals(self):
         """The same pcap without a link map is refused (several transmitters
-        interleave), and it is SIM even when the caller says REAL."""
+        interleave), and it is SIM even when the caller says REAL: also when
+        renamed without its manifest (Room Sim's addresses give it away),
+        with single_tx or with its link map."""
         for entry, prefix in self.exports.values():
             with self.assertRaisesRegex(ValueError, "not gateway-faithful"):
                 pp.from_pcap(prefix + ".sim.pcap", 2.0, pp.sim_end_ns(3))
+            link_map = pp.truth_link_map(prefix + ".truth.jsonl")
+            self.assertEqual(link_map.label, "SIM")
             with self.assertRaisesRegex(ValueError, "so its label is SIM"):
-                pp.from_pcap(prefix + ".sim.pcap", 2.0, pp.sim_end_ns(3), label="REAL",
-                             link_map=pp.truth_link_map(prefix + ".truth.jsonl"))
+                pp.from_pcap(prefix + ".sim.pcap", 2.0, pp.sim_end_ns(3), label="REAL", link_map=link_map)
+            renamed = os.path.join(os.path.dirname(prefix), "capture.pcap")
+            shutil.copy(prefix + ".sim.pcap", renamed)
+            with self.assertRaisesRegex(ValueError, r"10\.1\.<rx>\.1:5566, so its label is SIM; label 'REAL' refused"):
+                pp.from_pcap(renamed, 2.0, pp.sim_end_ns(3), label="REAL", single_tx=True)
+            with self.assertRaisesRegex(ValueError, "so its label is SIM; label 'REAL' refused"):
+                pp.from_pcap(renamed, 2.0, pp.sim_end_ns(3), label="REAL", link_map=link_map)
+            self.assertEqual(pp.from_pcap(renamed, 2.0, pp.sim_end_ns(3), link_map=link_map).label, "SIM")
 
 
 if __name__ == "__main__":

@@ -126,6 +126,11 @@ the Phase 4, 5 and 6 rows are from 2026-10-24.
 | Determinism | 1, 4, 8 and 96 threads; two separate full runs | byte-identical shards and scene files; the second full run, after the `zone_reachable` fix, changed exactly the 16 shards the fix named and nothing else |
 | `ml/` loader and plot | `.venv/bin/python -m unittest discover -s ml/tests`, with `SAANS_DATASET_DIR` on the generated dataset | 42 pass; every one of the 2,000 shards checked (members, dtypes, shapes, meta, null subcarriers, labels inside the floor and in reachable zones, packet counts per window) in 197 s |
 | Generated (SIM) | `saans gen-dataset --out /home/Aman/are_u_theone/datasets/roomsim-v1` (release, 96 cores) | 2,000 rooms x 120 s in 10 min (6.1 GB peak memory), 17.34 GB, 0 redraws; 1,492 rooms with people; splits 1,598 / 201 / 201, val and test each 51 / 54 / 48 / 48 rooms with 0 / 1 / 2 / 3 people and 50 L-shaped; packet loss 2.0%; at the end of 2 s windows the WLM baseline publishes in 57.5% of occupied windows (median error 1.31 m, median radius 5.07 m, uncalibrated) and in 5.3% of empty ones (false alarms); RTI publishes in 31.8% of occupied and 23.8% of empty windows |
+| **Phase 7** | | |
+| Preprocessing | `.venv/bin/python -m unittest discover -s ml/tests` (with `SAANS_DATASET_DIR`) | 105 pass for the preprocessing and the dataset loader: numpy against the stdlib reference within per-field tolerances on random and SIM windows; gain and phase invariance; layouts and the REAL layout check; guards; the pcap reader's label, address, duplicate, clock-step and malformed-datagram rules; and a dataset room exported with `saans roomsim-export` read back from the pcap giving windows identical to the shard's (also across all 60 windows of a full-length 12-node run) |
+| Mutation | 86 mutants of `ml/preprocess.py` and its tests, then 18 targeted ones | the first round killed 70; the survivors exposed seven untested behaviours, each now pinned by its own test, and every targeted mutant is caught |
+| Throughput | one core, SIM 2 s windows | about 390 windows/s (2.3 µs per packet); 110 with phase; 230 binned at 10 Hz |
+| Whole suites (Phase 7) | workspace `cargo test --locked`; full Python suite on 3.10.12 and 3.12.15 | Rust 598 pass (1 ignored); Python 695 at the baseline (3.12.15: only the UDP-buffer error; 3.10.12: that plus the two known pre-3.12 failures). No Rust or `wifisense/` code changed in Phase 7 |
 | Whole suites (Phase 6, from a clean build) | workspace `cargo test --locked`; gateway with `roomsim`; locate, roomsim, scene standalone; clippy with and without `roomsim`; full Python suite on 3.10.12, 3.11.5, 3.12.15; `make -C edge/dsp/test check`; golden regeneration | Rust workspace 593 pass (1 ignored), gateway with `roomsim` 132, saans-locate 167 / 254, saans-roomsim 68, saans-scene 49, saans-cli 70 after the last fix; clippy shows only the 4 earlier warnings; Python 695 at the pre-Phase 6 baseline (3.12.15: only the UDP-buffer error; 3.11.5 and 3.10.12: that plus the two known pre-3.12 failures); edge PASS; a full regeneration on CPython 3.14.8 changes 0 of 59 sets' files |
 | Whole suites (Phase 5, from a clean build) | workspace `cargo test --locked`; gateway with `roomsim`; clippy with and without `roomsim`; full Python suite on 3.10.12, 3.11.5, 3.12.15; `make -C edge/dsp/test check`; golden regeneration | Rust workspace 560 pass (1 ignored), gateway with `roomsim` 132; clippy shows only the 4 earlier warnings; Python 695 at the pre-Phase 5 baseline (3.12.15: only the UDP-buffer error; 3.11.5 and 3.10.12: that plus the two known pre-3.12 failures); edge PASS; a full regeneration on CPython 3.14.8 changes 0 of 59 sets' files |
 | Whole suites (Phase 4, from a clean build) | workspace `cargo test --locked`; gateway with `roomsim`; full Python suite on 3.10.12, 3.11.5, 3.12.15; `make -C edge/dsp/test check`; golden regeneration | Rust workspace 446 pass (1 ignored, the optional hypot dump), gateway with `roomsim` 79; Python 695 at the pre-Phase 4 baseline (row above); edge PASS (g++); a full regeneration on CPython 3.14.8 changes 0 of 59 sets' files |
@@ -255,7 +260,27 @@ about 17% of 2 s link-windows) dominate raw amplitude variance; and the
 sample plot clipped the WLM's room-sized circle and ranked links by gain
 steps. All are fixed.
 
-**GPU.** Phases 0–6 used none. The only GPU work so far was the fp16/bf16
+**Phase 7 review.** Two reviewers read the draft of `spec/preprocess.md`
+(fitness for Phases 8, 9, 11 and honesty; exactness against the code and
+data, with experiments) and found 24 defects. Among them:
+- the optional binning averaged complex values that carry a random
+  per-packet phase, keeping 40–60% of the amplitude and erasing the
+  presence contrast — bins now average amplitudes;
+- a pcap reader pooled every transmitter a receiver hears into one
+  "link" (an empty room looked busier than an occupied one);
+- normalising 52-bin and 44-bin sources over different bins shifted the
+  features by about 3% — normalisation now uses the 44 shared bins;
+- float time edges put SIM packets in different bins in the two
+  readers — times are integer nanoseconds;
+- numpy and the stdlib disagree in the last bits wherever the arithmetic
+  was left open — the spec now pins it, with per-field tolerances.
+
+A code review of the build then found 9 defects in the pcap reader and the
+record, all fixed. A renamed SIM export could be read as REAL. Two boards
+sharing a node id, duplicate datagrams and clock steps were accepted
+silently. Extreme finite CSI could overflow into NaN.
+
+**GPU.** Phases 0–7 used none. The only GPU work so far was the fp16/bf16
 benchmark in RUN.md §1.
 
 ## Open items for the owner
@@ -452,6 +477,24 @@ benchmark in RUN.md §1.
       `roomsim_export::an_id_problem_is_reported_even_when_the_text_fails_later`
       fails whenever `TMPDIR` contains the user name ("Aman"), because it
       checks that stderr never contains it.
+
+15. **Phase 7 decisions and findings for the owner.**
+    - *Decisions* (spec/preprocess.md *Decisions taken here*): numpy in
+      `ml/` with a stdlib reference and no Rust port; one record and one
+      reader per source; gain and the phase fit over the 44 shared
+      subcarriers (the other carried bins output with the same gain);
+      phase off by default and output as (cos, sin), the slope never
+      output; no resampling by default; unbiased spread with a 3-packet
+      minimum; labels derived, never overridable.
+    - *A recording from today's firmware is read as one link per receiver
+      only with `single_tx=True`*: the datagram carries no transmitter id,
+      so a multi-transmitter recording cannot be split, and the reader
+      cannot tell.
+    - *SIM-only regularities survive preprocessing*: reciprocal links are
+      near-identical, `gain_db` is an invented AGC walk, SIM carries 44
+      bins, and SIM packet times sit on an exact TDMA grid
+      (spec/preprocess.md §11). Phase 8 keeps them out of the model's
+      inputs where it can.
 
 ## Changing the simulator
 

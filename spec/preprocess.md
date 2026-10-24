@@ -116,7 +116,13 @@ first; `P` is the most received packets any link has, so it varies between
 windows and a slot index is not a time (`t_rel_ns` is). A lost packet
 occupies no slot in any source. Links are listed in ascending `(tx, rx)`;
 with a link map, every link of the map is listed even with no packet in the
-window. A `CsiWindow` with a non-finite `csi` entry is refused.
+window. A `CsiWindow` with a non-finite `csi` entry, or a non-zero
+component outside `[2^-32, 2^32)` in magnitude (the domain in which every
+§4 product and quotient stays finite in float64 and every output in
+float32; int8 and int16 CSI are far inside it), is refused; so is a `P`
+larger than the most received packets any link has, and a `tx = -1` link
+with a known tx position. A `CsiWindow`'s arrays are copied and frozen
+when it is made.
 
 **Provenance.** `source` is `"<dataset>[impairments=<on|hardware_off>]:<scene id>"`
 for SIM shards and `"pcap:<sha256 of the file, 12 hex>"` for pcaps;
@@ -153,8 +159,23 @@ for SIM shards and `"pcap:<sha256 of the file, 12 hex>"` for pcaps;
     `sigma/mu` 0.28 pooled against 0.02 per link in an empty room).
   The **label**: SIM when the CLI's own export detector
   (`wifisense.cli._sim_banner`, the rule `wifisense stats` uses) finds a
-  Room Sim export, and a caller's `label="REAL"` is then refused;
-  otherwise the caller's label, which is required. Positions come only from
+  Room Sim export, **or when a link map is given** (only a `.sim.pcap`'s
+  `truth.jsonl` provides one, and `truth_link_map` returns it tagged SIM),
+  **or when every datagram comes from Room Sim's address convention**
+  (`10.1.<rx>.1:5566`, spec/roomsim.md §13; a real node uses an ephemeral
+  port); a caller's `label="REAL"` is then refused. Otherwise the caller's
+  label, which is required.
+
+  **REAL streams are checked, not trusted** (the recorder writes in arrival
+  order and keeps everything): a `node_id` seen from more than one source
+  address is refused (two boards sharing an id; `wifisense stats` warns
+  about the same); exact duplicates of `(rx, seq, payload)` are dropped and
+  counted; `t_ns` going backwards in file order by more than 1 ms is
+  refused naming the receiver (a wall-clock step); a file from which no
+  datagram survives is refused with the read counts and the
+  `n_subcarriers` values seen, and a receiver whose wrong-count datagrams
+  outnumber its good ones is refused. The file is hashed and parsed from
+  the same bytes. Positions come only from
   a declared `scene` (ADR-008), never guessed. The layout check of §8 runs
   on REAL data. A datagram whose `(rx, seq)` is missing from a supplied link
   map is refused; a `.sim.pcap` without its manifest is read only with
@@ -330,7 +351,10 @@ value; adapters read the raw CSI).
   float64 values **before the float32 cast** match it: shapes, masks and
   counts exactly; `mu`, `sigma`, `gain_db`, `t_rel` within
   `1e-12 · max(1, |ref|)`; `z` within `1e-12 · (1 + |z| + mu/sigma)`; phase
-  components within 1e-12 (absolute); and the float32 outputs within one
+  components within 1e-12 (absolute), and a binned phase within
+  `1e-12 · Σ|r| / |Σ r|` (when a bin's residuals nearly cancel, a 1-ulp
+  difference between `np.arctan2` and `math.atan2` is magnified by that
+  ratio: measured 1.2e-12 at a ratio of 32 on noise, about 1e-15 on SIM); and the float32 outputs within one
   ulp of the reference's cast — on random windows and on windows of the SIM
   dataset (if `SAANS_DATASET_DIR` is set).
 - **Gain invariance:** multiplying any packet by any positive scalar `c`
@@ -372,15 +396,18 @@ value; adapters read the raw CSI).
   removes their mean, keeping it in `mu`.
 - The phase residual keeps the static ripple's phase and the multipath; it
   is relative phase, not range (decision 4).
-- **What `sigma` keeps of presence** (measured, SIM, 2 s windows): walking
-  vs empty AUC 0.94, still vs empty 0.63. A still person differs from an
+- **What `sigma` keeps of presence** (measured, SIM, 2 s windows, a
+  per-window `sigma/mu` feature over 50-scene samples): walking vs empty
+  AUC 0.90–0.98, still vs empty 0.50–0.70 (six samples). A still person differs from an
   empty room mainly in `mu`'s level, which nothing inside the window
   calibrates.
 - **SIM-only regularities survive preprocessing:** reciprocal links are
   near-identical (`mu` within 0.7%, RSSI within 0.02 dB, measured SIM, where
   real boards differ by dB); `gain_db` is an invented AGC walk; the phase
   impairment is only a common phase plus a linear slope; SIM always carries
-  44 bins.
+  44 bins; and SIM packet times sit on an exact `N · 12.5 ms` TDMA grid,
+  which separates SIM from REAL by itself (a model must not see `t_rel`'s
+  fine structure).
 - REAL `(-1, rx)` links can include ambient frames (the node has no MAC
   filter); the layout check (§8) catches a wrong layout, not stray
   transmitters.

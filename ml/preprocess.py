@@ -8,9 +8,12 @@ never a runtime path (ADR-001, ADR-007).
 **Labels.** Every `CsiWindow` is `"SIM"` or `"REAL"`, what its data is, and
 every output copies the window's label, source and window name unchanged;
 nothing here can relabel data. A shard is SIM. A pcap is SIM when
-`wifisense stats`' own detector finds a Room Sim export (a caller who says
-REAL is then refused), otherwise it is whatever the caller says it is,
-which must be said. `SIM->REAL` labels results, never windows.
+`wifisense stats`' own detector finds a Room Sim export, when it is read
+with a link map (only an export's truth gives one), or when every datagram
+comes from Room Sim's `10.1.<rx>.1:5566` (a renamed export); a caller who
+says REAL is then refused. Otherwise it is whatever the caller says it is,
+which must be said, and a REAL stream is checked, not trusted (§2).
+`SIM->REAL` labels results, never windows.
 
 Each source has an adapter that maps its layout (§8) onto one canonical
 record, `CsiWindow` (§2): complex CSI in `(re, im)` order on the 52 LLTF
@@ -49,7 +52,9 @@ import json
 import math
 import numbers
 import os
-from dataclasses import dataclass
+import re
+import tempfile
+from dataclasses import dataclass, field
 from fractions import Fraction
 
 import numpy as np
@@ -62,8 +67,8 @@ from wifisense.sources.recorder import ReadStats, read_pcap
 
 __all__ = [
     "LABELS", "GRID_K", "K_GRID", "SHARED44", "REF_BINS", "PAIRS", "LAYOUTS", "PHASE_MIN_AMP",
-    "SIM_T0_NS", "SIM_TICK_NS", "Layout", "CsiWindow", "PreprocessConfig", "layout", "to_grid",
-    "from_roomsim_shard", "from_pcap", "truth_link_map", "sim_end_ns", "preprocess", "reference_input",
+    "SIM_T0_NS", "SIM_TICK_NS", "Layout", "CsiWindow", "PreprocessConfig", "SimLinkMap", "PcapStats", "layout",
+    "to_grid", "from_roomsim_shard", "from_pcap", "truth_link_map", "sim_end_ns", "preprocess", "reference_input",
 ]
 
 #: What a window's data is (decision 6). `SIM->REAL` labels results, never windows.
@@ -198,8 +203,10 @@ class CsiWindow:
     (ascending; `tx = -1` when unknown) holds its **received packets only**,
     in time order, **right-aligned**: the newest at `P - 1`, padding
     (`received` false) first, so a slot index is not a time (`t_rel_ns`
-    is). The constructor checks every dtype, shape and invariant and
-    refuses a non-finite CSI entry. Treat the arrays as read-only.
+    is), and `P` is the most packets any link has. The constructor checks
+    every dtype, shape and invariant, refuses a non-finite CSI entry or a
+    non-zero component outside `[2^-32, 2^32)` in magnitude, and keeps
+    read-only copies of the arrays it is given.
     """
 
     label: str
@@ -229,10 +236,20 @@ def _want(name: str, arr, dtype, shape: tuple) -> None:
         raise ValueError(f"CsiWindow.{name}: want {np.dtype(dtype)} {shape}, got {got}")
 
 
+#: The record's array fields, copied and frozen when a `CsiWindow` is made (§2).
+_ARRAYS = ("links", "tx_known", "link_pos", "link_pos_known", "csi", "received", "carried", "t_rel_ns", "rssi",
+           "rssi_mask")
+#: §2: a non-zero CSI component must lie in [2^-32, 2^32) in magnitude, where every §4 product and
+#: quotient stays finite (and above underflow) in float64 and every output finite in float32.
+_DOMAIN_LO, _DOMAIN_HI = ref_impl.DOMAIN
+
+
 def _check_window(w: CsiWindow) -> None:
-    """§2's record, checked: dtypes and shapes, labels, link order, and the
-    masks' invariants (0 where not received or not carried, right-aligned
-    packets in time order inside the window)."""
+    """§2's record, checked: dtypes and shapes, labels, link order, the CSI
+    domain and the masks' invariants (0 where not received or not carried,
+    right-aligned packets in time order inside the window, `P` no larger
+    than needed). Every array is first replaced by a frozen copy, so the
+    checks hold for the arrays the window keeps."""
     if w.label not in LABELS:
         raise ValueError(f"CsiWindow.label {w.label!r} is not one of {LABELS} (SIM->REAL labels results, "
                          f"never windows)")
@@ -253,6 +270,10 @@ def _check_window(w: CsiWindow) -> None:
     _want("t_rel_ns", w.t_rel_ns, np.int64, (n_links, n_pk))
     _want("rssi", w.rssi, np.float64, (n_links, n_pk))
     _want("rssi_mask", w.rssi_mask, np.bool_, (n_links, n_pk))
+    for name in _ARRAYS:
+        kept = getattr(w, name).copy()
+        kept.setflags(write=False)
+        object.__setattr__(w, name, kept)
     tx, rx = w.links[:, 0].astype(np.int64), w.links[:, 1].astype(np.int64)
     if (tx < -1).any() or (rx < 0).any() or (tx == rx).any():
         raise ValueError("CsiWindow.links: tx must be -1 (unknown) or a node id, rx a node id, tx != rx")
@@ -263,12 +284,22 @@ def _check_window(w: CsiWindow) -> None:
         raise ValueError("CsiWindow.tx_known must be true exactly where tx != -1")
     if not np.isfinite(w.link_pos).all() or (w.link_pos[~w.link_pos_known] != 0).any():
         raise ValueError("CsiWindow.link_pos must be finite, and 0 where not known")
+    if (w.link_pos_known[:, 0] & (tx == -1)).any():
+        raise ValueError("CsiWindow: a link whose tx is unknown (-1) cannot have a known tx position (§2)")
     if not np.isfinite(w.csi.real).all() or not np.isfinite(w.csi.imag).all():
         raise ValueError(f"{w.source} {w.window_end}: a non-finite CSI entry; refused (§2)")
+    for part in (w.csi.real, w.csi.imag):
+        size = np.abs(part)
+        if ((size != 0.0) & ((size < _DOMAIN_LO) | (size >= _DOMAIN_HI))).any():
+            raise ValueError(f"{w.source} {w.window_end}: a non-zero CSI component outside [2^-32, 2^32) in "
+                             f"magnitude; refused (§2: outside it §4's products overflow or underflow)")
     if (w.csi[~w.received] != 0).any() or (w.csi[:, :, ~w.carried] != 0).any():
         raise ValueError("CsiWindow.csi must be 0 where not received and at bins not carried (§2)")
     if (w.received[:, 1:] < w.received[:, :-1]).any():
         raise ValueError("CsiWindow.received must be right-aligned: padding first, the newest packet at P-1 (§2)")
+    most = int(w.received.sum(axis=1).max(initial=0))
+    if n_pk != most:
+        raise ValueError(f"CsiWindow: P = {n_pk} slots, but the most received packets of any link is {most} (§2)")
     t = w.t_rel_ns
     if (t[~w.received] != 0).any():
         raise ValueError("CsiWindow.t_rel_ns must be 0 where not received")
@@ -337,13 +368,6 @@ def _pack(mask: np.ndarray):
     return p, l, j, p - after[l, j]
 
 
-def _shared(*arrays):
-    """Mark arrays that every window of one adapter call shares read-only."""
-    for a in arrays:
-        a.setflags(write=False)
-    return arrays
-
-
 def _link_positions(links: np.ndarray, pos: dict | None) -> tuple:
     """`(link_pos [L, 2, 3], link_pos_known [L, 2])` from node id -> (x, y, z)."""
     n = links.shape[0]
@@ -403,7 +427,6 @@ def from_roomsim_shard(dataset_dir: str, scene_index: int, k, length_s: float, *
     link_pos, pos_known = _link_positions(links, pos)
     tx_known = np.ones(links.shape[0], bool)
     carried = lay.carried
-    _shared(links, link_pos, pos_known, tx_known, carried)
     out = []
     for tick in ticks:
         iw = rd.window_iq(scene, tick, length_s)
@@ -430,12 +453,21 @@ def sim_end_ns(k: int) -> int:
     return SIM_T0_NS + SIM_TICK_NS * (int(k) + 1)
 
 
-def truth_link_map(truth_path: str) -> dict:
+class SimLinkMap(dict):
+    """`(rx, seq) -> (tx, rx)` from a Room Sim export's truth, tagged with
+    its label: only a `.sim.pcap`'s `truth.jsonl` gives a link map, so a pcap
+    read with one is SIM (§2)."""
+
+    label = "SIM"
+
+
+def truth_link_map(truth_path: str) -> SimLinkMap:
     """`(rx, seq) -> (tx, rx)` for every received packet of a Room Sim
     export's `PREFIX.truth.jsonl` (spec/roomsim.md §13): the only way to
     recover a datagram's transmitter. Checks every line is labelled SIM and
-    that each `link_index` names one `(tx, rx)`. SIM."""
-    out: dict = {}
+    that each `link_index` names one `(tx, rx)`. Returns a `SimLinkMap`
+    (label SIM)."""
+    out = SimLinkMap()
     by_index: dict = {}
     with open(truth_path, encoding="utf-8") as fh:
         for line_no, line in enumerate(fh, 1):
@@ -455,6 +487,24 @@ def truth_link_map(truth_path: str) -> dict:
                     raise ValueError(f"{truth_path}:{line_no}: (rx, seq) = {key} appears twice")
                 out[key] = (tx, rx)
     return out
+
+
+@dataclass
+class PcapStats(ReadStats):
+    """`wifisense.sources.recorder.ReadStats` (records read, datagrams
+    delivered, skipped by kind, `malformed`) plus what `from_pcap` drops or
+    sees: exact duplicates of `(rx, seq, payload)`, datagrams whose
+    `n_subcarriers` is not the layout's (also counted in `malformed`), and
+    how many parsed datagrams had each `n_subcarriers`."""
+
+    duplicates: int = 0
+    wrong_count: int = 0
+    subcarrier_counts: dict = field(default_factory=dict)
+
+
+#: spec/roomsim.md §13: a Room Sim export's datagrams come from 10.1.<rx>.1:5566.
+_SIM_SOURCE = re.compile(r"10\.1\.(\d{1,3})\.1")
+_SIM_PORT = 5566
 
 
 def _length_ns(length_s) -> int:
@@ -491,8 +541,16 @@ def _scene_positions(scene) -> dict:
     return out
 
 
-def _export_manifest(path: str) -> dict | None:
-    """A Room Sim export's `PREFIX.manifest.json` beside `PREFIX[.sim].pcap`, or None."""
+def _read_capture(path: str, port, st: ReadStats):
+    """Read a pcap once (§2): its bytes are hashed, judged by
+    `wifisense.cli._sim_banner` (with the export manifest beside it, also
+    read once) and parsed by `read_pcap`, all from one private copy, so the
+    provenance hash describes exactly the datagrams parsed even while a
+    recorder is still appending. Returns `(sha256 hex, is a Room Sim
+    export, the manifest beside it or None, the delivered datagrams)`."""
+    with open(path, "rb") as fh:
+        data = fh.read()
+    digest = hashlib.sha256(data).hexdigest()
     for suffix in (".sim.pcap", ".pcap"):
         if path.endswith(suffix):
             prefix = path[: -len(suffix)]
@@ -500,11 +558,30 @@ def _export_manifest(path: str) -> dict | None:
     else:
         prefix = path
     try:
-        with open(prefix + ".manifest.json", encoding="utf-8") as fh:
-            doc = json.load(fh)
-    except (OSError, ValueError):
-        return None
-    return doc if isinstance(doc, dict) else None
+        with open(prefix + ".manifest.json", "rb") as fh:
+            manifest_bytes = fh.read()
+    except OSError:
+        manifest_bytes = None
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = os.path.join(tmp, os.path.basename(path))
+        with open(copy, "wb") as fh:
+            fh.write(data)
+        if manifest_bytes is not None:
+            with open(os.path.join(tmp, os.path.basename(prefix) + ".manifest.json"), "wb") as fh:
+                fh.write(manifest_bytes)
+        export = _sim_banner(copy) is not None
+        try:
+            packets = list(read_pcap(copy, port, st))
+        except ValueError as err:
+            raise ValueError(str(err).replace(copy, path)) from None
+    manifest = None
+    if manifest_bytes is not None:
+        try:
+            doc = json.loads(manifest_bytes.decode("utf-8"))
+        except ValueError:
+            doc = None
+        manifest = doc if isinstance(doc, dict) else None
+    return digest, export, manifest, packets
 
 
 def _layout_check(path: str, lay: Layout, rx: np.ndarray, iq: np.ndarray) -> None:
@@ -523,9 +600,7 @@ def _layout_check(path: str, lay: Layout, rx: np.ndarray, iq: np.ndarray) -> Non
         if act == 0 or 100 * guard * len(active) > act * len(_GUARD_ENTRIES):
             if act == 0:
                 why = "no energy on the active entries"
-            elif guard == 0:
-                why = "guard entries silent"
-            else:
+            else:                                       # guard > 0 here: the inequality failed
                 db = 10.0 * math.log10((guard / len(_GUARD_ENTRIES)) / (act / len(active)))
                 why = f"guard entries 27..37 only {-db:.1f} dB below the active entries"
             raise ValueError(f"{path}: receiver {node}: {why} (need 20 dB): its datagrams do not look like the "
@@ -534,87 +609,146 @@ def _layout_check(path: str, lay: Layout, rx: np.ndarray, iq: np.ndarray) -> Non
 
 def from_pcap(path, length_s: float, end_ns, layout: str = "esp32-fw56", port: int | None = 5566,
               link_map: dict | None = None, single_tx: bool = False, label: str | None = None, scene=None, *,
-              stats: ReadStats | None = None):
+              stats: PcapStats | None = None):
     """Raw-CSI datagrams of a pcap as `CsiWindow`s (§2): a recording
     (`python3 -m wifisense record`, REAL) or a Room Sim export (`saans
     roomsim-export`, SIM).
 
-    Read with `wifisense.sources.recorder.read_pcap` (integer `t_ns`, UDP
-    destination `port`; None keeps every port) and parsed with
-    `parse_esp32_frame`. A datagram is skipped and counted in
-    `stats.malformed` when parsing raises (FeatureFrames included), when
-    `n_antennas` or `n_subcarriers` is 0, or when `n_subcarriers` is not
-    the layout's entry count (`esp32-fw56`: 56; `esp32-lltf64`: 64).
-    `end_ns` is one integer epoch-ns window end (one window returned) or a
-    sequence of them (a list); a window is `[end - length, end)` compared in
-    integers (`sim_end_ns(k)` gives a `.sim.pcap`'s tick ends).
+    The file is read once (hashed, judged and parsed from the same bytes)
+    with `wifisense.sources.recorder.read_pcap` (integer `t_ns`, UDP
+    destination `port`; None keeps every port) and `parse_esp32_frame`. A
+    datagram is skipped and counted in `stats.malformed` when parsing
+    raises (FeatureFrames included), when `n_antennas` is 0, or when
+    `n_subcarriers` is not the layout's entry count (`esp32-fw56`: 56,
+    `esp32-lltf64`: 64; also counted in `stats.wrong_count`). `end_ns` is
+    one integer epoch-ns window end (one window returned) or a sequence of
+    them (a list); a window is `[end - length, end)` compared in integers
+    (`sim_end_ns(k)` gives a `.sim.pcap`'s tick ends).
 
-    Links: with `link_map` (`(rx, seq) -> (tx, rx)`, e.g.
-    `truth_link_map(PREFIX.truth.jsonl)`) every datagram goes to its link
-    and every link of the map is listed, packets or not; a datagram missing
-    from the map is refused. Without it a receiver's stream is one link
-    `(-1, rx)`, which is honest only when one transmitter is heard: a Room
-    Sim export whose manifest says `gateway_faithful` false is refused, and
-    a recording (or an export without its manifest) needs `single_tx=True`
-    from the caller.
+    Checked, not trusted: a node_id seen from two source addresses, or a
+    datagram more than 1 ms before an earlier one in file order (a clock
+    step), is refused naming the node; exact duplicates of `(rx, seq,
+    payload)` are dropped (`stats.duplicates`); a file from which no
+    datagram survives is refused with the counts and the `n_subcarriers`
+    seen; on REAL data a receiver whose wrong-count datagrams outnumber its
+    good ones is refused, and §8's layout check runs.
 
-    Label: SIM when `wifisense.cli._sim_banner` finds a Room Sim export
-    (`label="REAL"` is then refused); otherwise `label` ("REAL" or "SIM")
-    is required. REAL data must pass §8's layout check. Positions come only
-    from a declared `scene` (a scene file's path or parsed JSON), never
-    guessed. `source` is `"pcap:"` and 12 hex digits of the file's sha256.
+    Label: SIM when `wifisense.cli._sim_banner` finds a Room Sim export,
+    when a link map is given (only an export's truth gives one;
+    `truth_link_map` tags it SIM), or when every datagram comes from Room
+    Sim's `10.1.<rx>.1:5566`; `label="REAL"` is then refused. Otherwise
+    `label` ("REAL" or "SIM") is required.
+
+    Links: with `link_map` (`(rx, seq) -> (tx, rx)`) every datagram goes to
+    its link and every link of the map is listed, packets or not; a
+    datagram missing from the map is refused. Without it a receiver's
+    stream is one link `(-1, rx)`, honest only when one transmitter is
+    heard: an export whose manifest says `gateway_faithful` false is
+    refused, and anything else without a gateway-faithful manifest needs
+    `single_tx=True` from the caller. Positions come only from a declared
+    `scene` (a scene file's path or parsed JSON), never guessed. `source`
+    is `"pcap:"` and 12 hex digits of the sha256 of the bytes read.
     """
     lay = _layout(layout)
     if lay.name not in _FIXED_PAIRS:
         raise ValueError(f"from_pcap reads ESP32 datagrams: layout {lay.name!r} is not one of {tuple(_FIXED_PAIRS)}")
     path = os.fspath(path)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{path} does not exist")
     length_ns = _length_ns(length_s)
     ends, one = _scalar_or_list(end_ns, "end_ns")
-    banner = _sim_banner(path)
-    if banner is not None:
-        if label not in (None, "SIM"):
-            raise ValueError(f"{path} is a Room Sim export, so its label is SIM; label {label!r} refused (§2)")
-        label = "SIM"
-    elif label not in LABELS:
-        raise ValueError(f"{path} is not a Room Sim export: pass label='REAL' for a recording (or 'SIM'), "
-                         f"not {label!r} (§2)")
+    if label not in (None,) + LABELS:
+        raise ValueError(f"label {label!r} is not None, 'SIM' or 'REAL' (SIM->REAL labels results, never windows)")
     if link_map is not None and single_tx:
         raise ValueError("single_tx=True is for a stream without a link map; with one, every packet has its link")
-    if link_map is None:
-        manifest = _export_manifest(path) if banner is not None else None
-        if manifest is not None and manifest.get("gateway_faithful") is False:
-            raise ValueError(f"{path}: a Room Sim export that is not gateway-faithful (several transmitters "
-                             f"interleave in each receiver's stream, spec/roomsim.md §12.4); pass "
-                             f"link_map=truth_link_map(<prefix>.truth.jsonl) (§2)")
-        faithful = manifest is not None and manifest.get("gateway_faithful") is True
-        if not faithful and not single_tx:
-            raise ValueError(f"{path}: without a link map a receiver's stream is one link only when one transmitter "
-                             f"is heard; pass single_tx=True if that is so, or a link_map (§2)")
-    with open(path, "rb") as fh:
-        digest = hashlib.sha256(fh.read()).hexdigest()
-    st = stats if stats is not None else ReadStats()
+    if link_map is not None and getattr(link_map, "label", "SIM") != "SIM":
+        raise ValueError(f"a link map labelled {link_map.label!r}: only a Room Sim export's truth gives one (§2)")
+    st = PcapStats() if stats is None else stats
+    if not isinstance(st, PcapStats):
+        raise TypeError("stats must be a PcapStats (a ReadStats with from_pcap's own counts)")
+    digest, export, manifest, packets = _read_capture(path, port, st)
+
     t_ns, rx, seq, rssi, iq = [], [], [], [], []
-    for pkt in read_pcap(path, port, st):
+    sources: dict = {}            # node_id -> source addresses seen
+    wrong: dict = {}              # node_id -> datagrams with another n_subcarriers
+    good: dict = {}               # node_id -> datagrams of the layout (duplicates included)
+    seen: set = set()             # (rx, seq, payload) kept
+    convention = bool(packets)    # every datagram from Room Sim's 10.1.<rx>.1:5566
+    latest = None                 # the latest t_ns so far, in file order
+    for pkt in packets:
+        ip, sport = pkt.src
+        sim_ip = _SIM_SOURCE.fullmatch(ip)
         try:
             frame = parse_esp32_frame(pkt.payload)
         except ValueError:
             st.malformed += 1
+            convention = convention and sim_ip is not None and sport == _SIM_PORT
             continue
-        # The parser zero-fills a payload short of n_antennas*n_subcarriers pairs only when either
-        # is 0, and a count other than the layout's is another layout: skipped and counted.
-        if frame.n_antennas == 0 or frame.n_subcarriers == 0 or frame.n_subcarriers != lay.entries:
+        node = frame.node_id
+        convention = convention and sim_ip is not None and sport == _SIM_PORT and int(sim_ip.group(1)) == node
+        sources.setdefault(node, set()).add(ip)
+        if latest is not None and pkt.t_ns < latest - 1_000_000:
+            raise ValueError(f"{path}: receiver {node}'s datagram at t_ns {pkt.t_ns} is {(latest - pkt.t_ns) / 1e6:.3f} "
+                             f"ms before an earlier one in the file (a wall-clock step?); refused (§2)")
+        latest = pkt.t_ns if latest is None else max(latest, pkt.t_ns)
+        st.subcarrier_counts[frame.n_subcarriers] = st.subcarrier_counts.get(frame.n_subcarriers, 0) + 1
+        if frame.n_subcarriers != lay.entries:            # another layout, or none (0): skipped and counted
+            st.malformed += 1
+            st.wrong_count += 1
+            wrong[node] = wrong.get(node, 0) + 1
+            continue
+        if frame.n_antennas == 0:                         # the parser zero-filled its payload: skipped
             st.malformed += 1
             continue
+        good[node] = good.get(node, 0) + 1
+        key = (node, frame.sequence, pkt.payload)
+        if key in seen:                                   # an exact duplicate: dropped and counted
+            st.duplicates += 1
+            continue
+        seen.add(key)
         t_ns.append(pkt.t_ns)
-        rx.append(frame.node_id)
+        rx.append(node)
         seq.append(frame.sequence)
         rssi.append(frame.rssi_dbm)
         iq.append(frame.iq)
+    for node, ips in sorted(sources.items()):
+        if len(ips) > 1:
+            raise ValueError(f"{path}: node {node} arrived from {len(ips)} addresses ({', '.join(sorted(ips))}): two "
+                             f"boards sharing a node_id? refused (§2)")
+    if not t_ns:
+        counts = sorted(st.subcarrier_counts)
+        seen_n = ("none parsed" if not counts else f"all have {counts[0]}" if len(counts) == 1
+                  else "they have " + ", ".join(str(n) for n in counts))
+        raise ValueError(f"{path}: no datagram survives: {st.records} records, {st.packets} UDP datagrams "
+                         f"(port {port}), {st.other_port} to other ports, {st.malformed} malformed, "
+                         f"{st.duplicates} duplicates; n_subcarriers: {seen_n}; layout {lay.name} wants {lay.entries}")
+    reason = ("a Room Sim export (wifisense stats' detector)" if export else
+              "read with a link map (only a Room Sim export's truth gives one)" if link_map is not None else
+              "every datagram comes from Room Sim's 10.1.<rx>.1:5566" if convention else None)
+    if reason is not None:
+        if label == "REAL":
+            raise ValueError(f"{path}: {reason}, so its label is SIM; label 'REAL' refused (§2)")
+        label = "SIM"
+    elif label is None:
+        raise ValueError(f"{path} is not a Room Sim export: pass label='REAL' for a recording (or 'SIM') (§2)")
+    if link_map is None:
+        faithful = manifest.get("gateway_faithful") if export and manifest is not None else None
+        if faithful is False:
+            raise ValueError(f"{path}: a Room Sim export that is not gateway-faithful (several transmitters "
+                             f"interleave in each receiver's stream, spec/roomsim.md §12.4); pass "
+                             f"link_map=truth_link_map(<prefix>.truth.jsonl) (§2)")
+        if faithful is not True and not single_tx:
+            raise ValueError(f"{path}: without a link map a receiver's stream is one link only when one transmitter "
+                             f"is heard; pass single_tx=True if that is so, or a link_map (§2)")
     t_arr = np.array(t_ns, np.int64)
     rx_arr = np.array(rx, np.int64)
     iq_arr = np.array(iq, np.int8).reshape(len(iq), lay.entries, 2)
     rssi_arr = np.array(rssi, np.float64)
     if label == "REAL":
+        for node in sorted(wrong):
+            if wrong[node] > good.get(node, 0):
+                raise ValueError(f"{path}: receiver {node}: {wrong[node]} datagrams with another n_subcarriers "
+                                 f"against {good.get(node, 0)} with {lay.entries} ({lay.name}); refused (§2)")
         _layout_check(path, lay, rx_arr, iq_arr)
     if link_map is not None:
         all_links = sorted({(int(v[0]), int(v[1])) for v in link_map.values()})
@@ -642,7 +776,6 @@ def from_pcap(path, length_s: float, end_ns, layout: str = "esp32-fw56", port: i
     n_links = len(all_links)
     bounds = np.searchsorted(li_sorted, np.arange(n_links + 1))
     carried = lay.carried
-    _shared(links, link_pos, pos_known, tx_known, carried)
     out = []
     for end in ends:
         lo = end - length_ns

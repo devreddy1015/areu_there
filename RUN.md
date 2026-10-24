@@ -572,9 +572,11 @@ out = pp.preprocess(win)                    # amp [links, 52, time] z-scores, mu
 ```
 
 A recording made with today's firmware (one transmitter) is read with
-`pp.from_pcap(path, 2.0, end_ns, label="REAL", single_tx=True)`; a
-recording with several transmitters cannot be split per link (the
-datagram carries no transmitter id) and is refused rather than pooled.
+`pp.from_pcap(path, 2.0, end_ns, label="REAL", single_tx=True)`. Pass
+`single_tx=True` only when exactly one node transmitted: the datagram
+carries no transmitter id, so `from_pcap` cannot tell, and several
+transmitters would be pooled into one stream per receiver. (A Room Sim
+export with several transmitters is refused without its link map.)
 The stdlib reference `ml/preprocess_ref.py` documents the exact arithmetic
 (it is what a later Rust port or golden vectors would be checked
 against). Tests, including one that exports a dataset room as a pcap and

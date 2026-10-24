@@ -56,8 +56,13 @@ Before training (spec/dataset.md §6, §12):
 shards, Room Sim's `.sim.pcap` exports, and (Phases 9 and 11) public
 datasets and the owner's recordings, which are **REAL**. Every window and
 every output carries its data's label, `"SIM"` or `"REAL"`, and nothing
-can change it: a shard is SIM, a pcap is SIM when it is a Room Sim export
-(a caller who says REAL is refused) and otherwise needs the caller's label.
+can change it: a shard is SIM; a pcap is SIM when it is a Room Sim export,
+is read with a link map, or comes entirely from Room Sim's
+`10.1.<rx>.1:5566` (a caller who says REAL is then refused), and otherwise
+needs the caller's label. A REAL stream is checked, not trusted: a node id
+from two addresses, a clock step backwards and a receiver sending mostly
+another layout are refused; exact duplicates are dropped and counted
+(`pp.PcapStats`).
 
 ```python
 from ml import preprocess as pp
