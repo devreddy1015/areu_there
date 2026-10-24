@@ -112,7 +112,7 @@ statement about the ports and not about a radio.
 | End-to-end FeatureFrames, Rust vs Python | **672 / 672 byte-identical**, across both consent settings | `NOTES.md:392` |
 | Rust parity after the receiver-impairment layer was added | max relative error 9.3e-15 against a 1e-9 tolerance | `NOTES.md:515` |
 | Rust simulator vs Python geometric physics | agree to 1e-14 | `NOTES.md:428` |
-| C++ float32 golden checks | **845** per `SAANS_PLAN.md:170` and `docs/COMPLETION_REPORT.md:185`; **669** per `rust/crates/saans-gateway/assets/site/evidence.html:134` | both committed, and they disagree — see §9 |
+| C++ float32 checks | **845** per compiler, nine binaries — re-counted 2026-10-24 from `make -C edge/dsp/test test` (eight suites print `PASS n/n`, totalling 711; `test_feature_frame` prints `14 cases, 134 checks`) | The site said 669 until 2026-10-24; see §9 |
 
 Byte-identical FeatureFrames across two languages is the single
 strongest verification result in the repository. It is stronger than a
@@ -164,10 +164,11 @@ The Rust gap is dominated by `saans-sim`, which grew from 21 recorded
 passing tests to 72 defined ones when the ESP32 receiver model (§3.5)
 was added in commit `629634a`.
 
-`README.md:338` describes `tests/` as "141 core tests". That is stale in
-both directions: the non-localization Python files alone now define 239
-test methods, and 141 is the number of *Rust* tests recorded in
-`COMPLETION_REPORT.md:179`. Do not quote it.
+`README.md` used to describe `tests/` as "141 core tests", which was
+stale in both directions: the non-localization Python files alone define
+239 test methods, and 141 is the number of *Rust* tests recorded in
+`COMPLETION_REPORT.md:179`. It now says 547, 239 of them outside
+`test_localize_*`.
 
 ### 2.4 Continuous integration
 
@@ -831,18 +832,26 @@ cannot change.
 Listed because a reader who finds an unlisted inconsistency should
 discount everything else here.
 
+Most of this table has since been fixed. It is kept, with a status per
+row, because the list of what was wrong is the evidence that checking
+found it; a table of only the current problems would hide how many there
+were.
+
 | Claim | Where | Status |
 |---|---|---|
-| "21 vector sets" | `NOTES.md:384`, `edge/README.md` | Stale. 23 at HEAD. |
-| C++ golden checks: 845 | `SAANS_PLAN.md:170`, `docs/COMPLETION_REPORT.md:185` | Disagrees with the site page below. Neither re-run here. |
-| C++ golden checks: 669 | `rust/.../assets/site/evidence.html:134` and `:168` | Same. One of the two is wrong and I do not know which. |
-| "141 core tests" for `tests/` | `README.md:338` | Stale, and collides with the Rust total. 547 methods defined, 239 outside `test_localize_*`. |
+| "21 vector sets" | `NOTES.md:384`, `edge/README.md` | Fixed: 23, the count `generate.py` prints. |
+| C++ golden checks: 845 | `SAANS_PLAN.md`, `docs/COMPLETION_REPORT.md:185` | **Correct.** Re-counted 2026-10-24: 845 per compiler. "golden" dropped from SAANS_PLAN, since `tdma` and `node_config` check configuration, not vectors. |
+| C++ golden checks: 669 | `rust/.../assets/site/evidence.html:134` and `:168` | Was the stale one: written in `187201e`, before later suites existed. Fixed to 845. |
+| "141 core tests" for `tests/` | `README.md` | Fixed: 547, 239 outside `test_localize_*`. |
 | "459 passed" (Python) | `docs/COMPLETION_REPORT.md:186` | Superseded by 88 tests added in `170c963`; 459 + 88 = 547. |
 | "141 passed" (Rust) | `docs/COMPLETION_REPORT.md:179` | Superseded; 217 test functions defined at HEAD. |
 | "208 tests" / "351 tests" | `NOTES-localize.md:214`, `:218` | Stale; 308 localization methods and 547 total are defined now. |
-| "no CI in this repository" | `docs/COMPLETION_REPORT.md:189` | Partly stale: `codeql.yml` and `pages.yml` are committed. Still true that no committed workflow runs the three test suites. |
-| Site evidence page: "21 vector sets" (S0 row) | `rust/.../assets/site/evidence.html` | Same staleness as `NOTES.md:384`. |
-| "CSI phase is the highest-value next piece of work" | `NOTES.md:192` (§5 item 4) | Flagged as stale by `docs/CAPABILITY_LIMITS.md:308-313`, which points at RespirFi's own footnote that single-antenna phase is unreliable under CFO/SFO. |
+| "no CI in this repository" | `docs/COMPLETION_REPORT.md:189` | Amended in place with a dated note: `ci.yml` since `101639b`. |
+| Site evidence page: "21 vector sets" (S0 row) | `rust/.../assets/site/evidence.html` | Fixed: 23. |
+| "CSI phase is the highest-value next piece of work" | `NOTES.md:192` (§5 item 4) | Marked superseded in place, with the reason: `docs/CAPABILITY_LIMITS.md` §4, RespirFi's footnote that single-antenna phase is unreliable under CFO/SFO. |
+| TX beacon default "50 Hz", "bounds the achievable CSI rate" | `edge/README.md:39`, `:91` | Wrong on both counts. Fixed: the TX rate tracks the CSI rate, 20 Hz, because one beacon is one CSI frame and a faster TX scales the RX's time axis (`saans_config.h:27-31`). |
+| "56 subcarriers × 312.5 kHz is a 17.19 MHz span" | `docs/CAPABILITY_LIMITS.md:189` | Arithmetic: that product is 17.5 MHz; 17.19 is 55 spacings, edge to edge. Fixed, with a note on the other convention. |
+| FeatureFrame "~64 bytes" | `SAANS_PLAN.md` §5 | Fixed: 68, fixed size. |
 | Breathing confidence described as "calibrated" | earlier draft of `CAPABILITY_LIMITS.md` | Corrected in that file, `:324-333`. See §6.5. |
 | AGC breakpoint "once every nine seconds" | earlier draft of `NOTES.md` §9 | Corrected in place, `:580-585`. See §3.5. |
 

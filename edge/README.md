@@ -36,7 +36,7 @@ contains no sensing code at all.
 
 | Role | What it does |
 |---|---|
-| **TX** | Broadcasts a 12-byte ESP-NOW frame at a fixed rate (default 50 Hz). Does no sensing and holds no state about people. It exists so the RX has a channel to measure. |
+| **TX** | Broadcasts a 12-byte ESP-NOW frame at a fixed rate (default: the CSI rate, 20 Hz). Does no sensing and holds no state about people. It exists so the RX has a channel to measure. |
 | **RX** | Captures CSI, runs the DSP, emits FeatureFrames over UDP to the gateway. Optionally also streams the raw CSI debug format. |
 
 Both must be on the **same WiFi channel** — ESP-NOW is connectionless and the
@@ -88,7 +88,7 @@ Under `menuconfig → Saans node`:
 | Node role | RX | TX/RX, compile-time |
 | Node id | 0 | 255 is reserved for "unknown/AP" in `tx_id` |
 | WiFi channel | 6 | TX and RX must agree |
-| TX beacon rate | 50 Hz | Bounds the achievable CSI rate |
+| TX beacon rate | = CSI rate (20 Hz) | Must match the RX: one beacon is one CSI frame and nothing decimates, so beaconing faster scales the RX's whole time axis (`saans_config.h:27-31`) |
 | Subcarriers | 56 | HT20 usable count; sizes the DSP at compile time. **Unverified on hardware** — see below |
 | CSI rate | 20 Hz | Must be ≥ 10 Hz — the gross-motion band reaches 4 Hz |
 | FeatureFrame rate | 2 Hz | What the gateway receives |

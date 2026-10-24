@@ -81,6 +81,12 @@ Across 64 synthetic scenarios (breathing 8–24 BPM x heart 50–110 BPM),
 | **Heart rate, ungated** | 80% within 3 BPM — not trustworthy on its own. |
 | **Heart rate, confidence ≥ 0.4** | **97% correct (38/39), mean error 0.38 BPM**, accepting 61% of scenarios. |
 
+The breathing and heart-rate rows were re-run on 2026-10-24 at `ed924f8`
+with `python3 evaluate.py --suite legacy` and reproduce exactly (mean
+0.0089, max 0.0171 BPM; 51/64; 38/39 of 39 accepted, 0.38 BPM). The
+presence row is from `NOTES.md` §4: 0.034 empty against 0.15 occupied
+after bandpassing to 0.1–2.0 Hz. All of it is synthetic.
+
 The heart-rate row is the important one. The estimator is wrong roughly a
 fifth of the time, but it *knows* when: gating on reported confidence
 turns an unreliable number into a reliable one that sometimes abstains.

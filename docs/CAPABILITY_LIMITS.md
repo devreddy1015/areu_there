@@ -186,8 +186,11 @@ aperture, their positions are typed in by a human, and each PLL is
 free-running at 10–40 ppm with no inter-node phase reference.
 
 The backup limit, for the fixed configuration you actually have: 56
-subcarriers × 312.5 kHz is a **17.19 MHz** measured span, so the
-bistatic path-length cell is `c/B` = **17.45 m**. In a 3.5 × 3.5 × 3 m
+subcarriers span 55 × 312.5 kHz = **17.19 MHz** edge to edge, so the
+bistatic path-length cell is `c/B` = **17.45 m** (with c = 3 × 10⁸ m/s).
+`NOTES.md` §6 uses the other convention, 56 × 312.5 kHz = 17.5 MHz of
+occupied bandwidth, which gives 17.14 m; neither is a typo for the other,
+and nothing below depends on the 2% between them. In a 3.5 × 3.5 × 3 m
 room the six first-order reflections sit 0.70–2.22 m of excess path from
 the line of sight. **All of them, plus the LoS, land in one cell** — at
 20 MHz, at 40 MHz, and at a perfectly stitched 83.5 MHz whole-ISM-band
