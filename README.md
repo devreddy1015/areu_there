@@ -176,6 +176,9 @@ cp crates/saans-gateway/saans.example.toml saans.toml   # then edit it
 ./target/release/saans-gateway --config saans.toml
 ```
 
+To keep it running (started at boot, restarted if it crashes, sandboxed),
+install it as a systemd service: [deploy/README.md](deploy/README.md).
+
 Everything is under the `http_addr` in the config, `http://127.0.0.1:8080`
 by default:
 
@@ -469,6 +472,7 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `docs/NEXT.md` | The plan: what is done, what is next, what waits for hardware |
 | `CONTRIBUTING.md` | The rules every change is held to, and the commands that check them |
 | `bench/` | The first bench session (B1): its order of work, the gateway config and a recording helper; the board profiles are in `edge/firmware/profiles/` |
+| `deploy/` | The gateway as a systemd service: the unit, a secrets template, install and operation |
 | `rust/crates/saans-gateway/tests/browser/` | Playwright smoke tests for the dashboard, against a SYNTHETIC replay |
 
 ## Licence
