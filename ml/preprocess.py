@@ -66,7 +66,7 @@ from wifisense.sources.esp32_udp import parse_esp32_frame
 from wifisense.sources.recorder import ReadStats, read_pcap
 
 __all__ = [
-    "LABELS", "GRID_K", "K_GRID", "SHARED44", "REF_BINS", "PAIRS", "LAYOUTS", "PHASE_MIN_AMP",
+    "LABELS", "GRID_K", "K_GRID", "SHARED44", "SHARED40", "REF_BINS", "PAIRS", "LAYOUTS", "PHASE_MIN_AMP",
     "SIM_T0_NS", "SIM_TICK_NS", "Layout", "CsiWindow", "PreprocessConfig", "SimLinkMap", "PcapStats", "layout",
     "to_grid", "from_roomsim_shard", "from_pcap", "truth_link_map", "sim_end_ns", "preprocess", "reference_input",
 ]
@@ -80,6 +80,7 @@ _K_FLOAT = K_GRID.astype(np.float64)
 _GRID_INDEX = {k: b for b, k in enumerate(GRID_K)}
 #: §3 / decision 3: the default reference bins, carried by every source (k = -26..-9, 1..26).
 SHARED44 = ref_impl.SHARED44
+SHARED40 = ref_impl.SHARED40
 _SHARED44_MASK = np.isin(K_GRID, SHARED44)
 REF_BINS = ref_impl.REF_BINS
 #: §5: a bin whose normalised amplitude a' is below this has no phase.
@@ -320,8 +321,9 @@ def _check_window(w: CsiWindow) -> None:
 @dataclass(frozen=True)
 class PreprocessConfig:
     """§1: `phase` (§5, off by default), `bin_hz` (§7: None keeps every
-    packet), `ref_bins` ("shared44", the default, or "carried" for
-    single-source work, §3), `min_packets` (§6, at least 2)."""
+    packet), `ref_bins` ("shared44", the default; "shared40", the bins
+    every Phase 9 source carries; or "carried" for single-source work, §3),
+    `min_packets` (§6, at least 2)."""
 
     phase: bool = False
     bin_hz: float | None = None
@@ -840,7 +842,7 @@ def _angle(im: np.ndarray, re: np.ndarray) -> np.ndarray:
 
 
 def _ref_mask(ref_bins: str, carried: np.ndarray) -> np.ndarray:
-    """§3: the reference bins R as a [52] mask (refusing a source that lacks shared44's bins)."""
+    """§3: the reference bins R as a [52] mask (refusing a source that lacks a named set's bins)."""
     mask = np.zeros(52, bool)
     mask[ref_impl.reference_bins(ref_bins, carried.tolist())] = True
     return mask

@@ -26,7 +26,8 @@ ADR-007).
    dataset, carries 44 of them (`k = -8..-1` are never sent); the public
    ESP32-S3 sets LoFi and WiCount carry all 52; OpenCSI's 52 S3/C3 values
    are of unknown LTF and order and its C6 trial has 246 HE20 tones (Phase 9
-   maps them or leaves them out).
+   maps them or leaves them out). *Resolved in Phase 9:* the first 52 LLTF
+   entries, 40 bins; the C6's tone `4k` is bin `k` (spec/phase9.md §2.2).
 
 **Decisions taken here** (flagged in the report):
 1. **Where it lives:** `ml/preprocess.py` (numpy, `.venv`), with a slow
@@ -191,9 +192,11 @@ HT-LTF, STBC) are dropped **by index, never by value** (spec/roomsim.md
 §13: hardware nulls need not be zero). `carried[b]` is true when the source
 places a value at grid bin `b`; a bin that is not carried is 0 everywhere
 and excluded from every statistic. The **reference bins** `R` (decision 3)
-are `k = -26..-9, 1..26` (`ref_bins = "shared44"`) or every carried bin
-(`"carried"`); a source that does not carry all of `R` is refused under
-`"shared44"`. Output: `k_grid` [52] int8, `carried` [52] bool, `ref` [52]
+are `k = -26..-9, 1..26` (`ref_bins = "shared44"`), `k = -26..-13, 1..26`
+(`"shared40"`, Phase 9: the bins every Phase 9 source carries, since
+OpenCSI's HT20 sessions keep only the first 52 entries of the LLTF buffer,
+spec/phase9.md §2), or every carried bin (`"carried"`); a source that does
+not carry all of a named set's bins is refused under that set. Output: `k_grid` [52] int8, `carried` [52] bool, `ref` [52]
 bool.
 
 ## 4. Per-packet L1 gain normalisation
@@ -311,6 +314,8 @@ subcarrier `k` (or none) and the pair order:
 | `esp32-lltf64` | 64 | FFT order `e` / `e - 64` | (imag, real) | the full LLTF block (`fw_subcarriers = 64`) |
 | `esp-radar-52-asc` | 52 | `-26..-1, 1..26` | per dataset | esp-radar v0.3 and every secondary-channel capture (LoFi, WiCount) |
 | `esp-radar-52-pos-first` | 52 | `1..26, -26..-1` | per dataset | esp-radar v0.1–0.2 without a secondary channel |
+| `opencsi-lltf52` | 52 | the first 52 entries of the LLTF block in FFT order (`0..31, -32..-13`): bins `-26..-13, 1..26` | (imag, real), assumed | OpenCSI's HT20 sessions (Phase 9, `ml/opencsi.py`) |
+| `opencsi-he256` | 256 | HE-LTF tones in centred order, `t = e - 128`; tone `t = 4k` is bin `k` | (imag, real), assumed | OpenCSI's C6 session (Phase 9; inferred from its null pattern) |
 
 (Room Sim's in-memory `Packet.buffer` is `(re, im)`; its datagrams and the
 shards are `(imag, real)`.) The ESP-IDF buffer is LLTF, then HT-LTF, then

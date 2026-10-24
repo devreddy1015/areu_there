@@ -44,7 +44,7 @@ import math
 from fractions import Fraction
 
 __all__ = [
-    "GRID_K", "SHARED44", "REF_BINS", "PHASE_MIN_AMP", "DOMAIN", "angle", "magnitude", "reference_bins",
+    "GRID_K", "SHARED44", "SHARED40", "REF_BINS", "PHASE_MIN_AMP", "DOMAIN", "angle", "magnitude", "reference_bins",
     "consecutive_pairs", "bin_layout", "normalise", "sanitise", "mean", "zscore", "preprocess_ref",
 ]
 
@@ -52,7 +52,10 @@ __all__ = [
 GRID_K = tuple(range(-26, 0)) + tuple(range(1, 27))
 #: §3 / decision 3: the reference bins every source carries (k = -26..-9, 1..26).
 SHARED44 = tuple(range(-26, -8)) + tuple(range(1, 27))
-REF_BINS = ("shared44", "carried")
+#: §3 (Phase 9): the bins every Phase 9 source carries (k = -26..-13, 1..26); OpenCSI's HT20 sessions
+#: keep only the first 52 entries of the LLTF buffer.
+SHARED40 = tuple(range(-26, -12)) + tuple(range(1, 27))
+REF_BINS = ("shared44", "shared40", "carried")
 #: §5: a bin whose normalised amplitude is below this has no phase (20 dB below the packet's mean).
 PHASE_MIN_AMP = 0.1
 #: §2: a non-zero CSI component lies in [2^-32, 2^32) in magnitude (outside it §4's products overflow or underflow).
@@ -76,13 +79,15 @@ def magnitude(re: float, im: float) -> float:
 
 def reference_bins(ref_bins: str, carried: list) -> list:
     """§3: the grid indices of the reference bins R, ascending. "shared44"
-    is k = -26..-9, 1..26 and refuses a source that does not carry them
-    all; "carried" is every carried bin (at least one)."""
-    if ref_bins == "shared44":
-        want = [GRID_K.index(k) for k in SHARED44]
+    is k = -26..-9, 1..26 and "shared40" k = -26..-13, 1..26, each refusing
+    a source that does not carry them all; "carried" is every carried bin
+    (at least one)."""
+    named = {"shared44": SHARED44, "shared40": SHARED40}
+    if ref_bins in named:
+        want = [GRID_K.index(k) for k in named[ref_bins]]
         missing = [GRID_K[b] for b in want if not carried[b]]
         if missing:
-            raise ValueError(f"ref_bins 'shared44': the source does not carry k = {missing} (§3)")
+            raise ValueError(f"ref_bins {ref_bins!r}: the source does not carry k = {missing} (§3)")
         return want
     if ref_bins == "carried":
         ref = [b for b in range(52) if carried[b]]
