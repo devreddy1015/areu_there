@@ -32,7 +32,7 @@
 
 use crate::eval::{self, Job, Kind, Lcg, LEAD_IN_S};
 use crate::score::{self, BreathingScore, Occupancy, Run};
-use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment};
+use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment, NODE_Z_M};
 use saans_sim::Simulator;
 use std::sync::Mutex;
 
@@ -60,7 +60,11 @@ struct Config {
 }
 
 fn node(id: u8, pos: Point) -> Node {
-    Node { id, pos }
+    Node {
+        id,
+        pos,
+        z_m: NODE_Z_M,
+    }
 }
 
 fn configs() -> (Vec<Config>, Vec<Config>) {

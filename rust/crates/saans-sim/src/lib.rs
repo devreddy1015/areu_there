@@ -12,8 +12,9 @@
 //! (`wifisense/sources/synthetic.py`, `scene="geometric"`), generalised to
 //! many links and a moving body:
 //!
-//! - 2-D room; per link a static channel of line of sight, image-method
-//!   wall reflections and furniture point scatterers ([`physics`]);
+//! - a 2-D room, or with [`Room::vertical`] a box with a floor, a ceiling
+//!   and heights; per link a static channel of line of sight,
+//!   image-method reflections and furniture point scatterers ([`physics`]);
 //! - the body is `body_points` scatterers across a torso of
 //!   `body_width_m`, perpendicular to each link's tx-body-rx bisector, RCS
 //!   0.3 m^2 split equally, recomputed for the current body position every
@@ -28,8 +29,9 @@
 //! the arm's RCS are [`SimOptions`] (defaults: 2.437 GHz, 312.5 kHz, 2 ms,
 //! 0.05 m^2) passed with [`Simulator::with_options`].
 //!
-//! `tests/parity.rs` reproduces the Python scene's golden vectors
-//! (`spec/golden/sim_geometric`) to ~1e-13.
+//! `tests/parity.rs` reproduces the Python scene's golden vectors, the
+//! slice (`spec/golden/sim_geometric`) and the box
+//! (`spec/golden/sim_geometric_3d`), to ~1e-13.
 //!
 //! ## Driving it by hand
 //!
@@ -107,8 +109,8 @@ pub use plan::{
     HEART_BPM, MARGIN_M, PAUSE_RAMP_S, SIT_DOWN_DROP_M, SIT_DOWN_S,
 };
 pub use scenario::{
-    Activity, Node, Point, Room, Scatterer, Scenario, Segment, SimOptions, Truth, TruthEvent,
-    TruthKind,
+    Activity, Node, Point, Point3, Room, Scatterer, Scenario, Segment, SimOptions, Truth,
+    TruthEvent, TruthKind, Vertical, NODE_Z_M,
 };
 pub use scene::{
     MaterialConstants, ObjectMaterial, ObjectType, Person, Phone, Scene, SceneError, SceneNode,

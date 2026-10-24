@@ -28,7 +28,8 @@
 //!
 //! ```text
 //! scene room.depth_m   -> Room.height_m (Python), size_m.1 (here)
-//! scene room.height_m  -> dropped; neither 2-D type has a field for it
+//! scene room.height_m  -> dropped by both 2-D types; the box model's
+//!                         Vertical::height_m (Scene::to_sim_box_room)
 //! ```
 //!
 //! [`Scene::sim_room_size_m`] is the only place that mapping is made in
@@ -54,7 +55,7 @@
 //! width and depth it was declared with. Nothing here panics; everything
 //! returns [`SceneError`] with the path of the offending field.
 
-use crate::scenario::{Node as SimNode, Point, Room as SimRoom};
+use crate::scenario::{Node as SimNode, Point, Room as SimRoom, Vertical};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -393,7 +394,8 @@ pub struct SceneRoom {
     /// The second HORIZONTAL axis. Maps to `Room.height_m` in the Python
     /// localization types and to `size_m.1` in [`crate::scenario::Room`].
     pub depth_m: f64,
-    /// ELEVATION. Neither 2-D type has a field for it.
+    /// ELEVATION. Neither 2-D type has a field for it; the box model's
+    /// [`Vertical::height_m`] is it.
     pub height_m: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub polygon_m: Vec<[f64; 2]>,
@@ -568,6 +570,7 @@ impl Scene {
     /// scene room.width_m  -> size_m.0     both are x
     /// scene room.depth_m  -> size_m.1     both are the second HORIZONTAL axis
     /// scene room.height_m -> dropped      elevation; the 2-D room has no field
+    ///                        (Vertical::height_m in Scene::to_sim_box_room)
     /// ```
     ///
     /// [`crate::scenario::Room::size_m`] is a pair of horizontal extents,
@@ -600,17 +603,34 @@ impl Scene {
         }
     }
 
-    /// The scene's nodes as simulator nodes, dropping elevation.
+    /// [`Scene::to_sim_room`] as a box: the scene's own floor-to-ceiling
+    /// height, and the [`Vertical`] defaults for everything the scene does
+    /// not describe. The floor and ceiling are concrete because the scene
+    /// format has no field for either material, for the same reason the
+    /// walls are not applied.
+    pub fn to_sim_box_room(&self) -> SimRoom {
+        SimRoom {
+            vertical: Some(Vertical {
+                height_m: self.room.height_m,
+                ..Vertical::default()
+            }),
+            ..self.to_sim_room()
+        }
+    }
+
+    /// The scene's nodes as simulator nodes, elevation included.
     ///
-    /// The stack is 2-D: nodes and chests are assumed to be at roughly
-    /// one height. [`Scene::node_z_spread_m`] is the number that says
-    /// whether a given scene honours that.
+    /// In the 2-D slice the simulator ignores `z_m`: nodes and chests are
+    /// assumed to be at roughly one height, and [`Scene::node_z_spread_m`]
+    /// says whether a given scene honours that. In a box
+    /// ([`Scene::to_sim_box_room`]) the heights are used.
     pub fn to_sim_nodes(&self) -> Vec<SimNode> {
         self.nodes
             .iter()
             .map(|n| SimNode {
                 id: n.id,
                 pos: (n.pos_m[0], n.pos_m[1]),
+                z_m: n.pos_m[2],
             })
             .collect()
     }
@@ -1809,9 +1829,36 @@ mod tests {
             for (a, b) in sim.iter().zip(&scene.nodes) {
                 assert_eq!(a.id, b.id, "{name}");
                 assert_eq!(a.pos, (b.pos_m[0], b.pos_m[1]), "{name}");
+                assert_eq!(a.z_m, b.pos_m[2], "{name}");
             }
-            // Dropping z is only honest while the nodes share a height.
+            // The slice ignoring z is only honest while the nodes share a
+            // height.
             assert_eq!(scene.node_z_spread_m(), 0.0, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_scene_runs_as_a_box_at_its_own_height() {
+        for (name, scene) in examples() {
+            let room = scene.to_sim_box_room();
+            assert_eq!(room.size_m, scene.sim_room_size_m(), "{name}");
+            let v = room.vertical.expect("a box");
+            assert_eq!(v.height_m, scene.room.height_m, "{name}");
+            assert!(scene.to_sim_room().vertical.is_none(), "{name}");
+
+            // And the simulator takes it, nodes at their scene heights.
+            let nodes = scene.to_sim_nodes();
+            let sc = crate::scenarios::scenario(
+                name,
+                room,
+                crate::scenarios::Layout {
+                    links: vec![(nodes[0].id, nodes[1].id)],
+                    nodes,
+                },
+                crate::scenarios::empty(0.01),
+                1,
+            );
+            assert!(crate::Simulator::try_new(&sc).is_ok(), "{name}");
         }
     }
 

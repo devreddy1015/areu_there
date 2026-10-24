@@ -16,7 +16,7 @@
 
 use crate::physics::dist;
 use crate::rng::Rng;
-use crate::scenario::{Activity, Node, Point, Room, Scenario, Segment};
+use crate::scenario::{Activity, Node, Point, Room, Scenario, Segment, NODE_Z_M};
 
 /// Empty room before anyone enters (>= the scorer's 95 s settle).
 pub const LEAD_IN_S: f64 = 120.0;
@@ -78,7 +78,11 @@ pub fn room_rich_nlos() -> Room {
 fn nodes(ps: &[Point]) -> Vec<Node> {
     ps.iter()
         .enumerate()
-        .map(|(i, &pos)| Node { id: i as u8, pos })
+        .map(|(i, &pos)| Node {
+            id: i as u8,
+            pos,
+            z_m: NODE_Z_M,
+        })
         .collect()
 }
 
