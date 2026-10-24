@@ -169,14 +169,17 @@ def run_sim_variance(length_s: float, sim_cache_dir: str, *, log=print) -> None:
     (shared40) cache's train windows, applied to every REAL session (SIM->REAL)."""
     x, p, cnt = sim_variance_features(sim_cache_dir)
     caches = load_caches(length_s)
+    evs = {t: eval_windows(caches[t]) for t in oc.TRIALS}
+    xe = {t: br.variance_features(caches[t]["sigma"][evs[t]], caches[t]["link_mask"][evs[t]]) for t in oc.TRIALS}
+    bounds = np.cumsum([0] + [xe[t].shape[0] for t in oc.TRIALS])
+    x_all = np.concatenate([xe[t] for t in oc.TRIALS])
     for seed in SEEDS:
-        for trial in oc.TRIALS:
-            c = caches[trial]
-            ev = eval_windows(c)
-            xe = br.variance_features(c["sigma"][ev], c["link_mask"][ev])
-            fits = br.fit_variance(x, p, cnt, xe, seed)
+        fits = br.fit_variance(x, p, cnt, x_all, seed)                   # fitted once, applied to every session
+        for i, trial in enumerate(oc.TRIALS):
             for name, pred in fits.items():
-                save_pred(_pred_path(f"simvar_{name}", trial, length_s, seed=seed), pred, label="SIM->REAL",
+                part = {"presence_prob": pred["presence_prob"][bounds[i]:bounds[i + 1]],
+                        "count_prob": pred["count_prob"][bounds[i]:bounds[i + 1]]}
+                save_pred(_pred_path(f"simvar_{name}", trial, length_s, seed=seed), part, label="SIM->REAL",
                           extra={"train": "SIM " + sim_cache_dir, "n_train": int(x.shape[0])})
         log(f"[phase9 SIM->REAL] SIM-trained variance baselines, seed {seed}")
 

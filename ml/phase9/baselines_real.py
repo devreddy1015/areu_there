@@ -244,6 +244,13 @@ def fit_variance(x_train: np.ndarray, presence: np.ndarray, count: np.ndarray, x
                  n_jobs: int = 16) -> dict:
     """Forest and MLP fitted on `(x_train, labels)`, applied to `x_eval`:
     `{"forest": pred, "mlp": pred}` with `presence_prob` and `count_prob`."""
+    from threadpoolctl import threadpool_limits
+    with threadpool_limits(limits=8):                 # BLAS threads: the box runs other jobs too
+        return {name: _fit_one(name, x_train, presence, count, x_eval, seed, n_jobs) for name in ("forest", "mlp")}
+
+
+def _fit_one(name: str, x_train, presence, count, x_eval, seed: int, n_jobs: int) -> dict:
+    """One classifier family for presence and count (classes 0..3 kept in `count_prob`)."""
     import warnings
 
     from sklearn.ensemble import RandomForestClassifier
@@ -251,31 +258,26 @@ def fit_variance(x_train: np.ndarray, presence: np.ndarray, count: np.ndarray, x
     from sklearn.neural_network import MLPClassifier
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
-    out = {}
-    for name in ("forest", "mlp"):
-        preds = {}
-        for task, y in (("presence", presence), ("count", count)):
+    preds = {}
+    for task, y in (("presence", presence), ("count", count)):
+        y = np.asarray(y, np.int64)
+        p = np.zeros((x_eval.shape[0], 4))
+        if np.unique(y).size < 2:
+            p[:, int(y[0])] = 1.0
+        else:
             if name == "forest":
                 clf = RandomForestClassifier(n_estimators=300, random_state=seed, n_jobs=n_jobs)
             else:
                 clf = make_pipeline(StandardScaler(), MLPClassifier((128, 128), max_iter=200, early_stopping=False,
                                                                      random_state=seed))
-            y = np.asarray(y, np.int64)
-            if np.unique(y).size < 2:
-                p = np.zeros((x_eval.shape[0], 4))
-                p[:, int(y[0])] = 1.0
-            else:
-                with warnings.catch_warnings():
-                    # 200 epochs is the fixed recipe (no REAL validation room to stop on); sklearn warns when
-                    # the loss is still moving then, which is expected and not an error.
-                    warnings.simplefilter("ignore", ConvergenceWarning)
-                    clf.fit(x_train, y)
-                pr = clf.predict_proba(x_eval)
-                p = np.zeros((x_eval.shape[0], 4))
-                p[:, np.asarray(clf.classes_, np.int64)] = pr
-            preds[task] = p
-        out[name] = {"presence_prob": preds["presence"][:, 1], "count_prob": preds["count"], "uses_calibration": False}
-    return out
+            with warnings.catch_warnings():
+                # 200 epochs is the fixed recipe (no REAL validation room to stop on); sklearn warns when
+                # the loss is still moving then, which is expected and not an error.
+                warnings.simplefilter("ignore", ConvergenceWarning)
+                clf.fit(x_train, y)
+            p[:, np.asarray(clf.classes_, np.int64)] = clf.predict_proba(x_eval)
+        preds[task] = p
+    return {"presence_prob": preds["presence"][:, 1], "count_prob": preds["count"], "uses_calibration": False}
 
 
 def prior(presence_train: np.ndarray, count_train: np.ndarray, n_eval: int) -> dict:
