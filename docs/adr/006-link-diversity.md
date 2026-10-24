@@ -31,5 +31,13 @@ This is a consequence of the decision above, not a change to it -- it is
 the second link earning its place in a case the original text did not
 name. Measured on identical simulated scenarios (`NOTES.md` §10), doubled
 readings fall from 6.9% to 3.4% with one link in a null and from 25.2% to
-16.5% with both, with no class made worse. The 1/2/3-link blind-spot
-measurement this ADR's consequences require is still owed.
+16.5% with both, with no class made worse.
+
+## Amendment, 2026-10-24: the 1/2/3-link measurement, simulation half
+Owed by the consequences above, now done in simulation on layouts the
+firmware can build -- one transmitter, more receivers (`NOTES.md` §11).
+The share of seats blind to every link is 4.5% with one link, 0.2% with
+two and 0.1% with three; seats where a still person is mostly missed go
+44 → 0 → 2 of 1,200 (the 2 within noise). Two links are the decision;
+a third finds no extra people and instead removes noise-driven false
+occupancy. The hardware half is still owed.

@@ -295,6 +295,12 @@ pub fn jobs(opts: &EvalOptions) -> Vec<Job> {
 
 /// One scenario through the production pipeline.
 pub fn run(job: &Job) -> Run {
+    run_with_quorum(job, 0)
+}
+
+/// [`run`] with the space's presence quorum set explicitly; 0 is the fusion
+/// default (1 below three usable links, otherwise a majority).
+pub fn run_with_quorum(job: &Job, presence_quorum: usize) -> Run {
     let sc = &job.scenario;
     let mut sim = Simulator::new(sc);
     let links: Vec<LinkId> = sc.links.iter().map(|&(tx, rx)| LinkId { rx, tx }).collect();
@@ -303,6 +309,7 @@ pub fn run(job: &Job) -> Run {
         links: links.clone(),
         vitals: true,
         collapse_detection: true,
+        presence_quorum,
         ..SpaceConfig::default()
     };
     let mut extractors: BTreeMap<(u8, u8), FeatureExtractor> = sc

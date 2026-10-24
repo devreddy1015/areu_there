@@ -12,6 +12,7 @@ those tables on every push.
 
     python3 tools/results.py            regenerate the CI-tier sections
     python3 tools/results.py --slow     ... and the slow ones too (minutes)
+    python3 tools/results.py --only K   regenerate just section K (any tier)
     python3 tools/results.py --check    regenerate the CI tier in memory,
                                         compare with the committed file and
                                         with every registered quote; exit 1
@@ -148,6 +149,15 @@ def suites() -> list[Suite]:
             "Six seeds per cell from seed 2, held out from threshold tuning. "
             "Takes minutes on a workstation, far longer on a CI runner.",
             scrub=[(r" in \d+ s \(", " (")],
+        ),
+        Suite(
+            "links", "What each extra link buys, one transmitter",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "links",
+             "--seats", "600", "--blind-seats", "5000"],
+            rust, "slow",
+            "The 1/2/3-link measurement ADR-006 owes, on layouts the firmware can "
+            "build (one TX, more receivers). NOTES.md §11 reads this; 1200 seats per "
+            "row, because at 300 the single-link miss rate read 0.5% instead of 2.8%.",
         ),
         Suite(
             "octave", "Doubled breathing rate at a null, two links",
@@ -376,10 +386,19 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--slow", action="store_true", help="also regenerate the slow tier")
     ap.add_argument("--check", action="store_true", help="compare, write nothing")
+    ap.add_argument("--only", action="append", default=[], metavar="KEY",
+                    help="regenerate only this section (repeatable)")
     args = ap.parse_args()
 
     tier = {"ci"} if args.check or not args.slow else {"ci", "slow"}
-    chosen = [s for s in suites() if s.tier in tier]
+    if args.only:
+        known = {s.key for s in suites()}
+        unknown = set(args.only) - known
+        if unknown:
+            raise SystemExit(f"unknown section(s) {sorted(unknown)}; known: {sorted(known)}")
+        chosen = [s for s in suites() if s.key in args.only]
+    else:
+        chosen = [s for s in suites() if s.tier in tier]
 
     committed = {}
     if os.path.exists(RESULTS):

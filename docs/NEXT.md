@@ -300,6 +300,14 @@ This is a measurement, not a fix. Calibration needs real data (B3).
 
 ### 1.6 Link diversity, in simulation, before the boards arrive
 
+**Done**, on branch `saans/links` (`saans links`, NOTES §11). The fourth
+board does not earn its place as a third receiver for detection: two
+links take seats where a still person is mostly missed from 44 to 0 of
+1,200, and a third adds nothing there, only less noise-driven false
+occupancy. Along the way: eval's own 3-link rows mixed geometry with
+link count and assumed two transmitters, and a first run at 300 seats
+put the single-link miss rate at 0.5% when it is 2.8%.
+
 ADR-006's decision rests on one simulated number: a second link takes
 breathing coverage "from 94% to 100% and halves missed pauses"
 (`NOTES.md:489-490`). Its own consequences clause says S6 "must measure

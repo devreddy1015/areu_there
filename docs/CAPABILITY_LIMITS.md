@@ -305,8 +305,15 @@ already sits in.
   does not improve with more nodes.
 - **Jumping from one link straight to three.** **[sourced]**
   `fusion.rs:123-130` silently changes the default presence quorum from
-  1 to 2 at three links, and still-person false-empty goes back up from
-  0.4% to 1.3%. Set `presence_quorum` explicitly and measure.
+  1 to 2 at three links, and in `saans eval` still-person false-empty
+  goes back up from 0.4% to 1.3%. Set `presence_quorum` explicitly and
+  measure. *Measured since, `NOTES.md` §11:* eval's 3-link layout also
+  moves the nodes, so that rise mixes quorum with geometry. Holding the
+  geometry fixed, quorum 2 misses 6 of 1,200 seats where quorum 1 misses
+  none -- the quorum is a real cause -- but on a layout the firmware can
+  build (one TX, three RX) quorum 2 costs nothing measurable, and the
+  third link's real gain is false occupancy from noise falling to 0.0%.
+  The quorum-1 cost the simulator cannot show is a person next door.
 - **Chasing CSI phase** as the next big thing. `NOTES.md` §5 item 4 says
   it is "the highest-value next piece of work"; `RESEARCH.md` §5a quotes
   RespirFi's own footnote that single-antenna CSI phase is unreliable
