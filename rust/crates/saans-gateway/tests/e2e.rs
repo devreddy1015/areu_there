@@ -6,7 +6,7 @@ mod support;
 
 use saans_dsp::features::{FeatureFrame, FLAG_HEART_VALID};
 use saans_gateway::pcap::PcapWriter;
-use saans_gateway::shared::Shared;
+use saans_gateway::shared::{Mode, Shared};
 use saans_gateway::{replay, GatewayConfig, ReplayOptions};
 use serde_json::{json, Value};
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -394,7 +394,7 @@ async fn replay_is_deterministic() {
     assert_eq!(s1.clock_steps_back, 1);
 
     // Replay with a published state (as `--replay --serve` does).
-    let shared = Shared::new("replay");
+    let shared = Shared::new(Mode::Replay);
     let s3 = replay(cfg.clone(), &ReplayOptions { events_out: None, ..opts("") }, Some(shared.clone())).await.unwrap();
     assert_eq!(s3.events, s1.events);
     assert_eq!(shared.query_events(None, None, 10_000).len() as u64, s1.events);

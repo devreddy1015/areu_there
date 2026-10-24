@@ -407,6 +407,34 @@ function pill(text, kind, dot, title) {
   return p;
 }
 
+/**
+ * The gateway's mode as [badge text, tooltip], or null for a value this
+ * page does not know (ADR-008 d15, spec/livedemo.md §1). An exhaustive
+ * mapping over the three wire values with no default branch: a fourth
+ * mode, or none at all, is shown as an error, never as a mode, so the
+ * page cannot call anything live by inference.
+ */
+function modeBadge(mode) {
+  switch (mode) {
+    case 'sim': return ['SIM', 'Simulated people and sensors (SIM) — not live sensors'];
+    case 'replay': return ['REPLAY', 'Replaying a capture file — not live sensors; a .sim.pcap is simulated (SIM)'];
+    case 'live': return ['LIVE', 'Live sensor input'];
+  }
+  return null;
+}
+
+/**
+ * The mode's badge, or the "unknown mode" error in its place. Every view
+ * that shows the mode shows this, so none can fall back to the raw value.
+ */
+function modePill(mode) {
+  const badge = modeBadge(mode);
+  if (badge) return pill(badge[0], 'mode', false, badge[1]);
+  return pill('unknown mode', 'bad', false, mode === undefined
+    ? 'The gateway has not reported its mode, so none is shown'
+    : 'The gateway reported a mode this page does not know, so none is shown');
+}
+
 function renderShell() {
   const me = S.me || {};
   const pills = $('#pills');
@@ -415,9 +443,8 @@ function renderShell() {
   // Mode and connection are different facts. A connected socket does not
   // mean sensors are reporting, and a replay is not live however healthy
   // the socket is.
-  const mode = (me.mode || '').toUpperCase() || 'UNKNOWN';
-  pills.append(pill(mode, 'mode', false,
-    mode === 'REPLAY' ? 'Replaying a recording — these are not live sensors' : 'Live sensor input'));
+  const badge = modeBadge(me.mode);
+  pills.append(modePill(me.mode));
 
   const connKind = S.conn === 'live' ? 'live' : (S.conn === 'offline' || S.conn === 'signed out') ? 'bad' : 'warn';
   pills.append(pill(S.conn, connKind, true, S.conn === 'signed out'
@@ -444,7 +471,7 @@ function renderShell() {
       'local access'));
   }
   renderTabs();
-  announce('Mode ' + mode + ', connection ' + S.conn + (stale ? ', data stale' : ''));
+  announce((badge ? 'Mode ' + badge[0] : 'Unknown mode') + ', connection ' + S.conn + (stale ? ', data stale' : ''));
 }
 
 /**
@@ -1211,7 +1238,7 @@ function renderSystem(h, links) {
   add(body, el('h2', { class: 'sec' }, 'Details'));
   const dl = el('dl');
   const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
-  row('Mode', h.mode || '');
+  add(dl, el('dt', null, 'Mode'), add(el('dd'), modePill(h.mode)));
   row('Gateway time', clock(h.time));
   row('Uptime', dur(h.uptime_s));
   row('Datagrams', String(h.datagrams_total ?? 0));

@@ -1,5 +1,7 @@
 //! `saans-gateway --config saans.toml` (live) or
 //! `saans-gateway --config saans.toml --replay rec.pcap [--speed 0] [--events-out ev.jsonl]`.
+//! A `roomsim` build also takes `--room-replay run.jsonl` (repeatable): a
+//! recorded Locate run offered on the room stream (spec/livedemo.md §6).
 
 use clap::Parser;
 use saans_gateway::{log, ClockMode, Gateway, GatewayConfig, ReplayOptions};
@@ -35,7 +37,47 @@ struct Args {
     /// stdin so it never reaches the shell history or the process list.
     #[arg(long)]
     hash_password: bool,
+    /// A recorded Locate run to offer on the room stream as REPLAY (SIM),
+    /// written by `saans roomsim-eval --records-out`. Repeatable, one file
+    /// per scene.
+    #[cfg(feature = "roomsim")]
+    #[arg(long, value_name = "FILE.jsonl")]
+    room_replay: Vec<PathBuf>,
 }
+
+/// The recorded room runs to install (spec/livedemo.md §6.2).
+#[cfg(feature = "roomsim")]
+type RoomReplays = saans_gateway::roomstream::RoomReplays;
+/// Without the `roomsim` feature there is no room stream, and nothing
+/// to install on it.
+#[cfg(not(feature = "roomsim"))]
+struct RoomReplays;
+
+/// Offer the recorded runs on this gateway's room stream.
+#[cfg(feature = "roomsim")]
+fn install_room(shared: &saans_gateway::shared::Shared, room: RoomReplays) {
+    if room.is_empty() {
+        return;
+    }
+    let scenes = room.scene_ids().join(", ");
+    if shared.room.install_replays(room).is_ok() {
+        log(&format!("room stream: recorded runs (REPLAY of SIM) for {scenes}"));
+    }
+}
+
+#[cfg(not(feature = "roomsim"))]
+fn install_room(_: &saans_gateway::shared::Shared, _: RoomReplays) {}
+
+/// `--check`'s line for the recorded room runs, when there are any.
+#[cfg(feature = "roomsim")]
+fn check_room(room: &RoomReplays) {
+    if !room.is_empty() {
+        println!("--room-replay: OK ({} recorded runs, SIM: {})", room.len(), room.scene_ids().join(", "));
+    }
+}
+
+#[cfg(not(feature = "roomsim"))]
+fn check_room(_: &RoomReplays) {}
 
 fn main() -> ExitCode {
     let args = Args::parse();
@@ -50,8 +92,21 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // Read and checked before --check returns, so the check run before a
+    // deployment finds a bad file (spec/livedemo.md §6.2).
+    #[cfg(feature = "roomsim")]
+    let room = match RoomReplays::load(&args.room_replay) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("saans-gateway: --room-replay {e}");
+            return ExitCode::from(2);
+        }
+    };
+    #[cfg(not(feature = "roomsim"))]
+    let room = RoomReplays;
     if args.check {
         println!("{}: OK ({} spaces)", args.config.display(), cfg.spaces.len());
+        check_room(&room);
         return ExitCode::SUCCESS;
     }
     if !(args.speed >= 0.0 && args.speed.is_finite()) {
@@ -66,8 +121,8 @@ fn main() -> ExitCode {
         }
     };
     let result = match args.replay.clone() {
-        Some(pcap) => rt.block_on(run_replay(cfg, args, pcap)),
-        None => rt.block_on(run_live(cfg)),
+        Some(pcap) => rt.block_on(run_replay(cfg, args, pcap, room)),
+        None => rt.block_on(run_live(cfg, room)),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -111,10 +166,11 @@ fn hash_password() -> ExitCode {
     }
 }
 
-async fn run_live(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_live(cfg: GatewayConfig, room: RoomReplays) -> Result<(), Box<dyn std::error::Error>> {
     let spaces = cfg.spaces.len();
     let data_dir = cfg.data_dir.clone();
     let gw = Gateway::start(cfg, ClockMode::Live).await?;
+    install_room(&gw.shared, room);
     log(&format!(
         "listening for sensors on udp {}, dashboard on http://{}/ ({spaces} spaces, data in {})",
         gw.udp_addr,
@@ -128,7 +184,7 @@ async fn run_live(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-async fn run_replay(cfg: GatewayConfig, args: Args, pcap: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_replay(cfg: GatewayConfig, args: Args, pcap: PathBuf, room: RoomReplays) -> Result<(), Box<dyn std::error::Error>> {
     let opts = ReplayOptions { pcap, speed: args.speed, events_out: args.events_out, port: args.port };
     if !args.serve {
         let summary = saans_gateway::replay(cfg, &opts, None).await?;
@@ -136,7 +192,8 @@ async fn run_replay(cfg: GatewayConfig, args: Args, pcap: PathBuf) -> Result<(),
         return Ok(());
     }
     // Serve while replaying: the HTTP side reads what the replay publishes.
-    let shared = saans_gateway::shared::Shared::with_history("replay", cfg.history);
+    let shared = saans_gateway::shared::Shared::with_history(saans_gateway::shared::Mode::Replay, cfg.history);
+    install_room(&shared, room);
     let http_addr = cfg.http_socket_addr()?;
     let listener = tokio::net::TcpListener::bind(http_addr)
         .await

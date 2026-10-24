@@ -13,13 +13,19 @@ name = "saans-gateway"
 path = "src/main.rs"
 
 [features]
-# The static room demo at /roomsim (ADR-008). Off by default: decision 13
-# says the view is compiled in only on purpose.
-roomsim = []
+# The room demo at /roomsim and its room stream at /api/roomsim (ADR-008,
+# spec/livedemo.md). Off by default: decision 13 says the view is compiled
+# in only on purpose. The stream runs Room Sim and Locate in the gateway,
+# and reads scenes WITHOUT saans-scene's `write` (ADR-008 decision 1;
+# saans-scene/tests/boundary.rs READERS).
+roomsim = ["dep:saans-roomsim", "dep:saans-locate", "dep:saans-scene"]
 
 [dependencies]
 saans-dsp = { path = "../saans-dsp" }
 saans-health = { path = "../saans-health" }
+saans-roomsim = { path = "../saans-roomsim", optional = true }
+saans-locate = { path = "../saans-locate", features = ["roomsim"], optional = true }
+saans-scene = { path = "../saans-scene", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = { version = "0.9", default-features = false, features = ["std", "parse", "serde"] }

@@ -17,6 +17,10 @@
 //! - `roomsim` (private, `roomsim` feature only): the static room demo at
 //!   `/roomsim`, drawing a declared scene with vendored three.js (ADR-008).
 //!   Serves no sensor data.
+//! - `roomstream` (`roomsim` feature only): the room stream at
+//!   `/api/roomsim`, a simulated (SIM) or recorded (REPLAY) Room Sim run
+//!   through Locate, one session thread per connection
+//!   (spec/livedemo.md). Never fed by, and never feeding, the sensor path.
 
 pub mod alerts;
 pub mod audit;
@@ -36,6 +40,8 @@ pub mod replay;
 pub mod roles;
 #[cfg(feature = "roomsim")]
 mod roomsim;
+#[cfg(feature = "roomsim")]
+pub mod roomstream;
 pub mod shared;
 pub mod store;
 pub mod timefmt;

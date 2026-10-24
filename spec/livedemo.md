@@ -318,7 +318,11 @@ second has passed in the current run, or since the last resume.
 - While the thread waits, the clock does not advance.
 - So `seq` has no gaps, and every record appears in exactly one frame's
   `new` block.
-- A connection that accepts no frame for 10 s is closed with 1008.
+- A connection that accepts no frame for 10 s is closed with 1008. The
+  connection detects this with numbered WebSocket pings, sent at most once
+  a second and only after a message went out: a ping left unanswered for
+  10 s closes the socket. Browsers answer pings on their own; a slow
+  client whose pongs keep arriving is kept.
 
 **Pause.** When paused, `q` stops. One frame with `paused: true` is sent,
 then one heartbeat per second. A heartbeat is an ordinary frame with the
@@ -347,6 +351,9 @@ the run starts in, and `restart` does nothing.
 - In SIM it is a new stream from the same setup (§8.1), so it needs no
   new calibration and sends no new `calibrating` state. In REPLAY it
   rewinds to the first record.
+- The new run's first frame goes at the next 100 ms deadline, so a burst
+  of restarts costs no extra frames. A restart before the session's
+  first frame does nothing.
 - `seq` keeps counting, and `run.index` goes up by one.
 
 **Fixed for the session.** A client cannot change scene, variant or seed

@@ -27,6 +27,10 @@ const READERS: &[(&str, &str)] = &[
         "saans-locate",
         "locates simulated people and a simulated phone; reads scenes only under its `roomsim` feature and in its tests",
     ),
+    (
+        "saans-gateway",
+        "carries CSI; under its `roomsim` feature it reads the embedded example scenes to run the room stream (spec/livedemo.md)",
+    ),
 ];
 
 /// Does this manifest declare a dependency on saans-scene, in any table?

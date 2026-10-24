@@ -19,6 +19,7 @@
 //! | `GET /roomsim/vendor/{rev}/{file}` | vendored three.js, three named files, cached immutable | anyone |
 //! | `GET /roomsim/scenes` | `{"label":"SCENE","scenes":[{id, name, provenance, sha256}]}` | anyone |
 //! | `GET /roomsim/scenes/{id}` | one example scene, allowlisted keys only (no people, no phone) | anyone |
+//! | `GET /api/roomsim?scene=&variant=&seed=&replay=` | WebSocket: a simulated (SIM) or recorded (REPLAY) room run, 10 Hz; `roomsim` feature only (spec/livedemo.md) | admin, safety; same origin |
 //!
 //! **Two locks on every byte of data.** The hub redacts by *consent*
 //! before publishing, so a space with `vitals = false` has no breathing
@@ -116,7 +117,7 @@ pub fn router(deps: HttpDeps) -> Router {
         .route("/api/live", get(live));
     // The room demo is compiled in only on purpose (ADR-008 decision 13).
     #[cfg(feature = "roomsim")]
-    let r = r.merge(crate::roomsim::routes());
+    let r = r.merge(crate::roomsim::routes()).route("/api/roomsim", get(crate::roomstream::handler));
     r.fallback(|| async { error(StatusCode::NOT_FOUND, "no such endpoint") })
         .with_state(AppState { shared, stop, cfg, alerts, auth, audit })
 }
@@ -151,7 +152,7 @@ fn is_https(h: &HeaderMap) -> bool {
 
 /// The principal for a request, or a 401. Denials are audited: a stream
 /// of them is how you notice someone probing the port.
-fn principal(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Response> {
+pub(crate) fn principal(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Response> {
     let authz = header_str(h, header::AUTHORIZATION);
     let cookie = header_str(h, header::COOKIE);
     app.auth.principal(authz, cookie).map_err(|d| {
@@ -192,7 +193,7 @@ async fn me(State(app): State<AppState>, h: HeaderMap) -> Response {
     let base = json!({
         "auth_required": app.auth.required(),
         "version": env!("CARGO_PKG_VERSION"),
-        "mode": app.shared.mode,
+        "mode": app.shared.mode.as_str(),
     });
     let mut v = base;
     match who {
@@ -204,11 +205,18 @@ async fn me(State(app): State<AppState>, h: HeaderMap) -> Response {
                 Some(s) => s.iter().cloned().collect::<Vec<_>>().into(),
                 None => Value::Null,
             };
-            v["can"] = json!({ "system": p.can_see_system(), "audit": p.can_see_audit() });
+            // `position` is the answer for a scene bound to no space
+            // (spec/livedemo.md §2.3); the room page asks before it opens
+            // its stream.
+            v["can"] = json!({
+                "system": p.can_see_system(),
+                "audit": p.can_see_audit(),
+                "position": p.can_see_position(None),
+            });
         }
         Err(_) => {
             v["authenticated"] = false.into();
-            v["can"] = json!({ "system": false, "audit": false });
+            v["can"] = json!({ "system": false, "audit": false, "position": false });
         }
     }
     no_store(Json(v).into_response())
@@ -516,7 +524,7 @@ async fn ws_session(mut socket: WebSocket, app: AppState, who: Principal) {
     let hello = json!({
         "type": "hello",
         "version": env!("CARGO_PKG_VERSION"),
-        "mode": shared.mode,
+        "mode": shared.mode.as_str(),
         "name": who.name,
         "role": who.role.as_str(),
         "can": { "system": who.can_see_system() },

@@ -12,7 +12,7 @@
 use crate::config::GatewayConfig;
 use crate::engine::TICK_S;
 use crate::hub::{local_epoch_s, tick_until, Hub, Wall};
-use crate::shared::Shared;
+use crate::shared::{Mode, Shared};
 use crate::timefmt::now_unix_ms;
 use std::io;
 use std::net::SocketAddr;
@@ -81,7 +81,7 @@ impl Gateway {
         let listener = TcpListener::bind(http_bind).await.map_err(|e| in_use("HTTP", http_bind, e))?;
         let (udp_addr, http_addr) = (sock.local_addr()?, listener.local_addr()?);
 
-        let shared = Shared::with_history("live", cfg.history);
+        let shared = Shared::with_history(Mode::Live, cfg.history);
         let cfg_arc = Arc::new(cfg.clone());
         let alerts = if cfg.alert_routes.is_empty() {
             None

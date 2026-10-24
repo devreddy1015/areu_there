@@ -417,7 +417,7 @@ impl Hub {
             e.spaces.iter().filter(|s| s.sample.is_some_and(|x| x.occupied.is_none())).map(|s| s.config.id.as_str()).collect();
         let mut h = json!({
             "version": env!("CARGO_PKG_VERSION"),
-            "mode": shared.mode,
+            "mode": shared.mode.as_str(),
             "uptime_s": shared.started.elapsed().as_secs_f64(),
             "t_s": t_s,
             "time": iso8601(self.wall.unix_ms(t_s, t_s), self.cfg.utc_offset_minutes),

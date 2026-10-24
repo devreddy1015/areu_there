@@ -31,7 +31,9 @@ pub enum Action {
     Login,
     LoginFailed,
     Logout,
-    /// A request with no valid credential.
+    /// A refused request: one with no valid credential (401), or one
+    /// whose principal's role may not see what it asked for (403, e.g.
+    /// positions, spec/livedemo.md §2.3). `detail` says which.
     Denied,
     /// A principal read a space's consented vital signs.
     VitalsRead,

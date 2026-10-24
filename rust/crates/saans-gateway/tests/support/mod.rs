@@ -46,6 +46,35 @@ pub fn config(name: &str, spaces_toml: &str) -> GatewayConfig {
     GatewayConfig::from_toml(&text).unwrap_or_else(|e| panic!("test config: {e}\n{text}"))
 }
 
+/// One bearer token per role, as `(role, token)`.
+pub const ROLE_TOKENS: [(&str, &str); 4] =
+    [("admin", "test-admin-token"), ("ops", "test-ops-token"), ("safety", "test-safety-token"), ("occupancy", "test-occupancy-token")];
+
+/// `[auth] required = true` and one `[[token]]` per [`ROLE_TOKENS`] entry,
+/// named after its role and stored as its SHA-256 (no Argon2, so no
+/// sign-in cost), to prepend to [`config`]'s `spaces_toml`. On the
+/// loopback `http_addr` the tests use, this is the only way to make the
+/// gateway ask for credentials.
+pub fn auth_toml() -> String {
+    let mut s = String::from("[auth]\nrequired = true\n");
+    for (role, token) in ROLE_TOKENS {
+        let sha = saans_gateway::auth::sha256_hex(token);
+        s += &format!("[[token]]\nname = \"{role}\"\nrole = \"{role}\"\nsha256 = \"{sha}\"\n");
+    }
+    s
+}
+
+/// The `Authorization` value for `role`'s token in [`ROLE_TOKENS`].
+pub fn bearer(role: &str) -> String {
+    let (_, token) = ROLE_TOKENS.iter().find(|(r, _)| *r == role).unwrap_or_else(|| panic!("no test token for role {role}"));
+    format!("Bearer {token}")
+}
+
+/// The `Origin` a page served by the gateway at `addr` sends.
+pub fn same_origin(addr: SocketAddr) -> String {
+    format!("http://{addr}")
+}
+
 pub struct TestGw {
     pub gw: Gateway,
     pub cfg: GatewayConfig,
@@ -96,8 +125,20 @@ impl TestGw {
         get(self.http(), path).await
     }
 
+    /// [`get_with`] on this gateway.
+    pub async fn get_with(&self, path: &str, headers: &[(&str, &str)]) -> Resp {
+        get_with(self.http(), path, headers).await
+    }
+
     pub async fn json(&self, path: &str) -> Value {
         let r = self.get(path).await;
+        assert_eq!(r.status, 200, "GET {path}: {}", r.body);
+        r.json()
+    }
+
+    /// [`TestGw::json`] with extra request headers.
+    pub async fn json_with(&self, path: &str, headers: &[(&str, &str)]) -> Value {
+        let r = self.get_with(path, headers).await;
         assert_eq!(r.status, 200, "GET {path}: {}", r.body);
         r.json()
     }
@@ -219,11 +260,30 @@ fn dechunk(mut b: &[u8]) -> Vec<u8> {
     }
 }
 
+/// A GET request's head: `Host: {addr}` unless `extra` names a `Host` of
+/// its own, then `fixed` (whole header lines), then `extra` as given.
+fn request_head(addr: SocketAddr, path: &str, fixed: &str, extra: &[(&str, &str)]) -> String {
+    let is_host = |k: &str| k.eq_ignore_ascii_case("host");
+    let host = extra.iter().find(|(k, _)| is_host(k)).map_or_else(|| addr.to_string(), |(_, v)| v.to_string());
+    let mut req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\n{fixed}");
+    for (k, v) in extra.iter().filter(|(k, _)| !is_host(k)) {
+        assert!(!k.contains(['\r', '\n', ':']) && !v.contains(['\r', '\n']), "header {k:?}: {v:?} would split the request");
+        req += &format!("{k}: {v}\r\n");
+    }
+    req + "\r\n"
+}
+
 /// `GET path` over a fresh connection (`Connection: close`).
 pub async fn get(addr: SocketAddr, path: &str) -> Resp {
+    get_with(addr, path, &[]).await
+}
+
+/// [`get`] with extra request headers (`Origin`, `Authorization`,
+/// `Cookie`, ...). A `Host` among them replaces the default `Host: {addr}`.
+pub async fn get_with(addr: SocketAddr, path: &str, headers: &[(&str, &str)]) -> Resp {
     let fut = async {
         let mut s = TcpStream::connect(addr).await.expect("connect");
-        let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nAccept: */*\r\nConnection: close\r\n\r\n");
+        let req = request_head(addr, path, "Accept: */*\r\nConnection: close\r\n", headers);
         s.write_all(req.as_bytes()).await.unwrap();
         let mut raw = Vec::new();
         s.read_to_end(&mut raw).await.unwrap();
@@ -252,18 +312,44 @@ pub struct Ws {
     buf: Vec<u8>,
 }
 
+/// One message from the server, as [`Ws::next_message`] returns it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WsMsg {
+    Text(String),
+    /// The server's close frame: its status code (`None` when the frame
+    /// carries none) and its reason.
+    Close { code: Option<u16>, reason: String },
+}
+
 /// RFC 6455 section 1.3's example key and its accept value.
 const WS_KEY: &str = "dGhlIHNhbXBsZSBub25jZQ==";
 const WS_ACCEPT: &str = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
 
 impl Ws {
     pub async fn connect(addr: SocketAddr, path: &str) -> Ws {
+        Self::connect_with(addr, path, &[]).await
+    }
+
+    /// [`Ws::connect`] with extra handshake headers (`Origin`,
+    /// `Authorization`, `Cookie`, a `Host` override). Panics unless the
+    /// server upgrades.
+    pub async fn connect_with(addr: SocketAddr, path: &str, headers: &[(&str, &str)]) -> Ws {
+        match Self::try_connect(addr, path, headers).await {
+            Ok(ws) => ws,
+            Err(r) => panic!("WebSocket handshake refused: {} {:?} {}", r.status, r.headers, r.body),
+        }
+    }
+
+    /// The handshake, returning the server's answer instead of panicking
+    /// when it does not upgrade: `Err` holds the refusal's status,
+    /// headers and body.
+    pub async fn try_connect(addr: SocketAddr, path: &str, headers: &[(&str, &str)]) -> Result<Ws, Resp> {
         let fut = async {
             let mut s = TcpStream::connect(addr).await.expect("connect");
-            let req = format!(
-                "GET {path} HTTP/1.1\r\nHost: {addr}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\
-                 Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {WS_KEY}\r\n\r\n"
+            let fixed = format!(
+                "Connection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {WS_KEY}\r\n"
             );
+            let req = request_head(addr, path, &fixed, headers);
             s.write_all(req.as_bytes()).await.unwrap();
             let mut buf = Vec::new();
             let end = loop {
@@ -276,12 +362,15 @@ impl Ws {
                 buf.extend_from_slice(&chunk[..n]);
             };
             let (status, headers) = parse_head(std::str::from_utf8(&buf[..end]).unwrap());
-            assert_eq!(status, 101, "{headers:?}");
+            buf.drain(..end + 4);
+            if status != 101 {
+                let body = refusal_body(&mut s, buf, &headers).await;
+                return Err(Resp { status, headers, body: String::from_utf8(body).expect("UTF-8 body") });
+            }
             let h = |n: &str| headers.iter().find(|(k, _)| k == n).map(|(_, v)| v.clone());
             assert_eq!(h("upgrade").map(|v| v.to_ascii_lowercase()).as_deref(), Some("websocket"));
             assert_eq!(h("sec-websocket-accept").as_deref(), Some(WS_ACCEPT));
-            buf.drain(..end + 4);
-            Ws { s, buf }
+            Ok(Ws { s, buf })
         };
         timeout(IO_TIMEOUT, fut).await.expect("WebSocket handshake timed out")
     }
@@ -322,17 +411,82 @@ impl Ws {
 
     /// The next text message, skipping control frames; panics on close.
     pub async fn next_text(&mut self) -> String {
+        match self.next_message().await {
+            WsMsg::Text(t) => t,
+            WsMsg::Close { code, reason } => panic!("server closed the WebSocket: code {code:?}, reason {reason:?}"),
+        }
+    }
+
+    /// The next text message or the server's close frame, answering a
+    /// ping (as every client must, RFC 6455 section 5.5.2) and skipping a
+    /// pong. Panics on any other frame, or after 10 s without one.
+    pub async fn next_message(&mut self) -> WsMsg {
         let fut = async {
             loop {
                 match self.frame().await {
-                    (0x1, p) => return String::from_utf8(p).expect("UTF-8 text frame"),
-                    (0x8, p) => panic!("server closed the WebSocket: {p:?}"),
-                    (0x9 | 0xA, _) => continue,
+                    (0x1, p) => return WsMsg::Text(String::from_utf8(p).expect("UTF-8 text frame")),
+                    (0x8, p) => {
+                        // RFC 6455 section 5.5.1: no body, or a 2-byte
+                        // code followed by a UTF-8 reason.
+                        assert_ne!(p.len(), 1, "a close frame body is empty or at least 2 bytes");
+                        let code = (p.len() >= 2).then(|| u16::from_be_bytes([p[0], p[1]]));
+                        let reason = String::from_utf8(p.get(2..).unwrap_or_default().to_vec()).expect("UTF-8 close reason");
+                        return WsMsg::Close { code, reason };
+                    }
+                    (0x9, p) => self.pong(&p).await,
+                    (0xA, _) => continue,
                     (op, _) => panic!("unexpected opcode {op}"),
                 }
             }
         };
         timeout(IO_TIMEOUT, fut).await.expect("no WebSocket message within 10 s")
+    }
+
+    /// The next frame as `(opcode, payload)`, control frames included,
+    /// answering nothing: to the server, a client that reads this way
+    /// has stopped reading. Panics after 10 s without one.
+    pub async fn next_raw(&mut self) -> (u8, Vec<u8>) {
+        timeout(IO_TIMEOUT, self.frame()).await.expect("no WebSocket frame within 10 s")
+    }
+
+    /// Answer a ping. Best effort: a server that has closed gets nothing.
+    async fn pong(&mut self, payload: &[u8]) {
+        assert!(payload.len() <= 125, "a control frame's payload is at most 125 bytes");
+        let mask = [0x12u8, 0x34, 0x56, 0x78];
+        let mut f = vec![0x80 | 0xA, 0x80 | payload.len() as u8];
+        f.extend_from_slice(&mask);
+        f.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+        let _ = timeout(IO_TIMEOUT, self.s.write_all(&f)).await;
+    }
+
+    /// Send one text message (masked, as a client must).
+    pub async fn send_text(&mut self, text: &str) {
+        self.send_frame(0x1, text.as_bytes()).await;
+    }
+
+    /// Send one binary message (masked).
+    pub async fn send_binary(&mut self, data: &[u8]) {
+        self.send_frame(0x2, data).await;
+    }
+
+    /// One unfragmented client frame: FIN, `opcode`, masked `payload`.
+    async fn send_frame(&mut self, opcode: u8, payload: &[u8]) {
+        let mask = [0x12u8, 0x34, 0x56, 0x78];
+        let mut f = vec![0x80 | opcode];
+        match payload.len() {
+            n if n < 126 => f.push(0x80 | n as u8),
+            n if n <= 0xFFFF => {
+                f.push(0x80 | 126);
+                f.extend_from_slice(&(n as u16).to_be_bytes());
+            }
+            n => {
+                f.push(0x80 | 127);
+                f.extend_from_slice(&(n as u64).to_be_bytes());
+            }
+        }
+        f.extend_from_slice(&mask);
+        f.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+        timeout(IO_TIMEOUT, self.s.write_all(&f)).await.expect("WebSocket send timed out").unwrap();
     }
 
     pub async fn next_json(&mut self) -> Value {
@@ -354,18 +508,44 @@ impl Ws {
     /// Send a (masked) close frame; the server must answer with its own
     /// close frame (RFC 6455 section 5.5.1).
     pub async fn close(mut self) {
-        let mask = [0x12u8, 0x34, 0x56, 0x78];
-        let payload = 1000u16.to_be_bytes();
-        let mut f = vec![0x88, 0x80 | payload.len() as u8];
-        f.extend_from_slice(&mask);
-        f.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
-        self.s.write_all(&f).await.unwrap();
+        self.send_frame(0x8, &1000u16.to_be_bytes()).await;
         // Messages still in flight may come first.
         let fut = async {
             while self.frame().await.0 != 0x8 {}
         };
         timeout(IO_TIMEOUT, fut).await.expect("server answers a close frame");
     }
+}
+
+/// The body of a refused handshake. The connection stays open (it was
+/// not asked to close), so the body is read by its `Content-Length`, or
+/// to the end of its chunks; only a response with neither is read to EOF.
+async fn refusal_body(s: &mut TcpStream, mut buf: Vec<u8>, headers: &[(String, String)]) -> Vec<u8> {
+    let h = |n: &str| headers.iter().find(|(k, _)| k == n).map(|(_, v)| v.as_str());
+    if let Some(n) = h("content-length") {
+        let n: usize = n.parse().expect("Content-Length");
+        while buf.len() < n {
+            assert!(read_more(s, &mut buf).await > 0, "connection closed inside the response body");
+        }
+        buf.truncate(n);
+        buf
+    } else if h("transfer-encoding").is_some_and(|v| v.contains("chunked")) {
+        while !(buf.starts_with(b"0\r\n\r\n") || buf.ends_with(b"\r\n0\r\n\r\n")) {
+            assert!(read_more(s, &mut buf).await > 0, "connection closed inside the response body");
+        }
+        dechunk(&buf)
+    } else {
+        while read_more(s, &mut buf).await > 0 {}
+        buf
+    }
+}
+
+/// Append what the socket has to `buf`; 0 at end of stream.
+async fn read_more(s: &mut TcpStream, buf: &mut Vec<u8>) -> usize {
+    let mut chunk = [0u8; 4096];
+    let n = s.read(&mut chunk).await.unwrap();
+    buf.extend_from_slice(&chunk[..n]);
+    n
 }
 
 // ------------------------------------------------------------- Prometheus
