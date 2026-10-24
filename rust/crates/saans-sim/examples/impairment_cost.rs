@@ -94,6 +94,8 @@ struct Run {
     clean: Vec<Vec<f64>>,
     agc_moves: usize,
     agc_steps_db: Vec<f64>,
+    /// Frame index of each AGC move: ground truth for `--corrections`.
+    agc_move_at: Vec<usize>,
 }
 
 impl Run {
@@ -117,6 +119,7 @@ fn run_arm(sc: &Scenario, arm: Arm, cfg: ImpairConfig) -> Run {
     let mut nodes = RawNodes::new(sc, sim.options(), cfg, 0);
     let rx = sc.links[0].1;
     let (mut frames, mut clean, mut steps) = (Vec::new(), Vec::new(), Vec::new());
+    let mut move_at = Vec::new();
     let mut last_gain = f64::NAN;
     let mut buf = Vec::new();
     while let Some(tick) = sim.step() {
@@ -146,6 +149,7 @@ fn run_arm(sc: &Scenario, arm: Arm, cfg: ImpairConfig) -> Run {
         let g = node.impairment().gain_db();
         if last_gain.is_finite() && g != last_gain {
             steps.push(g - last_gain);
+            move_at.push(frames.len() - 1);
         }
         last_gain = g;
     }
@@ -154,6 +158,7 @@ fn run_arm(sc: &Scenario, arm: Arm, cfg: ImpairConfig) -> Run {
         clean,
         agc_moves: steps.len(),
         agc_steps_db: steps,
+        agc_move_at: move_at,
     }
 }
 
@@ -376,6 +381,10 @@ fn med(xs: &[f64]) -> f64 {
 }
 
 fn main() {
+    if std::env::args().any(|a| a == "--corrections") {
+        corrections();
+        return;
+    }
     let fs = 20.0;
     println!(
         "saans-sim impairment cost. SYNTHETIC; the receiver model is UNVERIFIED (src/impair.rs)."
@@ -709,4 +718,309 @@ fn main() {
             med(&occ)
         );
     }
+}
+
+// ------------------------------------------------------------ --corrections
+//
+// Two ways to undo an AGC gain step before the node's DSP sees it, each
+// measured on the clean arm (what it costs when there is nothing to fix)
+// and on the receiver model (what it buys). Neither is in the production
+// DSP. NOTES.md §9 is explicit that changing the detectors on the strength
+// of an uncalibrated model is the opposite of what the model is for; this
+// measures the candidates so that when a bench recording says how often a
+// real AGC moves, the decision is already costed.
+
+/// Natural-log amplitude to amplitude dB.
+const NEPER_TO_DB: f64 = 20.0 / std::f64::consts::LN_10;
+/// The smallest common jump the step detector will call a gain step.
+/// Chosen from physics, not fitted: a 14 BPM breather moves a bin by about
+/// 0.01 dB per 50 ms frame (1.6% of |H| over a cycle, NOTES.md §9), so
+/// 0.2 dB is twenty times that and below any plausible AGC quantum. The
+/// model's quantum, 0.5 dB, is itself an assumption about real hardware.
+const STEP_MIN_DB: f64 = 0.2;
+/// ... and only when that common jump is this many standard errors clear
+/// of the per-subcarrier scatter. A gain step moves every bin alike; noise
+/// and a body do not. 5 was chosen before measuring, on an estimate of the
+/// scatter from quantization alone (~0.03 dB). The measured standard error
+/// at a true move is 0.10-0.15 dB, because many bins sit at low counts in
+/// frequency-selective fades, so a real 0.5 dB step reads at t of 3-4.5.
+/// The table sweeps the threshold rather than re-fitting it to the
+/// simulator's noise model, which is the least trustworthy part of it.
+const STEP_T: f64 = 5.0;
+const STEP_T_SWEEP: [f64; 4] = [2.0, 3.0, 4.0, 5.0];
+
+fn median_of(mut v: Vec<f64>) -> f64 {
+    v.retain(|x| x.is_finite());
+    if v.is_empty() {
+        return f64::NAN;
+    }
+    v.sort_by(f64::total_cmp);
+    let n = v.len();
+    if n % 2 == 1 {
+        v[n / 2]
+    } else {
+        0.5 * (v[n / 2 - 1] + v[n / 2])
+    }
+}
+
+fn log_amps(f: &CsiFrame) -> Vec<f64> {
+    f.amplitudes
+        .iter()
+        .map(|&a| if a > 0.0 { a.ln() } else { f64::NAN })
+        .collect()
+}
+
+fn scaled(f: &CsiFrame, log_scale: f64) -> CsiFrame {
+    let mut out = f.clone();
+    let k = log_scale.exp();
+    out.amplitudes.iter_mut().for_each(|a| *a *= k);
+    out
+}
+
+/// Design 1: divide every frame by its own median amplitude across
+/// subcarriers (held to the first frame's level). Kills any gain step
+/// outright -- and any other change common to the whole band, which at
+/// ESP32 bandwidth is most of a breather's signal.
+fn common_mode(frames: &[CsiFrame]) -> Vec<CsiFrame> {
+    let mut reference = f64::NAN;
+    frames
+        .iter()
+        .map(|f| {
+            let g = median_of(log_amps(f));
+            if !g.is_finite() {
+                return f.clone();
+            }
+            if !reference.is_finite() {
+                reference = g;
+            }
+            scaled(f, reference - g)
+        })
+        .collect()
+}
+
+/// Design 2: detect a frame-to-frame jump that is the same on every
+/// subcarrier, and undo it from then on. Returns the corrected frames and
+/// the frame indices it called steps.
+fn step_correct(frames: &[CsiFrame], t_min: f64) -> (Vec<CsiFrame>, Vec<usize>) {
+    let mut correction = 0.0;
+    let mut prev: Option<Vec<f64>> = None;
+    let mut detected = Vec::new();
+    let mut out = Vec::with_capacity(frames.len());
+    for (i, f) in frames.iter().enumerate() {
+        let logs = log_amps(f);
+        if let Some(p) = &prev {
+            let jumps: Vec<f64> = logs
+                .iter()
+                .zip(p)
+                .filter(|(a, b)| a.is_finite() && b.is_finite())
+                .map(|(a, b)| a - b)
+                .collect();
+            if jumps.len() >= 8 {
+                let d = median_of(jumps.clone());
+                let mad = median_of(jumps.iter().map(|j| (j - d).abs()).collect());
+                // Standard error of a median: 1.2533 sigma / sqrt(n), with
+                // sigma estimated robustly as 1.4826 MAD.
+                let se = 1.2533 * 1.4826 * mad / (jumps.len() as f64).sqrt();
+                if (d * NEPER_TO_DB).abs() >= STEP_MIN_DB && d.abs() > t_min * se.max(1e-12) {
+                    correction -= d;
+                    detected.push(i);
+                }
+            }
+        }
+        prev = Some(logs);
+        out.push(scaled(f, correction));
+    }
+    (out, detected)
+}
+
+/// Not a method: undo the model's *true* gain, read from its own record.
+/// The upper bound of any design that corrects gain steps -- if this does
+/// not restore presence, no detector of steps can.
+fn oracle_correct(frames: &[CsiFrame], move_at: &[usize], steps_db: &[f64]) -> Vec<CsiFrame> {
+    let mut gain_db = 0.0;
+    let mut next = 0;
+    frames
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            while next < move_at.len() && move_at[next] <= i {
+                gain_db += steps_db[next];
+                next += 1;
+            }
+            scaled(f, -gain_db / NEPER_TO_DB)
+        })
+        .collect()
+}
+
+/// A row of the corrections table: label, which metric, how to print it.
+type PipeRow = (&'static str, fn(&Pipe) -> f64, fn(f64) -> String);
+
+/// The seated-scenario metrics the main table reports, for one stream.
+struct Pipe {
+    occupied: f64,
+    empty_motion: f64,
+    seated_motion: f64,
+    threshold: f64,
+    bpm: f64,
+    hit: f64,
+}
+
+fn pipe(sc: &Scenario, frames: &[CsiFrame]) -> Pipe {
+    let all = features(sc, frames);
+    let empty: Vec<f64> = all
+        .iter()
+        .filter(|f| (60.0..scenarios::LEAD_IN_S - 5.0).contains(&f.t))
+        .map(|f| f.motion)
+        .collect();
+    let ff: Vec<&Feat> = all
+        .iter()
+        .filter(|f| f.t >= scenarios::LEAD_IN_S + 65.0)
+        .collect();
+    let valid: Vec<f64> = ff.iter().filter(|f| f.conf > 0.0).map(|f| f.bpm).collect();
+    let n = ff.len().max(1) as f64;
+    Pipe {
+        occupied: 100.0 * ff.iter().filter(|f| f.occupied).count() as f64 / n,
+        empty_motion: percentile(&empty, 50.0),
+        seated_motion: percentile(&ff.iter().map(|f| f.motion).collect::<Vec<_>>(), 50.0),
+        threshold: percentile(&ff.iter().map(|f| f.threshold).collect::<Vec<_>>(), 50.0),
+        bpm: if valid.is_empty() {
+            f64::NAN
+        } else {
+            percentile(&valid, 50.0)
+        },
+        hit: 100.0 * valid.iter().filter(|b| (*b - 14.0).abs() <= 2.0).count() as f64 / n,
+    }
+}
+
+fn corrections() {
+    let fs = 20.0;
+    let seated_s = 180.0;
+    let streams: [(&str, Option<ImpairConfig>); 3] = [
+        ("clean", None),
+        ("esp32", Some(ImpairConfig::esp32_s3())),
+        (
+            "esp32 d.002",
+            Some(ImpairConfig {
+                agc_dither_prob: 0.002,
+                ..ImpairConfig::esp32_s3()
+            }),
+        ),
+    ];
+    let names = [
+        "none",
+        "common-mode",
+        "step (t >= 5, as chosen before measuring)",
+        "oracle: the model's true gain undone (NOT a method; the bound on any step correction)",
+    ];
+    // [correction][stream] -> per-seed values
+    let mut m: Vec<Vec<Vec<Pipe>>> = (0..4)
+        .map(|_| (0..3).map(|_| Vec::new()).collect())
+        .collect();
+    // Threshold sweep, esp32 stream: (true moves, matched, detections, clean detections, occupied %s)
+    let mut sweep: Vec<(usize, usize, usize, usize, Vec<f64>)> = STEP_T_SWEEP
+        .iter()
+        .map(|_| (0, 0, 0, 0, Vec::new()))
+        .collect();
+    for &seed in &SEEDS {
+        let sc = seated_scenario(seed, seated_s);
+        for (j, (_, cfg)) in streams.iter().enumerate() {
+            let r = match cfg {
+                None => run(&sc, Arm::Clean),
+                Some(c) => run_cfg(&sc, *c),
+            };
+            for (k, &t_min) in STEP_T_SWEEP.iter().enumerate() {
+                let (stepped, found) = step_correct(&r.frames, t_min);
+                let w = &mut sweep[k];
+                if cfg.is_none() {
+                    w.3 += found.len();
+                } else if j == 1 {
+                    // Scored against the model's own record of when it
+                    // moved; a detection within one frame of a move counts.
+                    w.0 += r.agc_move_at.len();
+                    w.2 += found.len();
+                    w.1 += r
+                        .agc_move_at
+                        .iter()
+                        .filter(|&&t| found.iter().any(|&d| d.abs_diff(t) <= 1))
+                        .count();
+                    w.4.push(pipe(&sc, &stepped).occupied);
+                }
+                if t_min == STEP_T {
+                    m[2][j].push(pipe(&sc, &stepped));
+                }
+            }
+            m[0][j].push(pipe(&sc, &r.frames));
+            m[1][j].push(pipe(&sc, &common_mode(&r.frames)));
+            m[3][j].push(pipe(
+                &sc,
+                &oracle_correct(&r.frames, &r.agc_move_at, &r.agc_steps_db),
+            ));
+        }
+    }
+
+    println!(
+        "saans-sim AGC corrections. SYNTHETIC; the receiver model is UNVERIFIED (src/impair.rs)."
+    );
+    println!(
+        "{} room seeds; the seated scenario of the main table (14 BPM, {seated_s} s after a {} s empty lead-in),",
+        SEEDS.len(),
+        scenarios::LEAD_IN_S
+    );
+    println!(
+        "{fs} Hz. Each correction is applied to the frames a consumer sees, before the node's own"
+    );
+    println!("FeatureExtractor. Neither is in the production DSP. Median over seeds.");
+    let rows: [PipeRow; 6] = [
+        ("presence: frames reporting occupied, %", |p| p.occupied, f2),
+        (
+            "presence: motion energy, empty room",
+            |p| p.empty_motion,
+            f3,
+        ),
+        (
+            "presence: motion energy, person seated",
+            |p| p.seated_motion,
+            f3,
+        ),
+        ("presence: calibrated threshold", |p| p.threshold, f3),
+        ("breathing BPM (truth 14.0)", |p| p.bpm, f2),
+        ("frames within 2 BPM of truth, %", |p| p.hit, f2),
+    ];
+    for (c, name) in names.iter().enumerate() {
+        println!("\ncorrection: {name}");
+        print!("{:<42}", "");
+        for (s, _) in &streams {
+            print!("{:>13}", s);
+        }
+        println!();
+        for (label, get, fmt) in &rows {
+            print!("{label:<42}");
+            for col in &m[c] {
+                print!("{:>13}", fmt(med(&col.iter().map(get).collect::<Vec<_>>())));
+            }
+            println!();
+        }
+    }
+    println!("\nstep detector threshold sweep, against the model's own record of its AGC moves");
+    println!("(esp32 column; a detection within one frame of a move counts as catching it):");
+    println!(
+        "{:>8} {:>16} {:>12} {:>16} {:>18} {:>14}",
+        "t >=", "moves caught", "detections", "not at a move", "clean detections", "occupied, %"
+    );
+    for (k, &t_min) in STEP_T_SWEEP.iter().enumerate() {
+        let (moves, matched, det, clean, occ) = &sweep[k];
+        println!(
+            "{:>8.1} {:>16} {:>12} {:>16} {:>18} {:>14}",
+            t_min,
+            format!("{matched}/{moves}"),
+            det,
+            det.saturating_sub(*matched),
+            clean,
+            f2(med(occ))
+        );
+    }
+    println!(
+        "\n'esp32 d.002' is the receiver model with agc_dither_prob = 0.002, the low end of the"
+    );
+    println!("bracket in which presence fails; 'esp32' is the committed 0.020.");
 }

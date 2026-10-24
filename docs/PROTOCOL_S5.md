@@ -75,7 +75,11 @@ cheap in the way the other four questions in this section are.
    headers live inside the `espressif/idf:v5.4.1` container and have not
    been read.] Read the header first; the answer decides the next step.
 2. If a gain field exists, log it per frame — byte 18 or 19 of the raw
-   header is free — and count the moves directly.
+   header is free — and count the moves directly. This route matters
+   more than counting: in simulation, dividing out the true gain is the
+   *only* correction that restores presence, and no estimate of the steps
+   from the CSI itself does (`NOTES.md` §9, "Correcting it"). A logged
+   gain is both the measurement and, if the moves are frequent, the fix.
 3. If it does not, use the proxy: RSSI is already in the header at byte
    16 and an AGC step appears in it as a staircase. **Establish the
    proxy before quoting a number from it.** A staircase in RSSI can also

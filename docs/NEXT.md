@@ -226,6 +226,18 @@ false trigger is an abstention, not a wrong number.
 
 ### 1.4 AGC gain steps: build the detector, ship it off
 
+**Done as a measurement; nothing shipped, and nothing should be.** Both
+designs were built in the `impairment_cost` harness (`--corrections`)
+and neither works. Common-mode removal takes the *clean* arm to 0%
+occupied. The step detector does no harm but never rescues presence, at
+any threshold from 2 to 5 -- even catching 98% of moves -- because each
+correction is off by ~0.1 dB and the residuals are transients too. What
+does work is an oracle that divides out the model's *true* gain:
+presence and breathing back to 100%. So the fix, if one is needed, is
+reading the AGC gain from the radio, and `PROTOCOL_S5.md` §1.1 route 1
+now says so. Table in `NOTES.md` §9. The plan below is kept because it
+was the right thing to test.
+
 The largest simulated failure in the tree. NOTES.md §9's table:
 
 | seated, 14 BPM | clean | esp32 |

@@ -128,6 +128,15 @@ def suites() -> list[Suite]:
             "one constant, agc_dither_prob, which the last table sweeps.",
         ),
         Suite(
+            "corrections", "AGC gain-step corrections, measured and rejected",
+            [cargo(), "run", "-q", "--release", "-p", "saans-sim", "--example", "impairment_cost",
+             "--", "--corrections"],
+            rust, "ci",
+            "Two candidate corrections and an oracle that undoes the model's true "
+            "gain. NOTES.md §9 'Correcting it' reads this: only the oracle restores "
+            "presence, so the fix is reading the gain register, not a DSP stage.",
+        ),
+        Suite(
             "nulls", "Fresnel blind spots, full",
             [PY, "evaluate.py", "--suite", "nulls"], ROOT, "slow",
             "README's 95.1% / 95.7% / 64.5% / 68.1% come from this.",
