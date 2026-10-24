@@ -337,6 +337,34 @@ fn files(dir: &Path, sub: &str) -> BTreeMap<String, Vec<u8>> {
         .collect()
 }
 
+/// The impairment switches of §8 in a config (and Room Sim's `impair`),
+/// as the manifest's `impairment_switches` records them.
+fn switches(rs: &RoomSimConfig) -> Value {
+    serde_json::json!({
+        "impair": rs.impair,
+        "loss_prob": rs.loss_prob,
+        "loss_prob_link": rs.loss_prob_link,
+        "agc_jump_prob": rs.agc_jump_prob,
+        "device_gain_db": [rs.device_gain_db.0, rs.device_gain_db.1],
+        "ripple": rs.ripple,
+        "cpe": rs.cpe,
+        "timing_offset_s": rs.timing_offset_s,
+        "timing_offset_dev_s": [rs.timing_offset_dev_s.0, rs.timing_offset_dev_s.1],
+    })
+}
+
+/// The keys of the eight hardware switches §8's `--no-impair` sets.
+const HARDWARE: [&str; 8] = [
+    "loss_prob",
+    "loss_prob_link",
+    "agc_jump_prob",
+    "device_gain_db",
+    "ripple",
+    "cpe",
+    "timing_offset_s",
+    "timing_offset_dev_s",
+];
+
 /// The manifest without the keys that legitimately differ.
 fn manifest_without(dir: &Path, keys: &[&str]) -> Value {
     let mut m = read_json(&dir.join("manifest.json"));
@@ -380,6 +408,11 @@ fn a_small_dataset_is_the_library_run() {
     assert_eq!(m["seed"], 11);
     assert_eq!(m["label_hz"], 2);
     assert_eq!(m["impair"], true);
+    assert_eq!(m["impairments"], "on");
+    assert_eq!(
+        m["impairment_switches"],
+        switches(&RoomSimConfig::default())
+    );
     assert_eq!(m["baseline_valid"], true);
     assert_eq!(m["from"], Value::Null);
     assert_eq!(
@@ -500,7 +533,9 @@ fn check_scene(
         if nn >= n_store {
             break;
         }
-        if (nn + 1).is_multiple_of(40) {
+        // `% == 0`, not `is_multiple_of`: the workspace's rust-version is 1.80.
+        #[allow(clippy::manual_is_multiple_of)]
+        if (nn + 1) % 40 == 0 {
             // Labels: Room Sim's truth at transmission 40(k+1) - 1.
             let k = (nn + 1) / 40 - 1;
             labelled += 1;
@@ -587,6 +622,16 @@ fn check_scene(
             assert_eq!(occupied[k * 9 + z], u8::from(held));
         }
         assert_eq!(single[k], if p == 1 { zone[k * 3] } else { -1 });
+    }
+    // Every cell a person is labelled in is reachable (§5).
+    let reachable = a["zone_reachable"].u8();
+    for (at, &z) in zone.iter().enumerate() {
+        if z >= 0 {
+            assert_eq!(
+                reachable[z as usize], 1,
+                "label {at}: zone {z} is not reachable"
+            );
+        }
     }
     let frac = a["zone_floor_frac"].f32();
     assert_eq!(
@@ -728,8 +773,92 @@ fn check_scene(
 }
 
 // ---------------------------------------------------------------------
-// §11 Determinism, --no-impair, --from
+// §11 Determinism, --no-impair, --from; §7.3 splits
 // ---------------------------------------------------------------------
+
+/// §7.3's splits rebuilt here from §9's split draw: by `(n_people,
+/// l_shape)`, each stratum in the order of `uniform()` of
+/// `Rng::stream(seed, (1 << 40) | i)` (ties by index), `round(0.1 n)`
+/// half to even to test (at least 1 from 3 scenes), as many to val.
+#[test]
+fn the_splits_are_the_stratified_split_draws() {
+    let dir = temp_dir("splits");
+    let seed = 9u64;
+    generate(
+        &dir,
+        &[
+            "--scenes",
+            "60",
+            "--seconds",
+            "2",
+            "--seed",
+            "9",
+            "--threads",
+            "16",
+        ],
+    );
+    let m = read_json(&dir.join("manifest.json"));
+    let entries = m["scenes"].as_array().unwrap();
+    let mut strata: BTreeMap<(u64, bool), Vec<(f64, usize)>> = BTreeMap::new();
+    for (i, e) in entries.iter().enumerate() {
+        let u = saans_sim::rng::Rng::stream(seed, (1u64 << 40) | i as u64).uniform();
+        let key = (
+            e["n_people"].as_u64().unwrap(),
+            e["l_shape"].as_bool().unwrap(),
+        );
+        strata.entry(key).or_default().push((u, i));
+    }
+    let mut want = vec![""; entries.len()];
+    for members in strata.values_mut() {
+        members.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        let n = members.len();
+        let tenth = (0.1 * n as f64).round_ties_even() as usize;
+        let test = if n >= 3 { tenth.max(1) } else { tenth };
+        for (rank, &(_, i)) in members.iter().enumerate() {
+            want[i] = if rank < test {
+                "test"
+            } else if rank < test + tenth {
+                "val"
+            } else {
+                "train"
+            };
+        }
+    }
+    assert!(
+        strata.values().any(|m| m.len() >= 3),
+        "a stratum big enough to split"
+    );
+    for (i, e) in entries.iter().enumerate() {
+        assert_eq!(e["split"], want[i], "scene {i}");
+    }
+    for split in ["train", "val", "test"] {
+        let listed: Vec<usize> = m["splits"][split]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as usize)
+            .collect();
+        let expected: Vec<usize> = (0..entries.len()).filter(|&i| want[i] == split).collect();
+        assert_eq!(listed, expected, "{split}");
+        assert_eq!(m["split_counts"][split]["n_scenes"], expected.len());
+    }
+    assert!(!m["splits"]["test"].as_array().unwrap().is_empty());
+    // Every labelled cell is reachable, in every scene (§5), and no floor
+    // fraction is a floating-point residue.
+    for i in 0..entries.len() {
+        let a = shard(&dir, i);
+        let reachable = a["zone_reachable"].u8();
+        for &z in a["zone"].i8().iter().filter(|&&z| z >= 0) {
+            assert_eq!(reachable[z as usize], 1, "scene {i}: zone {z}");
+        }
+        for f in a["zone_floor_frac"].f32() {
+            assert!(
+                f == 0.0 || f == 1.0 || (1e-3..=0.999).contains(&f),
+                "scene {i}: {f}"
+            );
+        }
+    }
+}
 
 #[test]
 fn one_and_four_threads_write_the_same_bytes() {
@@ -759,30 +888,58 @@ fn no_impair_changes_only_the_radio_and_from_reruns_the_same_scenes() {
     let off = temp_dir("impair-off");
     let from_off = temp_dir("from-off");
     let from_on = temp_dir("from-on");
+    let back_on = temp_dir("back-on");
     let args = ["--scenes", "3", "--seconds", "2", "--seed", "5"];
     generate(&on, &args);
     let out = generate(&off, &[&args[..], &["--no-impair"]].concat());
-    assert!(stdout(&out).contains("baseline_valid false"));
+    assert!(stdout(&out).contains("impairments hardware_off"));
+    assert!(stdout(&out).contains("baseline_valid true"));
 
     // The scene files, Locate's configs and every label are the
-    // impairments-on dataset's; the Room Sim configs differ in `impair`
-    // only.
+    // impairments-on dataset's; the Room Sim configs differ in the eight
+    // hardware switches only, Room Sim's own `impair` true in both.
     let (son, soff) = (files(&on, "scenes"), files(&off, "scenes"));
     assert_eq!(
         son.keys().collect::<Vec<_>>(),
         soff.keys().collect::<Vec<_>>()
     );
+    let hardware_off = serde_json::json!({
+        "loss_prob": 0.0,
+        "loss_prob_link": {},
+        "agc_jump_prob": 0.0,
+        "device_gain_db": [0.0, 0.0],
+        "ripple": false,
+        "cpe": false,
+        "timing_offset_s": 0.0,
+        "timing_offset_dev_s": [0.0, 0.0],
+    });
     for (name, bytes) in &son {
         if name.ends_with(".roomsim.json") {
             let mut a: Value = serde_json::from_slice(bytes).unwrap();
             let mut b: Value = serde_json::from_slice(&soff[name]).unwrap();
             assert_eq!(
-                (a["impair"].clone(), b["impair"].clone()),
-                (Value::Bool(true), Value::Bool(false))
+                (&a["impair"], &b["impair"]),
+                (&Value::Bool(true), &Value::Bool(true))
             );
-            a.as_object_mut().unwrap().remove("impair");
-            b.as_object_mut().unwrap().remove("impair");
+            let defaults = serde_json::to_value(RoomSimConfig::default()).unwrap();
+            for key in HARDWARE {
+                assert_eq!(a[key], defaults[key], "{name}: {key} on");
+                assert_eq!(b[key], hardware_off[key], "{name}: {key} off");
+                a.as_object_mut().unwrap().remove(key);
+                b.as_object_mut().unwrap().remove(key);
+            }
             assert_eq!(a, b, "{name}");
+            // Noise kept.
+            for key in [
+                "snr_noise",
+                "chip_noise_counts",
+                "noise_floor_dbm",
+                "rssi_jitter_db",
+                "quantize",
+                "ltf_merge",
+            ] {
+                assert_eq!(b[key], defaults[key], "{name}: {key}");
+            }
         } else {
             assert_eq!(bytes, &soff[name], "{name}");
         }
@@ -792,21 +949,38 @@ fn no_impair_changes_only_the_radio_and_from_reruns_the_same_scenes() {
         read_json(&off.join("manifest.json")),
     );
     assert_eq!(
-        (&mon["impair"], &mon["baseline_valid"]),
-        (&Value::Bool(true), &Value::Bool(true))
+        (&mon["impair"], &mon["impairments"]),
+        (&Value::Bool(true), &Value::from("on"))
     );
     assert_eq!(
-        (&moff["impair"], &moff["baseline_valid"]),
-        (&Value::Bool(false), &Value::Bool(false))
+        (&moff["impair"], &moff["impairments"]),
+        (&Value::Bool(true), &Value::from("hardware_off"))
     );
+    let mut off_rs = RoomSimConfig::default();
+    for (key, v) in hardware_off.as_object().unwrap() {
+        let mut all = serde_json::to_value(&off_rs).unwrap();
+        all[key] = v.clone();
+        off_rs = serde_json::from_value(all).unwrap();
+    }
+    assert_eq!(moff["impairment_switches"], switches(&off_rs));
     assert_eq!(mon["splits"], moff["splits"]);
+    for (dir, m) in [(&on, &mon), (&off, &moff)] {
+        let valid = (0..3).all(|i| {
+            shard(dir, i)["calib_null_sigma"]
+                .f64()
+                .iter()
+                .any(|&s| s > 0.0)
+        });
+        assert_eq!(m["baseline_valid"], valid);
+        assert!(valid, "RSSI jitter keeps a null sigma above 0");
+    }
     for i in 0..3 {
         let (a, b) = (shard(&on, i), shard(&off, i));
         for name in LABEL_MEMBERS {
             assert_eq!(a[name], b[name], "scene {i}: {name}");
         }
-        // No packet is lost; the empty room's RSSI is constant, so every
-        // null sigma is 0 and WLM never publishes.
+        assert_ne!(a["csi_iq"], b["csi_iq"], "scene {i}: the radio differs");
+        // No packet is lost with the hardware off.
         let n = a["node_ids"].len();
         let columns = a["csi_mask"].shape[1];
         let mask = b["csi_mask"].u8();
@@ -815,8 +989,8 @@ fn no_impair_changes_only_the_radio_and_from_reruns_the_same_scenes() {
             let n_tx = m * n + usize::from(b["tx_slot"].u8()[li]);
             assert_eq!(mk, u8::from(n_tx < 160), "scene {i}: link {li}, column {m}");
         }
-        assert!(b["calib_null_sigma"].f64().iter().all(|&s| s == 0.0));
-        assert!(b["wlm_reason"].u8().iter().all(|&r| r == 1 || r == 4));
+        let meta: Value = serde_json::from_slice(&b["meta_json"].u8()).unwrap();
+        assert_eq!(meta["impair"], true, "Room Sim's master switch stays on");
     }
 
     // --from reruns DIR's scenes: with --no-impair it is the
@@ -842,6 +1016,12 @@ fn no_impair_changes_only_the_radio_and_from_reruns_the_same_scenes() {
     generate(&from_on, &["--from", src, "--scenes", "3"]);
     assert_eq!(files(&from_on, "shards"), files(&on, "shards"));
     assert_eq!(files(&from_on, "scenes"), files(&on, "scenes"));
+    // From the hardware-off copy without --no-impair: the impairments are
+    // on again, the source dataset byte for byte (the checks and the run
+    // use the ON profile, whatever DIR's configs say).
+    generate(&back_on, &["--from", off.to_str().unwrap()]);
+    assert_eq!(files(&back_on, "shards"), files(&on, "shards"));
+    assert_eq!(files(&back_on, "scenes"), files(&on, "scenes"));
 
     // A different --seed, --seconds or --scenes than DIR's is refused.
     for (flag, value) in [("--seed", "6"), ("--seconds", "4"), ("--scenes", "2")] {
@@ -890,6 +1070,10 @@ fn bad_invocations_are_refused_naming_the_parameter() {
         ),
         (vec!["gen-dataset", "--out", d, "--bogus"], "--bogus"),
         (vec!["gen-dataset", "--out", d, "--from", d], "--from"),
+        // An empty path would name the working directory's files.
+        (vec!["gen-dataset", "--out", ""], "--out"),
+        (vec!["gen-dataset", "--out", "", "--overwrite"], "--out"),
+        (vec!["gen-dataset", "--out", d, "--from", ""], "--from"),
     ] {
         let o = saans(&args, &[]);
         assert_eq!(o.status.code(), Some(2), "{args:?}: {}", stderr(&o));
@@ -922,9 +1106,16 @@ fn bad_invocations_are_refused_naming_the_parameter() {
         "{}",
         stderr(&o)
     );
-    // --from naming --out's own directory.
+    // A --from that is a file, not a dataset directory.
+    let elsewhere = temp_dir("refused-elsewhere");
     let o = saans(
-        &["gen-dataset", "--out", d, "--from", d, "--overwrite"],
+        &[
+            "gen-dataset",
+            "--out",
+            elsewhere.to_str().unwrap(),
+            "--from",
+            file.to_str().unwrap(),
+        ],
         &[],
     );
     assert_eq!(o.status.code(), Some(2));
@@ -933,6 +1124,36 @@ fn bad_invocations_are_refused_naming_the_parameter() {
         "{}",
         stderr(&o)
     );
+    assert!(stderr(&o).contains("not a directory"), "{}", stderr(&o));
+    assert!(!elsewhere.exists());
+    // --from naming --out's own directory, or a dataset inside the
+    // scenes/ or shards/ that --overwrite would remove.
+    for sub in ["", "scenes/old", "shards/old/deeper"] {
+        let from = dir.join(sub);
+        std::fs::create_dir_all(&from).unwrap();
+        std::fs::write(from.join("manifest.json"), b"{}").unwrap();
+        let o = saans(
+            &[
+                "gen-dataset",
+                "--out",
+                d,
+                "--from",
+                from.to_str().unwrap(),
+                "--overwrite",
+            ],
+            &[],
+        );
+        assert_eq!(o.status.code(), Some(2), "{sub}: {}", stderr(&o));
+        assert!(
+            stderr(&o).starts_with("gen-dataset: --from: "),
+            "{sub}: {}",
+            stderr(&o)
+        );
+        assert!(
+            from.join("manifest.json").exists(),
+            "{sub}: nothing removed"
+        );
+    }
     assert_eq!(std::fs::read(&file).unwrap(), b"x");
 }
 

@@ -25,8 +25,10 @@ use saans_locate::radius::{Outcome, Reason};
 use saans_locate::stream::RoomSimSetup;
 use saans_locate::LABEL;
 use saans_roomsim::impair::{buffer_active_all, buffer_k_all};
+use saans_roomsim::motion::Walkability;
+use saans_roomsim::room::RoomModel;
 use saans_roomsim::{Buffer, Config as RoomSimConfig, Posture, Simulator};
-use saans_scene::Scene;
+use saans_scene::{ObjectKind, Scene};
 use serde_json::json;
 
 use super::npz::{Array, Data};
@@ -94,29 +96,149 @@ fn cut_rect(scene: &Scene) -> Result<Option<(f64, f64, f64, f64)>, String> {
     }
 }
 
+/// `v` metres in centimetres: every generated coordinate is a multiple of
+/// 0.01 m (§5), so this is exact; anything else is refused.
+fn centimetres(v: f64) -> Result<i64, String> {
+    let c = (v * 100.0).round();
+    if (v * 100.0 - c).abs() > 1e-6 || c.abs() > 1e9 {
+        return Err(format!(
+            "{v} m is not a multiple of 0.01 m (spec/dataset.md §5)"
+        ));
+    }
+    Ok(c as i64)
+}
+
 /// §5 `zone_floor_frac`: per cell of the 3 x 3 grid over `(0,0)..(w,d)`,
 /// the fraction of its area that is floor; for an L, one minus the cut
-/// rectangle's share of the cell (exactly 0 for a cell the cut covers).
+/// rectangle's share of the cell. Computed exactly, in integers: lengths
+/// in thirds of a centimetre, so the cell edges `col * w / 3` are whole
+/// too; the only rounding is the final division (0 and 1 are exact).
 pub fn zone_floor_frac(scene: &Scene) -> Result<[f32; ZONES], String> {
-    let (w, d) = (scene.room.w_m, scene.room.d_m);
     let mut out = [1.0f32; ZONES];
     let Some((x0, y0, x1, y1)) = cut_rect(scene)? else {
         return Ok(out);
     };
-    let edge = |i: usize, extent: f64| {
-        if i == 3 {
-            extent
-        } else {
-            i as f64 * extent / 3.0
+    // A cell is w_cm x d_cm thirds of a centimetre.
+    let (w, d) = (centimetres(scene.room.w_m)?, centimetres(scene.room.d_m)?);
+    let third = |v: f64| centimetres(v).map(|c| 3 * c);
+    let (x0, y0, x1, y1) = (third(x0)?, third(y0)?, third(x1)?, third(y1)?);
+    let area = w * d;
+    for row in 0..3i64 {
+        for col in 0..3i64 {
+            let ox = ((col + 1) * w).min(x1) - (col * w).max(x0);
+            let oy = ((row + 1) * d).min(y1) - (row * d).max(y0);
+            let cut = ox.max(0) * oy.max(0);
+            out[(3 * row + col) as usize] = ((area - cut) as f64 / area as f64) as f32;
         }
-    };
-    for row in 0..3 {
-        for col in 0..3 {
-            let (cx0, cx1) = (edge(col, w), edge(col + 1, w));
-            let (cy0, cy1) = (edge(row, d), edge(row + 1, d));
-            let ox = (cx1.min(x1) - cx0.max(x0)).max(0.0);
-            let oy = (cy1.min(y1) - cy0.max(y0)).max(0.0);
-            out[3 * row + col] = (1.0 - (ox * oy) / ((cx1 - cx0) * (cy1 - cy0))) as f32;
+    }
+    Ok(out)
+}
+
+/// How far inside an elementary rectangle its corner test points sit, m
+/// (at most a quarter of the rectangle's width or height).
+pub const REACH_INSET_M: f64 = 1e-9;
+
+/// §5 `zone_reachable`: 1 where a person could be, exactly. Room Sim's
+/// `Walkability::point` (from `RoomModel::from_scene` and the run config)
+/// accepts a point inside the footprint at least `walk_margin_m` from
+/// every edge and outside every non-opening object's footprint grown by
+/// `rg = body_radius_m + object_clearance_m` (closed). In a generated
+/// scene every footprint edge is axis-aligned and every object stands at
+/// a multiple of 90 degrees, so every boundary of that set is an
+/// axis-aligned line, but for the disc of radius `walk_margin_m` around an
+/// L's reflex vertex. The arrangement of all those lines (the footprint's
+/// vertex coordinates, each edge's line moved `walk_margin_m` either way,
+/// each grown object's sides, and the cell edges) cuts the room into
+/// rectangles on whose interior every straight condition is constant; a
+/// rectangle is tested at its midpoint and at its four corners moved
+/// [`REACH_INSET_M`] inward (the disc is convex, so a rectangle that pokes
+/// out of it does so at a corner). Each point `Walkability::point` accepts
+/// marks the cell [`zone`] gives it, as the labels assign cells, so a
+/// strip of floor of any width counts and a cell is never called
+/// unreachable while a person can be in it. A cell holding the centre of a
+/// bed, chair or sofa (where a person lies or sits) is reachable too.
+/// Anything else (an edge or an object that is not axis-aligned) is
+/// refused rather than approximated.
+pub fn zone_reachable(scene: &Scene, rs: &RoomSimConfig) -> Result<[u8; ZONES], String> {
+    let (w, d) = (scene.room.w_m, scene.room.d_m);
+    let model = RoomModel::from_scene(scene, rs).map_err(|e| format!("Room Sim: {e}"))?;
+    let walk = Walkability::new(&model, rs);
+    // `Walkability::new`'s own parameters.
+    let (margin, rg) = (rs.walk_margin_m, rs.body_radius_m + rs.object_clearance_m);
+    let mut xs = vec![0.0, w / 3.0, 2.0 * w / 3.0, w];
+    let mut ys = vec![0.0, d / 3.0, 2.0 * d / 3.0, d];
+    for (a, b) in saans_roomsim::geometry::edges(&model.footprint) {
+        if a.0 == b.0 {
+            xs.extend([a.0 - margin, a.0, a.0 + margin]);
+            ys.extend([a.1, b.1]);
+        } else if a.1 == b.1 {
+            ys.extend([a.1 - margin, a.1, a.1 + margin]);
+            xs.extend([a.0, b.0]);
+        } else {
+            return Err(
+                "a footprint edge is not axis-aligned, so zone_reachable cannot be exact (spec/dataset.md §2.1)"
+                    .into(),
+            );
+        }
+    }
+    for (o, g) in scene.objects.iter().zip(&model.objects) {
+        if g.is_opening() {
+            continue;
+        }
+        let quarter = o.yaw_deg / 90.0;
+        if quarter.fract() != 0.0 {
+            return Err(format!(
+                "an object at yaw {} degrees is not axis-aligned, so zone_reachable cannot be exact (spec/dataset.md §2.3)",
+                o.yaw_deg
+            ));
+        }
+        // The grown box Walkability tests, `|lx| <= sl/2 + rg` and
+        // `|ly| <= sb/2 + rg`, turned into the room's axes.
+        let (along, across) = (g.sl / 2.0 + rg, g.sb / 2.0 + rg);
+        let (hx, hy) = if (quarter as i64).rem_euclid(2) == 1 {
+            (across, along)
+        } else {
+            (along, across)
+        };
+        xs.extend([g.c.x - hx, g.c.x + hx]);
+        ys.extend([g.c.y - hy, g.c.y + hy]);
+    }
+    for (v, hi) in [(&mut xs, w), (&mut ys, d)] {
+        v.retain(|c| (0.0..=hi).contains(c));
+        v.sort_by(f64::total_cmp);
+        v.dedup();
+    }
+    let mut out = [0u8; ZONES];
+    'room: for x in xs.windows(2) {
+        let (x0, x1) = (x[0], x[1]);
+        let ix = REACH_INSET_M.min((x1 - x0) / 4.0);
+        for y in ys.windows(2) {
+            let (y0, y1) = (y[0], y[1]);
+            let iy = REACH_INSET_M.min((y1 - y0) / 4.0);
+            let points = [
+                ((x0 + x1) / 2.0, (y0 + y1) / 2.0),
+                (x0 + ix, y0 + iy),
+                (x1 - ix, y0 + iy),
+                (x0 + ix, y1 - iy),
+                (x1 - ix, y1 - iy),
+            ];
+            for p in points {
+                let z = zone(p.0, p.1, w, d);
+                if out[z] == 0 && walk.point(p) {
+                    out[z] = 1;
+                }
+            }
+            if out.iter().all(|&r| r == 1) {
+                break 'room;
+            }
+        }
+    }
+    for o in &scene.objects {
+        if matches!(
+            o.kind,
+            ObjectKind::Bed | ObjectKind::Chair | ObjectKind::Sofa
+        ) {
+            out[zone(o.pos.0, o.pos.1, w, d)] = 1;
         }
     }
     Ok(out)
@@ -154,6 +276,8 @@ pub struct Built {
     pub windows: usize,
     pub windows_wlm: usize,
     pub n_links: usize,
+    /// Some link's calibration `null_sigma > 0` (§8 `baseline_valid`).
+    pub calibrated_noise: bool,
 }
 
 /// The labels of §5 at one tick, from Room Sim's truth.
@@ -438,9 +562,11 @@ fn baseline(ticks: &[TickRecord], k_labels: usize) -> Result<Baseline, String> {
     Ok(b)
 }
 
-/// Build scene `index`'s §7.2 members from its three runs. `scene_sha256`
-/// is the digest of the scene file's bytes (for `meta_json`). An error
-/// names what failed; the caller names the scene.
+/// Build scene `index`'s §7.2 members from its three runs. `rs` is the
+/// run config, its impairment profile already applied (`meta_json`'s
+/// `impair` is its Room Sim master switch, true in both profiles, §8).
+/// `scene_sha256` is the digest of the scene file's bytes. An error names
+/// what failed; the caller names the scene.
 pub fn build(
     scene: &Scene,
     rs: &RoomSimConfig,
@@ -482,6 +608,7 @@ pub fn build(
         .ticks;
     let base = baseline(&ticks, k_labels)?;
     let summary = setup.calibration().clone();
+    let calibrated_noise = summary.null_sigma.iter().any(|&s| s > 0.0);
     let locate_config = setup.config().clone();
     drop(setup);
 
@@ -504,6 +631,7 @@ pub fn build(
         .filter(|&&k| base.wlm_reason[k as usize] == 0)
         .count();
     let floor = zone_floor_frac(scene)?;
+    let reachable = zone_reachable(scene, rs)?;
     let mut nodes = scene.nodes.clone();
     nodes.sort_by_key(|n| n.id);
     let footprint = scene.footprint();
@@ -575,11 +703,7 @@ pub fn build(
             Data::F64((0..k).map(|i| 0.5 * (i + 1) as f64).collect()),
         ),
         Array::new("zone_floor_frac", &[ZONES], Data::F32(floor.to_vec())),
-        Array::new(
-            "zone_reachable",
-            &[ZONES],
-            Data::U8(floor.iter().map(|&f| u8::from(f > 0.0)).collect()),
-        ),
+        Array::new("zone_reachable", &[ZONES], Data::U8(reachable.to_vec())),
         // §6
         Array::new("wlm_xy", &[k, 2], Data::F32(base.wlm_xy)),
         Array::new("rti_xy", &[k, 2], Data::F32(base.rti_xy)),
@@ -656,6 +780,7 @@ pub fn build(
         windows,
         windows_wlm,
         n_links,
+        calibrated_noise,
     })
 }
 
@@ -768,6 +893,262 @@ mod tests {
         let poly = crate::gen_dataset::generator::l_polygon(w, d, 0, 1.0, 0.5);
         let f = zone_floor_frac(&room(w, d, Some(poly))).unwrap();
         assert_eq!(f, [0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
+    }
+
+    /// A width not divisible by 3 (each cell 2.71 m wide) cut by exactly
+    /// one cell: the float edge `8.13 / 3` is not 2.71, which used to leave
+    /// a 1e-16 residue in the fully cut cell. In integers it is exact.
+    #[test]
+    fn a_cut_of_exactly_one_cell_leaves_no_residue() {
+        let (w, d) = (8.13, 7.15);
+        for corner in 0..4 {
+            let poly = crate::gen_dataset::generator::l_polygon(w, d, corner, 2.71, 3.0);
+            let f = zone_floor_frac(&room(w, d, Some(poly))).unwrap();
+            // The corner cell, its row neighbour and its column neighbour.
+            let (cell, along_row, along_col) = [(0, 1, 3), (2, 1, 5), (8, 7, 5), (6, 7, 3)][corner];
+            assert_eq!(f[cell], 0.0, "corner {corner}: {f:?}");
+            assert_eq!(f[along_row], 1.0, "corner {corner}: {f:?}");
+            // 3.0 m of the column's 7.15 / 3 m cells: 1.85 m into the
+            // second, 185 of its 715 thirds of a centimetre.
+            assert_eq!(
+                f[along_col],
+                (530.0 / 715.0) as f32,
+                "corner {corner}: {f:?}"
+            );
+            let others = (0..9).filter(|c| ![cell, along_row, along_col].contains(c));
+            for c in others {
+                assert_eq!(f[c], 1.0, "corner {corner}: {f:?}");
+            }
+        }
+        // A coordinate off the 0.01 m grid is refused, not rounded.
+        let poly = crate::gen_dataset::generator::l_polygon(w, d, 0, 2.715, 3.0);
+        assert!(zone_floor_frac(&room(w, d, Some(poly))).is_err());
+    }
+
+    /// Seed 1, scene 1717 is an L whose cut covers a cell exactly: 0, not
+    /// a floating-point residue.
+    #[test]
+    fn a_generated_fully_cut_cell_is_exactly_zero() {
+        let g = crate::gen_dataset::generator::generate(1, 1717, 120).unwrap();
+        let f = zone_floor_frac(&g.scene).unwrap();
+        assert!(g.l_shape && f.contains(&0.0), "{f:?}");
+        for v in f {
+            assert!(v == 0.0 || v == 1.0 || (1e-3..=0.999).contains(&v), "{f:?}");
+        }
+    }
+
+    fn with_node(mut s: Scene, x: f64, y: f64) -> Scene {
+        s.nodes[0].pos = (x, y, 1.0);
+        s
+    }
+
+    /// An L cut 1.9 m into a 2 m cell leaves a 0.1 m sliver of floor:
+    /// floor, but narrower than the walking margin, so not reachable.
+    #[test]
+    fn a_sliver_of_floor_is_not_reachable() {
+        let poly = crate::gen_dataset::generator::l_polygon(6.0, 3.0, 0, 1.9, 1.5);
+        let s = with_node(room(6.0, 3.0, Some(poly)), 5.0, 2.5);
+        let f = zone_floor_frac(&s).unwrap();
+        assert_eq!(f[0], 0.05);
+        let r = zone_reachable(&s, &RoomSimConfig::default()).unwrap();
+        assert_eq!(r, [0, 1, 1, 1, 1, 1, 1, 1, 1]);
+        // The rectangle is reachable everywhere.
+        let s = with_node(room(6.0, 3.0, None), 5.0, 2.5);
+        assert_eq!(
+            zone_reachable(&s, &RoomSimConfig::default()).unwrap(),
+            [1; 9]
+        );
+    }
+
+    /// A cell a bed fills is reachable by its centre (a person lies
+    /// there); one an almirah fills is not.
+    #[test]
+    fn a_cell_full_of_bed_is_reachable_and_one_full_of_almirah_is_not() {
+        let furnished = |kind: ObjectKind| {
+            let mut s = with_node(room(6.0, 6.0, None), 5.0, 5.0);
+            s.objects.push(saans_scene::Object {
+                kind,
+                id: None,
+                pos: (1.0, 1.0, 0.25),
+                size: (1.9, 1.9, 0.5),
+                yaw_deg: 0.0,
+                material: saans_scene::ObjectMaterial::Fabric,
+            });
+            zone_reachable(&s, &RoomSimConfig::default()).unwrap()
+        };
+        assert_eq!(furnished(ObjectKind::Bed), [1; 9]);
+        assert_eq!(furnished(ObjectKind::Almirah), [0, 1, 1, 1, 1, 1, 1, 1, 1]);
+    }
+
+    /// The rule this replaced: a 0.05 m grid of `Walkability::point` tests
+    /// and the furniture centres. Kept as a reference: every cell it
+    /// found reachable is reachable, but it steps over strips of floor
+    /// narrower than 0.05 m.
+    fn grid_reachable(scene: &Scene, rs: &RoomSimConfig) -> [u8; ZONES] {
+        let (w, d) = (scene.room.w_m, scene.room.d_m);
+        let model = RoomModel::from_scene(scene, rs).unwrap();
+        let walk = Walkability::new(&model, rs);
+        let mut out = [0u8; ZONES];
+        for i in 0..=(w * 20.0).floor() as u32 {
+            for j in 0..=(d * 20.0).floor() as u32 {
+                let p = (f64::from(i) / 20.0, f64::from(j) / 20.0);
+                let z = zone(p.0, p.1, w, d);
+                if out[z] == 0 && walk.point(p) {
+                    out[z] = 1;
+                }
+            }
+        }
+        for o in &scene.objects {
+            if matches!(
+                o.kind,
+                ObjectKind::Bed | ObjectKind::Chair | ObjectKind::Sofa
+            ) {
+                out[zone(o.pos.0, o.pos.1, w, d)] = 1;
+            }
+        }
+        out
+    }
+
+    fn object(
+        kind: ObjectKind,
+        pos: (f64, f64, f64),
+        size: (f64, f64, f64),
+        yaw_deg: f64,
+    ) -> saans_scene::Object {
+        saans_scene::Object {
+            kind,
+            id: None,
+            pos,
+            size,
+            yaw_deg,
+            material: saans_scene::ObjectMaterial::Wood,
+        }
+    }
+
+    /// The table of seed 0's scene 1203, alone in its 3.95 x 5.49 m room:
+    /// grown by 0.23 m it reaches y = 5.052, the walking margin stops at
+    /// 5.49 - 0.4 = 5.09, so cell 6's floor is a strip 0.038 m tall that
+    /// the 0.05 m grid stepped over (y = 5.05 and 5.10).
+    #[test]
+    fn a_strip_of_floor_narrower_than_the_old_grid_is_reachable() {
+        let mut s = with_node(room(3.95, 5.49, None), 3.5, 0.5);
+        s.objects.push(object(
+            ObjectKind::Table,
+            (0.8784195425059129, 4.242208929397479, 0.39),
+            (1.16, 0.88, 0.78),
+            90.0,
+        ));
+        let rs = RoomSimConfig::default();
+        let model = RoomModel::from_scene(&s, &rs).unwrap();
+        let walk = Walkability::new(&model, &rs);
+        assert!(walk.point((0.808, 5.072)), "the walker's point is walkable");
+        assert_eq!(zone(0.808, 5.072, 3.95, 5.49), 6);
+        assert_eq!(grid_reachable(&s, &rs)[6], 0, "the old grid missed it");
+        assert_eq!(zone_reachable(&s, &rs).unwrap()[6], 1);
+    }
+
+    /// Seed 0, scene 1203 itself (a walker was labelled in cell 6 while the
+    /// old rule called it unreachable).
+    #[test]
+    fn scene_1203_of_seed_0_has_cell_6_reachable() {
+        let g = crate::gen_dataset::generator::generate(0, 1203, 120).unwrap();
+        assert_eq!((g.scene.room.w_m, g.scene.room.d_m), (3.95, 5.49));
+        let r = zone_reachable(&g.scene, &g.rs).unwrap();
+        assert_eq!(r[6], 1, "{r:?}");
+        assert_eq!(grid_reachable(&g.scene, &g.rs)[6], 0);
+        // Everything the old rule found is still found.
+        let old = grid_reachable(&g.scene, &g.rs);
+        assert!((0..ZONES).all(|c| r[c] >= old[c]), "{r:?} {old:?}");
+    }
+
+    /// An L cut 1.7 x 1.7 m from (0, 0) of a 6 x 6 m room: cell 0's only
+    /// walkable floor is the corner beyond the disc of radius 0.4 m around
+    /// the reflex vertex (1.7, 1.7), within (1.96, 2) x (1.96, 2): found at
+    /// a rectangle's corner, not its midpoint, and missed by the grid.
+    #[test]
+    fn floor_beyond_the_reflex_vertex_disc_is_found_at_a_corner() {
+        let poly = crate::gen_dataset::generator::l_polygon(6.0, 6.0, 0, 1.7, 1.7);
+        let s = with_node(room(6.0, 6.0, Some(poly)), 5.0, 5.0);
+        let rs = RoomSimConfig::default();
+        let r = zone_reachable(&s, &rs).unwrap();
+        assert_eq!(r, [1; 9], "{r:?}");
+        assert_eq!(grid_reachable(&s, &rs)[0], 0);
+        // With the cut a little larger the disc covers all of cell 0's
+        // floor: unreachable.
+        let poly = crate::gen_dataset::generator::l_polygon(6.0, 6.0, 0, 1.75, 1.75);
+        let s = with_node(room(6.0, 6.0, Some(poly)), 5.0, 5.0);
+        assert_eq!(zone_reachable(&s, &rs).unwrap()[0], 0);
+    }
+
+    #[test]
+    fn an_object_off_the_quarter_turns_is_refused() {
+        let mut s = with_node(room(6.0, 6.0, None), 5.0, 5.0);
+        s.objects.push(object(
+            ObjectKind::Table,
+            (2.0, 2.0, 0.375),
+            (1.0, 0.6, 0.75),
+            45.0,
+        ));
+        assert!(zone_reachable(&s, &RoomSimConfig::default()).is_err());
+    }
+
+    /// §5 over seeds 0..3 x 200 scenes: every person, at every transmission
+    /// of a 120 s run (Room Sim's own trajectories, evaluated at the run's
+    /// times: the labels' truth without the channels), is in a reachable
+    /// cell; so is every walkable point of a random sample; and every cell
+    /// the old grid rule found is still reachable (the output changed only
+    /// where it was wrong).
+    #[test]
+    fn every_person_and_walkable_point_is_in_a_reachable_cell() {
+        use crate::gen_dataset::generator::generate;
+        use rayon::prelude::*;
+        let jobs: Vec<(u64, usize)> = (0..4u64)
+            .flat_map(|s| (0..200).map(move |i| (s, i)))
+            .collect();
+        jobs.par_iter().for_each(|&(seed, i)| {
+            let g = generate(seed, i, 120).unwrap();
+            let (scene, rs) = (&g.scene, &g.rs);
+            let (w, d) = (scene.room.w_m, scene.room.d_m);
+            let r = zone_reachable(scene, rs).unwrap();
+            let old = grid_reachable(scene, rs);
+            assert!(
+                (0..ZONES).all(|c| r[c] >= old[c]),
+                "seed {seed} scene {i}: {r:?} {old:?}"
+            );
+            let sim = Simulator::new(scene, rs.clone()).unwrap();
+            for (j, person) in sim.people().iter().enumerate() {
+                match sim.track(j) {
+                    Some(mut track) => {
+                        for n in 0..9600u32 {
+                            let at = track.at(f64::from(n) * rs.slot_s);
+                            let z = zone(at.x, at.y, w, d);
+                            assert_eq!(
+                                r[z], 1,
+                                "seed {seed} scene {i}: people[{j}] at ({}, {}) in cell {z}",
+                                at.x, at.y
+                            );
+                        }
+                    }
+                    None => {
+                        let z = zone(person.start.0, person.start.1, w, d);
+                        assert_eq!(r[z], 1, "seed {seed} scene {i}: people[{j}] in cell {z}");
+                    }
+                }
+            }
+            let model = RoomModel::from_scene(scene, rs).unwrap();
+            let walk = Walkability::new(&model, rs);
+            let mut rng = saans_sim::rng::Rng::stream(seed, 7_000_000 + i as u64);
+            for _ in 0..4000 {
+                let p = (rng.range(0.0, w), rng.range(0.0, d));
+                if walk.point(p) {
+                    assert_eq!(
+                        r[zone(p.0, p.1, w, d)],
+                        1,
+                        "seed {seed} scene {i}: walkable {p:?}"
+                    );
+                }
+            }
+        });
     }
 
     #[test]

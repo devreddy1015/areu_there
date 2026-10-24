@@ -20,6 +20,7 @@ import io
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -28,6 +29,7 @@ import zipfile
 from fractions import Fraction
 
 import numpy as np
+from matplotlib.path import Path
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
@@ -75,7 +77,8 @@ def zone(x, y):
     return 3 * min(int(3 * y / D), 2) + min(int(3 * x / W), 2)
 
 
-def make_arrays(index=0, n_nodes=4, seconds=4, n_people=1, lost=(), l_shape=False, impair=True, mc=6):
+def make_arrays(index=0, n_nodes=4, seconds=4, n_people=1, lost=(), l_shape=False, impair=True, mc=6,
+                scene_sha256=None):
     """One synthetic SIM shard's members, in §7.2 order. Link l = (tx, rx)
     in tx-major order, `tx_slot[l] = tx`; column m of link l holds
     `(imag, real) = (l % 100, m % 120 + 1)` on active subcarriers when
@@ -117,7 +120,8 @@ def make_arrays(index=0, n_nodes=4, seconds=4, n_people=1, lost=(), l_shape=Fals
     angle = 2 * np.pi * np.arange(n) / n + 0.3
     node_pos = np.stack([W / 2 + 0.42 * W * np.cos(angle), D / 2 + 0.42 * D * np.sin(angle), np.full(n, 1.2)], 1)
     meta = {"label": "SIM", "spec": "dataset v1", "scene_index": index, "scene_id": f"gen-{index:06}",
-            "scene_sha256": hashlib.sha256(f"scene {index}".encode()).hexdigest(), "roomsim_seed": 1000 + index,
+            "scene_sha256": scene_sha256 or hashlib.sha256(f"scene {index}".encode()).hexdigest(),
+            "roomsim_seed": 1000 + index,
             "n_nodes": n, "n_people": p, "slot_s": 0.0125, "n_tx": n, "columns": cols,
             "calib_m0": cols + 4, "impair": impair}
     values = {
@@ -143,9 +147,26 @@ def make_arrays(index=0, n_nodes=4, seconds=4, n_people=1, lost=(), l_shape=Fals
     return {name: np.asarray(values[name], dtype=np.dtype(descr)) for name, descr in SPEC_72}
 
 
-def in_memory(arrays):
+def in_memory(arrays, baseline_valid=True):
     """A scene dict as `load_scene` returns it, without the files."""
-    return dict(arrays, meta=json.loads(arrays["meta_json"].tobytes()))
+    return dict(arrays, meta=json.loads(arrays["meta_json"].tobytes()),
+                dataset={"impairments": "on", "baseline_valid": baseline_valid})
+
+
+def scene_doc(index, l_shape=False):
+    """A generated scene file's geometry for the plot: a bed, a chair (P1
+    sits at (2.5, 3.0)), a door and a window on the walls. SIM."""
+    objects = [
+        {"type": "bed", "pos": [1.1, 3.4, 0.25], "size": [2.0, 1.2, 0.5], "yaw_deg": 90.0, "material": "fabric"},
+        {"type": "chair", "pos": [2.5, 3.0, 0.45], "size": [0.5, 0.5, 0.9], "yaw_deg": 0.0, "material": "wood"},
+        {"type": "door", "pos": [3.0, 0.0, 1.0], "size": [0.9, 0.1, 2.0], "yaw_deg": 0.0, "material": "wood"},
+        {"type": "window", "pos": [0.0, 1.5, 1.5], "size": [1.0, 0.1, 1.0], "yaw_deg": 90.0, "material": "glass"},
+    ]
+    room = {"w_m": W, "d_m": D, "h_m": H}
+    if l_shape:
+        room["polygon"] = [list(v) for v in L_FOOTPRINT]
+    return {"schema_version": 1, "name": f"gen-{index:06}", "provenance": "generated", "room": room,
+            "objects": objects, "nodes": [{"id": 0, "pos": [0.2, 0.2, 1.2]}], "people": []}
 
 
 def sha256(path):
@@ -157,9 +178,16 @@ def write_dataset(root, scenes, split_of=None, **manifest_fields):
     """Write `scenes` (make_arrays kwargs, or ready member dicts) as a SIM
     dataset under `root`; scene i goes to `split_of[i]` (default train)."""
     os.makedirs(os.path.join(root, "shards"))
+    os.makedirs(os.path.join(root, "scenes"))
     entries = []
     for i, spec in enumerate(scenes):
-        arrays = spec if "csi_iq" in spec else make_arrays(index=i, **spec)
+        if "csi_iq" in spec:
+            arrays = spec
+        else:
+            data = json.dumps(scene_doc(i, spec.get("l_shape", False)), indent=2).encode()
+            with open(os.path.join(root, "scenes", f"gen-{i:06}.json"), "wb") as f:
+                f.write(data)
+            arrays = make_arrays(index=i, scene_sha256=hashlib.sha256(data).hexdigest(), **spec)
         shard = f"shards/gen-{i:06}.npz"
         np.savez(os.path.join(root, shard), **arrays)
         meta = json.loads(arrays["meta_json"].tobytes())
@@ -167,8 +195,8 @@ def write_dataset(root, scenes, split_of=None, **manifest_fields):
                         "shard": shard, "shard_sha256": sha256(os.path.join(root, shard)),
                         "scene_sha256": meta["scene_sha256"], "n_nodes": meta["n_nodes"],
                         "n_people": meta["n_people"]})
-    manifest = {"label": "SIM", "spec": "dataset v1", "seed": 0, "seconds": 4, "label_hz": 2,
-                "impair": True, "baseline_valid": True, "from": None,
+    manifest = {"label": "SIM", "spec": "dataset v1", "seed": 0, "n_scenes": len(entries), "seconds": 4,
+                "label_hz": 2, "impair": True, "impairments": "on", "baseline_valid": True, "from": None,
                 "splits": {name: [e["index"] for e in entries if e["split"] == name] for name in rd.SPLITS},
                 "scenes": entries}
     manifest.update(manifest_fields)
@@ -222,7 +250,8 @@ class TestAmplitude(unittest.TestCase):
 class TestLoad(TempDir):
     def test_round_trip(self):
         manifest = write_dataset(self.dir, [{"n_people": 2}, {"n_nodes": 6, "l_shape": True}])
-        want = make_arrays(index=1, n_nodes=6, l_shape=True)
+        scene_sha = sha256(os.path.join(self.dir, "scenes", "gen-000001.json"))
+        want = make_arrays(index=1, n_nodes=6, l_shape=True, scene_sha256=scene_sha)
         scene = rd.load_scene(self.dir, 1, manifest=rd.load_manifest(self.dir))
         for name, _ in SPEC_72:
             np.testing.assert_array_equal(scene[name], want[name], err_msg=name)
@@ -230,7 +259,34 @@ class TestLoad(TempDir):
         self.assertEqual(scene["meta"]["scene_id"], "gen-000001")
         self.assertEqual(scene["meta"]["label"], "SIM")
         self.assertEqual(scene["entry"], manifest["scenes"][1])
+        self.assertEqual(scene["dataset"], {"impairments": "on", "baseline_valid": True})
         self.assertEqual(rd.load_scene(self.dir, 0)["meta"]["n_people"], 2)
+        self.assertEqual(rd.load_scene_json(self.dir, 1)["room"]["polygon"][2], [W, 0.6 * D])
+
+    def test_scene_file_checked(self):
+        write_dataset(self.dir, [{}])
+        path = os.path.join(self.dir, "scenes", "gen-000000.json")
+        with open(path, "ab") as f:
+            f.write(b" ")
+        with self.assertRaisesRegex(ValueError, "scene_sha256"):
+            rd.load_scene_json(self.dir, 0)
+
+    def test_impairments_profile(self):
+        """§8: "on" or "hardware_off"; an older manifest says only `impair`."""
+        self.assertEqual(rd.impairments({"impairments": "hardware_off", "impair": True}), "hardware_off")
+        self.assertEqual(rd.impairments({"impair": True}), "on")
+        self.assertEqual(rd.impairments({"impair": False}), "off")
+        write_dataset(self.dir, [{}], impairments="hardware_off", baseline_valid=False)
+        scene = rd.load_scene(self.dir, 0)
+        self.assertEqual(scene["dataset"], {"impairments": "hardware_off", "baseline_valid": False})
+        self.assertFalse(rd.baseline_at(scene, 3)["valid"])
+        with self.assertRaisesRegex(ValueError, "impairments"):
+            rd.impairments({"impairments": "partly"})
+
+    def test_n_scenes_must_match(self):
+        write_dataset(self.dir, [{}], n_scenes=2)
+        with self.assertRaisesRegex(ValueError, "n_scenes"):
+            rd.load_manifest(self.dir)
 
     def test_manifest_label_and_spec(self):
         with self.assertRaisesRegex(FileNotFoundError, "unfinished"):
@@ -305,11 +361,13 @@ class TestLoad(TempDir):
 
 
 class TestWindow(unittest.TestCase):
-    def check_slots(self, win, link, columns, valid):
+    def check_slots(self, win, link, columns, valid, inside=None):
         """Slot j of `link` is column `columns[j]`, received iff `valid[j]`,
-        with amplitude sqrt((l % 100)^2 + (m + 1)^2) on active subcarriers, 0 on nulls."""
+        in the window iff `inside[j]` (default `valid`), with amplitude
+        sqrt((l % 100)^2 + (m + 1)^2) on active subcarriers, 0 on nulls."""
         np.testing.assert_array_equal(win.column[link], columns)
         np.testing.assert_array_equal(win.mask[link], valid)
+        np.testing.assert_array_equal(win.inside[link], valid if inside is None else inside)
         active = np.array(ACTIVE, bool)
         for j, (m, ok) in enumerate(zip(columns, valid)):
             got = win.amplitude[link, :, j]
@@ -398,7 +456,8 @@ class TestWindow(unittest.TestCase):
         lost = [(0, 75)] + [(5, m) for m in range(40, 80)]
         scene = in_memory(make_arrays(n_nodes=4, lost=lost))
         win = rd.window(scene, 7)
-        self.check_slots(win, 0, list(range(40, 80)), [m != 75 for m in range(40, 80)])
+        self.check_slots(win, 0, list(range(40, 80)), [m != 75 for m in range(40, 80)], [True] * 40)
+        self.assertEqual(win.inside[5].sum(), 40)
         self.assertEqual(win.link_mask.tolist(), [link != 5 for link in range(12)])
         self.assertTrue(np.isnan(win.amplitude[5]).all())
         filled = rd.window(scene, 7, fill=0.0)
@@ -428,6 +487,8 @@ class TestWindow(unittest.TestCase):
                         want = {m for m in span if 0 <= m < cols and arrays["csi_mask"][link, m]}
                         got = set(win.column[link][win.mask[link]].tolist())
                         self.assertEqual(got, want, (n, length, k, link))
+                        inside = {m for m in span if 0 <= m < cols}
+                        self.assertEqual(set(win.column[link][win.inside[link]].tolist()), inside)
                         self.assertEqual(win.column[link][-1], span[-1])
 
     def test_bad_arguments(self):
@@ -473,7 +534,7 @@ class TestLabelsBaseline(unittest.TestCase):
         self.assertEqual(rd.baseline_at(scene, 7)["wlm"]["reason"], "implausible_radius")
         self.assertEqual(rd.baseline_at(scene, 2)["rti"]["reason"], "not_significant")
         self.assertTrue(b3["valid"])
-        self.assertFalse(rd.baseline_at(in_memory(make_arrays(impair=False)), 3)["valid"])
+        self.assertFalse(rd.baseline_at(in_memory(make_arrays(), baseline_valid=False), 3)["valid"])
 
     def test_baseline_never_a_centre_without_radius(self):
         no_radius = make_arrays()
@@ -509,11 +570,61 @@ class TestSplits(TempDir):
                 rd.splits(case)
 
 
+class TestPlotParts(unittest.TestCase):
+    def test_normalised_variance_ignores_gain_steps(self):
+        """Link 0 is a fixed subcarrier pattern under a 3 dB gain step
+        (what the AGC does): normalised variance ~0, raw variance large.
+        Link 1 changes shape across subcarriers (what a person does): it
+        varies. Link 2 has one packet: NaN."""
+        active = np.array(ACTIVE, bool)
+        t = 6
+        pattern = 20.0 + np.arange(56) % 7
+        gain = np.array([1.0, 1.0, 1.0, 1.4125, 1.4125, 1.4125])
+        amp = np.zeros((3, 56, t), np.float32)
+        amp[0] = pattern[:, None] * gain[None, :]
+        amp[1] = pattern[:, None] + 3.0 * np.sin(np.arange(56)[:, None] * np.arange(t)[None, :])
+        amp[2] = pattern[:, None]
+        amp[:, ~active] = 0
+        mask = np.ones((3, t), bool)
+        mask[2, 1:] = False
+        amp[2][:, 1:] = np.nan
+        win = rd.Window(amp, mask, mask.any(axis=1), np.tile(np.arange(t), (3, 1)), mask)
+        var = plot_sample.link_variance(win, np.array(ACTIVE))
+        self.assertLess(var[0], 1e-12)
+        self.assertGreater(var[1], 1e-3)
+        self.assertTrue(math.isnan(var[2]))
+        self.assertGreater(np.nanvar(amp[0][active], axis=1).mean(), 10.0)   # raw: the step dominates
+
+    def test_one_direction_per_pair(self):
+        """The two most variable links are 0 -> 1 and 1 -> 0: one pair, so
+        the second panel goes to the next pair, and the pair shows its more
+        variable direction."""
+        links = np.array([(tx, rx) for tx in range(4) for rx in range(4) if rx != tx])
+        variance = np.full(12, 0.001)
+        variance[0], variance[3], variance[5] = 0.05, 0.06, 0.01      # 0->1, 1->0, 1->3
+        mask = np.ones((12, 4), bool)
+        win = rd.Window(np.zeros((12, 56, 4), np.float32), mask, mask.any(axis=1), np.zeros((12, 4), int), mask)
+        pairs = plot_sample.pair_variance(links, variance)
+        self.assertEqual(pairs[(0, 1)], ([0, 3], 0.055))
+        shown = plot_sample.pick_links(pairs, win, variance, 2)
+        self.assertEqual(shown, [3, 5])
+
+    def test_floor_coverage(self):
+        rect = np.array([(0, 0), (W, 0), (W, D), (0, D)], float)
+        self.assertEqual(plot_sample.floor_coverage(rect, (3.0, 2.0), 50.0), 1.0)
+        self.assertAlmostEqual(plot_sample.floor_coverage(rect, (3.0, 2.25), 1.0), math.pi / (W * D), delta=0.002)
+        ell = np.array(L_FOOTPRINT, float)          # floor area 27 - 0.16 * 27 = 22.68
+        self.assertAlmostEqual(plot_sample.floor_coverage(ell, (W, D), 1.0), 0.0, delta=0.001)
+        self.assertAlmostEqual(plot_sample.floor_coverage(ell, (0.6 * W, 0.6 * D), 1.0),
+                               0.75 * math.pi / 22.68, delta=0.003)
+
+
 class TestPlot(TempDir):
     def setUp(self):
         super().setUp()
-        write_dataset(self.dir, [{"n_people": 2}, {"n_nodes": 6, "n_people": 1, "l_shape": True,
-                                                   "lost": [(3, m) for m in range(30, 54)]}])
+        lost = [(3, m) for m in range(30, 54)]
+        write_dataset(self.dir, [{"n_people": 2}, {"n_nodes": 6, "n_people": 1, "l_shape": True, "lost": lost},
+                                 {"n_nodes": 12, "n_people": 0}])
 
     def assert_png(self, path):
         with open(path, "rb") as f:
@@ -521,10 +632,19 @@ class TestPlot(TempDir):
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
         self.assertGreater(len(data), 20_000)
 
+    def figure(self, scene, w):
+        fig = plot_sample.make_figure(self.dir, scene, w)
+        self.addCleanup(plot_sample.plt.close, fig)
+        fig.canvas.draw()
+        return fig
+
+    def texts(self, ax):
+        return [t.get_text() for t in ax.texts] + [ax.get_title()]
+
     def test_published_and_abstained(self):
         """Window 0 ends at k = 3 (WLM published), window 1 at k = 7 (WLM
         abstained, implausible_radius); scene 1 is an L with a lost link."""
-        for scene, w in ((0, 0), (1, 1)):
+        for scene, w in ((0, 0), (1, 1), (2, 0)):
             out = os.path.join(self.dir, f"s{scene}w{w}.png")
             plot_sample.plot_sample(self.dir, scene, w, out)
             self.assert_png(out)
@@ -536,6 +656,70 @@ class TestPlot(TempDir):
         self.assert_png(out)
         with self.assertRaises(IndexError):
             plot_sample.plot_sample(self.dir, 0, 2, out)
+
+    def test_figure_contents(self):
+        """The profile in the title, furniture, the circle in view with its
+        floor share, the legend inside the figure, 64 subcarrier rows with
+        k -8..-1 blank, and slot counts of in-window packets only."""
+        fig = self.figure(1, 0)
+        plan = fig.axes[0]
+        self.assertIn("impairments on", fig._suptitle.get_text())
+        self.assertTrue({"bed", "chair"} <= set(self.texts(plan)))
+        circle = [p for p in plan.patches if isinstance(p, plot_sample.Circle)]
+        self.assertEqual(len(circle), 1)
+        (cx, cy), r = circle[0].center, circle[0].radius
+        self.assertLessEqual(plan.get_xlim()[0], cx - r)
+        self.assertGreaterEqual(plan.get_xlim()[1], cx + r)
+        self.assertLessEqual(plan.get_ylim()[0], cy - r)
+        self.assertGreaterEqual(plan.get_ylim()[1], cy + r)
+        legend = fig.legends[0]
+        self.assertTrue(any("covers" in t.get_text() and "% of floor (SIM)" in t.get_text() for t in legend.texts))
+        box, frame = legend.get_window_extent(), fig.bbox
+        self.assertTrue(box.x0 >= frame.x0 and box.y0 >= frame.y0 and box.x1 <= frame.x1 and box.y1 <= frame.y1)
+        scene = rd.load_scene(self.dir, 1)
+        win = rd.window(scene, 3)
+        panels = [ax for ax in fig.axes if ax.images]
+        self.assertEqual(len(panels), 3)
+        for ax in panels:
+            image = np.ma.masked_invalid(ax.images[0].get_array())
+            self.assertEqual(image.shape[0], 64)
+            self.assertTrue(image.mask[24:32].all())                 # k = -8..-1: not sent
+            self.assertFalse(image.mask[32 + 5].all())               # k = 5 was sent
+            link, got, sent = (int(v) for v in re.search(r"link (\d+) .*: (\d+) of (\d+) in-window",
+                                                         ax.get_title()).groups())
+            self.assertEqual((got, sent), (win.mask[link].sum(), win.inside[link].sum()))
+            self.assertIn(sent, (27, 26))                            # N = 6: T = 27 or one fewer
+
+    def test_empty_room_false_alarm(self):
+        """Scene 2 is empty and its WLM publishes at k = 3: a false alarm."""
+        fig = self.figure(2, 0)
+        self.assertTrue(any("false alarm" in t.get_text() for t in fig.legends[0].texts))
+        self.assertTrue(any("false alarm -- the room is empty (SIM)" in t for t in self.texts(fig.axes[-1])))
+
+    def test_big_circle_widens_view(self):
+        arrays = make_arrays()
+        arrays["wlm_radius"][3] = 20.0
+        write_dataset(os.path.join(self.dir, "big"), [arrays])
+        fig = plot_sample.make_figure(os.path.join(self.dir, "big"), 0, 0)
+        self.addCleanup(plot_sample.plt.close, fig)
+        plan = fig.axes[0]
+        self.assertLessEqual(plan.get_xlim()[0], 2.3 - 20.0)
+        self.assertGreaterEqual(plan.get_ylim()[1], 2.0 + 20.0)
+        self.assertTrue(any("covers 100% of floor" in t.get_text() for t in fig.legends[0].texts))
+        self.assertIn("furniture not drawn", " ".join(self.texts(plan)))     # no scene file for it
+
+    def test_invalid_baseline_and_profile(self):
+        root = os.path.join(self.dir, "off")
+        write_dataset(root, [{"n_people": 1}], impairments="hardware_off", baseline_valid=False)
+        fig = plot_sample.make_figure(root, 0, 0)
+        self.addCleanup(plot_sample.plt.close, fig)
+        plan = fig.axes[0]
+        self.assertIn("hardware impairments off", fig._suptitle.get_text())
+        self.assertIn("baseline not valid for this dataset (SIM)", self.texts(plan))
+        self.assertFalse([p for p in plan.patches if isinstance(p, plot_sample.Circle)])
+        text = " ".join(" ".join(self.texts(ax)) for ax in fig.axes)
+        self.assertNotIn("abstained", text)
+        self.assertNotIn("centre (", text)
 
     def test_script_runs_isolated(self):
         """`python -I ml/plot_sample.py ...` finds its package without the
@@ -553,29 +737,73 @@ class TestPlot(TempDir):
 @unittest.skipUnless(os.environ.get("SAANS_DATASET_DIR"), "SAANS_DATASET_DIR names no real dataset")
 class TestRealDataset(unittest.TestCase):
     """Every shard of a real `saans gen-dataset` output against §7.2 (and
-    §4, §5, §6's invariants): numpy loads every member with the right shape
-    and dtype. Reads the whole dataset (about 9 MB per scene)."""
+    §4, §5, §6, §8's invariants): numpy loads every member with the right
+    shape and dtype, null subcarriers are zero, zones match positions,
+    people stand on the floor, and every 2 s window holds T or T - 1
+    packets per link. Reads the whole dataset (about 9 MB per scene)."""
 
     def test_every_shard(self):
         root = os.environ["SAANS_DATASET_DIR"]
         manifest = rd.load_manifest(root)
         rd.splits(manifest)
-        s = manifest["seconds"]
-        k_ticks = 2 * s
+        profile = rd.impairments(manifest)
+        k_ticks = 2 * manifest["seconds"]
+        calibrated = []
         for entry in manifest["scenes"]:
             with self.subTest(scene=entry["index"]):
                 scene = rd.load_scene(root, entry["index"], manifest=manifest)
                 self.check_bytes(root, entry)
                 self.check_shapes(scene, manifest, entry, k_ticks)
                 self.check_labels(scene, k_ticks)
-                for k in (3, k_ticks - 1):
-                    n = scene["meta"]["n_tx"]
-                    self.assertEqual(rd.window(scene, k).amplitude.shape, (n * (n - 1), 56, -(-160 // n)))
+                self.check_geometry(scene)
+                self.check_windows(scene, lossless=profile != "on")
+                calibrated.append(bool((scene["calib_null_sigma"] > 0).any()))
+        if "impairments" in manifest:
+            self.assertIn(manifest["impairments"], ("on", "hardware_off"))
+        # §8: baseline_valid is true when every scene's calibration has some
+        # link with null_sigma > 0.
+        self.assertIsInstance(manifest["baseline_valid"], bool)
+        self.assertEqual(manifest["baseline_valid"], all(calibrated))
+
+    def check_windows(self, scene, lossless):
+        """§4.3: every 2 s window holds T = ceil(160/N) or T - 1 (only when
+        160/N is not whole) in-window slots per link; received packets are
+        among them, all of them when no packet can be lost."""
+        n = scene["meta"]["n_tx"]
+        t = -(-160 // n)
+        allowed = {t, t - 1} if 160 % n else {t}
+        for k in scene["window_end_tick"]:
+            win = rd.window(scene, int(k))
+            self.assertEqual(win.amplitude.shape, (n * (n - 1), 56, t))
+            self.assertTrue(set(win.inside.sum(axis=1).tolist()) <= allowed, k)
+            self.assertFalse((win.mask & ~win.inside).any())
+            if lossless:
+                np.testing.assert_array_equal(win.mask, win.inside)
+
+    def check_geometry(self, scene):
+        """Zones from positions (§5, float32 xy: only a point within 0.1 mm
+        of a grid line may differ), people inside the footprint, reachable
+        cells have floor and hold every person, null subcarriers are zero."""
+        w, d = (float(v) for v in scene["room_size"][:2])
+        present = scene["person_mask"].astype(bool)
+        xy = scene["xy"][present].astype(np.float64)
+        for (x, y), z in zip(xy, scene["zone"][present]):
+            if rd.zone_of(x, y, w, d) != z:
+                near = min(abs(3 * x / w - round(3 * x / w)) * w / 3, abs(3 * y / d - round(3 * y / d)) * d / 3)
+                self.assertLess(near, 1e-4, (x, y, z))
+        if len(xy):
+            self.assertTrue(Path(scene["footprint"].astype(np.float64)).contains_points(xy).all())
+        reachable = scene["zone_reachable"].astype(bool)
+        self.assertFalse((reachable & (scene["zone_floor_frac"] == 0)).any())
+        self.assertTrue(reachable[scene["zone"][present]].all())
+        active = scene["subcarrier_active"].astype(bool)
+        self.assertFalse(scene["csi_iq"][:, ~active].any())
+        self.assertFalse(scene["calib_iq"][:, ~active].any())
 
     def check_bytes(self, root, entry):
         """§7.2's bytes: STORED members in order, npy 1.0, C order, data at a
         multiple of 64."""
-        with zipfile.ZipFile(rd._shard_path(root, entry["shard"])) as z:
+        with zipfile.ZipFile(rd._dataset_path(root, entry["shard"])) as z:
             self.assertEqual(z.namelist(), [n + ".npy" for n, _ in SPEC_72])
             for info, (name, descr) in zip(z.infolist(), SPEC_72):
                 self.assertEqual(info.compress_type, zipfile.ZIP_STORED, name)
@@ -610,8 +838,10 @@ class TestRealDataset(unittest.TestCase):
         for key in ("scene_index", "scene_id", "scene_sha256", "roomsim_seed", "n_nodes", "n_people",
                     "slot_s", "n_tx", "columns", "calib_m0", "impair"):
             self.assertIn(key, meta)
-        self.assertEqual((meta["columns"], meta["n_people"], meta["impair"], meta["scene_sha256"]),
-                         (cols, entry["n_people"], manifest["impair"], entry["scene_sha256"]))
+        self.assertEqual((meta["columns"], meta["n_people"], meta["scene_sha256"]),
+                         (cols, entry["n_people"], entry["scene_sha256"]))
+        if "impair" in manifest:
+            self.assertEqual(meta["impair"], manifest["impair"])
         scene_file = os.path.join(os.environ["SAANS_DATASET_DIR"], "scenes", entry["id"] + ".json")
         if os.path.exists(scene_file):
             self.assertEqual(sha256(scene_file), meta["scene_sha256"])
@@ -638,7 +868,6 @@ class TestRealDataset(unittest.TestCase):
             occupied[k, scene["zone"][k, i]] = 1
         np.testing.assert_array_equal(scene["zone_occupied"], occupied)
         np.testing.assert_array_equal(scene["zone_single"], np.where(count == 1, scene["zone"][:, 0], -1))
-        np.testing.assert_array_equal(scene["zone_reachable"], scene["zone_floor_frac"] > 0)
         self.assertEqual((scene["wlm_reason"][0], scene["rti_reason"][0]), (4, 4))
         for k in range(k_ticks):
             rd.baseline_at(scene, k)          # a published estimate always has its radius

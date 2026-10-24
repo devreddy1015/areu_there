@@ -14,7 +14,8 @@ baseline) and spec/scene.schema.json (the scene format).
 2. **What is generated now.** The impairment layer ON only, 2,000 scenes
    x 2 min, outside git under `/home/Aman/are_u_theone/datasets/`. The
    impairment-OFF copy for Phase 8's ablation is generated then, from the
-   same scene files, with `--no-impair --from DIR` (§8).
+   same scene files, with `--no-impair --from DIR` (§8: the hardware
+   impairments off, the receiver's noise kept).
 
 **Decisions taken here** (flagged in the report):
 1. **Format:** `.npz`, one file per scene, written by a small hand-written
@@ -34,12 +35,16 @@ baseline) and spec/scene.schema.json (the scene format).
 5. **Splits are fixed in the manifest**, by scene, stratified (§7.3).
 6. **ML tooling lives in a new `ml/` directory** (Python with numpy, run in
    `.venv`), not in `wifisense/` or `tests/`, which stay stdlib-only.
-7. **Size.** About 8 MB of occupied-room stream and 1 MB of calibration per
-   scene on average: about 18 GB (17 GiB) for 2,000 scenes (the owner was
-   told "about 15 GB" before the calibration recording was added).
+7. **Size.** About 8.7 MB per scene on average, the empty-room
+   calibration recording included: 17.34 GB (16.1 GiB) for 2,000 scenes,
+   measured (the owner was told "about 15 GB" before the calibration
+   recording was added).
 
 **Rules.** No unsafe Rust. Everything written is **SIM** (scene geometry
-drawn at random, people and CSI simulated) and says so in every file.
+drawn at random, people and CSI simulated) and says so in every file,
+except the two per-scene config files (§7.1): Room Sim and Locate read
+them exactly as written and refuse unknown keys, so the manifest and the
+shard's `meta_json` carry their label.
 No physics changes and no public-API change beyond owner decision 1:
 Room Sim and Locate run as specified, through their existing public APIs,
 so no Python reference change and no golden regeneration (the provenance
@@ -137,8 +142,14 @@ stand 0.15, sit 0.2, lie 0.15:
 - `stand`: likewise, with `people_mode` = `stationary` and
   `start_heading_rad` ~ U[0, 2π).
 
-A `lie` or `sit` with no free object falls back to `walk`. No walkable
-point in 1000 tries redraws the scene (§2.6). `people[j]` has `start` only
+Every start keeps at least 0.5 m from the starts already placed (a
+`lie` or `sit` takes only a free object whose centre is that far from
+them). A `lie` or `sit` with no such object falls back to `walk`. No
+walkable point in 1000 tries redraws the scene (§2.6). Walking people
+pause for `pause_s` ~ U[0, 20] s between legs (Room Sim's default, kept),
+so a `walk` person is on a walk segment for only about a third of the
+time: the per-tick `walking` label (§5), not the mode, says who moves.
+Room Sim's people pass through each other (spec/roomsim.md §16). `people[j]` has `start` only
 (no `id`); `phone` is absent.
 
 **2.6 Validity.** A drawn scene is kept when all of these accept it, with
@@ -159,7 +170,8 @@ Room Sim's defaults (spec/roomsim.md §3.2) with, per scene: `seed` = the
 scene's Room Sim seed (§9); `duration_s = S + 0.5` (Locate then has a tick
 at `t = S`, §6; no CSI transmission at or after `t = S` is stored);
 `floor_material`, `ceiling_material` (§2.2); `n_people = P`, `people_mode`
-and `start_heading_rad` (§2.5); `impair = false` with `--no-impair`.
+and `start_heading_rad` (§2.5); with `--no-impair`, the hardware
+impairment switches of §8 (Room Sim's master switch `impair` stays true).
 Everything else default: every node `txrx`, `slot_s` 0.0125,
 `fw_subcarriers` 56, `quantize` on. The exact config is written per scene
 (§7.1).
@@ -169,7 +181,8 @@ fills §4 and §5; Locate's own `RoomSimSetup` (its calibration run and, via
 `stream()`, the same occupied run again for §6's ticks, so Locate is
 exactly `run_roomsim`); and the calibration run once more to store its
 packets (§6). Measured (release, 10 x 10 m, 3 people): 4 nodes 4.0 + 4.8 s,
-12 nodes 15.2 + 18.3 s; 2,000 scenes take about 10 minutes on 96 cores.
+12 nodes 15.2 + 18.3 s; 2,000 scenes took 600 s on 96 cores (6.1 GB
+peak memory), measured on the generated dataset.
 
 ## 4. The CSI stream
 
@@ -234,7 +247,18 @@ order carries no meaning.
 Per scene: `zone_floor_frac` [9] float32, the fraction of each cell's area
 that is floor (1 except where an L's cut corner removes part of up to four
 cells, and the whole corner cell when both cut extents exceed a third),
-and `zone_reachable` [9] uint8 = `zone_floor_frac > 0`. Phase 8 masks
+computed exactly (every coordinate is a multiple of 0.01 m, so in
+integers), never from a floating-point residue; and `zone_reachable` [9]
+uint8: 1 where a person could be — the cell holds a point that
+`Walkability::point` accepts, or the centre of a bed, chair or sofa (a
+sliver of floor narrower than the walking margin is not reachable). The
+test is exact, not sampled: every yaw is a multiple of 90°, so the grown
+objects and the walk-margin inset are axis-aligned rectangles, and the
+midpoint and inward-moved corners of every rectangle of their arrangement
+inside the cell are tried (the corners catch the disc the margin leaves
+around an L's reflex corner). A sampled grid once missed a 3.8 cm strip
+and marked an occupied cell unreachable — the harmful direction, since
+Phase 8 masks unreachable cells out of the zone head. Phase 8 masks
 unreachable cells out of the zone head and its accuracy.
 
 **Scoring notes for Phase 8** (recorded here so the labels are read as
@@ -262,6 +286,15 @@ are label ticks `k = j + 1`; the arrays below are on the label grid
 | `calib_baseline`, `calib_null_sigma` | [L] | float64 | Locate's empty-room calibration (spec/locate.md §4.2) |
 | `calib_mask` | [L] | uint8 | calibrated from enough windows |
 | `calib_iq`, `calib_mask_m`, `calib_rssi` | [L, 56, Mc, 2], [L, Mc], [L, Mc] | int8, uint8, int8 | the calibration run's packets Locate calibrated from (same scene, config and seed, nobody in the room, `S + 0.5 <= t < S + 0.5 + calib_s`), on the §4.1 grid from superframe `calib_m0` (in `meta_json`) |
+
+**The calibration is an idealised reference.** The calibration run uses
+the scene's own seed, so its clutter, devices and link noise streams are
+the occupied run's exactly; only the people differ. A real empty-room
+recording would differ by drift. Given `calib_*`, even still people are
+separable from an empty room (measured, SIM: AUC 1.00 against 0.60
+without it). `calib_*` is therefore for recomputing the WLM baseline;
+a model that uses it is reported separately and says so, and the WLM's
+coverage of still people relies on it.
 
 Locate's tick at `t_k` uses the received packets with `t_k − 1 <= t <=
 t_k`: it also sees the transmission at exactly `t_k`, which a window ending
@@ -309,8 +342,10 @@ Exact bytes, so byte-identity (§9) holds:
 
 ### 7.3 The manifest
 `{"label":"SIM", "spec":"dataset v1", "command", "seed", "n_scenes",
-"seconds", "label_hz":2, "impair", "baseline_valid"` (false with
-`--no-impair`, §8), `"from"` (the source dataset of `--from`, or null),
+"seconds", "label_hz":2, "impair"` (Room Sim's master switch, true in
+both profiles), `"impairments"` (`"on"` or `"hardware_off"`, §8),
+`"impairment_switches"` (the values used), `"baseline_valid"` (§8),
+`"from"` (the source dataset of `--from`, or null),
 `"roomsim_defaults", "locate_config", "generator"` (every §2 distribution),
 `"rejections"` (counts by reason), `"splits": {"train":[…], "val":[…],
 "test":[…]}`, `"split_counts"` (by `n_people`, `n_nodes`, `l_shape`),
@@ -322,7 +357,8 @@ it is an unfinished run.
 
 **Splits** are by scene, stratified by (`n_people`, `l_shape`): within each
 stratum the scenes are ordered by their split draw (§9); the first
-`round(0.1 n)` go to test (at least 1 when the stratum has 3 or more), the
+`round(0.1 n)` (round half to even, as spec/roomsim.md and spec/locate.md
+define `round`) go to test (at least 1 when the stratum has 3 or more), the
 next `round(0.1 n)` to val, the rest to train. The scene is the unit of
 independence: a scene's labels are strongly correlated (presence and count
 are constant), so every interval on these data resamples scenes, never
@@ -335,23 +371,37 @@ windows.
   free space, refuses when the estimate exceeds the free space less 5 GB,
   then runs §3–§6 in parallel.
 - Refuses a non-empty `--out` unless `--overwrite` (which removes only
-  `manifest.json`, `scenes/` and `shards/` there).
+  `manifest.json`, `scenes/` and `shards/` there); refuses an empty
+  `--out` or `--from`, a `--from` that is not a directory with a manifest,
+  and a `--from` inside the `--out` it would overwrite (each exit 2,
+  naming the flag).
 - Progress on stderr every 5% (scenes done, elapsed, ETA); at the end a
   summary, every line labelled SIM: scenes, labels, bytes, the share of
   scenes with people, people-count, node-count and wall-material
   histograms, and the share of 2 s windows whose end tick has a published
-  WLM estimate (its coverage).
+  WLM estimate, separately for occupied scenes (coverage) and empty ones
+  (false alarms).
 - Exit 0 on success, 2 on a refused argument (naming it), 1 on an I/O
   error.
-- **`--no-impair`** changes only the radio: the scene files, configs (but
-  `impair`), people and every §5 label are byte-identical to the
-  impairments-ON dataset of the same seed (tested); §4's and §6's arrays
-  change (no packet is lost). With `impair = false` the empty room's RSSI
-  is constant, every `calib_null_sigma` is 0 and WLM never publishes, so
-  the manifest says `"baseline_valid": false`: Phase 8's ablation reports
-  the WLM baseline from the impairments-ON dataset on the same split.
+- **`--no-impair`** turns the **hardware impairments** off and keeps the
+  receiver's noise: `loss_prob = 0`, `loss_prob_link` empty,
+  `agc_jump_prob = 0`, `device_gain_db = (0, 0)`, `ripple = false`,
+  `cpe = false`, `timing_offset_s = 0`, `timing_offset_dev_s = (0, 0)`;
+  kept: `snr_noise`, `chip_noise_counts`, `noise_floor_dbm`,
+  `rssi_jitter_db`, int8 quantisation, `ltf_merge` (spec/roomsim.md §12).
+  Room Sim's master switch `impair = false` is **not** used: it also
+  removes all noise, an empty room then has exactly zero variance, and
+  presence becomes trivial (measured, SIM: AUC 0.999 from one number).
+  The scene files, configs (but these fields), people and every §5 label
+  are byte-identical to the impairments-ON dataset of the same seed
+  (tested); §4's and §6's arrays change. The manifest's `"impairments"`
+  is `"on"` or `"hardware_off"` with the switches above, and
+  `"baseline_valid"` is true when every scene's calibration has
+  `null_sigma > 0` on some link (RSSI jitter keeps it so); Phase 8 reports
+  the baseline of whichever dataset it evaluates, on the same split.
 - **`--from DIR`** reads DIR's scene files, configs and splits instead of
-  drawing them (`--scenes`, `--seconds`, `--seed` are then taken from DIR's
+  drawing them (its §2.6 checks run with the ON profile, like a fresh
+  draw) (`--scenes`, `--seconds`, `--seed` are then taken from DIR's
   manifest and refused if given differently).
 
 ## 9. Determinism
@@ -423,3 +473,10 @@ ML tooling, Python 3.11 in `.venv` with numpy and matplotlib:
 - The stored baseline sees 1 s of RSSI per tick with an uncalibrated
   radius (§6); comparisons at other windows or signals use the recomputed
   WLM and say so.
+- The stored calibration is an exact, drift-free empty room (§6): a model
+  given it sees more than a deployment would.
+- Room Sim's AGC steps (±3 dB, about 17% of 2 s link-windows with
+  impairments on) change a link's whole amplitude between packets; raw
+  amplitude variance therefore tracks gain steps as much as people, and
+  per-packet gain normalisation (Phase 7) matters.
+- People pass through each other while walking (Room Sim v1).

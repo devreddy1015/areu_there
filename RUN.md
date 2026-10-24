@@ -484,9 +484,76 @@ cargo test -p saans-cli --locked
 The browser check (§4b) now covers the SIM view too; its header gives the
 two gateways and the recorded run it needs.
 
+## 4f. The simulated dataset (Phase 6)
+
+`saans gen-dataset` (`spec/dataset.md`) draws random rooms (3-10 m, some
+L-shaped, random materials and furniture, 4-12 nodes, 0-3 people), runs
+Room Sim and Locate on each, and writes one `.npz` shard per room plus
+the scene files, their exact run configs and a manifest with fixed
+by-scene splits. Everything in it is **SIM**: the rooms are drawn at
+random (`provenance: generated`), the people and the CSI are simulated.
+It is never committed; it lives outside the repository:
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+cd /home/Aman/are_u_theone/are_U_there/rust
+cargo build --release -p saans-cli
+tmux new -s dataset
+target/release/saans gen-dataset --out /home/Aman/are_u_theone/datasets/roomsim-v1
+```
+
+Defaults: 2,000 scenes x 120 s, seed 0, every core (`--scenes`,
+`--seconds`, `--seed`, `--threads` change them). On this box the default
+run took 10 minutes on 96 cores (6.1 GB peak memory) and wrote 17.3 GB. It first draws and checks
+every scene, prints the estimated size against the free disk space
+(refusing when it would not fit), then runs, printing progress every 5%;
+the output is byte-identical for any thread count. The paired copy with
+the hardware impairments off (packet loss, AGC steps, device gains,
+ripple, phase and timing offsets; the receiver's noise kept), for Phase
+8's ablation, is made from the same scenes:
+
+```bash
+target/release/saans gen-dataset --no-impair --from /home/Aman/are_u_theone/datasets/roomsim-v1 --out /home/Aman/are_u_theone/datasets/roomsim-v1-hwoff
+```
+
+Reading it (Python ML tooling, numpy, in `.venv`; `ml/README.md`):
+
+```python
+from ml import roomsim_dataset as rd
+man = rd.load_manifest("/home/Aman/are_u_theone/datasets/roomsim-v1")
+sc = rd.load_scene("/home/Aman/are_u_theone/datasets/roomsim-v1", 0, man)
+w = rd.window(sc, k=int(sc["window_end_tick"][0]), length_s=2.0)  # [links, 56, time] amplitude, SIM
+```
+
+The shard stores what the ESP32 sends (int8 I/Q of the 56 forwarded
+subcarriers, per link, on the TDMA grid) with labels every 0.5 s; the
+loader cuts windows of any length from it, so the 2 s windows of the
+brief are one choice, not the storage format. The sample plot (two are
+in `phase6-samples/`):
+
+```bash
+.venv/bin/python -I ml/plot_sample.py /home/Aman/are_u_theone/datasets/roomsim-v1 --scene 0 --window 10 --out /tmp/sample.png
+```
+
+Two cautions from the review (spec/dataset.md §6, §12): the stored
+empty-room calibration is an exact, drift-free copy of the room, so a
+model that uses it must be reported separately; and Room Sim's AGC steps
+change a link's whole amplitude between packets, so raw amplitude
+variance tracks gain steps as much as people (normalise per packet).
+
+Tests:
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there/rust && cargo test -p saans-cli --locked
+cd .. && .venv/bin/python -m unittest discover -s ml/tests
+SAANS_DATASET_DIR=/home/Aman/are_u_theone/datasets/roomsim-v1 .venv/bin/python -m unittest discover -s ml/tests   # checks every shard
+```
+
 ## 5. Datasets
 
-Nothing is downloaded yet. When Phases 9 and 11 need LoFi, OpenCSI,
-WiCount or your own pcaps: **no dataset is ever committed**. Keep them
-under `saans-data/`, which `.gitignore` already excludes along with
-`*.pcap`, for the health-data reasons in ADR-001 and ADR-005.
+The simulated dataset of §4f lives in `/home/Aman/are_u_theone/datasets/`,
+outside the repository. Nothing real is downloaded yet. When Phases 9 and
+11 need LoFi, OpenCSI, WiCount or your own pcaps: **no dataset is ever
+committed**. Keep them under `saans-data/`, which `.gitignore` already
+excludes along with `*.pcap`, for the health-data reasons in ADR-001 and
+ADR-005.

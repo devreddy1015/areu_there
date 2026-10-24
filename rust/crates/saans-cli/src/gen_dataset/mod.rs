@@ -19,22 +19,27 @@
 //!   order, and no file holds a time or a path that varies, so `scenes/`,
 //!   `shards/` and the manifest (except `totals`) are byte-identical for
 //!   any `--threads`.
-//! - **`--no-impair`** changes only the radio (`impair = false`): the
-//!   scenes are drawn and checked with `impair = true` (§2.6), so the scene
-//!   files, the configs but `impair`, the people and the labels are the
-//!   impairments-on dataset's; the manifest says `"baseline_valid": false`.
-//! - **Refusals** name the parameter and exit with code 2: a bad option,
-//!   a non-empty `--out` without `--overwrite` (which removes only
+//! - **`--no-impair`** turns the hardware impairments off and keeps the
+//!   receiver's noise ([`generator::Impairments::HardwareOff`], §8; Room
+//!   Sim's master switch `impair` stays true). The scenes are drawn and
+//!   checked with the impairments on (§2.6), and `--from` re-checks them
+//!   so, so the scene files, the configs but those switches, the people
+//!   and the labels are the impairments-on dataset's. `baseline_valid` is
+//!   true when every scene's calibration has a link with `null_sigma > 0`.
+//! - **Refusals** name the parameter and exit with code 2: a bad or empty
+//!   option, a non-empty `--out` without `--overwrite` (which removes only
 //!   `manifest.json`, `scenes/` and `shards/` there), too little free
-//!   space, a `--from` that is not a finished dataset or disagrees with
-//!   `--scenes`, `--seconds` or `--seed`. An I/O error, a generator that
-//!   finds no valid draw in 100 attempts, or a run Locate or Room Sim
-//!   refuses exits with code 1, naming the scene.
+//!   space, a `--from` that is not a directory with a manifest, is `--out`
+//!   or lies in its `scenes/` or `shards/`, or disagrees with `--scenes`,
+//!   `--seconds` or `--seed`. An I/O error, a generator that finds no
+//!   valid draw in 100 attempts, or a run Locate or Room Sim refuses exits
+//!   with code 1, naming the scene.
 //!
 //! Everything printed or written is **SIM**: rooms drawn at random (no
 //! generated scene describes a room, provenance `generated`), simulated
 //! people in simulated WiFi, a model, not a measurement. Progress goes to
-//! stderr every 5%; the summary to stdout; every line starts with SIM.
+//! stderr every 5% (a closed stderr is ignored, never a panic); the summary
+//! to stdout; every line starts with SIM.
 //! No generated person or phone has an id, and none is ever printed.
 
 mod generator;
@@ -59,7 +64,7 @@ use saans_scene::Scene;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
-use generator::{scene_id, wall_material_name, Rejections};
+use generator::{scene_id, wall_material_name, Impairments, Rejections};
 
 /// The spec string every file of a dataset carries (§7.2, §7.3).
 pub const SPEC: &str = "dataset v1";
@@ -169,9 +174,17 @@ impl Options {
                 }
                 it.next().ok_or_else(|| Refused::new(a, "needs a value"))
             };
+            // A path that is empty would name the working directory's files.
+            let path = |v: &String| {
+                if v.is_empty() {
+                    Err(Refused::new(a, "is empty; give a directory"))
+                } else {
+                    Ok(v.clone())
+                }
+            };
             match a.as_str() {
-                "--out" => out = Some(value(out.is_some())?.clone()),
-                "--from" => from = Some(value(from.is_some())?.clone()),
+                "--out" => out = Some(path(value(out.is_some())?)?),
+                "--from" => from = Some(path(value(from.is_some())?)?),
                 "--scenes" => {
                     let v = value(scenes.is_some())?;
                     scenes = Some(
@@ -236,6 +249,12 @@ impl Options {
     }
 }
 
+/// One line on stderr. A closed or failing stderr is ignored: progress is
+/// never worth a panic (§8).
+fn note(line: &str) {
+    let _ = writeln!(io::stderr(), "{line}");
+}
+
 /// The lower-case hex sha256 of `bytes`.
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -276,7 +295,7 @@ struct Plan {
     scene: Scene,
     /// The scene file's bytes, written as they are.
     scene_bytes: Vec<u8>,
-    /// The run config, `impair` as asked.
+    /// The run config, its impairment profile applied.
     rs: RoomSimConfig,
     meta: Meta,
     split: Split,
@@ -287,7 +306,7 @@ fn draw_all(
     seed: u64,
     scenes: usize,
     seconds: u32,
-    impair: bool,
+    impairments: Impairments,
 ) -> Result<(Vec<Plan>, Rejections), Failure> {
     let drawn: Vec<_> = (0..scenes)
         .into_par_iter()
@@ -313,7 +332,7 @@ fn draw_all(
         })?;
         rejections.merge(&g.rejections);
         let mut rs = g.rs;
-        rs.impair = impair;
+        impairments.apply(&mut rs);
         plans.push(Plan {
             index: g.index,
             scene_bytes: g.scene.to_json_pretty().into_bytes(),
@@ -350,16 +369,16 @@ struct Source {
 /// taken from it and refused if given differently (§8).
 fn read_source(dir: &str, opts: &Options) -> Result<Source, Failure> {
     let refused = |why: String| Failure::Refused(Refused::new("--from", why));
+    if !Path::new(dir).is_dir() {
+        return Err(refused(format!("{dir}: not a directory")));
+    }
     let path = Path::new(dir).join("manifest.json");
-    let text = match fs::read_to_string(&path) {
-        Ok(t) => t,
-        Err(e) if e.kind() == ErrorKind::NotFound => {
-            return Err(refused(format!(
-                "{dir}: no manifest.json, so not a finished dataset (spec/dataset.md §7.3)"
-            )))
-        }
-        Err(e) => return Err(io_err(&path, e)),
-    };
+    if !path.is_file() {
+        return Err(refused(format!(
+            "{dir}: no manifest.json, so not a finished dataset (spec/dataset.md §7.3)"
+        )));
+    }
+    let text = fs::read_to_string(&path).map_err(|e| io_err(&path, e))?;
     let m: Value = serde_json::from_str(&text)
         .map_err(|e| refused(format!("{}: not JSON: {e}", path.display())))?;
     let field = |k: &str| {
@@ -428,9 +447,10 @@ fn read_source(dir: &str, opts: &Options) -> Result<Source, Failure> {
 }
 
 /// Phase 1 with `--from`: read each scene file (its sha256 must be the
-/// manifest's), its run config (`impair` as asked) and its manifest
-/// entry, and make the §2.6 checks again.
-fn plan_from(src: &Source, i: usize, impair: bool) -> Result<Plan, Failure> {
+/// manifest's), its run config and its manifest entry; make the §2.6
+/// checks again with the impairments on, as a fresh draw makes them (§8);
+/// then apply the asked profile to the run config.
+fn plan_from(src: &Source, i: usize, impairments: Impairments) -> Result<Plan, Failure> {
     let id = scene_id(i);
     let refused = |why: String| Failure::Refused(Refused::new("--from", format!("{id}: {why}")));
     let e = &src.entries[i];
@@ -474,7 +494,7 @@ fn plan_from(src: &Source, i: usize, impair: bool) -> Result<Plan, Failure> {
     let cfg_text = fs::read_to_string(&cfg_path).map_err(|e| io_err(&cfg_path, e))?;
     let mut rs = RoomSimConfig::from_json_str(&cfg_text)
         .map_err(|e| refused(format!("its Room Sim config: {e}")))?;
-    rs.impair = impair;
+    Impairments::On.apply(&mut rs);
     if rs.duration_s != f64::from(src.seconds) + 0.5 {
         return Err(refused(format!(
             "its config's duration_s is {}, not seconds + 0.5",
@@ -483,6 +503,7 @@ fn plan_from(src: &Source, i: usize, impair: bool) -> Result<Plan, Failure> {
     }
     shard::tx_per_tick(&rs).map_err(refused)?;
     generator::check(&scene, &rs).map_err(|(_, why)| refused(why))?;
+    impairments.apply(&mut rs);
     let openings = get("openings")?;
     let opening = |k: &str| {
         openings
@@ -545,8 +566,8 @@ const SPLITS: [&str; 3] = ["train", "val", "test"];
 /// §7.3: by scene, stratified by `(n_people, l_shape)`; within a stratum
 /// the scenes in the order of their split draw (ties by index), the first
 /// `round(0.1 n)` to test (at least 1 when the stratum has 3 or more), the
-/// next `round(0.1 n)` to val, the rest to train. `round` is half up, in
-/// integers: `(n + 5) / 10`.
+/// next `round(0.1 n)` to val, the rest to train. `round` is half to even
+/// (spec/roomsim.md's and spec/locate.md's `round`), on the double `0.1 n`.
 fn assign_splits(scenes: &[(usize, bool, f64)]) -> Vec<&'static str> {
     let mut strata: BTreeMap<(usize, bool), Vec<usize>> = BTreeMap::new();
     for (i, &(people, l_shape, _)) in scenes.iter().enumerate() {
@@ -556,7 +577,8 @@ fn assign_splits(scenes: &[(usize, bool, f64)]) -> Vec<&'static str> {
     for members in strata.values_mut() {
         members.sort_by(|&a, &b| scenes[a].2.total_cmp(&scenes[b].2).then(a.cmp(&b)));
         let n = members.len();
-        let tenth = (n + 5) / 10;
+        // Python's round(0.1 * n) on the same double: half to even.
+        let tenth = (0.1 * n as f64).round_ties_even() as usize;
         let n_test = if n >= 3 { tenth.max(1) } else { tenth };
         for (rank, &i) in members.iter().enumerate() {
             out[i] = if rank < n_test {
@@ -659,7 +681,8 @@ fn gb(bytes: u64) -> String {
 // ---------------------------------------------------------------------
 
 /// Refuse, before any work, an `--out` that is not a directory, or is a
-/// non-empty one without `--overwrite`, or is `--from`'s directory.
+/// non-empty one without `--overwrite`; and a `--from` that `--overwrite`
+/// would destroy: `--out` itself or anything in its `scenes/` or `shards/`.
 fn check_out(opts: &Options) -> Result<(), Failure> {
     let out = Path::new(&opts.out);
     match fs::metadata(out) {
@@ -675,11 +698,14 @@ fn check_out(opts: &Options) -> Result<(), Failure> {
         Ok(_) => {}
     }
     if let Some(from) = &opts.from {
-        if let (Ok(a), Ok(b)) = (fs::canonicalize(out), fs::canonicalize(from)) {
-            if a == b {
+        if let (Ok(out), Ok(from)) = (fs::canonicalize(out), fs::canonicalize(from)) {
+            if from == out
+                || from.starts_with(out.join("scenes"))
+                || from.starts_with(out.join("shards"))
+            {
                 return Err(Refused::new(
                     "--from",
-                    "is --out's directory; write the new dataset elsewhere",
+                    "is --out or lies in its scenes/ or shards/, which this run replaces; write the new dataset elsewhere",
                 )
                 .into());
             }
@@ -765,6 +791,8 @@ struct Done {
     labels: usize,
     windows: usize,
     windows_wlm: usize,
+    /// Some link's calibration `null_sigma > 0` (§8 `baseline_valid`).
+    calibrated_noise: bool,
 }
 
 /// Run §3-§6 on one scene and write its four files (§7.1), each to a
@@ -802,6 +830,7 @@ fn produce(plan: &Plan, out: &Path, seconds: u32) -> Result<Done, Failure> {
         labels: built.labels,
         windows: built.windows,
         windows_wlm: built.windows_wlm,
+        calibrated_noise: built.calibrated_noise,
     })
 }
 
@@ -822,11 +851,11 @@ impl Progress {
             *printed = step;
             let elapsed = self.started.elapsed().as_secs_f64();
             let eta = elapsed * (self.total - done) as f64 / done as f64;
-            eprintln!(
+            note(&format!(
                 "SIM  gen-dataset: {done} of {} scenes ({}%), {elapsed:.0} s elapsed, ETA {eta:.0} s",
                 self.total,
                 100 * done / self.total
-            );
+            ));
         }
     }
 }
@@ -863,7 +892,11 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
     let started = Instant::now();
     let out = PathBuf::from(&opts.out);
     check_out(opts)?;
-    let impair = !opts.no_impair;
+    let impairments = if opts.no_impair {
+        Impairments::HardwareOff
+    } else {
+        Impairments::On
+    };
     let source = opts
         .from
         .as_deref()
@@ -894,14 +927,14 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
             let plans = pool.install(|| {
                 (0..src.scenes)
                     .into_par_iter()
-                    .map(|i| plan_from(src, i, impair))
+                    .map(|i| plan_from(src, i, impairments))
                     .collect::<Result<Vec<_>, _>>()
             })?;
             (plans, src.rejections)
         }
-        None => pool.install(|| draw_all(seed, scenes, seconds, impair))?,
+        None => pool.install(|| draw_all(seed, scenes, seconds, impairments))?,
     };
-    eprintln!(
+    note(&format!(
         "SIM  gen-dataset: {} {scenes} scenes in {:.1} s ({} redraws)",
         if source.is_some() {
             "read and checked"
@@ -910,18 +943,18 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         },
         started.elapsed().as_secs_f64(),
         rejections.total()
-    );
+    ));
     let calib_s = LocateConfig::default().calib_s;
     let estimate: u64 = plans
         .iter()
         .map(|p| shard::estimate_bytes(p.scene.nodes.len(), seconds, calib_s))
         .sum();
     let free = free_bytes(&out)?;
-    eprintln!(
+    note(&format!(
         "SIM  gen-dataset: estimated size {} ({estimate} bytes) for {scenes} scenes of {seconds} s; {} free on the target filesystem",
         gb(estimate),
         gb(free)
-    );
+    ));
     size_check(estimate, free)?;
     prepare_out(&out, opts.overwrite)?;
 
@@ -1022,6 +1055,9 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
     if let Some(f) = &from {
         command.push_str(&format!(" --from {f}"));
     }
+    // §8: every scene's calibration has a link with null_sigma > 0, so
+    // WLM can publish (RSSI jitter keeps it so with the hardware off).
+    let baseline_valid = done.iter().all(|d| d.calibrated_noise);
     let wall_s = started.elapsed().as_secs_f64();
     let manifest = json!({
         "label": "SIM",
@@ -1031,8 +1067,12 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         "n_scenes": scenes,
         "seconds": seconds,
         "label_hz": shard::LABEL_HZ,
-        "impair": impair,
-        "baseline_valid": impair,
+        // Room Sim's master switch, true in both profiles (§8); the
+        // profile is `impairments`.
+        "impair": true,
+        "impairments": impairments.name(),
+        "impairment_switches": impairments.switches_json(),
+        "baseline_valid": baseline_valid,
         "from": from,
         "roomsim_defaults": serde_json::to_value(RoomSimConfig::default()).expect("a config always serializes"),
         "locate_config": locate_config_json(&LocateConfig::default()),
@@ -1059,17 +1099,26 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
     let people = histogram(plans.iter().map(|p| p.scene.people.len()));
     let nodes = histogram(plans.iter().map(|p| p.scene.nodes.len()));
     let materials = histogram(plans.iter().map(|p| p.meta.wall_material.clone()));
-    let windows: usize = done.iter().map(|d| d.windows).sum();
-    let windows_wlm: usize = done.iter().map(|d| d.windows_wlm).sum();
-    let (occ_windows, occ_wlm) = plans
-        .iter()
-        .zip(&done)
-        .filter(|(p, _)| !p.scene.people.is_empty())
-        .fold((0, 0), |(w, k), (_, d)| (w + d.windows, k + d.windows_wlm));
+    // WLM at the end ticks of the 2 s windows: in occupied scenes its
+    // coverage, in empty ones its false alarms (§8).
+    let wlm_windows = |occupied: bool| {
+        plans
+            .iter()
+            .zip(&done)
+            .filter(|(p, _)| p.scene.people.is_empty() != occupied)
+            .fold((0, 0), |(w, k), (_, d)| (w + d.windows, k + d.windows_wlm))
+    };
+    let (occ_windows, occ_wlm) = wlm_windows(true);
+    let (empty_windows, empty_wlm) = wlm_windows(false);
+    let uncalibrated = done.iter().filter(|d| !d.calibrated_noise).count();
     let mut lines = vec![
         format!(
             "saans gen-dataset (spec/dataset.md): {n} generated scenes x {seconds} s, seed {seed}, impairments {}{}; rooms drawn at random, simulated people in simulated WiFi, a model, not a measurement",
-            if impair { "on" } else { "off" },
+            match impairments {
+                Impairments::On => "on",
+                Impairments::HardwareOff =>
+                    "hardware_off (no loss, AGC jumps, device gain, ripple, CPE or timing offsets; the receiver's noise kept)",
+            },
             from.as_ref().map_or_else(String::new, |f| format!(", scenes from {f}"))
         ),
         format!(
@@ -1085,14 +1134,19 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         format!("scenes by node count: {}", line(&nodes)),
         format!("scenes by wall material: {}", line(&materials)),
         format!(
-            "WLM (baseline) published at the end tick of 2 s windows (its coverage): {}; in scenes with people: {}",
-            of(windows_wlm, windows),
-            of(occ_wlm, occ_windows)
+            "WLM (baseline) published at the end tick of 2 s windows: in scenes with people (coverage) {}; in empty scenes (false alarms) {}",
+            of(occ_wlm, occ_windows),
+            of(empty_wlm, empty_windows)
         ),
+        if baseline_valid {
+            "baseline_valid true: every scene's empty-room calibration has a link with null sigma > 0".to_string()
+        } else {
+            format!(
+                "baseline_valid false: in {} scenes the empty-room calibration has null sigma 0 on every link, so WLM can never publish there",
+                of(uncalibrated, n)
+            )
+        },
     ];
-    if !impair {
-        lines.push("baseline_valid false: with impairments off the empty room's RSSI is constant, every null sigma is 0 and WLM never publishes; report the WLM baseline from the impairments-on dataset (spec/dataset.md §8)".to_string());
-    }
     lines.push(format!(
         "wall time {wall_s:.1} s; manifest {}",
         out.join("manifest.json").display()
@@ -1106,7 +1160,7 @@ pub fn main(args: &[String]) -> ExitCode {
     let opts = match Options::parse(args.get(1..).unwrap_or_default()) {
         Ok(o) => o,
         Err(e) => {
-            eprintln!("gen-dataset: {e}\nusage: {USAGE}");
+            note(&format!("gen-dataset: {e}\nusage: {USAGE}"));
             return ExitCode::from(2);
         }
     };
@@ -1123,11 +1177,11 @@ pub fn main(args: &[String]) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(Failure::Refused(e)) => {
-            eprintln!("gen-dataset: {e}");
+            note(&format!("gen-dataset: {e}"));
             ExitCode::from(2)
         }
         Err(Failure::Io(e) | Failure::Failed(e)) => {
-            eprintln!("gen-dataset: {e}");
+            note(&format!("gen-dataset: {e}"));
             ExitCode::FAILURE
         }
     }
@@ -1207,6 +1261,8 @@ mod tests {
                 "--overwrite",
             ),
             (vec!["--out", "d", "--from"], "--from"),
+            (vec!["--out", ""], "--out"),
+            (vec!["--out", "d", "--from", ""], "--from"),
             (vec!["--out", "d", "--sead", "1"], "--sead"),
         ] {
             let e = parse(&args).expect_err(&format!("{args:?}"));
@@ -1238,8 +1294,9 @@ mod tests {
 
     #[test]
     fn splits_are_stratified_and_ordered_by_the_split_draw() {
-        // 25 one-person rectangles: test round(2.5) = 3, val 3, train 19;
-        // the three smallest draws go to test, the next three to val.
+        // 25 one-person rectangles: round(2.5) = 2 (half to even) to test,
+        // 2 to val, 21 to train; the smallest draws go to test, the next
+        // to val.
         let mut keys: Vec<(usize, bool, f64)> =
             (0..25).map(|i| (1, false, 1.0 - i as f64 / 25.0)).collect();
         // Two empty L rooms: too few for a test scene.
@@ -1253,17 +1310,21 @@ mod tests {
                 .filter(|&i| s[i] == name)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(of_split("test"), vec![22, 23, 24, 28]);
-        assert_eq!(of_split("val"), vec![19, 20, 21]);
-        assert_eq!(s[25], "train");
-        assert_eq!(s[26], "train");
-        assert_eq!(s[27], "train");
-        assert_eq!(s[29], "train");
+        assert_eq!(of_split("test"), vec![23, 24, 28]);
+        assert_eq!(of_split("val"), vec![21, 22]);
+        assert_eq!(of_split("train").len(), 25);
         // Equal draws are ordered by index.
         let tied = vec![(2, false, 0.5); 10];
         let s = assign_splits(&tied);
         assert_eq!(s[0], "test");
         assert_eq!(s[1], "val");
         assert!(s[2..].iter().all(|&x| x == "train"));
+        // Half to even: round(1.5) = 2, round(0.5) = 0 (then the minimum
+        // of 1 test), round(3.5) = 4.
+        for (n, test, val) in [(15, 2, 2), (5, 1, 0), (35, 4, 4), (45, 4, 4)] {
+            let s = assign_splits(&vec![(3, true, 0.5); n]);
+            let count = |x: &str| s.iter().filter(|&&y| y == x).count();
+            assert_eq!((count("test"), count("val")), (test, val), "n = {n}");
+        }
     }
 }

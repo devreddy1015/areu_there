@@ -15,6 +15,20 @@ The CSI is stored as the ESP32 sends it: int8 `(imag, real)` pairs, one
 column per TDMA superframe (§4.1). `amplitude` and `window` turn it into
 the brief's `[links, subcarriers, time]` tensor without resampling (§4.3).
 Masked window slots are NaN unless the caller asks for another fill.
+
+Two things to know before training on it (spec/dataset.md §6, §12):
+
+  * **AGC gain steps.** With impairments on, Room Sim's AGC steps a link's
+    gain by about ±3 dB between packets, uniformly across subcarriers (in
+    about 17% of 2 s link-windows). Raw amplitude variance therefore
+    tracks gain steps as much as people; normalise each packet's gain
+    (e.g. divide by its mean over active subcarriers) before reading
+    motion into it. That normalisation is Phase 7's, not this loader's.
+  * **`calib_*` is an idealised empty room.** The calibration run shares
+    the occupied run's seed, so its clutter, devices and noise are the same
+    streams exactly, with no drift. It is there to recompute the WLM
+    baseline; a model that uses it sees more than a deployment would and is
+    reported separately.
 """
 
 from __future__ import annotations
@@ -31,8 +45,8 @@ import numpy as np
 
 __all__ = [
     "LABEL", "SPEC", "MEMBERS", "META_KEYS", "REASONS", "POSTURES", "SPLITS", "Window",
-    "load_manifest", "load_scene", "amplitude", "window", "labels_at", "baseline_at", "splits",
-    "zone_of",
+    "load_manifest", "load_scene", "load_scene_json", "impairments", "amplitude", "window", "labels_at",
+    "baseline_at", "splits", "zone_of",
 ]
 
 LABEL = "SIM"
@@ -47,6 +61,10 @@ SLOT_S = 0.0125
 N_SUB = 56
 MAX_PEOPLE = 3
 SPLITS = ("train", "val", "test")
+#: The manifest's `impairments` profiles (§8), plus "off" for a manifest
+#: from before the field existed whose `impair` is false (Room Sim's master
+#: switch: no impairments and no noise).
+IMPAIRMENTS = ("on", "hardware_off", "off")
 #: `wlm_reason` / `rti_reason` codes (§6).
 REASONS = ("estimate", "no_disturbance", "not_significant", "implausible_radius", "warming_up")
 #: `posture` codes (§5); 255 is absent.
@@ -116,14 +134,17 @@ class Window(NamedTuple):
     mask: np.ndarray       #: [L, T] bool, a received packet inside the window
     link_mask: np.ndarray  #: [L] bool, the link has at least one packet
     column: np.ndarray     #: [L, T] int64, the superframe `m` of each slot (may be < 0 near t = 0)
+    inside: np.ndarray     #: [L, T] bool, the slot's transmission is in the window and the stream (sent,
+    #:                        lost or not): `T` or `T - 1` per link, less only before the stream starts
 
 
 def load_manifest(dataset_dir: str) -> dict:
     """Read and check `DIR/manifest.json` of a SIM dataset (§7.3).
 
     Refuses a directory without a manifest (an unfinished run), a manifest
-    not labelled SIM or not `dataset v1`, and one whose scene list has a
-    repeated index. The data it describes are SIM.
+    not labelled SIM or not `dataset v1`, one whose scene list has a
+    repeated index or disagrees with `n_scenes`, an unknown `impairments`
+    profile, and a missing `baseline_valid`. The data it describes are SIM.
     """
     path = os.path.join(dataset_dir, "manifest.json")
     if not os.path.isfile(path):
@@ -132,14 +153,27 @@ def load_manifest(dataset_dir: str) -> dict:
         manifest = json.load(f)
     _check_label(manifest, path)
     entries = manifest.get("scenes")
-    # §7.3 lists "scenes" twice (a count, then the entry list); a JSON
-    # reader keeps the last, which is the list, and that is what is used.
-    if not isinstance(entries, list):
-        raise ValueError(f"{path}: 'scenes' is not the list of scene entries")
+    if not isinstance(entries, list) or manifest.get("n_scenes", len(entries)) != len(entries):
+        raise ValueError(f"{path}: 'scenes' is not the list of n_scenes = {manifest.get('n_scenes')} entries")
     indices = [int(e["index"]) for e in entries]
     if len(set(indices)) != len(indices):
         raise ValueError(f"{path}: repeated scene index")
+    impairments(manifest)
+    if not isinstance(manifest.get("baseline_valid"), bool):
+        raise ValueError(f"{path}: 'baseline_valid' is not true or false (§8)")
     return manifest
+
+
+def impairments(manifest: dict) -> str:
+    """The SIM dataset's impairment profile (§8): "on", "hardware_off"
+    (hardware impairments off, the receiver's noise kept), or "off" for an
+    older manifest without the field whose `impair` is false."""
+    profile = manifest.get("impairments")
+    if profile is None:
+        profile = "on" if manifest.get("impair", True) else "off"
+    if profile not in IMPAIRMENTS:
+        raise ValueError(f"manifest impairments {profile!r} is not one of {IMPAIRMENTS}")
+    return profile
 
 
 def load_scene(dataset_dir: str, index: int, manifest: dict | None = None) -> dict:
@@ -148,15 +182,20 @@ def load_scene(dataset_dir: str, index: int, manifest: dict | None = None) -> di
     Checks, before returning: the shard's sha256 equals the manifest
     entry's `shard_sha256`; `meta_json` says `label` SIM and `spec`
     `dataset v1`, has every §7.2 key and names this scene (index, id,
-    scene sha256); every member is present with its
-    §7.2 dtype and shape (and nothing else is); `slot_s` is 0.0125 s.
-    Adds `scene["meta"]` (the parsed `meta_json`) and `scene["entry"]`
-    (the manifest entry). Pass `manifest` to skip re-reading it. All SIM.
+    scene sha256); every member is present with its §7.2 dtype and shape
+    (and nothing else is); `slot_s` is 0.0125 s.
+    Adds `scene["meta"]` (the parsed `meta_json`), `scene["entry"]` (the
+    manifest entry) and `scene["dataset"]` (`impairments`, `baseline_valid`
+    from the manifest). Pass `manifest` to skip re-reading it. All SIM.
+
+    The CSI carries Room Sim's AGC gain steps (see the module docstring);
+    `calib_*` is an idealised, drift-free empty room, for recomputing the
+    WLM baseline only: a model that uses it is reported separately (§6).
     """
     if manifest is None:
         manifest = load_manifest(dataset_dir)
     entry = _entry(manifest, index)
-    path = _shard_path(dataset_dir, entry["shard"])
+    path = _dataset_path(dataset_dir, entry["shard"])
     with open(path, "rb") as f:
         data = f.read()
     digest = hashlib.sha256(data).hexdigest()
@@ -187,7 +226,27 @@ def load_scene(dataset_dir: str, index: int, manifest: dict | None = None) -> di
         raise ValueError(f"{path}: a tx_slot is not below n_tx = {n_tx}")
     scene["meta"] = meta
     scene["entry"] = entry
+    scene["dataset"] = {"impairments": impairments(manifest), "baseline_valid": bool(manifest["baseline_valid"])}
     return scene
+
+
+def load_scene_json(dataset_dir: str, index: int, manifest: dict | None = None) -> dict:
+    """SIM scene `index`'s scene file, `DIR/scenes/<id>.json` (§7.1): the
+    generated geometry (walls, furniture, doors, windows, nodes, people's
+    starts) as parsed JSON. Checks its sha256 against the manifest's
+    `scene_sha256` and that its provenance is "generated"."""
+    if manifest is None:
+        manifest = load_manifest(dataset_dir)
+    entry = _entry(manifest, index)
+    path = _dataset_path(dataset_dir, os.path.join("scenes", entry["id"] + ".json"))
+    with open(path, "rb") as f:
+        data = f.read()
+    if hashlib.sha256(data).hexdigest() != entry["scene_sha256"]:
+        raise ValueError(f"{path}: sha256 does not match the manifest's scene_sha256")
+    doc = json.loads(data.decode("utf-8"))
+    if doc.get("provenance") != "generated":
+        raise ValueError(f"{path}: provenance {doc.get('provenance')!r}, not 'generated' (SIM)")
+    return doc
 
 
 def amplitude(iq: np.ndarray) -> np.ndarray:
@@ -218,6 +277,11 @@ def window(scene: dict, k: int, length_s: float = 2.0, fill: float = np.nan) -> 
     pass `fill=0.0` for a model that consumes the mask itself. Null
     subcarriers are not masked here: find them by `subcarrier_active`.
     The float32 amplitudes are `amplitude()`'s float64 values rounded once.
+
+    The amplitudes are raw: with impairments on they carry Room Sim's AGC
+    gain steps (about ±3 dB, uniform across subcarriers, in about 17% of
+    2 s link-windows), so normalise each packet's gain before reading
+    motion from their variance (Phase 7).
     """
     k = _tick(scene, k)
     halves = _halves(length_s)
@@ -235,7 +299,7 @@ def window(scene: dict, k: int, length_s: float = 2.0, fill: float = np.nan) -> 
     mask = inside & (scene["csi_mask"][rows, col] != 0)
     iq = np.moveaxis(scene["csi_iq"][rows, :, col], 1, 2)   # [L, T, 56, 2] -> [L, 56, T, 2]
     amp = np.where(mask[:, None, :], amplitude(iq), fill).astype(np.float32)
-    return Window(amp, mask, mask.any(axis=1), column)
+    return Window(amp, mask, mask.any(axis=1), column, inside)
 
 
 def labels_at(scene: dict, k: int) -> dict:
@@ -264,12 +328,14 @@ def baseline_at(scene: dict, k: int) -> dict:
     Each is `{"published", "reason", "xy", "radius_m"}`; `xy` and
     `radius_m` are None unless published, and a published estimate always
     carries both (a shard where they disagree with the reason is refused),
-    so no caller can draw a centre without its radius. `valid` is false
-    for an impairments-off scene, where WLM never publishes (§8). The
-    radius is Locate's uncalibrated model. SIM.
+    so no caller can draw a centre without its radius. `valid` is the
+    manifest's `baseline_valid` (§8: every scene's calibration has some
+    link with `null_sigma > 0`). The radius is Locate's uncalibrated
+    model, and the calibration it used is idealised (§6). SIM.
     """
     k = _tick(scene, k)
-    return {"label": LABEL, "k": k, "t": float(scene["t_label"][k]), "valid": bool(scene["meta"]["impair"]),
+    valid = bool(scene["dataset"]["baseline_valid"])
+    return {"label": LABEL, "k": k, "t": float(scene["t_label"][k]), "valid": valid,
             "wlm": _estimate(scene, "wlm", k), "rti": _estimate(scene, "rti", k)}
 
 
@@ -314,15 +380,15 @@ def _entry(manifest: dict, index: int) -> dict:
     raise KeyError(f"no scene {index} in the manifest")
 
 
-def _shard_path(dataset_dir: str, shard: str) -> str:
-    """The SIM shard's path: the entry's `shard`, relative to the dataset
-    (or a bare name under `shards/`); never outside the dataset directory."""
+def _dataset_path(dataset_dir: str, name: str) -> str:
+    """A SIM dataset file's path: `name` relative to the dataset (a bare
+    shard name falls back to `shards/`); never outside the dataset."""
     root = os.path.realpath(dataset_dir)
-    path = os.path.realpath(os.path.join(root, shard))
-    if not os.path.exists(path) and os.path.dirname(shard) == "":
-        path = os.path.realpath(os.path.join(root, "shards", shard))
+    path = os.path.realpath(os.path.join(root, name))
+    if not os.path.exists(path) and os.path.dirname(name) == "":
+        path = os.path.realpath(os.path.join(root, "shards", name))
     if os.path.commonpath([root, path]) != root:
-        raise ValueError(f"shard {shard!r} is outside {dataset_dir}")
+        raise ValueError(f"{name!r} is outside {dataset_dir}")
     return path
 
 

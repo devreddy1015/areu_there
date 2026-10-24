@@ -12,9 +12,11 @@
 //! and the centre (x, then y). Per opening try: the edge, then the
 //! position along it. Per node try: the edge, the position along it, then
 //! z. A `lie` or `sit` person takes a free object uniformly among the free
-//! ones (one draw); a `walk` or `stand` start is `x` then `y` per try, and
-//! a `stand` heading is drawn after the start. Every distribution is a
-//! modelling choice (SIM), listed by [`generator_json`] for the manifest.
+//! ones whose centre is at least 0.5 m from the starts already placed (one
+//! draw); a `walk` or `stand` start is `x` then `y` per try, kept when
+//! walkable and that far from them, and a `stand` heading is drawn after
+//! the start. Every distribution is a modelling choice (SIM), listed by
+//! [`generator_json`] for the manifest.
 
 use std::f64::consts::TAU;
 
@@ -193,9 +195,81 @@ pub const MODES: [(PersonMode, f64); 4] = [
     (PersonMode::Lie, 0.15),
 ];
 pub const START_TRIES: usize = 1000;
+/// §2.5: every start keeps this far from the starts already placed (a
+/// `lie` or `sit` takes only a free object whose centre is this far).
+pub const PERSON_GAP_M: f64 = 0.5;
 
 /// §2.6: attempts per scene before the command fails.
 pub const MAX_ATTEMPTS: u32 = 100;
+
+/// A run's impairment profile (§8). Room Sim's master switch `impair`
+/// stays true in both: switching it off also removes the receiver's
+/// noise, and an empty room would then have exactly zero variance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Impairments {
+    /// Room Sim's defaults (spec/roomsim.md §12).
+    On,
+    /// `--no-impair`: the hardware impairments off (no loss, no AGC
+    /// jumps, no device gain, no ripple, no CPE, no timing offsets); the
+    /// receiver's noise, RSSI jitter, LTF merge and int8 quantisation kept.
+    HardwareOff,
+}
+
+impl Impairments {
+    /// The manifest's `impairments` value.
+    pub fn name(self) -> &'static str {
+        match self {
+            Impairments::On => "on",
+            Impairments::HardwareOff => "hardware_off",
+        }
+    }
+
+    /// Set this profile's switches on `rs`, and `impair = true`; nothing
+    /// else changes.
+    pub fn apply(self, rs: &mut RoomSimConfig) {
+        let on = RoomSimConfig::default();
+        rs.impair = true;
+        match self {
+            Impairments::On => {
+                rs.loss_prob = on.loss_prob;
+                rs.loss_prob_link = on.loss_prob_link;
+                rs.agc_jump_prob = on.agc_jump_prob;
+                rs.device_gain_db = on.device_gain_db;
+                rs.ripple = on.ripple;
+                rs.cpe = on.cpe;
+                rs.timing_offset_s = on.timing_offset_s;
+                rs.timing_offset_dev_s = on.timing_offset_dev_s;
+            }
+            Impairments::HardwareOff => {
+                rs.loss_prob = 0.0;
+                rs.loss_prob_link.clear();
+                rs.agc_jump_prob = 0.0;
+                rs.device_gain_db = (0.0, 0.0);
+                rs.ripple = false;
+                rs.cpe = false;
+                rs.timing_offset_s = 0.0;
+                rs.timing_offset_dev_s = (0.0, 0.0);
+            }
+        }
+    }
+
+    /// The switches this profile sets, as the manifest records them.
+    pub fn switches_json(self) -> Value {
+        let mut rs = RoomSimConfig::default();
+        self.apply(&mut rs);
+        json!({
+            "impair": rs.impair,
+            "loss_prob": rs.loss_prob,
+            "loss_prob_link": rs.loss_prob_link,
+            "agc_jump_prob": rs.agc_jump_prob,
+            "device_gain_db": [rs.device_gain_db.0, rs.device_gain_db.1],
+            "ripple": rs.ripple,
+            "cpe": rs.cpe,
+            "timing_offset_s": rs.timing_offset_s,
+            "timing_offset_dev_s": [rs.timing_offset_dev_s.0, rs.timing_offset_dev_s.1],
+        })
+    }
+}
 
 // ---------------------------------------------------------------------
 // What a scene is drawn into
@@ -449,7 +523,8 @@ pub fn l_polygon(w: f64, d: f64, corner: usize, cx: f64, cy: f64) -> Vec<Point> 
 /// The §3 run config of a scene: Room Sim's defaults with `seed`,
 /// `duration_s = S + 0.5`, the floor and ceiling materials and the people
 /// (`n_people`, `people_mode` for walkers and standers,
-/// `start_heading_rad` for standers); `impair = true` (§2.6).
+/// `start_heading_rad` for standers); the impairments on (§2.6), which
+/// [`Impairments::apply`] changes for `--no-impair`.
 pub fn run_config(
     seed: u64,
     seconds: u32,
@@ -691,6 +766,12 @@ fn draw(seed: u64, i: usize, a: u32, seconds: u32) -> Result<Draw, (Reason, Stri
     let mut taken = vec![false; scene.objects.len()];
     let mut people: Vec<(PersonMode, Option<f64>)> = Vec::with_capacity(n_people);
     let mut starts: Vec<Point> = Vec::with_capacity(n_people);
+    // At least 0.5 m from every start already placed.
+    let apart = |p: Point, starts: &[Point]| {
+        starts
+            .iter()
+            .all(|q| (q.0 - p.0).hypot(q.1 - p.1) >= PERSON_GAP_M)
+    };
     for j in 0..n_people {
         let mut mode = pick(&mut rng, &MODES);
         let mut start = None;
@@ -700,7 +781,10 @@ fn draw(seed: u64, i: usize, a: u32, seconds: u32) -> Result<Draw, (Reason, Stri
                 _ => matches!(k, ObjectKind::Chair | ObjectKind::Sofa),
             };
             let free: Vec<usize> = (0..objects_placed)
-                .filter(|&k| !taken[k] && fits(scene.objects[k].kind))
+                .filter(|&k| {
+                    let o = &scene.objects[k];
+                    !taken[k] && fits(o.kind) && apart((o.pos.0, o.pos.1), &starts)
+                })
                 .collect();
             if free.is_empty() {
                 mode = PersonMode::Walk;
@@ -715,7 +799,7 @@ fn draw(seed: u64, i: usize, a: u32, seconds: u32) -> Result<Draw, (Reason, Stri
         if matches!(mode, PersonMode::Walk | PersonMode::Stand) {
             for _ in 0..START_TRIES {
                 let p = (rng.range(0.0, w), rng.range(0.0, d));
-                if walk.point(p) {
+                if walk.point(p) && apart(p, &starts) {
                     start = Some(p);
                     break;
                 }
@@ -918,6 +1002,9 @@ pub fn generator_json() -> Value {
             "walk": "start uniform in the bounding box, kept when Room Sim's Walkability::point accepts it; people_mode walk",
             "stand": "as walk, people_mode stationary, start_heading_rad ~ U[0, 2 pi)",
             "start_tries": START_TRIES,
+            "start_gap_m": PERSON_GAP_M,
+            "spacing": "every start at least start_gap_m from the starts already placed; a lie or sit takes only a free object whose centre is that far, else walks",
+            "pause_s": "Room Sim's default U[0, 20] s between walk legs, kept: the per-tick walking label, not the mode, says who moves",
         },
     })
 }

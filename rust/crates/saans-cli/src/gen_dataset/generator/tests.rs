@@ -1,5 +1,8 @@
 //! §11 "Generator": seeds 0..3 x 200 indices, drawn and checked (§2.6)
-//! only; nothing is simulated past `Simulator::new`. Everything is SIM.
+//! only; nothing is simulated past `Simulator::new`. Every number of §2 is
+//! written here as the spec writes it, never read from the generator's own
+//! constants, so a constant that drifts from the spec fails. Everything
+//! is SIM.
 
 use super::*;
 use rayon::prelude::*;
@@ -12,6 +15,15 @@ const SECONDS: u32 = 120;
 /// The two-sided 99% normal quantile.
 const Z99: f64 = 2.5758;
 const EPS: f64 = 1e-9;
+
+/// §2.2: wall material, probability, thickness range.
+const SPEC_WALLS: [(&str, f64, (f64, f64)); 5] = [
+    ("concrete", 0.35, (0.15, 0.25)),
+    ("brick", 0.30, (0.15, 0.25)),
+    ("drywall", 0.20, (0.08, 0.12)),
+    ("wood", 0.10, (0.04, 0.08)),
+    ("glass", 0.05, (0.008, 0.012)),
+];
 
 fn all() -> Vec<Generated> {
     let jobs: Vec<(u64, usize)> = SEEDS
@@ -55,32 +67,36 @@ fn the_generator_draws_valid_scenes_with_its_distributions() {
     }
 
     // The accepted shares against §2's.
-    for (m, p, _) in WALL_MATERIALS {
-        let k = scenes.iter().filter(|g| g.wall_material == m).count();
-        binomial_ok(wall_material_name(m), k, n, p);
+    for (m, p, _) in SPEC_WALLS {
+        let k = scenes
+            .iter()
+            .filter(|g| wall_material_name(g.wall_material) == m)
+            .count();
+        binomial_ok(m, k, n, p);
     }
     binomial_ok(
         "L-shape",
         scenes.iter().filter(|g| g.l_shape).count(),
         n,
-        L_SHAPE_P,
+        0.25,
     );
-    let nodes = NODE_COUNT.1 - NODE_COUNT.0 + 1;
-    for count in NODE_COUNT.0..=NODE_COUNT.1 {
+    for count in 4..=12 {
         let k = scenes
             .iter()
             .filter(|g| g.scene.nodes.len() == count)
             .count();
-        binomial_ok(&format!("{count} nodes"), k, n, 1.0 / nodes as f64);
+        binomial_ok(&format!("{count} nodes"), k, n, 1.0 / 9.0);
     }
-    let people = PEOPLE_COUNT.1 - PEOPLE_COUNT.0 + 1;
-    for count in PEOPLE_COUNT.0..=PEOPLE_COUNT.1 {
+    for count in 0..=3 {
         let k = scenes
             .iter()
             .filter(|g| g.scene.people.len() == count)
             .count();
-        binomial_ok(&format!("{count} people"), k, n, 1.0 / people as f64);
+        binomial_ok(&format!("{count} people"), k, n, 0.25);
     }
+    assert!(scenes
+        .iter()
+        .all(|g| g.scene.people.len() <= 3 && (4..=12).contains(&g.scene.nodes.len())));
 
     scenes.par_iter().for_each(check_one);
 }
@@ -103,11 +119,7 @@ fn check_one(g: &Generated) {
     assert!(fp
         .iter()
         .all(|p| (0.0..=w).contains(&p.0) && (0.0..=d).contains(&p.1)));
-    for (lo, hi, v) in [
-        (ROOM_W_M.0, ROOM_W_M.1, w),
-        (ROOM_D_M.0, ROOM_D_M.1, d),
-        (ROOM_H_M.0, ROOM_H_M.1, s.room.h_m),
-    ] {
+    for (lo, hi, v) in [(3.0, 10.0, w), (3.0, 10.0, d), (2.5, 3.5, s.room.h_m)] {
         assert!(
             v >= lo && v <= hi && (v * 100.0 - (v * 100.0).round()).abs() < 1e-6,
             "{name}: {v}"
@@ -125,9 +137,9 @@ fn check_one(g: &Generated) {
             (g.wall_material, t, None)
         );
     }
-    let (_, _, (t_lo, t_hi)) = WALL_MATERIALS
+    let (_, _, (t_lo, t_hi)) = SPEC_WALLS
         .iter()
-        .find(|m| m.0 == g.wall_material)
+        .find(|m| m.0 == wall_material_name(g.wall_material))
         .copied()
         .unwrap();
     assert!(t >= t_lo && t <= t_hi, "{name}: t = {t}");
@@ -139,7 +151,7 @@ fn check_one(g: &Generated) {
         .filter(|o| !matches!(o.kind, ObjectKind::Door | ObjectKind::Window))
         .collect();
     assert_eq!(furniture.len(), g.objects_placed);
-    assert!(g.objects_placed <= g.objects_drawn && g.objects_drawn <= FURNITURE_COUNT.1);
+    assert!(g.objects_placed <= g.objects_drawn && g.objects_drawn <= 6);
     for (k, o) in furniture.iter().enumerate() {
         assert!(o.yaw_deg == 0.0 || o.yaw_deg == 90.0 || o.yaw_deg == 180.0 || o.yaw_deg == 270.0);
         assert_eq!(o.pos.2, o.size.2 / 2.0, "{name}: stands on the floor");
@@ -147,13 +159,13 @@ fn check_one(g: &Generated) {
         assert!(point_in_polygon(&fp, (o.pos.0, o.pos.1)));
         for &e in &es {
             assert!(
-                r.distance(&Rect::of_segment(e)) >= t / 2.0 + FURNITURE_FACE_GAP_M - EPS,
+                r.distance(&Rect::of_segment(e)) >= t / 2.0 + 0.1 - EPS,
                 "{name}: object {k} near a wall"
             );
         }
         for (j, q) in furniture.iter().enumerate().skip(k + 1) {
             assert!(
-                r.distance(&Rect::of_object(q)) >= FURNITURE_GAP_M - EPS,
+                r.distance(&Rect::of_object(q)) >= 0.1 - EPS,
                 "{name}: objects {k} and {j}"
             );
         }
@@ -179,23 +191,20 @@ fn check_one(g: &Generated) {
             .unwrap_or_else(|| panic!("{name}: an opening off every edge"));
         let (a, b) = es[e];
         let len = length((a, b));
-        assert!(len >= OPENING_MIN_EDGE_M);
+        assert!(len >= 1.6);
         let s_along = (p.0 - a.0).hypot(p.1 - a.1);
-        assert!(s_along >= OPENING_END_M - EPS && s_along <= len - OPENING_END_M + EPS);
+        assert!(s_along >= 0.6 - EPS && s_along <= len - 0.6 + EPS);
         let dir = (b.1 - a.1).atan2(b.0 - a.0).to_degrees();
         assert_eq!(o.yaw_deg, dir, "{name}: yaw is the edge's direction");
         let want = if o.kind == ObjectKind::Door {
-            DOOR
+            ((0.9, 0.1, 2.0), 1.0, ObjectMaterial::Wood)
         } else {
-            WINDOW
+            ((1.0, 0.1, 1.0), 1.5, ObjectMaterial::Glass)
         };
-        assert_eq!(
-            (o.size, o.pos.2, o.material),
-            (want.size, want.z, want.material)
-        );
+        assert_eq!((o.size, o.pos.2, o.material), want);
         for &(_, ps, ph) in on_edge.iter().filter(|x| x.0 == e) {
             assert!(
-                (s_along - ps).abs() >= o.size.0 / 2.0 + ph + OPENING_GAP_M - EPS,
+                (s_along - ps).abs() >= o.size.0 / 2.0 + ph + 0.1 - EPS,
                 "{name}: openings overlap"
             );
         }
@@ -203,8 +212,7 @@ fn check_one(g: &Generated) {
     }
 
     // §2.4: nodes inset from an edge, along it, 0.5 m apart in (x, y).
-    let inset = (t / 2.0).max(NODE_INSET_MIN_M) + NODE_INSET_EXTRA_M;
-    assert!(s.nodes.len() >= NODE_COUNT.0 && s.nodes.len() <= NODE_COUNT.1);
+    let inset = (t / 2.0).max(0.05) + 0.05;
     for (k, node) in s.nodes.iter().enumerate() {
         assert_eq!(usize::from(node.id), k, "{name}: ids in placement order");
         let p = (node.pos.0, node.pos.1);
@@ -216,10 +224,10 @@ fn check_one(g: &Generated) {
         assert!(es
             .iter()
             .all(|&(a, b)| distance_to_segment(a, b, p) >= inset - 1e-9));
-        assert!(node.pos.2 >= NODE_Z_M.0 && node.pos.2 <= NODE_Z_M.1);
+        assert!(node.pos.2 >= 0.8 && node.pos.2 <= 2.2);
         for q in &s.nodes[k + 1..] {
             assert!(
-                (q.pos.0 - p.0).hypot(q.pos.1 - p.1) >= NODE_GAP_M,
+                (q.pos.0 - p.0).hypot(q.pos.1 - p.1) >= 0.5,
                 "{name}: nodes too close"
             );
         }
@@ -255,8 +263,46 @@ fn check_one(g: &Generated) {
                 };
                 assert!(kinds.contains(&o.kind));
             }
-            PersonMode::Stand => assert!(g.rs.start_heading_rad.contains_key(&j)),
-            PersonMode::Walk => {}
+            PersonMode::Stand | PersonMode::Walk => {}
+        }
+        // §2.5: people_mode walk for walkers, stationary for standers (with
+        // a heading in [0, 2 pi)), and nothing for sitters and liers, whose
+        // mode Room Sim derives from the object they are on.
+        let heading = g.rs.start_heading_rad.get(&j).copied();
+        match mode {
+            PersonMode::Walk => {
+                assert_eq!(g.rs.people_mode.get(&j), Some(&Mode::Walk));
+                assert_eq!(heading, None);
+            }
+            PersonMode::Stand => {
+                assert_eq!(g.rs.people_mode.get(&j), Some(&Mode::Stationary));
+                let h = heading.expect("a stander's heading");
+                assert!(
+                    (0.0..std::f64::consts::TAU).contains(&h),
+                    "{name}: heading {h}"
+                );
+            }
+            PersonMode::Sit | PersonMode::Lie => {
+                assert_eq!(g.rs.people_mode.get(&j), None);
+                assert_eq!(heading, None);
+            }
+        }
+    }
+    let moving = |want: &[PersonMode]| g.modes.iter().filter(|m| want.contains(m)).count();
+    assert_eq!(
+        g.rs.people_mode.len(),
+        moving(&[PersonMode::Walk, PersonMode::Stand])
+    );
+    assert_eq!(g.rs.start_heading_rad.len(), moving(&[PersonMode::Stand]));
+    // §2.5: every start at least 0.5 m from every other.
+    for (j, p) in s.people.iter().enumerate() {
+        let a = p.start.unwrap();
+        for q in &s.people[j + 1..] {
+            let b = q.start.unwrap();
+            assert!(
+                (a.0 - b.0).hypot(a.1 - b.1) >= 0.5,
+                "{name}: starts too close"
+            );
         }
     }
     let on: Vec<usize> = sim.people().iter().filter_map(|p| p.resting_on()).collect();
