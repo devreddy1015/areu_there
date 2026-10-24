@@ -248,6 +248,40 @@ PAIRED vs legacy (readings within 0.5 BPM): +X right & legacy wrong / -legacy ri
   null        respirfi +5/-0   respirfi-nofloor +21/-24   pca +26/-8   oracle +37/-0
   mixed-sign  respirfi +4/-0   respirfi-nofloor +7/-0   pca +7/-0   oracle +7/-0
 
+CONFIDENCE vs ACCURACY. The breathing confidence is the share of in-band
+energy at the peak, a gate rather than a probability; these tables measure
+how far it is from one. 'gap' = share right - mean confidence: negative is
+overconfident. Uniform placement is the honest population; the forced nulls
+are over-sampled by design and shown apart, where overconfidence would live.
+
+RELIABILITY, uniform placement: 288 readings, fusion legacy, right = within 1 BPM
+    confidence  readings  mean conf  share right     gap
+    0.0-0.1            3      0.000        0.667  +0.667
+    0.1-0.2            1      0.162        0.000  -0.162
+    0.2-0.3            1      0.246        1.000  +0.754
+    0.3-0.4            1      0.322        1.000  +0.678
+    0.4-0.5            3      0.432        1.000  +0.568
+    0.5-0.6            1      0.511        1.000  +0.489
+    0.6-0.7            4      0.651        1.000  +0.349
+    0.7-0.8            4      0.754        1.000  +0.246
+    0.8-0.9           24      0.867        1.000  +0.133
+    0.9-1.0          246      0.992        1.000  +0.008
+  expected calibration error: 0.047
+
+RELIABILITY, whole-band nulls: 200 readings, fusion legacy, right = within 1 BPM
+    confidence  readings  mean conf  share right     gap
+    0.0-0.1           30      0.024        0.233  +0.210
+    0.1-0.2            7      0.144        0.714  +0.570
+    0.2-0.3            9      0.253        0.667  +0.414
+    0.3-0.4           12      0.337        0.667  +0.329
+    0.4-0.5           11      0.450        0.636  +0.186
+    0.5-0.6           17      0.555        0.353  -0.202
+    0.6-0.7           25      0.655        0.840  +0.185
+    0.7-0.8           19      0.747        0.789  +0.043
+    0.8-0.9           14      0.851        0.786  -0.065
+    0.9-1.0           56      0.978        0.911  -0.068
+  expected calibration error: 0.168
+
 Columns: '2x rate' = estimate within 1 BPM of twice the truth (the
 blind-spot signature); 'conf>=.4' = readings that pass the DEGRADED gate;
 'acc|gate' = accuracy among those; 'conf-wrong' = confidence >= 0.7 yet
@@ -541,6 +575,40 @@ PAIRED vs legacy (readings within 0.5 BPM): +X right & legacy wrong / -legacy ri
   partial     respirfi +30/-0   respirfi-nofloor +65/-164   pca +71/-61   oracle +115/-2
   null        respirfi +38/-0   respirfi-nofloor +105/-158   pca +91/-106   oracle +186/-9
   mixed-sign  respirfi +16/-0   respirfi-nofloor +42/-21   pca +54/-8   oracle +80/-1
+
+CONFIDENCE vs ACCURACY. The breathing confidence is the share of in-band
+energy at the peak, a gate rather than a probability; these tables measure
+how far it is from one. 'gap' = share right - mean confidence: negative is
+overconfident. Uniform placement is the honest population; the forced nulls
+are over-sampled by design and shown apart, where overconfidence would live.
+
+RELIABILITY, uniform placement: 1920 readings, fusion legacy, right = within 1 BPM
+    confidence  readings  mean conf  share right     gap
+    0.0-0.1           63      0.020        0.333  +0.313
+    0.1-0.2           34      0.142        0.441  +0.299
+    0.2-0.3           15      0.257        0.667  +0.410
+    0.3-0.4           25      0.358        0.880  +0.522
+    0.4-0.5           24      0.458        0.958  +0.501
+    0.5-0.6           48      0.552        0.833  +0.281
+    0.6-0.7           29      0.648        0.862  +0.214
+    0.7-0.8           57      0.751        1.000  +0.249
+    0.8-0.9           91      0.862        0.956  +0.094
+    0.9-1.0         1534      0.988        1.000  +0.012
+  expected calibration error: 0.064
+
+RELIABILITY, whole-band nulls: 1068 readings, fusion legacy, right = within 1 BPM
+    confidence  readings  mean conf  share right     gap
+    0.0-0.1          218      0.019        0.239  +0.220
+    0.1-0.2           62      0.152        0.613  +0.461
+    0.2-0.3           49      0.255        0.571  +0.317
+    0.3-0.4           82      0.349        0.561  +0.212
+    0.4-0.5           58      0.441        0.603  +0.163
+    0.5-0.6           69      0.553        0.710  +0.157
+    0.6-0.7           75      0.645        0.720  +0.075
+    0.7-0.8           81      0.756        0.889  +0.133
+    0.8-0.9           84      0.852        0.774  -0.078
+    0.9-1.0          290      0.980        0.941  -0.039
+  expected calibration error: 0.154
 
 Columns: '2x rate' = estimate within 1 BPM of twice the truth (the
 blind-spot signature); 'conf>=.4' = readings that pass the DEGRADED gate;

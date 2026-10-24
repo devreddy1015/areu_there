@@ -339,7 +339,13 @@ whole-band blind spots, and the Explorer review observed it doing so at
 **confidence 1.00** — i.e. unanimous about a doubled rate. The gate
 turns an unreliable number into a mostly-reliable one that abstains; it
 does not make the confidence a calibrated probability, and the double-
-rate failure is the known case where it does not save you. The ceiling described
+rate failure is the known case where it does not save you. *Measured
+since (`NOTES.md` §12, SYNTHETIC):* the expected calibration error is
+0.064 in uniform placement and 0.154 at whole-band nulls, and the error
+runs in opposite directions -- underconfident in ordinary rooms,
+overconfident at the top where nulls double the rate -- so no remapping
+of the number can fix it. The fix is information it lacks: a second
+link. The ceiling described
 here is on *spatial* capability specifically.
 
 The next three things worth building are in
