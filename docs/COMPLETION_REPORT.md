@@ -225,6 +225,8 @@ See `UI_GAP_ANALYSIS.md` §3 for the full list. The ones that matter:
 - **Alert acknowledge / resolve / escalate** — `AlertService` is a stub.
   No controls were added, because a button that does nothing is worse
   than no button.
+  *Closed 2026-10-24: built, and the dashboard has the buttons now that
+  they do something.*
 - **MQTT** — still a stub, now refused at config load.
 - **Browser end-to-end tests** — none exist; the above was manual.
 - **Audit log retention** — not swept. Audit records usually outlive

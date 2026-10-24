@@ -789,6 +789,16 @@ async fn websocket_streams_state_and_events() {
     let hello = ws.next_json().await;
     assert_eq!(hello["type"], "hello");
     assert_eq!(hello["mode"], "live");
+    // The dashboard replaces its capabilities with whichever of /api/me and
+    // this frame arrived last, so they must be the same object. They were
+    // not: `hello` carried only `system`, and a connected dashboard forgot
+    // everything else.
+    let me = g.json("/api/me").await;
+    assert_eq!(hello["can"], me["can"], "hello and /api/me disagree");
+    assert_eq!(
+        me["can"]["alerts"], true,
+        "the loopback admin may act on alerts: {me}"
+    );
     // The latest state straight away, before the next tick.
     let first = ws.next_json().await;
     assert_eq!(first["type"], "state");

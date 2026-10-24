@@ -228,13 +228,16 @@ now distinguished.
 
 ### 2.6 What is a stub
 
-- `AlertService::new` is `todo!()`. Alert acknowledge, resolve and
-  escalate do not exist. No UI controls were added for them, on the
-  stated grounds that a button that does nothing is worse than no button
-  (`docs/COMPLETION_REPORT.md:220-222`).
-- `mqtt::spawn` is `todo!()` (`docs/COMPLETION_REPORT.md:223`).
-- Both are now rejected at config load rather than panicking at startup,
-  which is honest but is not the same as finished.
+- `mqtt::spawn` is `todo!()` (`docs/COMPLETION_REPORT.md:223`), and an
+  `[mqtt]` section is rejected at config load rather than panicking at
+  startup -- honest, but not the same as finished.
+- *No longer a stub, since 2026-10-24:* the alert service. Routing,
+  acknowledgement, escalation, persistence, Telegram and webhooks are
+  built and tested, including the brief's exit gate run live: a scripted
+  breathing pause paged a webhook once, survived a gateway restart, and
+  was acknowledged and resolved from the dashboard, with both actions in
+  the audit log. None of that has met a real Telegram bot or paging
+  system -- the tests stand in local servers for both.
 - There are no browser end-to-end tests; the UI verification in
   `COMPLETION_REPORT.md` §6 was manual and is recorded as weaker than a
   suite (`docs/COMPLETION_REPORT.md:224`).

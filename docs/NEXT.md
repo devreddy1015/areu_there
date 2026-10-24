@@ -349,6 +349,14 @@ force" -- applies to the key that *was* built.
 
 ### 1.8 AlertService: the six `todo!()`s
 
+**Done**, on branch `saans/alerts`, and the exit gate was run live as
+well as in tests: a real gateway, frames over UDP, a local webhook, and
+the dashboard clicked in a browser. Clicking found two bugs no Rust test
+could: the WebSocket `hello` frame replaced the dashboard's capabilities
+with a smaller set, so a connected dashboard forgot `audit` and would
+have hidden the buttons; and the panel rebuilt every 2 s, wiping a
+half-typed note. Both are fixed, and the first has a test.
+
 The brief's A2. Not an accuracy change; the thing that makes the system
 deployable, and the one the integrations (webhook, Telegram) hang off.
 `reqwest` and `rumqttc` are already in `Cargo.toml` so no new

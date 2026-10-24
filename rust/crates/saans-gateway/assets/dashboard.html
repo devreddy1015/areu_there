@@ -161,6 +161,11 @@ ol.events li[data-sev="advisory"] { border-left-color: var(--warn); }
 ol.events li[data-sev="check"] { border-left-color: var(--bad); }
 ol.events time { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 ol.events .what { font-weight: 600; }
+.alerts-panel { margin: 0 0 18px; }
+.alerts-panel h2 { font-size: 15px; margin: 0 0 4px; }
+.alerts-panel > p { margin: 0 0 8px; font-size: 13px; }
+ol.events .acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+ol.events .acts input { min-width: 14em; }
 ol.events .ev { grid-column: 2; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 
 .scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 9px; }
@@ -349,6 +354,12 @@ footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-a
   </section>
 
   <section id="view-events" role="tabpanel" aria-labelledby="tab-events" tabindex="0" hidden>
+    <section class="alerts-panel" id="al-panel" aria-labelledby="al-h" hidden>
+      <h2 id="al-h">Open alerts</h2>
+      <p class="muted">Advisory. Acknowledging says someone is looking; it never replaces your usual procedure.</p>
+      <ol class="events" id="al-list"></ol>
+      <p class="sr" aria-live="polite" id="al-status"></p>
+    </section>
     <div class="toolbar">
       <label class="f"><span class="sr">Search events</span>
         <input type="search" id="ev-q" placeholder="Search evidence and type…"></label>
@@ -1160,6 +1171,8 @@ function mergeEvents(list) {
     if (e && !seen.has(evKey(e))) { S.events.push(e); seen.add(evKey(e)); added = true; }
   }
   if (!added) return;
+  // A new event may have opened, or repeated, an alert.
+  if (!S.alertsOff) refreshAlertsSoon();
   S.events.sort((a, b) => (b.unix_ms || 0) - (a.unix_ms || 0));
   S.events.length = Math.min(S.events.length, MAX_EVENTS);
   if (S.tab === 'events') renderEvents();
@@ -1197,6 +1210,104 @@ function renderEvents() {
 }
 for (const id of ['#ev-space', '#ev-sev', '#ev-since']) $(id).addEventListener('change', renderEvents);
 $('#ev-q').addEventListener('input', renderEvents);
+
+// ---------------------------------------------------------------- alerts
+// Shown only when the gateway routes alerts: /api/alerts answers 404 when no
+// [[alert_route]] is configured, and then there is no panel at all. The
+// buttons appear for a role that may act (me.can.alerts: admin or safety).
+// The gateway checks again, per space, and answers 403 or 404 if not, so
+// hiding a button is a courtesy and not the control.
+S.alerts = null;
+// Only a 404 means "no alert routing here". A failed fetch -- a gateway
+// still starting, a dropped connection -- is retried on the next tick
+// rather than read as "not configured", which would hide the panel until
+// a reload.
+S.alertsOff = false;
+async function refreshAlerts() {
+  try {
+    S.alerts = (await getJSON('/api/alerts?open=true&limit=100')).alerts || [];
+    S.alertsOff = false;
+  } catch (e) {
+    if (handleAuthLoss(e)) return;
+    if (e instanceof HttpError && e.status === 404) { S.alerts = null; S.alertsOff = true; }
+  }
+  renderAlerts();
+}
+let alertsSoon = null;
+function refreshAlertsSoon() {
+  if (alertsSoon) return;
+  alertsSoon = setTimeout(() => { alertsSoon = null; refreshAlerts(); }, 800);
+}
+function alertItem(a) {
+  const li = el('li', { 'data-sev': a.severity || 'info', 'data-alert': String(a.id) });
+  const t = el('time', { 'data-opened': String(a.opened_unix_ms) }, 'opened ' + ago(a.opened_unix_ms));
+  const what = el('div');
+  const extra = [
+    spaceName(a.space_id), a.state,
+    a.repeats ? a.repeats + ' repeat' + (a.repeats === 1 ? '' : 's') : null,
+    a.escalation_level ? 'escalated' : null,
+    a.acked_by ? 'acknowledged by ' + a.acked_by + ' ' + ago(a.acked_unix_ms) : null,
+  ].filter(Boolean).join(' · ');
+  add(what, el('span', { class: 'what' }, '#' + a.id + ' ' + (EVENT_LABEL[a.kind] || a.kind)),
+    document.createTextNode(' · ' + extra));
+  add(li, t, what);
+  if (a.event && a.event.evidence) add(li, el('div', { class: 'ev' }, a.event.evidence));
+  if (S.me && S.me.can && S.me.can.alerts) {
+    const acts = el('div', { class: 'acts' });
+    if (a.state === 'open') {
+      const ack = el('button', { type: 'button' }, 'Acknowledge');
+      ack.addEventListener('click', () => actOnAlert(a.id, 'ack', null, acts));
+      acts.append(ack);
+    }
+    const note = el('input', { type: 'text', maxlength: '500', placeholder: 'Resolution note (optional)',
+      'aria-label': 'Resolution note for alert ' + a.id });
+    const res = el('button', { type: 'button' }, 'Resolve');
+    res.addEventListener('click', () => actOnAlert(a.id, 'resolve', note.value, acts));
+    add(acts, note, res);
+    li.append(acts);
+  }
+  return li;
+}
+// Rebuilding the rows takes a button out from under a pointer and wipes a
+// half-typed note, and the panel refreshes every 2 s. So it rebuilds only
+// when an alert actually changed, keeps any notes across that, and
+// otherwise only moves the "opened ... ago" clocks.
+let alertsSig = null;
+function renderAlerts() {
+  const panel = $('#al-panel');
+  if (S.alerts == null) { panel.hidden = true; alertsSig = null; return; }
+  panel.hidden = false;
+  const ol = $('#al-list');
+  const sig = JSON.stringify(S.alerts.map((a) => [a.id, a.state, a.repeats, a.escalation_level, a.acked_by]))
+    + (S.me && S.me.can && S.me.can.alerts ? '+act' : '');
+  if (sig === alertsSig) {
+    for (const t of ol.querySelectorAll('time[data-opened]')) t.textContent = 'opened ' + ago(Number(t.dataset.opened));
+    return;
+  }
+  alertsSig = sig;
+  const notes = {};
+  for (const i of ol.querySelectorAll('li[data-alert] input')) notes[i.closest('li').dataset.alert] = i.value;
+  ol.replaceChildren(...S.alerts.map(alertItem));
+  for (const i of ol.querySelectorAll('li[data-alert] input')) {
+    const kept = notes[i.closest('li').dataset.alert];
+    if (kept) i.value = kept;
+  }
+  if (!S.alerts.length) ol.append(el('li', null, 'No open alerts.'));
+}
+async function actOnAlert(id, verb, note, acts) {
+  for (const b of acts.querySelectorAll('button, input')) b.disabled = true;
+  const status = $('#al-status');
+  try {
+    await postJSON('/api/alerts/' + id + '/' + verb, verb === 'resolve' ? { note: note || '' } : {});
+    status.textContent = 'Alert ' + id + (verb === 'ack' ? ' acknowledged.' : ' resolved.');
+  } catch (e) {
+    if (handleAuthLoss(e)) return;
+    const why = e.data && e.data.error ? e.data.error : 'the gateway refused';
+    status.textContent = 'Alert ' + id + ': ' + why + '.';
+    status.classList.remove('sr');
+  }
+  refreshAlerts();
+}
 
 // ---------------------------------------------------------------- system
 function linkTable(groups, caption) {
@@ -2078,6 +2189,7 @@ async function start() {
   showTab(visibleTabs().some((t) => t.id === wanted) ? wanted : 'overview');
 
   getJSON('/api/events?limit=500').then(mergeEvents).catch((e) => handleAuthLoss(e));
+  refreshAlerts();
   refreshSystem();
   connect();
 
@@ -2087,6 +2199,7 @@ async function start() {
       // its readyState says.
       renderShell();
       if (S.tab === 'system' || S.tab === 'topology') refreshSystem();
+      if (S.tab === 'events' && !S.alertsOff) refreshAlerts();
     }, 2000);
   }
 }

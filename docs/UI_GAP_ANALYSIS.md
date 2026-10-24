@@ -164,7 +164,7 @@ this system has not demonstrated.
 
 | Gap | Priority | Why it is not done |
 |---|---|---|
-| Alert acknowledge / resolve / escalate | P2 | `AlertService` is a stub. Needs backend state, authorisation, persistence and audit before any button appears |
+| Alert acknowledge / resolve / escalate | P2 | `AlertService` is a stub. Needs backend state, authorisation, persistence and audit before any button appears *Closed 2026-10-24: built; Acknowledge / Resolve in the Events view.* |
 | MQTT publishing | P2 | `mqtt::spawn` is a stub. Now refused at config load instead of panicking |
 | Room geometry and coverage | P3 | Needs a config schema, a room survey, and an honest way to draw what is *not* covered |
 | 3D observatory | P3 | Blocked on the above plus a localisation result that does not yet exist |

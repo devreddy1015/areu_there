@@ -159,7 +159,9 @@ driving it. See `COMPLETION_REPORT.md` for exactly what was run.
 ## 9. Deliberately not built
 
 - **Alert acknowledge / resolve.** `AlertService` is a stub; a button
-  that does nothing is worse than no button.
+  that does nothing is worse than no button. *Built 2026-10-24, and the
+  buttons added then -- above the event list, only when routing is
+  configured, only for admin and safety.*
 - **Raw CSI heatmap.** FeatureFrames are not subcarrier data and must
   not be drawn as if they were.
 - **An *inferred* floor plan, person position or 3D room.** No

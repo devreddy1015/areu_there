@@ -94,3 +94,34 @@ collapse_detection = false
 breathing_pause_min_s = 10.0
 rate_high_bpm = 24.0
 rate_low_bpm = 8.0
+
+# ------------------------------------------------------------------ alerts
+# Advisory alerts to Telegram or a webhook, with Acknowledge / Resolve and
+# escalation (SAANS_PLAN.md §10.3). Uncomment to use. Secrets never go in
+# this file: name the environment variable that holds them.
+#
+# Routes are tried in order and the first match owns the alert. `info`
+# events never page. One alert per (space, kind) is open at a time; repeats
+# update it and page nobody.
+#
+# What leaves the building: by default only "an alert of this kind is open
+# in this space". The evidence sentence, confidence and every number stay
+# home unless a route sets include_health_details = true.
+#
+# [telegram.wardens]
+# bot_token_env = "SAANS_TELEGRAM_TOKEN"   # from @BotFather
+# chat_id = -1001234567890
+# allowed_user_ids = [111111111]           # who may press the buttons; empty = anyone in the chat
+#
+# [webhook.pager]
+# url = "https://pager.example.org/saans"  # https only, except to localhost
+# secret_env = "SAANS_WEBHOOK_KEY"         # HMAC-SHA256 of the body in X-Saans-Signature
+#
+# [[alert_route]]
+# name = "rest-rooms"
+# spaces = ["rest-room-1"]
+# kinds = ["breathing_pause", "inactivity"]
+# channels = ["telegram:wardens"]
+# ack_timeout_min = 5                      # still unacknowledged after this: escalate, once
+# escalate_to = ["webhook:pager"]
+# include_health_details = false
