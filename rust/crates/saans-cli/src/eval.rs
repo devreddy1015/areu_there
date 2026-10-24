@@ -12,7 +12,7 @@ use saans_dsp::features::{FeatureExtractor, FeatureExtractorConfig};
 use saans_health::{
     EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceFusion, SpaceMonitor,
 };
-use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment, TruthKind};
+use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment, TruthKind, NODE_Z_M};
 use saans_sim::Simulator;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -72,7 +72,11 @@ pub fn rooms() -> Vec<(&'static str, Room)> {
 pub type Layout = (&'static str, Vec<Node>, Vec<(u8, u8)>);
 
 pub fn layouts() -> Vec<Layout> {
-    let n = |id, x, y| Node { id, pos: (x, y) };
+    let n = |id, x, y| Node {
+        id,
+        pos: (x, y),
+        z_m: NODE_Z_M,
+    };
     vec![
         ("1 link", vec![n(0, 1.5, 2.5), n(1, 4.5, 2.5)], vec![(0, 1)]),
         (

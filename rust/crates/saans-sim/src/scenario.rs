@@ -7,6 +7,16 @@
 use serde::{Deserialize, Serialize};
 
 pub type Point = (f64, f64);
+/// (x, y, z), z up from the floor: the axes `scenes/*.json` use.
+pub type Point3 = (f64, f64, f64);
+
+/// Mounting height of a node when nothing says otherwise: every scene in
+/// `scenes/` puts its nodes at 1.2 m.
+pub const NODE_Z_M: f64 = 1.2;
+
+fn default_node_z() -> f64 {
+    NODE_Z_M
+}
 
 /// A furniture point scatterer placed explicitly (in addition to the
 /// `n_scatterers` drawn at random from the scenario seed).
@@ -14,6 +24,49 @@ pub type Point = (f64, f64);
 pub struct Scatterer {
     pub pos: Point,
     pub rcs_m2: f64,
+    /// Height above the floor. Ignored in the 2-D slice; required when the
+    /// room has a [`Vertical`], because a height is not something to
+    /// guess for a scatterer somebody placed on purpose.
+    #[serde(default)]
+    pub z_m: Option<f64>,
+}
+
+/// The room as a box rather than a horizontal slice: the Python
+/// `SyntheticConfig(room_height_m=...)`. Walls, floor and ceiling all
+/// reflect (image method over six faces, each image once), and nodes,
+/// chest and furniture have heights. See NOTES.md §13 for what it assumes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Vertical {
+    /// Floor to ceiling.
+    pub height_m: f64,
+    /// |Gamma| of the floor and of the ceiling, applied with a pi phase
+    /// flip like `wall_reflection`, and like it the same at every angle.
+    pub floor_reflection: f64,
+    pub ceiling_reflection: f64,
+    /// Chest height: ~1.0 m seated, ~1.3 m standing, ~0.6 m lying in bed.
+    /// One height for the whole timeline; the arm is at it too. The chest
+    /// breathes horizontally, along the horizontal part of the
+    /// tx-chest-rx bisector.
+    pub chest_z_m: f64,
+    /// Heights of the random furniture scatterers, uniform in this range,
+    /// drawn after every horizontal draw so a seed puts the same furniture
+    /// footprint in the slice and the box.
+    pub scatterer_z_m: Point,
+}
+
+impl Default for Vertical {
+    /// A 2.7 m room (`scenes/bedroom.json`) with a concrete floor and
+    /// ceiling: 0.395, the ITU-R P.2040 row in `scenes/materials.json`. The
+    /// same defaults as the Python reference.
+    fn default() -> Self {
+        Self {
+            height_m: 2.7,
+            floor_reflection: 0.395,
+            ceiling_reflection: 0.395,
+            chest_z_m: 1.0,
+            scatterer_z_m: (0.3, 1.8),
+        }
+    }
 }
 
 /// The room's static radio environment (same physics as the Python
@@ -37,6 +90,10 @@ pub struct Room {
     /// they leave). Clamped into the walkable area.
     #[serde(default = "default_door")]
     pub door_m: Point,
+    /// `None` is the 2-D slice at chest height (the original model, and
+    /// every scenario in this crate); `Some` makes the room a box.
+    #[serde(default)]
+    pub vertical: Option<Vertical>,
 }
 
 fn default_door() -> Point {
@@ -54,6 +111,7 @@ impl Default for Room {
             scatterer_rcs_m2: (0.05, 0.5),
             scatterers: Vec::new(),
             door_m: default_door(),
+            vertical: None,
         }
     }
 }
@@ -62,6 +120,9 @@ impl Default for Room {
 pub struct Node {
     pub id: u8,
     pub pos: Point,
+    /// Mounting height. Ignored in the 2-D slice.
+    #[serde(default = "default_node_z")]
+    pub z_m: f64,
 }
 
 /// What the person is doing for one segment of the timeline.

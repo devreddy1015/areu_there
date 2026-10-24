@@ -1026,12 +1026,34 @@ cells found no whole-band null in 5000 tries.
    S5 recordings, as RespirFi's off-by-default status already says.
    Nothing in the pipeline changes on the strength of this.
 
+### The Rust port
+
+`saans-sim` has the box as `Room::vertical`, with heights on `Node`
+and on explicit `Scatterer`s.
+
+- **Parity.** It reproduces `sim_geometric_3d` to 4e-14 relative in
+  amplitude and 9e-15 in phase and sensitivity, and the per-point chest
+  gains to 2e-16 (`tests/parity.rs`).
+- **The slice is untouched.** A digest of every bit of five scripted
+  runs (all three rooms, one to three links, the arm, sensitivity and
+  coverage maps; 257k frames) is identical before and after the port.
+- **Scenes.** `Scene::to_sim_box_room` runs a scene in a box at its own
+  height, and `to_sim_nodes` now keeps each node's.
+
+What the port adds beyond the reference, because the Rust body moves
+and has an arm:
+
+- **The arm** sits at chest height.
+- **One chest height for the whole timeline.** A fall in a box still
+  ends with the chest at 1.0 m. A chest that drops is the obvious next
+  model change, and per ADR-002 it starts in the reference.
+
+Nothing uses the box yet. Every built-in scenario, `saans eval`,
+`links`, `octave` and the gateway's `--simulate` are still the slice.
+
 ### Not done
 
-- **The Rust simulator** (`saans-sim`) is still 2-D. Porting the box
-  changes `saans-sim`'s public types and is waiting on that decision.
-  `sim_geometric_3d` is ready for its parity test.
+- **The detectors in a box.** Whether the S3 results (`saans eval`)
+  hold there is the next measurement.
 - **The 2-D corner bug**, above.
 - **Angle- and polarisation-dependent reflection.**
-- **The scenes in `scenes/`** already carry room and node heights. The
-  Rust loader drops them until the port.

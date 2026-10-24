@@ -49,7 +49,7 @@ use crate::shared::Shared;
 use crate::timefmt::now_unix_ms;
 use saans_dsp::features::{FeatureExtractor, FeatureExtractorConfig};
 use saans_health::{LinkId, SpaceConfig};
-use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment, Truth};
+use saans_sim::scenario::{Activity, Node, Point, Room, Scenario, Segment, Truth, NODE_Z_M};
 use saans_sim::{scenarios, Simulator, Tick};
 use serde_json::{json, Value};
 use std::io;
@@ -168,7 +168,11 @@ pub fn explorer_scenario() -> Scenario {
         nodes: NODES_M
             .iter()
             .enumerate()
-            .map(|(i, &pos)| Node { id: i as u8, pos })
+            .map(|(i, &pos)| Node {
+                id: i as u8,
+                pos,
+                z_m: NODE_Z_M,
+            })
             .collect(),
         links: LINKS.to_vec(),
     };

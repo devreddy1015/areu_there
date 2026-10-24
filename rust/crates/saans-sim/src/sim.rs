@@ -1,10 +1,10 @@
 //! The simulator: a compiled [`Plan`] rendered through per-link geometric
 //! channels, one tick at a time.
 
-use crate::physics::{point_path, BodyPoint, LinkChannel, BODY_RCS_M2};
+use crate::physics::{BodyPoint, LinkChannel, BODY_RCS_M2};
 use crate::plan::{BodyState, Bounds, Plan};
 use crate::rng::Rng;
-use crate::scenario::{Point, Scenario, SimOptions, Truth, TruthEvent};
+use crate::scenario::{Point, Point3, Scenario, SimOptions, Truth, TruthEvent};
 use saans_dsp::CsiFrame;
 
 /// RSSI of a link whose mean |h| is the unattenuated-LoS 40.
@@ -82,6 +82,8 @@ pub struct Simulator {
     plan: Plan,
     links: Vec<LinkSim>,
     scatterers: Vec<(Point, f64)>,
+    /// Their heights, in the same order; empty in the 2-D slice.
+    scatterer_z: Vec<f64>,
     n_ticks: u64,
     tick: u64,
     /// Time of the last tick produced (0 before the first).
@@ -173,11 +175,65 @@ impl Simulator {
                 ));
             }
         }
-        let node = |id: u8| {
+        if let Some(v) = &s.room.vertical {
+            let height = v.height_m;
+            if !(height > 0.0 && height.is_finite()) {
+                return Err(format!("room height {height} must be positive"));
+            }
+            let inside = |z: f64| z > 0.0 && z < height;
+            if ![v.floor_reflection, v.ceiling_reflection]
+                .iter()
+                .all(|g| (0.0..=1.0).contains(g))
+            {
+                return Err(format!(
+                    "floor and ceiling reflections {} and {} must be in [0, 1]",
+                    v.floor_reflection, v.ceiling_reflection
+                ));
+            }
+            if !inside(v.chest_z_m) {
+                return Err(format!(
+                    "chest height {} is not inside the room's {height} m",
+                    v.chest_z_m
+                ));
+            }
+            let (lo, hi) = v.scatterer_z_m;
+            if !(lo >= 0.0 && lo <= hi && hi <= height) {
+                return Err(format!(
+                    "furniture heights {:?} must satisfy 0 <= low <= high <= {height} m",
+                    v.scatterer_z_m
+                ));
+            }
+            for n in &s.nodes {
+                if !inside(n.z_m) {
+                    return Err(format!(
+                        "node {} at height {} is not inside the room's {height} m",
+                        n.id, n.z_m
+                    ));
+                }
+            }
+            for sc in &s.room.scatterers {
+                match sc.z_m {
+                    Some(z) if (0.0..=height).contains(&z) => {}
+                    Some(z) => {
+                        return Err(format!(
+                            "scatterer at {:?}: height {z} is not inside the room's {height} m",
+                            sc.pos
+                        ))
+                    }
+                    None => {
+                        return Err(format!(
+                            "scatterer at {:?} has no height, and this room has one",
+                            sc.pos
+                        ))
+                    }
+                }
+            }
+        }
+        let node = |id: u8| -> Result<Point3, String> {
             s.nodes
                 .iter()
                 .find(|n| n.id == id)
-                .map(|n| n.pos)
+                .map(|n| (n.pos.0, n.pos.1, n.z_m))
                 .ok_or(format!("link references unknown node {id}"))
         };
 
@@ -198,16 +254,35 @@ impl Simulator {
             let rcs = room_rng.range(lo, hi);
             scatterers.push((p, rcs));
         }
+        // Heights after every horizontal draw, so a seed puts the same
+        // furniture footprint in the slice and the box.
+        let mut scatterer_z = Vec::new();
+        if let Some(v) = &s.room.vertical {
+            scatterer_z.extend(s.room.scatterers.iter().filter_map(|sc| sc.z_m));
+            let (zlo, zhi) = v.scatterer_z_m;
+            for _ in 0..s.room.n_scatterers {
+                scatterer_z.push(room_rng.range(zlo, zhi));
+            }
+        }
+        let placed: Vec<(Point3, f64)> = scatterers
+            .iter()
+            .enumerate()
+            .map(|(i, &(p, rcs))| ((p.0, p.1, scatterer_z.get(i).copied().unwrap_or(0.0)), rcs))
+            .collect();
 
         let mut links = Vec::with_capacity(s.links.len());
         for (i, &(tx, rx)) in s.links.iter().enumerate() {
             let (ptx, prx) = (node(tx)?, node(rx)?);
-            if crate::physics::dist(ptx, prx) <= 0.0 {
+            let apart = match s.room.vertical {
+                None => crate::physics::dist((ptx.0, ptx.1), (prx.0, prx.1)),
+                Some(_) => crate::physics::dist3(ptx, prx),
+            };
+            if apart <= 0.0 {
                 return Err(format!("link ({tx}, {rx}): nodes coincide"));
             }
             let ch = LinkChannel::new(
                 &s.room,
-                &scatterers,
+                &placed,
                 ptx,
                 prx,
                 opts.carrier_hz,
@@ -231,6 +306,7 @@ impl Simulator {
             plan,
             links,
             scatterers,
+            scatterer_z,
             n_ticks,
             tick: 0,
             now_s: 0.0,
@@ -269,6 +345,12 @@ impl Simulator {
     /// All furniture scatterers actually used, (position, RCS).
     pub fn scatterers(&self) -> &[(Point, f64)] {
         &self.scatterers
+    }
+
+    /// Their heights, in the same order as [`Simulator::scatterers`]; empty
+    /// when the room is the 2-D slice.
+    pub fn scatterer_z(&self) -> &[f64] {
+        &self.scatterer_z
     }
 
     /// Advance one tick. `None` after the last tick.
@@ -321,7 +403,7 @@ impl Simulator {
                     link.ch.add_path(re, im, p.amp, p.len - p.gain * body.disp);
                 }
                 if opts.arm_rcs_m2 > 0.0 {
-                    let (amp, len) = point_path(link.ch.tx, link.ch.rx, body.arm, opts.arm_rcs_m2);
+                    let (amp, len) = link.ch.body_point_path(body.arm, opts.arm_rcs_m2);
                     link.ch.add_path(re, im, amp, len);
                 }
             }
@@ -477,12 +559,9 @@ impl Simulator {
             &mut pts,
         );
         let extra: Vec<(f64, f64)> = if self.opts.arm_rcs_m2 > 0.0 {
-            vec![point_path(
-                l.ch.tx,
-                l.ch.rx,
-                self.plan.arm_rest(centre),
-                self.opts.arm_rcs_m2,
-            )]
+            vec![l
+                .ch
+                .body_point_path(self.plan.arm_rest(centre), self.opts.arm_rcs_m2)]
         } else {
             Vec::new()
         };
