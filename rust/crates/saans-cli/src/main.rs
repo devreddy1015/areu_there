@@ -4,6 +4,7 @@
 //!     saans export SCENARIO --out FILE.pcap [--seed N] [--vitals]
 //!     saans import-roomplan FILE.json --out SCENE.json [--name NAME]
 //!     saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]
+//!     saans roomsim-eval --scene SCENE.json [--seconds S] [--seed N] [--variant declared|with_walker|empty] [--records-out FILE] [--json]
 //!
 //! `export` runs a simulated scenario through the node-side FeatureExtractor
 //! and writes the FeatureFrames as a pcap, so `saans-gateway --replay`
@@ -19,9 +20,15 @@
 //! raw mode), `PREFIX.truth.jsonl` and `PREFIX.manifest.json` (§13),
 //! refusing to replace an earlier export unless given `--overwrite`.
 //! Everything it writes is SIM: a model, not a measurement.
+//!
+//! `roomsim-eval` runs Room Sim and Locate on a scene and prints the live
+//! demo's statistics of the run (spec/livedemo.md §10), every line SIM, or
+//! one JSON object with `--json`; `--records-out` writes the run as a
+//! records file for the gateway's `--room-replay` (§6).
 
 mod eval;
 mod pcap;
+mod roomsim_eval;
 mod roomsim_export;
 mod score;
 
@@ -31,7 +38,8 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]"
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}",
+        roomsim_eval::USAGE
     );
     ExitCode::from(2)
 }
@@ -55,6 +63,7 @@ fn main() -> ExitCode {
         Some("trace") => trace(&args),
         Some("import-roomplan") => import_roomplan(&args),
         Some("roomsim-export") => roomsim_export(&args),
+        Some("roomsim-eval") => roomsim_eval::main(&args),
         _ => usage(),
     }
 }

@@ -17,6 +17,9 @@ saans-scene = { path = "../saans-scene", features = ["write"] }
 # Room Sim v1 (spec/roomsim.md), for `saans roomsim-export`. Everything it
 # produces is SIM.
 saans-roomsim = { path = "../saans-roomsim" }
+# Locate v1 on a Room Sim run, for `saans roomsim-eval` (spec/livedemo.md
+# §10): the streaming driver, the score and the records file. SIM.
+saans-locate = { path = "../saans-locate", features = ["roomsim"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # scene_sha256 in the roomsim-export manifest (the digest of the file's bytes).

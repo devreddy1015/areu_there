@@ -28,5 +28,16 @@ pub mod radius;
 #[cfg(feature = "roomsim")]
 pub mod pipeline;
 
+// The live demo (spec/livedemo.md §3.1, §8): the run variants, the
+// streaming driver, the score and the records file, behind `roomsim`.
+#[cfg(feature = "roomsim")]
+pub mod records;
+#[cfg(feature = "roomsim")]
+pub mod score;
+#[cfg(feature = "roomsim")]
+pub mod stream;
+#[cfg(feature = "roomsim")]
+pub mod variant;
+
 /// The only label Phase 4 produces.
 pub const LABEL: &str = "SIM";

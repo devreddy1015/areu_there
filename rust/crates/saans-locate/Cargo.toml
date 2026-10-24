@@ -8,13 +8,17 @@ license.workspace = true
 [features]
 # The Room Sim pipeline (spec/locate.md §10): reads scenes WITHOUT
 # saans-scene's `write` (ADR-008 decision 1; tests/boundary.rs READERS).
-roomsim = ["dep:saans-roomsim", "dep:saans-scene"]
+# The live demo's streaming driver, score and records (spec/livedemo.md
+# §8) need serde_json, with float_roundtrip for an exact records round trip.
+roomsim = ["dep:saans-roomsim", "dep:saans-scene", "dep:serde", "dep:serde_json"]
 
 [dependencies]
 saans-sim = { path = "../saans-sim" }
 saans-dsp = { path = "../saans-dsp" }
 saans-roomsim = { path = "../saans-roomsim", optional = true }
 saans-scene = { path = "../saans-scene", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", features = ["float_roundtrip"], optional = true }
 
 [dev-dependencies]
 saans-roomsim = { path = "../saans-roomsim" }

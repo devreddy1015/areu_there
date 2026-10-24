@@ -1973,6 +1973,7 @@ version = "0.1.0"
 dependencies = [
  "saans-dsp",
  "saans-health",
+ "saans-locate",
  "saans-roomsim",
  "saans-scene",
  "saans-sim",
@@ -2022,6 +2023,8 @@ dependencies = [
  "saans-roomsim",
  "saans-scene",
  "saans-sim",
+ "serde",
+ "serde_json",
  "sha2",
 ]
 

@@ -10,6 +10,10 @@
 //! - one **epoch record** per fired phone epoch (§6, §7), from the phone
 //!   module, which is simulated only (ADR-008 decision 16).
 //!
+//! [`run_roomsim`] is one [`RoomSimSetup`] and one stream of it advanced
+//! to the end in one step (spec/livedemo.md §8.1), so a stream advanced in
+//! any steps gives its records.
+//!
 //! The scene is read through `saans-scene` without `write` (ADR-008
 //! decision 1). No `Person.id` or `Phone.id` is read from the scene here:
 //! people are `people[i]` by index, so no id can reach a record, log or
@@ -41,11 +45,10 @@ use crate::measure::{
     new_csi_frame, CalibrationMode, CsiFrame, LinkMeasurement, LinkSignal, MeasurementConfig,
     RssiSignal, StaticSuppressedSignal, TotalPowerSignal,
 };
-use crate::phone::{
-    self, Blockers, BoxObj, Config, Cylinder, EpochRecord, PhoneNode, PhoneRun, TruthSample, Wall,
-};
+use crate::phone::{self, Blockers, BoxObj, Config, Cylinder, EpochRecord, PhoneNode, Wall};
 use crate::pynum::LocateError;
 use crate::radius::{publish, Outcome, Reason};
+use crate::stream::RoomSimSetup;
 use crate::track::{Tracker, TrackerConfig};
 use crate::LABEL;
 
@@ -60,9 +63,10 @@ pub enum PipelineError {
     /// The run is refused (§2, §4.1, §4.2, §4.3, §9, §10.1); `param` names
     /// the parameter: `roles`, `nodes`, `quantize`, `tx_period`, `calib_s`,
     /// `tick_hz`, `label` (a person label that is not SIM, REAL or
-    /// SIM->REAL; never echoed) or `people_posture` (a lying person on no
-    /// object, which Room Sim never produces). A §9 parameter that fails
-    /// validation or is not Room Sim's is [`PipelineError::Phone`].
+    /// SIM->REAL; never echoed), `people_posture` (a lying person on no
+    /// object, which Room Sim never produces) or `t_end` (a stream advanced
+    /// to NaN or backwards, spec/livedemo.md §8.1). A §9 parameter that
+    /// fails validation or is not Room Sim's is [`PipelineError::Phone`].
     Refused { param: &'static str, reason: String },
     /// A label other than `"SIM"` for Room Sim input (the phone is
     /// simulated only, ADR-008 decision 16). The given label is not
@@ -611,6 +615,18 @@ impl PersonLocator {
     /// Before any calibration `y` is the raw windowed variance and
     /// `null_sigma` is zero (the ported behaviour), so WLM abstains.
     pub fn tick(&mut self, t_k: f64) -> Result<(Outcome, Outcome), PipelineError> {
+        let (wlm_out, rti_out, _, _) = self.tick_values(t_k)?;
+        Ok((wlm_out, rti_out))
+    }
+
+    /// [`PersonLocator::tick`], also returning the very `y` and
+    /// `null_sigma` its WLM used, canonical order: `(wlm, rti, y,
+    /// null_sigma)`. The stream's link values come from these
+    /// (spec/livedemo.md §4 `links`, §8.1).
+    pub(crate) fn tick_values(
+        &mut self,
+        t_k: f64,
+    ) -> Result<(Outcome, Outcome, Vec<f64>, Vec<f64>), PipelineError> {
         let y = self.measurement.vector(Some(t_k));
         let null_sigma = self.measurement.baseline_std_vector();
         let wlm_out = wlm(
@@ -634,7 +650,12 @@ impl PersonLocator {
                 Some(est.confidence),
             ),
         };
-        Ok((wlm_out, rti_out))
+        Ok((wlm_out, rti_out, y, null_sigma))
+    }
+
+    /// The WLM parameters (§5) this locator's ticks use.
+    pub(crate) fn wlm_params(&self) -> &WlmParams {
+        &self.wlm
     }
 }
 
@@ -723,22 +744,6 @@ pub fn cylinders(sim: &Simulator, truth: &Truth) -> Result<Vec<Cylinder>, Pipeli
         .collect()
 }
 
-/// One §10.1 tick record at `t_k` with the given truth.
-fn tick_record(
-    person: &mut PersonLocator,
-    t_k: f64,
-    truth: &[PersonTruthRecord],
-) -> Result<TickRecord, PipelineError> {
-    let (wlm_out, rti_out) = person.tick(t_k)?;
-    Ok(TickRecord {
-        label: person.label(),
-        t: t_k,
-        wlm: wlm_out,
-        rti: rti_out,
-        truth: truth.to_vec(),
-    })
-}
-
 /// §10.1: `t_{k+1} = tick_time(window_s, tick_hz, k + 1)`, computed from
 /// `k + 1` (never accumulated), where `t_k` is tick `k`'s time. A tick
 /// that does not advance (`not (t_{k+1} > t_k)`: `float(k) / tick_hz` no
@@ -755,7 +760,8 @@ pub fn next_tick(window_s: f64, tick_hz: f64, k: u64, t_k: f64) -> Result<f64, P
     Ok(next)
 }
 
-fn truth_records(truth: &Truth) -> Vec<PersonTruthRecord> {
+/// A transmission's people as §11 tick truth, in index order.
+pub(crate) fn truth_records(truth: &Truth) -> Vec<PersonTruthRecord> {
     truth
         .people
         .iter()
@@ -791,126 +797,20 @@ pub fn run_roomsim(
     cfg: &Config,
     label: &str,
 ) -> Result<RoomSimRun, PipelineError> {
-    if label != LABEL {
-        return Err(PipelineError::Label);
-    }
-    cfg.validate()?;
-    check_roomsim_config(rs, cfg)?;
-    let cfg = &resolve_config(rs, cfg)?;
-    let sim = Simulator::new(scene, rs.clone())?;
-    let geometry = person_geometry(scene, cfg)?;
-    let rate_hz = base_rate_hz(&sim);
-    let mut person = PersonLocator::new(geometry, cfg, rate_hz, label)?;
-    check_tx_period(&sim, cfg.window_s, rate_hz, person.min_samples())?;
-    let fw = rs.fw_subcarriers;
-
-    // 1. Calibration: the same scene, config and seed, nobody in the room,
-    //    duration_s + calib_s; only its packets with t >= duration_s.
-    let calib_sim = Simulator::new(scene, calibration_config(rs, cfg.calib_s))?;
-    let mut glue_error: Option<PipelineError> = None;
-    let mut calib_packets = 0usize;
-    let calibrated = {
-        let stream = calib_sim
-            .packets()
-            .filter(|p| p.t >= rs.duration_s)
-            .filter_map(|p| match packet_frame(&p, fw, rate_hz) {
-                Ok(Some(frame)) => {
-                    calib_packets += 1;
-                    Some((p.t, p.tx, p.rx, frame))
-                }
-                Ok(None) => None,
-                Err(e) => {
-                    glue_error.get_or_insert(e);
-                    None
-                }
-            });
-        person.calibrate_from(stream)
+    let Some(setup) = RoomSimSetup::new(scene, rs, cfg, label, &mut || true)? else {
+        unreachable!("a calibration whose keep_going is always true is never abandoned");
     };
-    if let Some(e) = glue_error {
-        return Err(e);
-    }
-    calibrated?;
-    let calibration = CalibrationSummary {
-        packets: calib_packets,
-        baseline: person.measurement().baseline_vector(),
-        null_sigma: person.measurement().baseline_std_vector(),
-        calibrated_mask: person.measurement().calibrated_mask(),
-    };
-
-    // 3. The phone (when the scene has one), SIM only.
-    let mut phone_run = match scene.phone {
-        Some(_) => Some(PhoneRun::new(
-            cfg,
-            &phone_nodes(&sim),
-            &blockers(&sim),
-            label,
-        )?),
-        None => None,
-    };
-
-    // 2. The occupied run: packets in order; tick k once every packet with
-    //    t <= t_k is in.
-    let duration_s = rs.duration_s;
-    let mut ticks = Vec::new();
-    let mut epochs = Vec::new();
-    let mut k: u64 = 0;
-    let mut t_k = tick_time(cfg.window_s, cfg.tick_hz, k);
-    let mut truth_now: Vec<PersonTruthRecord> = Vec::new();
-    let mut packets = 0usize;
-    for tr in sim.run() {
-        while t_k < duration_s && t_k < tr.t {
-            ticks.push(tick_record(&mut person, t_k, &truth_now)?);
-            t_k = next_tick(cfg.window_s, cfg.tick_hz, k, t_k)?;
-            k += 1;
-        }
-        truth_now = truth_records(&tr.truth);
-        if let (Some(run), Some(p)) = (phone_run.as_mut(), tr.truth.phone) {
-            let cyl = cylinders(&sim, &tr.truth)?;
-            let sample = TruthSample {
-                t: tr.t,
-                phone: [p.x, p.y, p.z],
-                cylinders: &cyl,
-            };
-            if let Some(rec) = run.step(&sample)? {
-                epochs.push(rec);
-            }
-        }
-        for p in &tr.packets {
-            if let Some(frame) = packet_frame(p, fw, rate_hz)? {
-                person.update(p.t, p.tx, p.rx, &frame)?;
-                packets += 1;
-            }
-        }
-    }
-    while t_k < duration_s {
-        ticks.push(tick_record(&mut person, t_k, &truth_now)?);
-        t_k = next_tick(cfg.window_s, cfg.tick_hz, k, t_k)?;
-        k += 1;
-    }
-
-    let m = person.measurement();
-    let diagnostics = Diagnostics {
-        packets,
-        clock_restarts: m.clock_restarts,
-        stale_samples: m.stale_samples,
-        window_overflows: m.window_overflows,
-        blind_pixels: person.inverter().blind_pixels.len(),
-        n_independent_links: person.inverter().n_independent_links,
-    };
+    let mut stream = setup.stream()?;
+    let all = stream.advance_to(f64::INFINITY)?;
     Ok(RoomSimRun {
         label: LABEL,
-        rate_hz,
-        min_samples: person.min_samples(),
-        links: person
-            .geometry()
-            .links()
-            .iter()
-            .map(|l| (l.tx_id, l.rx_id))
-            .collect(),
-        calibration,
-        ticks,
-        epochs,
-        has_phone: scene.phone.is_some(),
-        diagnostics,
+        rate_hz: setup.rate_hz(),
+        min_samples: setup.min_samples(),
+        links: setup.links().to_vec(),
+        calibration: setup.calibration().clone(),
+        ticks: all.ticks,
+        epochs: all.epochs,
+        has_phone: setup.has_phone(),
+        diagnostics: stream.diagnostics(),
     })
 }
