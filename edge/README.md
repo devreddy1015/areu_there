@@ -23,6 +23,7 @@ edge/
 ./build.sh                # build the firmware for esp32s3
 ./build.sh menuconfig     # configure role, channel, consent, gateway
 PORT=/dev/ttyUSB0 ./build.sh flash-monitor
+SAANS_NODE_KEY=… KEY_ID=0 PORT=/dev/ttyUSB0 ./build.sh provision   # signed frames, ADR-012; see docs/HARDWARE.md
 ```
 
 Nothing needs installing beyond Docker: the toolchain lives in

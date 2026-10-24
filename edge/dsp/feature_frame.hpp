@@ -20,6 +20,11 @@
 // them relying on its own endianness. (Floats go out through their integer
 // bit pattern, which assumes float and integer byte order agree -- true on
 // x86, ARM and the ESP32-S3 alike.)
+//
+// Also FeatureFrame v2 (ADR-012, spec/wire.md §2b): the same fields, signed
+// with the node's key so a gateway can tell its frames from anyone else's,
+// with a boot counter so it can tell them from old ones. See the end of the
+// file; the HMAC is `sha256.hpp`.
 
 #pragma once
 
@@ -29,6 +34,7 @@
 #include <optional>
 
 #include "crc32.hpp"
+#include "sha256.hpp"
 
 namespace saans {
 
@@ -42,6 +48,16 @@ constexpr std::size_t kFeatureBodySize = 64;  // CRC covers bytes 0..63
 static_assert(kFeatureFrameSize == 68, "spec/wire.md §2: FeatureFrame v1 is 68 bytes");
 static_assert(kFeatureBodySize + sizeof(std::uint32_t) == kFeatureFrameSize,
               "the CRC is the last four bytes of the frame");
+
+// FeatureFrame v2 (spec/wire.md §2b): v1's bytes 0..62 with version 2,
+// key_id in v1's reserved byte, a u32 boot counter, then a 16-byte tag.
+constexpr std::uint8_t kFeatureVersionSigned = 2;
+constexpr std::size_t kSignedFrameSize = 84;
+constexpr std::size_t kSignedBodySize = 68;  // the tag covers bytes 0..67
+constexpr std::size_t kTagSize = 16;
+constexpr std::size_t kFrameKeySize = 32;
+static_assert(kSignedBodySize + kTagSize == kSignedFrameSize, "spec/wire.md §2b: 68 + 16 = 84");
+static_assert(kTagSize <= kSha256Size, "the tag is a truncated HMAC-SHA256");
 
 /// `calib_age_s` when presence calibration has never completed.
 constexpr std::uint32_t kNotCalibrated = 0xFFFFFFFFu;
@@ -202,6 +218,11 @@ inline float get_f32(const std::uint8_t* p) noexcept { return bits_f32(get_u32(p
 
 }  // namespace detail
 
+namespace detail {
+inline void encode_fields(const FeatureFrame& f, std::uint8_t version, std::uint8_t last,
+                          std::uint8_t* out) noexcept;
+}  // namespace detail
+
 /// Write one frame into a caller-provided 68-byte buffer.
 ///
 /// Byte-for-byte what `FeatureFrame.encode()` in the reference produces,
@@ -210,8 +231,18 @@ inline float get_f32(const std::uint8_t* p) noexcept { return bits_f32(get_u32(p
 /// so the gate cannot be inferred from the frame. Producers call
 /// `apply_consent_gate` first, or use `encode_feature_frame_gated`.
 inline void encode_feature_frame(const FeatureFrame& f, std::uint8_t* out) noexcept {
+    detail::encode_fields(f, f.version, 0, out);  // byte 63 is reserved, spec says 0
+    detail::put_u32(out + 64, crc32(out, kFeatureBodySize));
+}
+
+namespace detail {
+
+/// Bytes 0..63, which v1 and v2 share. The last is v1's `reserved` (0) or
+/// v2's `key_id`.
+inline void encode_fields(const FeatureFrame& f, std::uint8_t version, std::uint8_t last,
+                          std::uint8_t* out) noexcept {
     detail::put_u32(out + 0, kFeatureMagic);
-    detail::put_u8(out + 4, f.version);
+    detail::put_u8(out + 4, version);
     detail::put_u8(out + 5, f.node_id);  // the type is Python's `& 0xFF`
     detail::put_u8(out + 6, f.tx_id);
     detail::put_u8(out + 7, f.flags);
@@ -235,9 +266,10 @@ inline void encode_feature_frame(const FeatureFrame& f, std::uint8_t* out) noexc
     detail::put_u8(out + 61,
                    static_cast<std::uint8_t>(detail::clamp_i32(f.noise_floor_dbm, -128, 127)));
     detail::put_u8(out + 62, static_cast<std::uint8_t>(detail::clamp_i32(f.n_subcarriers, 0, 255)));
-    detail::put_u8(out + 63, 0);  // reserved, spec says 0
-    detail::put_u32(out + 64, crc32(out, kFeatureBodySize));
+    detail::put_u8(out + 63, last);
 }
+
+}  // namespace detail
 
 /// Gate, then encode. The one call a sender should reach for: it is not
 /// possible to forget the gate and still get bytes out of it.
@@ -262,6 +294,10 @@ enum class DecodeError : std::uint8_t {
     kBadVersion,  // not FeatureFrame v1
 };
 
+namespace detail {
+inline FeatureFrame decode_fields(const std::uint8_t* data) noexcept;
+}  // namespace detail
+
 /// Parse and validate one datagram.
 ///
 /// Order matters and matches the reference: length, then CRC, then magic, then
@@ -284,8 +320,19 @@ inline DecodeError decode_feature_frame(const std::uint8_t* data, std::size_t le
         return DecodeError::kBadVersion;
     }
 
+    out = detail::decode_fields(data);
+    // byte 63 is reserved; the spec says write 0, and says nothing about
+    // rejecting a frame that does not, so a v1.x sender that uses it stays
+    // readable here.
+    return DecodeError::kOk;
+}
+
+namespace detail {
+
+/// Every field from bytes 0..62, which v1 and v2 lay out alike.
+inline FeatureFrame decode_fields(const std::uint8_t* data) noexcept {
     FeatureFrame f;
-    f.version = version;
+    f.version = data[4];
     f.node_id = data[5];
     f.tx_id = data[6];
     f.flags = data[7];
@@ -306,12 +353,10 @@ inline DecodeError decode_feature_frame(const std::uint8_t* data, std::size_t le
     f.rssi_dbm = static_cast<std::int32_t>(static_cast<std::int8_t>(data[60]));
     f.noise_floor_dbm = static_cast<std::int32_t>(static_cast<std::int8_t>(data[61]));
     f.n_subcarriers = static_cast<std::int32_t>(data[62]);
-    // byte 63 is reserved; the spec says write 0, and says nothing about
-    // rejecting a frame that does not, so a v1.x sender that uses it stays
-    // readable here.
-    out = f;
-    return DecodeError::kOk;
+    return f;
 }
+
+}  // namespace detail
 
 /// Convenience form for code that would rather branch on a value.
 inline std::optional<FeatureFrame> decode_feature_frame(const std::uint8_t* data,
@@ -338,6 +383,92 @@ inline const char* decode_error_str(DecodeError e) noexcept {
         case DecodeError::kBadVersion: return "unsupported FeatureFrame version";
     }
     return "unknown";
+}
+
+// ---------------------------------------------------------------------------
+// FeatureFrame v2: signed (ADR-012, spec/wire.md §2b)
+// ---------------------------------------------------------------------------
+
+/// The key node `node_id` is flashed with, from a site key: HMAC-SHA256(site
+/// key, "saans frame key v1" || node_id). A node never holds a site key; this
+/// is here so the derivation can be held to the reference's golden keys.
+inline void derive_node_key(const std::uint8_t* site_key, std::uint8_t node_id,
+                            std::uint8_t* out) noexcept {
+    static constexpr char kLabel[] = "saans frame key v1";
+    HmacSha256 m(site_key, kFrameKeySize);
+    m.update(reinterpret_cast<const std::uint8_t*>(kLabel), sizeof(kLabel) - 1);
+    m.update(&node_id, 1);
+    m.finish(out);
+}
+
+namespace detail {
+
+inline void signed_tag(const std::uint8_t* node_key, const std::uint8_t* body,
+                       std::uint8_t* tag) noexcept {
+    std::uint8_t full[kSha256Size];
+    hmac_sha256(node_key, kFrameKeySize, body, kSignedBodySize, full);
+    std::memcpy(tag, full, kTagSize);
+}
+
+}  // namespace detail
+
+/// Write one signed frame (84 bytes) into `out`: the fields, `key_id`,
+/// `boot`, and the first 16 bytes of HMAC-SHA256 under `node_key` over
+/// bytes 0..67. `f.version` is ignored; the result is always version 2.
+/// Byte-for-byte `encode_signed` in the reference; the
+/// `feature_codec_signed` golden vector is the proof. Like
+/// `encode_feature_frame`, this does not apply the consent gate.
+inline void encode_signed_frame(const FeatureFrame& f, const std::uint8_t* node_key,
+                                std::uint8_t key_id, std::uint32_t boot,
+                                std::uint8_t* out) noexcept {
+    detail::encode_fields(f, kFeatureVersionSigned, key_id, out);
+    detail::put_u32(out + 64, boot);
+    detail::signed_tag(node_key, out, out + kSignedBodySize);
+}
+
+/// Gate, then sign: the one call a sender should reach for.
+inline void encode_signed_frame_gated(const FeatureFrame& f, VitalsConsent consent,
+                                      const std::uint8_t* node_key, std::uint8_t key_id,
+                                      std::uint32_t boot, std::uint8_t* out) noexcept {
+    FeatureFrame gated = f;
+    apply_consent_gate(gated, consent);
+    encode_signed_frame(gated, node_key, key_id, boot, out);
+}
+
+enum class SignedDecodeError : std::uint8_t {
+    kOk = 0,
+    kBadLength,   // not exactly 84 bytes
+    kBadMagic,    // not 0x534E4153
+    kBadVersion,  // not FeatureFrame v2
+    kBadTag,      // forged, corrupted, or signed with another key
+};
+
+/// Check, then parse, one signed frame under `node_key`: length, magic,
+/// version, then the tag in constant time, and only then the fields.
+/// Choosing the key (by the frame's `key_id` and `node_id`) and the replay
+/// floor are the receiver's (the gateway's), not this function's. `out`,
+/// `key_id` and `boot` are left untouched unless the result is `kOk`.
+inline SignedDecodeError decode_signed_frame(const std::uint8_t* data, std::size_t len,
+                                             const std::uint8_t* node_key, FeatureFrame& out,
+                                             std::uint8_t& key_id, std::uint32_t& boot) noexcept {
+    if (len != kSignedFrameSize) {
+        return SignedDecodeError::kBadLength;
+    }
+    if (detail::get_u32(data + 0) != kFeatureMagic) {
+        return SignedDecodeError::kBadMagic;
+    }
+    if (data[4] != kFeatureVersionSigned) {
+        return SignedDecodeError::kBadVersion;
+    }
+    std::uint8_t want[kTagSize];
+    detail::signed_tag(node_key, data, want);
+    if (!equal_ct(want, data + kSignedBodySize, kTagSize)) {
+        return SignedDecodeError::kBadTag;
+    }
+    out = detail::decode_fields(data);
+    key_id = data[63];
+    boot = detail::get_u32(data + 64);
+    return SignedDecodeError::kOk;
 }
 
 }  // namespace saans

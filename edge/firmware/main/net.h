@@ -9,6 +9,11 @@
 namespace saans {
 namespace net {
 
+// The default NVS partition, once; idempotent. app_main calls it before
+// anything reads NVS (telemetry's reboot count), and the WiFi bring-up below
+// calls it again for itself.
+esp_err_t nvs_init();
+
 // Brings up NVS, the event loop and WiFi. The TX role needs the radio but no
 // association (ESP-NOW is connectionless); the RX role associates so it can
 // reach the gateway over IP.

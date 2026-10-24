@@ -29,7 +29,7 @@
 # order), so nothing depends on which one invoked it.
 
 TESTS := foundation vitals preprocess gapfill_bnr feature_frame pipeline feature_extractor \
-         tdma node_config
+         tdma node_config frame_auth
 
 # ---------------------------------------------------------------------------
 

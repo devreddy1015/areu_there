@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <optional>
 
 #include "esp_log.h"
 #include "esp_task_wdt.h"
@@ -15,6 +16,7 @@
 #include "freertos/task.h"
 
 #include "csi_capture.h"
+#include "frame_auth.h"
 #include "net.h"
 #include "roles.h"
 #include "saans_config.h"
@@ -55,6 +57,7 @@ using Extractor =
 // larger than the object, for no benefit.
 Extractor  g_extractor;
 std::uint8_t g_wire[kFeatureFrameSize];
+std::uint8_t g_wire_signed[kSignedFrameSize];
 
 void log_startup_expectations() {
     // Five periods of the presence band's low edge, which is how the DSP
@@ -150,6 +153,10 @@ void run_rx_role() {
         }
     }
 
+    // Before the first frame: this advances and commits the boot counter
+    // the frames of this boot are signed with (ADR-012).
+    const std::optional<frame_auth::Key> key = frame_auth::load();
+
     ESP_ERROR_CHECK(csi::start());
     log_startup_expectations();
 
@@ -166,6 +173,7 @@ void run_rx_role() {
     std::uint8_t raw[csi::kRawHeaderSize + 2 * cfg::kNSubcarriers];
     const std::uint32_t freq_mhz = csi::channel_to_mhz(cfg::kWifiChannel);
     ESP_LOGW(kTag, "raw mode ON — raw CSI is leaving this node (flagged in every frame)");
+    ESP_LOGW(kTag, "raw CSI is never signed: a gateway with [[frame_key]] refuses it");
 #endif
 
     for (;;) {
@@ -197,11 +205,19 @@ void run_rx_role() {
                                               frame.noise_floor_dbm);
 
             for (const FeatureFrame& f : out) {
-                // encode() applies the consent gate as a backstop before
+                // Both encoders apply the consent gate as a backstop before
                 // writing bytes, so there is no path from here to the wire that
-                // skips it.
-                g_extractor.encode(f, g_wire);
-                if (net::udp_send(g_wire, sizeof(g_wire)) == ESP_OK) {
+                // skips it. Signed when a key is provisioned, never both.
+                esp_err_t sent;
+                if (key) {
+                    g_extractor.encode_signed(f, key->node_key, key->key_id, key->boot,
+                                              g_wire_signed);
+                    sent = net::udp_send(g_wire_signed, sizeof(g_wire_signed));
+                } else {
+                    g_extractor.encode(f, g_wire);
+                    sent = net::udp_send(g_wire, sizeof(g_wire));
+                }
+                if (sent == ESP_OK) {
                     ++emitted;
                 } else {
                     ++send_failures;
@@ -232,6 +248,12 @@ void run_rx_role() {
                      static_cast<unsigned long>(emitted),
                      static_cast<unsigned long>(csi::dropped()),
                      static_cast<unsigned long>(send_failures));
+            if (!key) {
+                // Every report, not once at boot: a gateway with frame keys
+                // refuses these frames, and from there this node looks dead.
+                ESP_LOGW(kTag, "frames are UNSIGNED (no key provisioned): a gateway with "
+                               "[[frame_key]] refuses them (ADR-012)");
+            }
 
             // WHAT THE RADIO IS ACTUALLY DELIVERING. The DSP is compiled for
             // a fixed subcarrier count on the assumption that these frames

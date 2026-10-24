@@ -23,7 +23,7 @@ how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 | [009](009-static-copy.md) | The site is also published as a static copy that says it has no gateway behind it | 2026-10-14 | yes |
 | [010](010-audit-retention.md) | The audit log is kept for a year, then deleted | 2026-10-19 | yes, 2026-10-24 |
 | [011](011-multi-site.md) | One gateway per site; a hosted control plane is ruled out | 2026-10-19 | **no** — and nothing is scheduled |
-| [012](012-authenticated-frames.md) | FeatureFrame v2: frames signed with a per-node key, and a counter the gateway will not accept twice | 2026-10-24 | **no** — Python reference, golden vectors and the gateway done; the C++ node and firmware to come (NEXT.md §1.11) |
+| [012](012-authenticated-frames.md) | FeatureFrame v2: frames signed with a per-node key, and a counter the gateway will not accept twice | 2026-10-24 | yes, 2026-10-24, in all three implementations; the firmware builds but has not run on a board |
 
 Writing a new one: copy the shape of the existing files — title line,
 `**Status:**` with a date, then Context, Decision, Consequences — and

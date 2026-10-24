@@ -45,6 +45,7 @@
 // its own frames exactly.
 //
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -567,6 +568,35 @@ void run_set(Report& rep, const char* name, bool expect_private) {
 
     if (expect_private) {
         check_privacy_gate(rep, got);
+    }
+
+    // The signed encoder (ADR-012) sits behind the same consent gate as the
+    // unsigned one: every frame's bytes 0..62 agree but for the version, and
+    // a frame carrying vitals it should not is cleared before it is signed.
+    {
+        std::uint8_t key[saans::kFrameKeySize];
+        std::memset(key, 0x5a, sizeof key);
+        std::size_t differ = 0;
+        for (const saans::FeatureFrame& f : got) {
+            std::uint8_t v1[saans::kFeatureFrameSize];
+            std::uint8_t v2[saans::kSignedFrameSize];
+            g_fx.encode(f, v1);
+            g_fx.encode_signed(f, key, 1, 7, v2);
+            if (std::memcmp(v1, v2, 4) != 0 || std::memcmp(v1 + 5, v2 + 5, 58) != 0) {
+                ++differ;
+            }
+        }
+        saans::FeatureFrame leaky = got.empty() ? saans::FeatureFrame{} : got.back();
+        leaky.breathing_bpm = 17.25f;
+        leaky.flags = static_cast<std::uint8_t>(leaky.flags | saans::kFlagBreathingValid);
+        std::uint8_t v2[saans::kSignedFrameSize];
+        g_fx.encode_signed(leaky, key, 1, 7, v2);
+        const bool withheld = saans::detail::get_u32(v2 + 36) == 0u &&
+                              (v2[7] & saans::kFlagBreathingValid) == 0;
+        rep.truth("encode_signed gates as encode does",
+                  differ == 0 && withheld == expect_private,
+                  std::to_string(differ) + " frames differ; a forced breathing rate " +
+                      (withheld ? "was withheld" : "went out") + ", as consent says");
     }
 
     // The template parameters are a RAM budget, not a behaviour. A tightly
