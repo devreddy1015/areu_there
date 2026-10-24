@@ -384,6 +384,23 @@ checklist in `COMPLETION_REPORT.md` §6 into Playwright, and the brief's
 exit gate is specific: breaking the "not shown to your role" label makes
 it fail. Both are deployability, not accuracy.
 
+**A3 (MQTT) done**, on branch `saans/mqtt`. `mqtt.rs` publishes the
+§10.2 topic set from the privacy-filtered stream, with everything but
+the vitals topic filtered as the `occupancy` role. Two deviations from
+§10.2, both now written there: no occupancy `confidence` (the fusion
+computes none, and the events' 0.6 / 0.8 / 0.9 is a heuristic lookup on
+links usable; the payload carries that count instead), and a password or
+vitals only to a broker on the same machine (rumqttc is built without
+TLS). Tests run against an embedded rumqttd; each of five deliberate
+breakages (a blocking reconnect sleep, vitals without the consent check,
+no last will, no republish on reconnect, events filtered as admin) fails
+one. "Ingest unchanged" is measured against the same config with the
+broker up (~0.44 s for 1200 ticks either way), not against no MQTT at
+all: publishing has a cost of its own (~0.15 s per 1200 ticks, debug
+build), because the core only builds the output stream when something
+consumes it. Not yet run against Home Assistant itself; the exit gate
+used `examples/mqtt_watch.rs` as the subscriber. A4 is next.
+
 ### 1.10 The basic things
 
 Each is small. Each has cost someone time in this project already.

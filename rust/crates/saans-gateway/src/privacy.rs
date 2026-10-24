@@ -41,6 +41,22 @@ pub fn redact_value(v: &mut Value, vitals: bool) {
     }
 }
 
+/// The vitals-derived top-level keys of a published space state, and
+/// nothing else: the complement of [`redact_value`], by the same key test.
+/// For outputs that keep vital signs apart from occupancy (the MQTT
+/// `vitals` topic). Consent is the caller's to check; for a space without
+/// it the state has no such keys and this returns an empty map.
+pub fn vitals_only(v: &Value) -> serde_json::Map<String, Value> {
+    match v {
+        Value::Object(m) => m
+            .iter()
+            .filter(|(k, _)| mentions_vitals(k))
+            .map(|(k, x)| (k.clone(), x.clone()))
+            .collect(),
+        _ => serde_json::Map::new(),
+    }
+}
+
 /// Whether an event (serialized, with its `type` tag) may be shown for a
 /// space with the given vitals setting.
 pub fn event_allowed(event: &Value, vitals: bool) -> bool {

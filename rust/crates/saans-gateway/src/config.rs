@@ -424,11 +424,32 @@ impl GatewayConfig {
             }
             check_spaces(&format!("token {:?}", t.name), &t.spaces)?;
         }
-        if self.mqtt.is_some() {
-            // `mqtt::spawn` is still a stub. Accepting the section would
-            // mean --check passes and the process then panics on startup,
-            // which is worse than refusing it here.
-            return err("[mqtt] is configured but the MQTT publisher is not implemented yet; remove the section");
+        if let Some(m) = &self.mqtt {
+            if m.host.is_empty() || m.client_id.is_empty() {
+                return err("mqtt.host and mqtt.client_id must not be empty");
+            }
+            let b = &m.base_topic;
+            if b.split('/').any(str::is_empty) || b.contains(['+', '#', '\0']) {
+                return err(format!(
+                    "mqtt.base_topic {b:?} must be '/'-separated non-empty levels with no + or # and no leading or trailing '/'"
+                ));
+            }
+            match (&m.username, &m.password_env) {
+                (None, Some(_)) => return err("mqtt.password_env is set but mqtt.username is not"),
+                (_, Some(v)) if v.is_empty() => return err("mqtt.password_env is empty"),
+                _ => {}
+            }
+            // rumqttc is built without TLS: the connection is plain TCP.
+            let local = m.host == "localhost"
+                || m.host
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|a| a.is_loopback());
+            if !local && (m.password_env.is_some() || m.vitals_topics) {
+                return err(format!(
+                    "mqtt: the broker connection is plain TCP (no TLS in this build), so a password or vitals_topics may only go to a broker on this machine, not {:?}; run a local broker and bridge it over TLS",
+                    m.host
+                ));
+            }
         }
         let h = &self.history;
         if !(h.window_s > 0.0 && h.window_s <= crate::history::MAX_WINDOW_S) {
@@ -591,12 +612,17 @@ mod tests {
         let start = text
             .find("# [telegram.wardens]")
             .expect("the example has an alert block");
+        // Up to the next section's rule line.
+        let end = text[start..]
+            .find("\n# ---")
+            .map_or(text.len(), |i| start + i);
         let live: String = text[..start].to_string()
-            + &text[start..]
+            + &text[start..end]
                 .lines()
                 .map(|l| l.strip_prefix("# ").unwrap_or(l))
                 .collect::<Vec<_>>()
-                .join("\n");
+                .join("\n")
+            + &text[end..];
         let cfg = GatewayConfig::from_toml(&live).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(cfg.alert_routes.len(), 1);
         assert_eq!(
@@ -604,6 +630,73 @@ mod tests {
             vec!["webhook:pager".to_string()]
         );
         assert!(!cfg.alert_routes[0].include_health_details);
+    }
+
+    #[test]
+    fn the_commented_mqtt_example_is_a_valid_config() {
+        let text = include_str!("../saans.example.toml");
+        let start = text
+            .find("# [mqtt]")
+            .expect("the example has an MQTT block");
+        let live: String = text[..start].to_string()
+            + &text[start..]
+                .lines()
+                .map(|l| l.strip_prefix("# ").unwrap_or(l))
+                .collect::<Vec<_>>()
+                .join("\n");
+        let cfg = GatewayConfig::from_toml(&live).unwrap_or_else(|e| panic!("{e}"));
+        let m = cfg.mqtt.expect("[mqtt] parsed");
+        assert_eq!((m.base_topic.as_str(), m.port), ("saans/v1", 1883));
+        assert!(m.homeassistant_discovery && !m.vitals_topics);
+    }
+
+    #[test]
+    fn mqtt_refuses_secrets_and_vitals_over_the_network_and_bad_topics() {
+        let check = |mqtt: &str| {
+            GatewayConfig::from_toml(&format!(
+                "[[space]]\nid = \"a\"\nlinks = [{{ rx = 1, tx = 2 }}]\n[mqtt]\n{mqtt}\n"
+            ))
+            .map(|_| ())
+            .map_err(|e| e.0)
+        };
+        assert_eq!(check(""), Ok(()));
+        assert_eq!(
+            check("host = \"broker.campus\""),
+            Ok(()),
+            "occupancy alone may cross the LAN"
+        );
+        for ok in [
+            "host = \"localhost\"",
+            "host = \"::1\"",
+            "host = \"127.0.0.1\"",
+        ] {
+            assert_eq!(
+                check(&format!(
+                    "{ok}\nusername = \"u\"\npassword_env = \"P\"\nvitals_topics = true"
+                )),
+                Ok(())
+            );
+        }
+        for (bad, why) in [
+            (
+                "host = \"10.0.0.5\"\nusername = \"u\"\npassword_env = \"P\"",
+                "plain TCP",
+            ),
+            (
+                "host = \"broker.campus\"\nvitals_topics = true",
+                "plain TCP",
+            ),
+            ("password_env = \"P\"", "username"),
+            ("username = \"u\"\npassword_env = \"\"", "empty"),
+            ("base_topic = \"saans/#\"", "base_topic"),
+            ("base_topic = \"/saans\"", "base_topic"),
+            ("base_topic = \"saans//v1\"", "base_topic"),
+            ("base_topic = \"\"", "base_topic"),
+            ("client_id = \"\"", "client_id"),
+        ] {
+            let e = check(bad).expect_err(bad);
+            assert!(e.contains(why), "{bad}: {e}");
+        }
     }
 
     #[test]
