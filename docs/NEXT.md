@@ -141,6 +141,13 @@ margin on both sides.
 
 ### 1.3 The double-rate breathing failure, which the gate does not catch
 
+**Done** (part a), on branch `saans/octave`: the cross-link octave rule
+in fusion. Doubled readings 6.9% → 3.4% with one link in a null, 25.2% →
+16.5% with both, 1.1% → 0.2% with both clear; no class made worse,
+coverage unchanged. Full table and its caveats in `NOTES.md` §10. Part
+(b), a single-link signal, stays unbuilt: the simulator cannot represent
+what it would need, so it waits for real recordings.
+
 **Redesigned before building, 2026-10-24.** The single-link guard
 described below cannot work in this simulator, and finding that out by
 reading the code first is the reason to read the code first.

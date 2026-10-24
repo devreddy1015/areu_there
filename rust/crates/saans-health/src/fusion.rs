@@ -6,7 +6,9 @@
 //! nothing in the subcarrier domain rescues it. A second link at another
 //! angle almost never shares the blind spot. So presence is a vote across
 //! links and breathing comes from whichever link currently sees it best,
-//! with hysteresis so the source does not flap between near-equals.
+//! with hysteresis so the source does not flap between near-equals -- after
+//! first setting aside any link reading twice another's rate, because a
+//! null doubles a rate and nothing halves one (the octave rule, NOTES §10).
 
 use crate::types::{Breathing, LinkId, Rate, SpaceConfig, SpaceSample};
 use saans_dsp::features::{
@@ -24,6 +26,9 @@ pub const MIN_RATE_VITALS_HZ: f64 = 10.0;
 pub const MAX_LOSS_VITALS: f64 = 0.20;
 /// Switch the breathing source only for a clearly better link.
 pub const SWITCH_MARGIN: f64 = 0.10;
+/// Two links whose rates differ by 2:1 to within this are an octave pair.
+/// The same definition `evaluate.py` uses for a "2x rate" reading.
+const OCTAVE_TOL_BPM: f64 = 1.0;
 
 #[derive(Debug, Clone)]
 pub struct LinkTrack {
@@ -177,6 +182,25 @@ impl SpaceFusion {
                 .values()
                 .filter(|l| l.vitals_usable(t_s) && l.last.unwrap().flag(FLAG_BREATHING_VALID))
                 .collect();
+            // The octave rule. At a Fresnel null a link's amplitude follows
+            // the square of chest displacement, so a breather at f reads as
+            // 2f -- often at high confidence, because sin^2 is a clean tone.
+            // Nothing in the physics turns f into f/2. So when one link's
+            // rate is twice another's, the higher one is the null and is
+            // set aside, however confident it is, and hysteresis does not
+            // keep it. The lowest rate in any chain of octaves always
+            // survives, so this never empties the candidates. One link
+            // alone has nothing to compare against and is left as it is.
+            let bpm = |l: &LinkTrack| l.last.unwrap().breathing_bpm as f64;
+            let candidates: Vec<&LinkTrack> = candidates
+                .iter()
+                .filter(|l| {
+                    !candidates
+                        .iter()
+                        .any(|o| o.link != l.link && (bpm(l) - 2.0 * bpm(o)).abs() < OCTAVE_TOL_BPM)
+                })
+                .copied()
+                .collect();
             let best = candidates
                 .iter()
                 .filter(|l| l.last.unwrap().breathing_conf.is_finite())
@@ -295,6 +319,67 @@ mod tests {
             Some(false),
             "one wall-leaking link must not outvote two"
         );
+    }
+
+    fn at(bpm: f32, conf: f32) -> FeatureFrame {
+        FeatureFrame {
+            breathing_bpm: bpm,
+            ..frame(true, conf, 20.0)
+        }
+    }
+
+    #[test]
+    fn two_links_at_two_to_one_take_the_lower_rate() {
+        // A link at a Fresnel null reads a breather at f as 2f, often at
+        // high confidence. Nothing turns f into f/2. So the doubled link
+        // loses even though it is the more confident one.
+        let mut s = space(2);
+        let (null, clear) = (LinkId { rx: 0, tx: 9 }, LinkId { rx: 1, tx: 9 });
+        s.ingest(null, at(24.0, 0.95), 1.0);
+        s.ingest(clear, at(12.2, 0.60), 1.0);
+        let br = s.sample(1.1).breathing.unwrap();
+        assert_eq!(br.link, clear);
+        assert!((br.bpm - 12.2).abs() < 1e-4);
+    }
+
+    #[test]
+    fn the_octave_rule_overrides_hysteresis() {
+        // Hysteresis keeps the source from flapping between near-equals.
+        // A doubled reading is not a near-equal; staying on it out of
+        // inertia would keep reporting the wrong rate.
+        let mut s = space(2);
+        let (a, b) = (LinkId { rx: 0, tx: 9 }, LinkId { rx: 1, tx: 9 });
+        s.ingest(a, at(12.0, 0.90), 1.0);
+        s.ingest(b, at(12.1, 0.50), 1.0);
+        assert_eq!(s.sample(1.1).breathing.unwrap().link, a);
+        s.ingest(a, at(24.2, 0.95), 1.5);
+        assert_eq!(s.sample(1.6).breathing.unwrap().link, b);
+    }
+
+    #[test]
+    fn disagreements_that_are_not_an_octave_are_left_to_confidence() {
+        // 18 vs 12 is 3:2. No physical mechanism makes that, so the rule
+        // has no business taking a side; the more confident link wins.
+        let mut s = space(2);
+        let (a, b) = (LinkId { rx: 0, tx: 9 }, LinkId { rx: 1, tx: 9 });
+        s.ingest(a, at(18.0, 0.90), 1.0);
+        s.ingest(b, at(12.0, 0.60), 1.0);
+        assert_eq!(s.sample(1.1).breathing.unwrap().link, a);
+        // Just outside the 1 BPM window around 2x: 25.1 vs 12.0.
+        let mut s = space(2);
+        s.ingest(a, at(25.1, 0.90), 1.0);
+        s.ingest(b, at(12.0, 0.60), 1.0);
+        assert_eq!(s.sample(1.1).breathing.unwrap().link, a);
+    }
+
+    #[test]
+    fn a_single_link_is_never_second_guessed() {
+        // With one link there is nothing to compare against. A doubled
+        // reading on its own is indistinguishable from fast breathing,
+        // and the rule does not pretend otherwise.
+        let mut s = space(1);
+        s.ingest(LinkId { rx: 0, tx: 9 }, at(24.0, 0.95), 1.0);
+        assert!((s.sample(1.1).breathing.unwrap().bpm - 24.0).abs() < 1e-4);
     }
 
     #[test]

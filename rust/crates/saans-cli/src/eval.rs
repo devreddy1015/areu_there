@@ -92,6 +92,9 @@ pub fn layouts() -> Vec<Layout> {
 /// rates, pause times). The simulator has its own for physics noise.
 pub struct Lcg(u64);
 impl Lcg {
+    pub fn new(seed: u64) -> Self {
+        Lcg(seed)
+    }
     fn next(&mut self) -> f64 {
         self.0 = self
             .0
@@ -99,15 +102,15 @@ impl Lcg {
             .wrapping_add(1442695040888963407);
         (self.0 >> 11) as f64 / (1u64 << 53) as f64
     }
-    fn range(&mut self, lo: f64, hi: f64) -> f64 {
+    pub fn range(&mut self, lo: f64, hi: f64) -> f64 {
         lo + (hi - lo) * self.next()
     }
-    fn seat(&mut self) -> Point {
+    pub fn seat(&mut self) -> Point {
         (self.range(0.8, 5.2), self.range(0.8, 4.2))
     }
 }
 
-const LEAD_IN_S: f64 = 100.0; // filter warmup 50 s + calibration 30 s + margin
+pub const LEAD_IN_S: f64 = 100.0; // filter warmup 50 s + calibration 30 s + margin
 
 fn seg(duration_s: f64, activity: Activity) -> Segment {
     Segment {

@@ -17,7 +17,7 @@ how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 | [003](003-float32-edge-f64-gateway.md) | float32 on the edge, f64 on the gateway, with the tolerances that follow | 2026-10-13 | yes |
 | [004](004-featureframe-v1.md) | FeatureFrame v1 wire format | 2026-10-13 | yes |
 | [005](005-advisory-consented-abstaining.md) | Health outputs are advisory, consented per space, allowed to abstain, and carry no identities | 2026-10-13 | yes |
-| [006](006-link-diversity.md) | Link diversity over subcarrier selection for blind spots | 2026-10-13 | in code; its own consequences require a 1/2/3-link measurement, sim then hardware, not yet done |
+| [006](006-link-diversity.md) | Link diversity over subcarrier selection for blind spots; amended 2026-10-24 with the octave rule | 2026-10-13 | in code; its own consequences require a 1/2/3-link measurement, sim then hardware, not yet done |
 | [007](007-no-learned-models-yet.md) | No learned models until the DSP ceiling is measured on real data | 2026-10-13 | n/a — a prohibition |
 | [008](008-one-origin.md) | The site and the dashboard are one server | 2026-10-14 | yes |
 | [009](009-static-copy.md) | The site is also published as a static copy that says it has no gateway behind it | 2026-10-14 | yes |
