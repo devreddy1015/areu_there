@@ -1,0 +1,79 @@
+{
+ "name": "localize_weights_office",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/office.json",
+  "scene_sha256": "f675736f83b55f8304e5e29ff6c0d2d6c0c24d89ff8bab1c0e665d72caa92a43",
+  "room_w": 6.0,
+  "room_h": 5.0,
+  "pitch_m": 0.5,
+  "lambda_m": 0.3,
+  "n_x": 12,
+  "n_y": 10,
+  "n_nodes": 6,
+  "n_links": 30,
+  "n_pixels": 120,
+  "nnz": 768,
+  "n_blind": 0,
+  "min_boundary_margin": 0.0014753818545292785,
+  "cmp.blind_pixels": "exact",
+  "cmp.link_len": "rule",
+  "cmp.link_rx": "exact",
+  "cmp.link_tx": "exact",
+  "cmp.link_w": "rule",
+  "cmp.node_id": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.pixel_link_counts": "exact",
+  "cmp.support_idx": "exact",
+  "cmp.support_len": "exact"
+ },
+ "arrays": {
+  "node_id": [
+   "localize_weights_office__node_id.f64",
+   6
+  ],
+  "node_x": [
+   "localize_weights_office__node_x.f64",
+   6
+  ],
+  "node_y": [
+   "localize_weights_office__node_y.f64",
+   6
+  ],
+  "link_tx": [
+   "localize_weights_office__link_tx.f64",
+   30
+  ],
+  "link_rx": [
+   "localize_weights_office__link_rx.f64",
+   30
+  ],
+  "link_len": [
+   "localize_weights_office__link_len.f64",
+   30
+  ],
+  "link_w": [
+   "localize_weights_office__link_w.f64",
+   30
+  ],
+  "support_len": [
+   "localize_weights_office__support_len.f64",
+   30
+  ],
+  "support_idx": [
+   "localize_weights_office__support_idx.f64",
+   768
+  ],
+  "pixel_link_counts": [
+   "localize_weights_office__pixel_link_counts.f64",
+   120
+  ],
+  "blind_pixels": [
+   "localize_weights_office__blind_pixels.f64",
+   0
+  ]
+ }
+}

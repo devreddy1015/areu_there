@@ -46,6 +46,16 @@ jobs:
         working-directory: rust
       - run: cargo test -p saans-roomsim --locked
         working-directory: rust
+      # saans-locate by itself (spec/locate.md, Rules), for the same
+      # reason: standalone, these prove it builds and passes without
+      # saans-scene's `write`. Its Room Sim pipeline is compiled only with
+      # its `roomsim` feature, named here rather than --all-features.
+      - run: cargo check -p saans-locate --locked
+        working-directory: rust
+      - run: cargo test -p saans-locate --locked
+        working-directory: rust
+      - run: cargo test -p saans-locate --features roomsim --locked
+        working-directory: rust
 
   python:
     name: Python reference (unittest)

@@ -1,0 +1,83 @@
+{
+ "name": "localize_rankstarved",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "room_w": 8.0,
+  "room_h": 6.0,
+  "n_nodes": 12,
+  "inset_m": 0.1,
+  "pitch_m": 2.0,
+  "lambda_m": 0.3,
+  "sigma": 1.0,
+  "delta_c": 0.5,
+  "n_links": 132,
+  "n_pixels": 12,
+  "n_independent_links": 51,
+  "n_cases": 11,
+  "min_boundary_margin": 0.011112822452897408,
+  "cmp.c_alpha": "input",
+  "cmp.c_asymmetry": "le:1e-07",
+  "cmp.c_check": "input",
+  "cmp.c_code": "exact",
+  "cmp.c_has_residual": "exact",
+  "cmp.c_mean_diag_a": "rule:each",
+  "cmp.c_min_diag_a": "rule:each",
+  "cmp.c_residual": "le:c_residual_tol",
+  "cmp.c_residual_tol": "input",
+  "cmp.group_idx": "exact",
+  "cmp.group_len": "exact",
+  "cmp.group_scale": "rule"
+ },
+ "arrays": {
+  "c_alpha": [
+   "localize_rankstarved__c_alpha.f64",
+   11
+  ],
+  "c_residual_tol": [
+   "localize_rankstarved__c_residual_tol.f64",
+   11
+  ],
+  "c_check": [
+   "localize_rankstarved__c_check.f64",
+   11
+  ],
+  "c_code": [
+   "localize_rankstarved__c_code.f64",
+   11
+  ],
+  "c_has_residual": [
+   "localize_rankstarved__c_has_residual.f64",
+   11
+  ],
+  "c_residual": [
+   "localize_rankstarved__c_residual.f64",
+   11
+  ],
+  "c_mean_diag_a": [
+   "localize_rankstarved__c_mean_diag_a.f64",
+   11
+  ],
+  "c_min_diag_a": [
+   "localize_rankstarved__c_min_diag_a.f64",
+   11
+  ],
+  "c_asymmetry": [
+   "localize_rankstarved__c_asymmetry.f64",
+   11
+  ],
+  "group_len": [
+   "localize_rankstarved__group_len.f64",
+   51
+  ],
+  "group_idx": [
+   "localize_rankstarved__group_idx.f64",
+   132
+  ],
+  "group_scale": [
+   "localize_rankstarved__group_scale.f64",
+   51
+  ]
+ }
+}

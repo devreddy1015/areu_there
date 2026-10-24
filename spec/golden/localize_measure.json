@@ -1,0 +1,505 @@
+{
+ "name": "localize_measure",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "n_links": 6,
+  "n_sub": 8,
+  "sample_rate_hz": 10.0,
+  "room_w": 4.0,
+  "room_h": 3.0,
+  "pitch_m": 0.5,
+  "lambda_m": 0.3,
+  "node_x": "0.2,3.8,2.0",
+  "node_y": "0.2,0.2,2.8",
+  "min_windows": 10,
+  "n_calib": 700,
+  "n_occ": 737,
+  "n_queries": 25,
+  "n_variants": 8,
+  "variants": "tp,ss,rs,tpn,rsn,rsc,rsm,given",
+  "tp_min_samples": 5,
+  "tp_is_calibrated": 1,
+  "tp_window_s": 1.0,
+  "tp_signal": 1,
+  "tp_mode": "subtract",
+  "tp_clamp_negative": 0,
+  "tp_set_baseline": 0,
+  "ss_min_samples": 5,
+  "ss_is_calibrated": 1,
+  "ss_window_s": 1.0,
+  "ss_signal": 2,
+  "ss_mode": "subtract",
+  "ss_clamp_negative": 0,
+  "ss_set_baseline": 0,
+  "rs_min_samples": 5,
+  "rs_is_calibrated": 1,
+  "rs_window_s": 1.0,
+  "rs_signal": 0,
+  "rs_mode": "subtract",
+  "rs_clamp_negative": 0,
+  "rs_set_baseline": 0,
+  "tpn_min_samples": 5,
+  "tpn_is_calibrated": 1,
+  "tpn_window_s": 1.0,
+  "tpn_signal": 1,
+  "tpn_mode": "normalize",
+  "tpn_clamp_negative": 0,
+  "tpn_set_baseline": 0,
+  "rsn_min_samples": 5,
+  "rsn_is_calibrated": 1,
+  "rsn_window_s": 1.0,
+  "rsn_signal": 0,
+  "rsn_mode": "normalize",
+  "rsn_clamp_negative": 0,
+  "rsn_set_baseline": 0,
+  "rsc_min_samples": 5,
+  "rsc_is_calibrated": 1,
+  "rsc_window_s": 1.0,
+  "rsc_signal": 0,
+  "rsc_mode": "subtract",
+  "rsc_clamp_negative": 1,
+  "rsc_set_baseline": 0,
+  "rsm_min_samples": 4,
+  "rsm_is_calibrated": 1,
+  "rsm_window_s": 0.75,
+  "rsm_signal": 0,
+  "rsm_mode": "subtract",
+  "rsm_clamp_negative": 0,
+  "rsm_set_baseline": 0,
+  "given_min_samples": 5,
+  "given_is_calibrated": 1,
+  "given_window_s": 1.0,
+  "given_signal": 1,
+  "given_mode": "subtract",
+  "given_clamp_negative": 0,
+  "given_set_baseline": 1,
+  "n_err": 13,
+  "err.0": "LinkMeasurement(geometry, window_s=0.0, sample_rate_hz=10.0)",
+  "err.1": "LinkMeasurement(geometry, sample_rate_hz=0.0)",
+  "err.2": "LinkMeasurement(geometry, sample_rate_hz=10.0, min_samples=1)",
+  "err.3": "LinkMeasurement(geometry, sample_rate_hz=10.0, calibration_mode='median')",
+  "err.4": "update(0.0, 0, 0, frame)",
+  "err.5": "update(0.0, 0, 7, frame)",
+  "err.6": "set_baseline([0.1] * 5)",
+  "err.7": "set_baseline([0.1] * 5 + [-0.1])",
+  "err.8": "set_baseline([0.1] * 5 + [nan])",
+  "err.9": "set_baseline([0.1] * 6, [0.1] * 5)",
+  "err.10": "calibrate_from(empty stream)",
+  "err.11": "CsiFrame([1.0, 2.0], [0.0], 0, 10.0)",
+  "err.12": "CsiFrame([1.0], [0.0], 0, 0.0)",
+  "cmp.c_amp": "input",
+  "cmp.c_rssi": "input",
+  "cmp.c_rx": "input",
+  "cmp.c_seq": "input",
+  "cmp.c_t": "input",
+  "cmp.c_tx": "input",
+  "cmp.err_code": "exact",
+  "cmp.given_baseline": "rule",
+  "cmp.given_baseline_raw_std": "rule",
+  "cmp.given_baseline_std": "rule",
+  "cmp.given_calibrated_mask": "exact",
+  "cmp.given_counters": "exact",
+  "cmp.given_counts": "exact",
+  "cmp.given_ready": "exact",
+  "cmp.given_vector": "rule:6",
+  "cmp.input_baseline": "input",
+  "cmp.input_baseline_std": "input",
+  "cmp.o_amp": "input",
+  "cmp.o_rssi": "input",
+  "cmp.o_rx": "input",
+  "cmp.o_seq": "input",
+  "cmp.o_t": "input",
+  "cmp.o_tx": "input",
+  "cmp.q_after": "input",
+  "cmp.q_has_t": "input",
+  "cmp.q_t": "input",
+  "cmp.rs_baseline": "rule",
+  "cmp.rs_baseline_raw_std": "rule",
+  "cmp.rs_baseline_std": "rule",
+  "cmp.rs_calibrated_mask": "exact",
+  "cmp.rs_counters": "exact",
+  "cmp.rs_counts": "exact",
+  "cmp.rs_ready": "exact",
+  "cmp.rs_vector": "rule:6",
+  "cmp.rsc_baseline": "rule",
+  "cmp.rsc_baseline_raw_std": "rule",
+  "cmp.rsc_baseline_std": "rule",
+  "cmp.rsc_calibrated_mask": "exact",
+  "cmp.rsc_counters": "exact",
+  "cmp.rsc_counts": "exact",
+  "cmp.rsc_ready": "exact",
+  "cmp.rsc_vector": "rule:6",
+  "cmp.rsm_baseline": "rule",
+  "cmp.rsm_baseline_raw_std": "rule",
+  "cmp.rsm_baseline_std": "rule",
+  "cmp.rsm_calibrated_mask": "exact",
+  "cmp.rsm_counters": "exact",
+  "cmp.rsm_counts": "exact",
+  "cmp.rsm_ready": "exact",
+  "cmp.rsm_vector": "rule:6",
+  "cmp.rsn_baseline": "rule",
+  "cmp.rsn_baseline_raw_std": "rule",
+  "cmp.rsn_baseline_std": "rule",
+  "cmp.rsn_calibrated_mask": "exact",
+  "cmp.rsn_counters": "exact",
+  "cmp.rsn_counts": "exact",
+  "cmp.rsn_ready": "exact",
+  "cmp.rsn_vector": "rule:6",
+  "cmp.ss_baseline": "rule",
+  "cmp.ss_baseline_raw_std": "rule",
+  "cmp.ss_baseline_std": "rule",
+  "cmp.ss_calibrated_mask": "exact",
+  "cmp.ss_counters": "exact",
+  "cmp.ss_counts": "exact",
+  "cmp.ss_ready": "exact",
+  "cmp.ss_vector": "rule:6",
+  "cmp.tp_baseline": "rule",
+  "cmp.tp_baseline_raw_std": "rule",
+  "cmp.tp_baseline_std": "rule",
+  "cmp.tp_calibrated_mask": "exact",
+  "cmp.tp_counters": "exact",
+  "cmp.tp_counts": "exact",
+  "cmp.tp_ready": "exact",
+  "cmp.tp_vector": "rule:6",
+  "cmp.tpn_baseline": "rule",
+  "cmp.tpn_baseline_raw_std": "rule",
+  "cmp.tpn_baseline_std": "rule",
+  "cmp.tpn_calibrated_mask": "exact",
+  "cmp.tpn_counters": "exact",
+  "cmp.tpn_counts": "exact",
+  "cmp.tpn_ready": "exact",
+  "cmp.tpn_vector": "rule:6"
+ },
+ "arrays": {
+  "c_t": [
+   "localize_measure__c_t.f64",
+   700
+  ],
+  "c_tx": [
+   "localize_measure__c_tx.f64",
+   700
+  ],
+  "c_rx": [
+   "localize_measure__c_rx.f64",
+   700
+  ],
+  "c_seq": [
+   "localize_measure__c_seq.f64",
+   700
+  ],
+  "c_rssi": [
+   "localize_measure__c_rssi.f64",
+   700
+  ],
+  "c_amp": [
+   "localize_measure__c_amp.f64",
+   5600
+  ],
+  "o_t": [
+   "localize_measure__o_t.f64",
+   737
+  ],
+  "o_tx": [
+   "localize_measure__o_tx.f64",
+   737
+  ],
+  "o_rx": [
+   "localize_measure__o_rx.f64",
+   737
+  ],
+  "o_seq": [
+   "localize_measure__o_seq.f64",
+   737
+  ],
+  "o_rssi": [
+   "localize_measure__o_rssi.f64",
+   737
+  ],
+  "o_amp": [
+   "localize_measure__o_amp.f64",
+   5896
+  ],
+  "q_after": [
+   "localize_measure__q_after.f64",
+   25
+  ],
+  "q_has_t": [
+   "localize_measure__q_has_t.f64",
+   25
+  ],
+  "q_t": [
+   "localize_measure__q_t.f64",
+   25
+  ],
+  "input_baseline": [
+   "localize_measure__input_baseline.f64",
+   6
+  ],
+  "input_baseline_std": [
+   "localize_measure__input_baseline_std.f64",
+   6
+  ],
+  "tp_baseline": [
+   "localize_measure__tp_baseline.f64",
+   6
+  ],
+  "tp_baseline_std": [
+   "localize_measure__tp_baseline_std.f64",
+   6
+  ],
+  "tp_baseline_raw_std": [
+   "localize_measure__tp_baseline_raw_std.f64",
+   6
+  ],
+  "tp_calibrated_mask": [
+   "localize_measure__tp_calibrated_mask.f64",
+   6
+  ],
+  "tp_vector": [
+   "localize_measure__tp_vector.f64",
+   150
+  ],
+  "tp_counts": [
+   "localize_measure__tp_counts.f64",
+   150
+  ],
+  "tp_ready": [
+   "localize_measure__tp_ready.f64",
+   150
+  ],
+  "tp_counters": [
+   "localize_measure__tp_counters.f64",
+   75
+  ],
+  "ss_baseline": [
+   "localize_measure__ss_baseline.f64",
+   6
+  ],
+  "ss_baseline_std": [
+   "localize_measure__ss_baseline_std.f64",
+   6
+  ],
+  "ss_baseline_raw_std": [
+   "localize_measure__ss_baseline_raw_std.f64",
+   6
+  ],
+  "ss_calibrated_mask": [
+   "localize_measure__ss_calibrated_mask.f64",
+   6
+  ],
+  "ss_vector": [
+   "localize_measure__ss_vector.f64",
+   150
+  ],
+  "ss_counts": [
+   "localize_measure__ss_counts.f64",
+   150
+  ],
+  "ss_ready": [
+   "localize_measure__ss_ready.f64",
+   150
+  ],
+  "ss_counters": [
+   "localize_measure__ss_counters.f64",
+   75
+  ],
+  "rs_baseline": [
+   "localize_measure__rs_baseline.f64",
+   6
+  ],
+  "rs_baseline_std": [
+   "localize_measure__rs_baseline_std.f64",
+   6
+  ],
+  "rs_baseline_raw_std": [
+   "localize_measure__rs_baseline_raw_std.f64",
+   6
+  ],
+  "rs_calibrated_mask": [
+   "localize_measure__rs_calibrated_mask.f64",
+   6
+  ],
+  "rs_vector": [
+   "localize_measure__rs_vector.f64",
+   150
+  ],
+  "rs_counts": [
+   "localize_measure__rs_counts.f64",
+   150
+  ],
+  "rs_ready": [
+   "localize_measure__rs_ready.f64",
+   150
+  ],
+  "rs_counters": [
+   "localize_measure__rs_counters.f64",
+   75
+  ],
+  "tpn_baseline": [
+   "localize_measure__tpn_baseline.f64",
+   6
+  ],
+  "tpn_baseline_std": [
+   "localize_measure__tpn_baseline_std.f64",
+   6
+  ],
+  "tpn_baseline_raw_std": [
+   "localize_measure__tpn_baseline_raw_std.f64",
+   6
+  ],
+  "tpn_calibrated_mask": [
+   "localize_measure__tpn_calibrated_mask.f64",
+   6
+  ],
+  "tpn_vector": [
+   "localize_measure__tpn_vector.f64",
+   150
+  ],
+  "tpn_counts": [
+   "localize_measure__tpn_counts.f64",
+   150
+  ],
+  "tpn_ready": [
+   "localize_measure__tpn_ready.f64",
+   150
+  ],
+  "tpn_counters": [
+   "localize_measure__tpn_counters.f64",
+   75
+  ],
+  "rsn_baseline": [
+   "localize_measure__rsn_baseline.f64",
+   6
+  ],
+  "rsn_baseline_std": [
+   "localize_measure__rsn_baseline_std.f64",
+   6
+  ],
+  "rsn_baseline_raw_std": [
+   "localize_measure__rsn_baseline_raw_std.f64",
+   6
+  ],
+  "rsn_calibrated_mask": [
+   "localize_measure__rsn_calibrated_mask.f64",
+   6
+  ],
+  "rsn_vector": [
+   "localize_measure__rsn_vector.f64",
+   150
+  ],
+  "rsn_counts": [
+   "localize_measure__rsn_counts.f64",
+   150
+  ],
+  "rsn_ready": [
+   "localize_measure__rsn_ready.f64",
+   150
+  ],
+  "rsn_counters": [
+   "localize_measure__rsn_counters.f64",
+   75
+  ],
+  "rsc_baseline": [
+   "localize_measure__rsc_baseline.f64",
+   6
+  ],
+  "rsc_baseline_std": [
+   "localize_measure__rsc_baseline_std.f64",
+   6
+  ],
+  "rsc_baseline_raw_std": [
+   "localize_measure__rsc_baseline_raw_std.f64",
+   6
+  ],
+  "rsc_calibrated_mask": [
+   "localize_measure__rsc_calibrated_mask.f64",
+   6
+  ],
+  "rsc_vector": [
+   "localize_measure__rsc_vector.f64",
+   150
+  ],
+  "rsc_counts": [
+   "localize_measure__rsc_counts.f64",
+   150
+  ],
+  "rsc_ready": [
+   "localize_measure__rsc_ready.f64",
+   150
+  ],
+  "rsc_counters": [
+   "localize_measure__rsc_counters.f64",
+   75
+  ],
+  "rsm_baseline": [
+   "localize_measure__rsm_baseline.f64",
+   6
+  ],
+  "rsm_baseline_std": [
+   "localize_measure__rsm_baseline_std.f64",
+   6
+  ],
+  "rsm_baseline_raw_std": [
+   "localize_measure__rsm_baseline_raw_std.f64",
+   6
+  ],
+  "rsm_calibrated_mask": [
+   "localize_measure__rsm_calibrated_mask.f64",
+   6
+  ],
+  "rsm_vector": [
+   "localize_measure__rsm_vector.f64",
+   150
+  ],
+  "rsm_counts": [
+   "localize_measure__rsm_counts.f64",
+   150
+  ],
+  "rsm_ready": [
+   "localize_measure__rsm_ready.f64",
+   150
+  ],
+  "rsm_counters": [
+   "localize_measure__rsm_counters.f64",
+   75
+  ],
+  "given_baseline": [
+   "localize_measure__given_baseline.f64",
+   6
+  ],
+  "given_baseline_std": [
+   "localize_measure__given_baseline_std.f64",
+   6
+  ],
+  "given_baseline_raw_std": [
+   "localize_measure__given_baseline_raw_std.f64",
+   6
+  ],
+  "given_calibrated_mask": [
+   "localize_measure__given_calibrated_mask.f64",
+   6
+  ],
+  "given_vector": [
+   "localize_measure__given_vector.f64",
+   150
+  ],
+  "given_counts": [
+   "localize_measure__given_counts.f64",
+   150
+  ],
+  "given_ready": [
+   "localize_measure__given_ready.f64",
+   150
+  ],
+  "given_counters": [
+   "localize_measure__given_counters.f64",
+   75
+  ],
+  "err_code": [
+   "localize_measure__err_code.f64",
+   13
+  ]
+ }
+}

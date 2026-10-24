@@ -1,0 +1,79 @@
+{
+ "name": "localize_weights_hall",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "room_w": 9.0,
+  "room_h": 7.0,
+  "pitch_m": 0.5,
+  "lambda_m": 0.3,
+  "n_x": 18,
+  "n_y": 14,
+  "n_nodes": 8,
+  "n_links": 56,
+  "n_pixels": 252,
+  "nnz": 1990,
+  "n_blind": 31,
+  "min_boundary_margin": 8.45851041175183e-05,
+  "cmp.blind_pixels": "exact",
+  "cmp.link_len": "rule",
+  "cmp.link_rx": "exact",
+  "cmp.link_tx": "exact",
+  "cmp.link_w": "rule",
+  "cmp.node_id": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.pixel_link_counts": "exact",
+  "cmp.support_idx": "exact",
+  "cmp.support_len": "exact"
+ },
+ "arrays": {
+  "node_id": [
+   "localize_weights_hall__node_id.f64",
+   8
+  ],
+  "node_x": [
+   "localize_weights_hall__node_x.f64",
+   8
+  ],
+  "node_y": [
+   "localize_weights_hall__node_y.f64",
+   8
+  ],
+  "link_tx": [
+   "localize_weights_hall__link_tx.f64",
+   56
+  ],
+  "link_rx": [
+   "localize_weights_hall__link_rx.f64",
+   56
+  ],
+  "link_len": [
+   "localize_weights_hall__link_len.f64",
+   56
+  ],
+  "link_w": [
+   "localize_weights_hall__link_w.f64",
+   56
+  ],
+  "support_len": [
+   "localize_weights_hall__support_len.f64",
+   56
+  ],
+  "support_idx": [
+   "localize_weights_hall__support_idx.f64",
+   1990
+  ],
+  "pixel_link_counts": [
+   "localize_weights_hall__pixel_link_counts.f64",
+   252
+  ],
+  "blind_pixels": [
+   "localize_weights_hall__blind_pixels.f64",
+   31
+  ]
+ }
+}

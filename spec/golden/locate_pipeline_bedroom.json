@@ -1,0 +1,338 @@
+{
+ "name": "locate_pipeline_bedroom",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "seed": 0,
+  "duration_s": 10.0,
+  "cfg.n_people": 2,
+  "person_label": "SIM",
+  "calib_s": 15.0,
+  "window_s": 1.0,
+  "tick_hz": 2.0,
+  "link_signal": "rssi_dbm",
+  "phone_seed": 0,
+  "tx_power_dbm": 10.0,
+  "carrier_hz": 2437000000.0,
+  "rssi_p0_dbm": -30.184893805577858,
+  "wlm_floor": 0.25,
+  "rate_hz": 20.0,
+  "min_samples": 10,
+  "n_links": 12,
+  "n_pixels": 56,
+  "n_x": 8,
+  "n_y": 7,
+  "n_blind": 0,
+  "n_ticks": 18,
+  "n_epochs": 50,
+  "has_phone": 1,
+  "n_people": 2,
+  "n_nodes": 4,
+  "n_independent_links": 6,
+  "cmp.baseline": "rule",
+  "cmp.blind_pixels": "exact",
+  "cmp.calibrated_mask": "exact",
+  "cmp.ep_rssi_cov_xx": "rule:each",
+  "cmp.ep_rssi_cov_xy": "rule:each",
+  "cmp.ep_rssi_cov_yy": "rule:each",
+  "cmp.ep_rssi_fix_reason": "exact",
+  "cmp.ep_rssi_kf_reason": "exact",
+  "cmp.ep_rssi_radius": "rule:each",
+  "cmp.ep_rssi_reason": "exact",
+  "cmp.ep_rssi_x": "rule",
+  "cmp.ep_rssi_y": "rule",
+  "cmp.ep_rtt_cov_xx": "rule:each",
+  "cmp.ep_rtt_cov_xy": "rule:each",
+  "cmp.ep_rtt_cov_yy": "rule:each",
+  "cmp.ep_rtt_fix_reason": "exact",
+  "cmp.ep_rtt_kf_reason": "exact",
+  "cmp.ep_rtt_radius": "rule:each",
+  "cmp.ep_rtt_reason": "exact",
+  "cmp.ep_rtt_x": "rule",
+  "cmp.ep_rtt_y": "rule",
+  "cmp.ep_t": "rule",
+  "cmp.ep_x": "rule",
+  "cmp.ep_y": "rule",
+  "cmp.ep_z": "rule",
+  "cmp.link_rx": "exact",
+  "cmp.link_tx": "exact",
+  "cmp.null_sigma": "rule",
+  "cmp.rp_blocked": "exact",
+  "cmp.rp_node": "exact",
+  "cmp.rp_rssi_dbm": "tie:rp_rssi_v",
+  "cmp.rp_rssi_present": "exact",
+  "cmp.rp_rssi_v": "rule:4",
+  "cmp.rp_rtt_m": "rule:4",
+  "cmp.rp_rtt_present": "exact",
+  "cmp.tk_image": "rule:56",
+  "cmp.tk_p_posture": "exact",
+  "cmp.tk_p_walking": "exact",
+  "cmp.tk_p_x": "rule",
+  "cmp.tk_p_y": "rule",
+  "cmp.tk_rti_confidence": "rule:each",
+  "cmp.tk_rti_cov_xx": "rule:each",
+  "cmp.tk_rti_cov_xy": "rule:each",
+  "cmp.tk_rti_cov_yy": "rule:each",
+  "cmp.tk_rti_radius": "rule:each",
+  "cmp.tk_rti_reason": "exact",
+  "cmp.tk_rti_x": "rule",
+  "cmp.tk_rti_y": "rule",
+  "cmp.tk_t": "exact",
+  "cmp.tk_tracking": "exact",
+  "cmp.tk_wlm_confidence": "rule:each",
+  "cmp.tk_wlm_cov_xx": "rule:each",
+  "cmp.tk_wlm_cov_xy": "rule:each",
+  "cmp.tk_wlm_cov_yy": "rule:each",
+  "cmp.tk_wlm_radius": "rule:each",
+  "cmp.tk_wlm_reason": "exact",
+  "cmp.tk_wlm_x": "rule",
+  "cmp.tk_wlm_y": "rule",
+  "cmp.tk_y": "rule:12",
+  "cmp.tk_z": "rule:each"
+ },
+ "arrays": {
+  "link_tx": [
+   "locate_pipeline_bedroom__link_tx.f64",
+   12
+  ],
+  "link_rx": [
+   "locate_pipeline_bedroom__link_rx.f64",
+   12
+  ],
+  "baseline": [
+   "locate_pipeline_bedroom__baseline.f64",
+   12
+  ],
+  "null_sigma": [
+   "locate_pipeline_bedroom__null_sigma.f64",
+   12
+  ],
+  "calibrated_mask": [
+   "locate_pipeline_bedroom__calibrated_mask.f64",
+   12
+  ],
+  "blind_pixels": [
+   "locate_pipeline_bedroom__blind_pixels.f64",
+   0
+  ],
+  "tk_t": [
+   "locate_pipeline_bedroom__tk_t.f64",
+   18
+  ],
+  "tk_y": [
+   "locate_pipeline_bedroom__tk_y.f64",
+   216
+  ],
+  "tk_image": [
+   "locate_pipeline_bedroom__tk_image.f64",
+   1008
+  ],
+  "tk_z": [
+   "locate_pipeline_bedroom__tk_z.f64",
+   18
+  ],
+  "tk_tracking": [
+   "locate_pipeline_bedroom__tk_tracking.f64",
+   18
+  ],
+  "tk_p_x": [
+   "locate_pipeline_bedroom__tk_p_x.f64",
+   36
+  ],
+  "tk_p_y": [
+   "locate_pipeline_bedroom__tk_p_y.f64",
+   36
+  ],
+  "tk_p_walking": [
+   "locate_pipeline_bedroom__tk_p_walking.f64",
+   36
+  ],
+  "tk_p_posture": [
+   "locate_pipeline_bedroom__tk_p_posture.f64",
+   36
+  ],
+  "tk_wlm_reason": [
+   "locate_pipeline_bedroom__tk_wlm_reason.f64",
+   18
+  ],
+  "tk_wlm_x": [
+   "locate_pipeline_bedroom__tk_wlm_x.f64",
+   18
+  ],
+  "tk_wlm_y": [
+   "locate_pipeline_bedroom__tk_wlm_y.f64",
+   18
+  ],
+  "tk_wlm_radius": [
+   "locate_pipeline_bedroom__tk_wlm_radius.f64",
+   18
+  ],
+  "tk_wlm_cov_xx": [
+   "locate_pipeline_bedroom__tk_wlm_cov_xx.f64",
+   18
+  ],
+  "tk_wlm_cov_xy": [
+   "locate_pipeline_bedroom__tk_wlm_cov_xy.f64",
+   18
+  ],
+  "tk_wlm_cov_yy": [
+   "locate_pipeline_bedroom__tk_wlm_cov_yy.f64",
+   18
+  ],
+  "tk_wlm_confidence": [
+   "locate_pipeline_bedroom__tk_wlm_confidence.f64",
+   18
+  ],
+  "tk_rti_reason": [
+   "locate_pipeline_bedroom__tk_rti_reason.f64",
+   18
+  ],
+  "tk_rti_x": [
+   "locate_pipeline_bedroom__tk_rti_x.f64",
+   18
+  ],
+  "tk_rti_y": [
+   "locate_pipeline_bedroom__tk_rti_y.f64",
+   18
+  ],
+  "tk_rti_radius": [
+   "locate_pipeline_bedroom__tk_rti_radius.f64",
+   18
+  ],
+  "tk_rti_cov_xx": [
+   "locate_pipeline_bedroom__tk_rti_cov_xx.f64",
+   18
+  ],
+  "tk_rti_cov_xy": [
+   "locate_pipeline_bedroom__tk_rti_cov_xy.f64",
+   18
+  ],
+  "tk_rti_cov_yy": [
+   "locate_pipeline_bedroom__tk_rti_cov_yy.f64",
+   18
+  ],
+  "tk_rti_confidence": [
+   "locate_pipeline_bedroom__tk_rti_confidence.f64",
+   18
+  ],
+  "ep_t": [
+   "locate_pipeline_bedroom__ep_t.f64",
+   50
+  ],
+  "ep_x": [
+   "locate_pipeline_bedroom__ep_x.f64",
+   50
+  ],
+  "ep_y": [
+   "locate_pipeline_bedroom__ep_y.f64",
+   50
+  ],
+  "ep_z": [
+   "locate_pipeline_bedroom__ep_z.f64",
+   50
+  ],
+  "rp_node": [
+   "locate_pipeline_bedroom__rp_node.f64",
+   200
+  ],
+  "rp_blocked": [
+   "locate_pipeline_bedroom__rp_blocked.f64",
+   200
+  ],
+  "rp_rtt_present": [
+   "locate_pipeline_bedroom__rp_rtt_present.f64",
+   200
+  ],
+  "rp_rtt_m": [
+   "locate_pipeline_bedroom__rp_rtt_m.f64",
+   200
+  ],
+  "rp_rssi_present": [
+   "locate_pipeline_bedroom__rp_rssi_present.f64",
+   200
+  ],
+  "rp_rssi_dbm": [
+   "locate_pipeline_bedroom__rp_rssi_dbm.f64",
+   200
+  ],
+  "rp_rssi_v": [
+   "locate_pipeline_bedroom__rp_rssi_v.f64",
+   200
+  ],
+  "ep_rtt_reason": [
+   "locate_pipeline_bedroom__ep_rtt_reason.f64",
+   50
+  ],
+  "ep_rtt_x": [
+   "locate_pipeline_bedroom__ep_rtt_x.f64",
+   50
+  ],
+  "ep_rtt_y": [
+   "locate_pipeline_bedroom__ep_rtt_y.f64",
+   50
+  ],
+  "ep_rtt_radius": [
+   "locate_pipeline_bedroom__ep_rtt_radius.f64",
+   50
+  ],
+  "ep_rtt_cov_xx": [
+   "locate_pipeline_bedroom__ep_rtt_cov_xx.f64",
+   50
+  ],
+  "ep_rtt_cov_xy": [
+   "locate_pipeline_bedroom__ep_rtt_cov_xy.f64",
+   50
+  ],
+  "ep_rtt_cov_yy": [
+   "locate_pipeline_bedroom__ep_rtt_cov_yy.f64",
+   50
+  ],
+  "ep_rtt_fix_reason": [
+   "locate_pipeline_bedroom__ep_rtt_fix_reason.f64",
+   50
+  ],
+  "ep_rtt_kf_reason": [
+   "locate_pipeline_bedroom__ep_rtt_kf_reason.f64",
+   50
+  ],
+  "ep_rssi_reason": [
+   "locate_pipeline_bedroom__ep_rssi_reason.f64",
+   50
+  ],
+  "ep_rssi_x": [
+   "locate_pipeline_bedroom__ep_rssi_x.f64",
+   50
+  ],
+  "ep_rssi_y": [
+   "locate_pipeline_bedroom__ep_rssi_y.f64",
+   50
+  ],
+  "ep_rssi_radius": [
+   "locate_pipeline_bedroom__ep_rssi_radius.f64",
+   50
+  ],
+  "ep_rssi_cov_xx": [
+   "locate_pipeline_bedroom__ep_rssi_cov_xx.f64",
+   50
+  ],
+  "ep_rssi_cov_xy": [
+   "locate_pipeline_bedroom__ep_rssi_cov_xy.f64",
+   50
+  ],
+  "ep_rssi_cov_yy": [
+   "locate_pipeline_bedroom__ep_rssi_cov_yy.f64",
+   50
+  ],
+  "ep_rssi_fix_reason": [
+   "locate_pipeline_bedroom__ep_rssi_fix_reason.f64",
+   50
+  ],
+  "ep_rssi_kf_reason": [
+   "locate_pipeline_bedroom__ep_rssi_kf_reason.f64",
+   50
+  ]
+ }
+}

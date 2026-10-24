@@ -52,7 +52,7 @@ decisions: [docs/adr/](docs/adr/); wire format: [spec/wire.md](spec/wire.md).
 | Part | Where | Checked by |
 |---|---|---|
 | Reference DSP + FeatureFrame | `wifisense/` (Python) | `python3 -m unittest discover -s tests` |
-| Golden vectors | `spec/golden/` | `python3 spec/golden/generate.py` |
+| Golden vectors | `spec/golden/` | `$(.venv/bin/uv python find 3.14) -I spec/golden/generate.py` (CPython 3.14 only) |
 | Rust DSP (byte-identical frames) | `rust/crates/saans-dsp` | `cargo test -p saans-dsp` |
 | Health detectors, link fusion | `rust/crates/saans-health` | `cargo test -p saans-health` |
 | Simulator (matches Python physics to 1e-14) | `rust/crates/saans-sim` | `cargo test -p saans-sim` |

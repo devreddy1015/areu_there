@@ -1,0 +1,27 @@
+label SIM
+spec locate_v1
+reasons no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated
+n_cases 12
+symmetry_tol 1e-09
+n_err 1
+err.0 cholesky_solve_factored(G of case 0, [1.0, 2.0])
+cmp.err_code exact
+cmp.m_a input
+cmp.m_b input
+cmp.m_code exact
+cmp.m_g rule:ptr:m_nn
+cmp.m_inv rule:ptr:m_nn
+cmp.m_n input
+cmp.m_nn input
+cmp.m_pivot exact
+cmp.m_x rule:ptr:m_n
+array.m_n 12
+array.m_nn 12
+array.m_a 188
+array.m_b 32
+array.m_code 12
+array.m_pivot 12
+array.m_g 188
+array.m_x 32
+array.m_inv 188
+array.err_code 1

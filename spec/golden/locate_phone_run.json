@@ -1,0 +1,1221 @@
+{
+ "name": "locate_phone_run",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "n_nodes": 8,
+  "n_walls": 6,
+  "n_boxes": 3,
+  "n_samples": 1129,
+  "tx_power_dbm": 10.0,
+  "carrier_hz": 2437000000.0,
+  "n_variants": 3,
+  "variants": "a,b,c",
+  "a_cfg.phone_seed": 11,
+  "a_phone_seed": 11,
+  "a_rssi_p0_dbm": -30.184893805577858,
+  "a_pl0": 40.18489380557786,
+  "a_n_epochs": 72,
+  "b_cfg.phone_rate_hz": 10.0,
+  "b_cfg.phone_seed": 12,
+  "b_cfg.rtt_nlos_bias_m": 2.0,
+  "b_cfg.rtt_outlier_p": 0.3,
+  "b_cfg.rtt_fail_p": 0.3,
+  "b_cfg.rssi_fail_p": 0.3,
+  "b_cfg.huber_k": 1.0,
+  "b_cfg.phone_max_coast_s": 0.5,
+  "b_phone_seed": 12,
+  "b_rssi_p0_dbm": -30.184893805577858,
+  "b_pl0": 40.18489380557786,
+  "b_n_epochs": 142,
+  "c_cfg.wlm_radius_scale": 1.5,
+  "c_cfg.rti_radius_scale": 2.0,
+  "c_cfg.phone_radius_scale": 0.5,
+  "c_cfg.min_plausible_radius_m": 2.6,
+  "c_cfg.phone_seed": 55,
+  "c_cfg.rtt_sigma_m": 4.0,
+  "c_cfg.rtt_fail_p": 0.5,
+  "c_cfg.rssi_fail_p": 0.3,
+  "c_cfg.rssi_shadow_sigma_db": 1.0,
+  "c_cfg.rssi_device_sigma_db": 1e+308,
+  "c_phone_seed": 55,
+  "c_rssi_p0_dbm": -30.184893805577858,
+  "c_pl0": 40.18489380557786,
+  "c_n_epochs": 72,
+  "cmp.a_blocked": "exact",
+  "cmp.a_d": "rule:8",
+  "cmp.a_device_db": "rule",
+  "cmp.a_ep_j": "exact",
+  "cmp.a_ep_t": "exact",
+  "cmp.a_g": "rule",
+  "cmp.a_g_s": "rule",
+  "cmp.a_offset_m": "rule",
+  "cmp.a_rssi_cov_xx": "rule:each",
+  "cmp.a_rssi_cov_xy": "rule:each",
+  "cmp.a_rssi_cov_yy": "rule:each",
+  "cmp.a_rssi_dbm": "tie:a_rssi_v",
+  "cmp.a_rssi_fix_chi2": "rule:each",
+  "cmp.a_rssi_fix_inv00": "rule:each",
+  "cmp.a_rssi_fix_inv01": "rule:each",
+  "cmp.a_rssi_fix_inv11": "rule:each",
+  "cmp.a_rssi_fix_iter": "exact",
+  "cmp.a_rssi_fix_r00": "rule:each",
+  "cmp.a_rssi_fix_r01": "rule:each",
+  "cmp.a_rssi_fix_r11": "rule:each",
+  "cmp.a_rssi_fix_reason": "exact",
+  "cmp.a_rssi_fix_x": "rule",
+  "cmp.a_rssi_fix_y": "rule",
+  "cmp.a_rssi_kf_discarded": "exact",
+  "cmp.a_rssi_kf_p00": "rule:each",
+  "cmp.a_rssi_kf_p01": "rule:each",
+  "cmp.a_rssi_kf_p11": "rule:each",
+  "cmp.a_rssi_kf_reason": "exact",
+  "cmp.a_rssi_kf_started": "exact",
+  "cmp.a_rssi_kf_x": "rule",
+  "cmp.a_rssi_kf_y": "rule",
+  "cmp.a_rssi_present": "exact",
+  "cmp.a_rssi_radius": "rule:each",
+  "cmp.a_rssi_reason": "exact",
+  "cmp.a_rssi_v": "rule:8",
+  "cmp.a_rssi_x": "rule",
+  "cmp.a_rssi_y": "rule",
+  "cmp.a_rtt_cov_xx": "rule:each",
+  "cmp.a_rtt_cov_xy": "rule:each",
+  "cmp.a_rtt_cov_yy": "rule:each",
+  "cmp.a_rtt_fix_chi2": "rule:each",
+  "cmp.a_rtt_fix_inv00": "rule:each",
+  "cmp.a_rtt_fix_inv01": "rule:each",
+  "cmp.a_rtt_fix_inv11": "rule:each",
+  "cmp.a_rtt_fix_iter": "exact",
+  "cmp.a_rtt_fix_r00": "rule:each",
+  "cmp.a_rtt_fix_r01": "rule:each",
+  "cmp.a_rtt_fix_r11": "rule:each",
+  "cmp.a_rtt_fix_reason": "exact",
+  "cmp.a_rtt_fix_x": "rule",
+  "cmp.a_rtt_fix_y": "rule",
+  "cmp.a_rtt_kf_discarded": "exact",
+  "cmp.a_rtt_kf_p00": "rule:each",
+  "cmp.a_rtt_kf_p01": "rule:each",
+  "cmp.a_rtt_kf_p11": "rule:each",
+  "cmp.a_rtt_kf_reason": "exact",
+  "cmp.a_rtt_kf_started": "exact",
+  "cmp.a_rtt_kf_x": "rule",
+  "cmp.a_rtt_kf_y": "rule",
+  "cmp.a_rtt_m": "rule:8",
+  "cmp.a_rtt_present": "exact",
+  "cmp.a_rtt_radius": "rule:each",
+  "cmp.a_rtt_reason": "exact",
+  "cmp.a_rtt_value": "rule:8",
+  "cmp.a_rtt_x": "rule",
+  "cmp.a_rtt_y": "rule",
+  "cmp.a_shadow": "rule",
+  "cmp.a_u_b": "exact",
+  "cmp.a_u_fail": "exact",
+  "cmp.a_u_fail_s": "exact",
+  "cmp.a_u_j": "exact",
+  "cmp.a_u_mag": "exact",
+  "cmp.a_u_out": "exact",
+  "cmp.b_blocked": "exact",
+  "cmp.b_d": "rule:8",
+  "cmp.b_device_db": "rule",
+  "cmp.b_ep_j": "exact",
+  "cmp.b_ep_t": "exact",
+  "cmp.b_g": "rule",
+  "cmp.b_g_s": "rule",
+  "cmp.b_offset_m": "rule",
+  "cmp.b_rssi_cov_xx": "rule:each",
+  "cmp.b_rssi_cov_xy": "rule:each",
+  "cmp.b_rssi_cov_yy": "rule:each",
+  "cmp.b_rssi_dbm": "tie:b_rssi_v",
+  "cmp.b_rssi_fix_chi2": "rule:each",
+  "cmp.b_rssi_fix_inv00": "rule:each",
+  "cmp.b_rssi_fix_inv01": "rule:each",
+  "cmp.b_rssi_fix_inv11": "rule:each",
+  "cmp.b_rssi_fix_iter": "exact",
+  "cmp.b_rssi_fix_r00": "rule:each",
+  "cmp.b_rssi_fix_r01": "rule:each",
+  "cmp.b_rssi_fix_r11": "rule:each",
+  "cmp.b_rssi_fix_reason": "exact",
+  "cmp.b_rssi_fix_x": "rule",
+  "cmp.b_rssi_fix_y": "rule",
+  "cmp.b_rssi_kf_discarded": "exact",
+  "cmp.b_rssi_kf_p00": "rule:each",
+  "cmp.b_rssi_kf_p01": "rule:each",
+  "cmp.b_rssi_kf_p11": "rule:each",
+  "cmp.b_rssi_kf_reason": "exact",
+  "cmp.b_rssi_kf_started": "exact",
+  "cmp.b_rssi_kf_x": "rule",
+  "cmp.b_rssi_kf_y": "rule",
+  "cmp.b_rssi_present": "exact",
+  "cmp.b_rssi_radius": "rule:each",
+  "cmp.b_rssi_reason": "exact",
+  "cmp.b_rssi_v": "rule:8",
+  "cmp.b_rssi_x": "rule",
+  "cmp.b_rssi_y": "rule",
+  "cmp.b_rtt_cov_xx": "rule:each",
+  "cmp.b_rtt_cov_xy": "rule:each",
+  "cmp.b_rtt_cov_yy": "rule:each",
+  "cmp.b_rtt_fix_chi2": "rule:each",
+  "cmp.b_rtt_fix_inv00": "rule:each",
+  "cmp.b_rtt_fix_inv01": "rule:each",
+  "cmp.b_rtt_fix_inv11": "rule:each",
+  "cmp.b_rtt_fix_iter": "exact",
+  "cmp.b_rtt_fix_r00": "rule:each",
+  "cmp.b_rtt_fix_r01": "rule:each",
+  "cmp.b_rtt_fix_r11": "rule:each",
+  "cmp.b_rtt_fix_reason": "exact",
+  "cmp.b_rtt_fix_x": "rule",
+  "cmp.b_rtt_fix_y": "rule",
+  "cmp.b_rtt_kf_discarded": "exact",
+  "cmp.b_rtt_kf_p00": "rule:each",
+  "cmp.b_rtt_kf_p01": "rule:each",
+  "cmp.b_rtt_kf_p11": "rule:each",
+  "cmp.b_rtt_kf_reason": "exact",
+  "cmp.b_rtt_kf_started": "exact",
+  "cmp.b_rtt_kf_x": "rule",
+  "cmp.b_rtt_kf_y": "rule",
+  "cmp.b_rtt_m": "rule:8",
+  "cmp.b_rtt_present": "exact",
+  "cmp.b_rtt_radius": "rule:each",
+  "cmp.b_rtt_reason": "exact",
+  "cmp.b_rtt_value": "rule:8",
+  "cmp.b_rtt_x": "rule",
+  "cmp.b_rtt_y": "rule",
+  "cmp.b_shadow": "rule",
+  "cmp.b_u_b": "exact",
+  "cmp.b_u_fail": "exact",
+  "cmp.b_u_fail_s": "exact",
+  "cmp.b_u_j": "exact",
+  "cmp.b_u_mag": "exact",
+  "cmp.b_u_out": "exact",
+  "cmp.box": "input",
+  "cmp.c_blocked": "exact",
+  "cmp.c_d": "rule:8",
+  "cmp.c_device_db": "rule",
+  "cmp.c_ep_j": "exact",
+  "cmp.c_ep_t": "exact",
+  "cmp.c_g": "rule",
+  "cmp.c_g_s": "rule",
+  "cmp.c_offset_m": "rule",
+  "cmp.c_rssi_cov_xx": "rule:each",
+  "cmp.c_rssi_cov_xy": "rule:each",
+  "cmp.c_rssi_cov_yy": "rule:each",
+  "cmp.c_rssi_dbm": "tie:c_rssi_v",
+  "cmp.c_rssi_fix_chi2": "rule:each",
+  "cmp.c_rssi_fix_inv00": "rule:each",
+  "cmp.c_rssi_fix_inv01": "rule:each",
+  "cmp.c_rssi_fix_inv11": "rule:each",
+  "cmp.c_rssi_fix_iter": "exact",
+  "cmp.c_rssi_fix_r00": "rule:each",
+  "cmp.c_rssi_fix_r01": "rule:each",
+  "cmp.c_rssi_fix_r11": "rule:each",
+  "cmp.c_rssi_fix_reason": "exact",
+  "cmp.c_rssi_fix_x": "rule",
+  "cmp.c_rssi_fix_y": "rule",
+  "cmp.c_rssi_kf_discarded": "exact",
+  "cmp.c_rssi_kf_p00": "rule:each",
+  "cmp.c_rssi_kf_p01": "rule:each",
+  "cmp.c_rssi_kf_p11": "rule:each",
+  "cmp.c_rssi_kf_reason": "exact",
+  "cmp.c_rssi_kf_started": "exact",
+  "cmp.c_rssi_kf_x": "rule",
+  "cmp.c_rssi_kf_y": "rule",
+  "cmp.c_rssi_present": "exact",
+  "cmp.c_rssi_radius": "rule:each",
+  "cmp.c_rssi_reason": "exact",
+  "cmp.c_rssi_v": "rule:8",
+  "cmp.c_rssi_x": "rule",
+  "cmp.c_rssi_y": "rule",
+  "cmp.c_rtt_cov_xx": "rule:each",
+  "cmp.c_rtt_cov_xy": "rule:each",
+  "cmp.c_rtt_cov_yy": "rule:each",
+  "cmp.c_rtt_fix_chi2": "rule:each",
+  "cmp.c_rtt_fix_inv00": "rule:each",
+  "cmp.c_rtt_fix_inv01": "rule:each",
+  "cmp.c_rtt_fix_inv11": "rule:each",
+  "cmp.c_rtt_fix_iter": "exact",
+  "cmp.c_rtt_fix_r00": "rule:each",
+  "cmp.c_rtt_fix_r01": "rule:each",
+  "cmp.c_rtt_fix_r11": "rule:each",
+  "cmp.c_rtt_fix_reason": "exact",
+  "cmp.c_rtt_fix_x": "rule",
+  "cmp.c_rtt_fix_y": "rule",
+  "cmp.c_rtt_kf_discarded": "exact",
+  "cmp.c_rtt_kf_p00": "rule:each",
+  "cmp.c_rtt_kf_p01": "rule:each",
+  "cmp.c_rtt_kf_p11": "rule:each",
+  "cmp.c_rtt_kf_reason": "exact",
+  "cmp.c_rtt_kf_started": "exact",
+  "cmp.c_rtt_kf_x": "rule",
+  "cmp.c_rtt_kf_y": "rule",
+  "cmp.c_rtt_m": "rule:8",
+  "cmp.c_rtt_present": "exact",
+  "cmp.c_rtt_radius": "rule:each",
+  "cmp.c_rtt_reason": "exact",
+  "cmp.c_rtt_value": "rule:8",
+  "cmp.c_rtt_x": "rule",
+  "cmp.c_rtt_y": "rule",
+  "cmp.c_shadow": "rule",
+  "cmp.c_u_b": "exact",
+  "cmp.c_u_fail": "exact",
+  "cmp.c_u_fail_s": "exact",
+  "cmp.c_u_j": "exact",
+  "cmp.c_u_mag": "exact",
+  "cmp.c_u_out": "exact",
+  "cmp.clk_e_next": "exact",
+  "cmp.clk_fired": "exact",
+  "cmp.clk_t": "input",
+  "cmp.cyl": "input",
+  "cmp.node_id": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.node_z": "input",
+  "cmp.s_ncyl": "input",
+  "cmp.s_t": "input",
+  "cmp.s_x": "input",
+  "cmp.s_y": "input",
+  "cmp.s_z": "input",
+  "cmp.wall": "input"
+ },
+ "arrays": {
+  "node_id": [
+   "locate_phone_run__node_id.f64",
+   8
+  ],
+  "node_x": [
+   "locate_phone_run__node_x.f64",
+   8
+  ],
+  "node_y": [
+   "locate_phone_run__node_y.f64",
+   8
+  ],
+  "node_z": [
+   "locate_phone_run__node_z.f64",
+   8
+  ],
+  "wall": [
+   "locate_phone_run__wall.f64",
+   30
+  ],
+  "box": [
+   "locate_phone_run__box.f64",
+   24
+  ],
+  "s_t": [
+   "locate_phone_run__s_t.f64",
+   1129
+  ],
+  "s_x": [
+   "locate_phone_run__s_x.f64",
+   1129
+  ],
+  "s_y": [
+   "locate_phone_run__s_y.f64",
+   1129
+  ],
+  "s_z": [
+   "locate_phone_run__s_z.f64",
+   1129
+  ],
+  "s_ncyl": [
+   "locate_phone_run__s_ncyl.f64",
+   1129
+  ],
+  "cyl": [
+   "locate_phone_run__cyl.f64",
+   13548
+  ],
+  "a_offset_m": [
+   "locate_phone_run__a_offset_m.f64",
+   8
+  ],
+  "a_device_db": [
+   "locate_phone_run__a_device_db.f64",
+   8
+  ],
+  "a_ep_j": [
+   "locate_phone_run__a_ep_j.f64",
+   72
+  ],
+  "a_ep_t": [
+   "locate_phone_run__a_ep_t.f64",
+   72
+  ],
+  "a_blocked": [
+   "locate_phone_run__a_blocked.f64",
+   576
+  ],
+  "a_d": [
+   "locate_phone_run__a_d.f64",
+   576
+  ],
+  "a_u_fail": [
+   "locate_phone_run__a_u_fail.f64",
+   576
+  ],
+  "a_g": [
+   "locate_phone_run__a_g.f64",
+   576
+  ],
+  "a_u_out": [
+   "locate_phone_run__a_u_out.f64",
+   576
+  ],
+  "a_u_mag": [
+   "locate_phone_run__a_u_mag.f64",
+   576
+  ],
+  "a_u_b": [
+   "locate_phone_run__a_u_b.f64",
+   576
+  ],
+  "a_u_fail_s": [
+   "locate_phone_run__a_u_fail_s.f64",
+   576
+  ],
+  "a_g_s": [
+   "locate_phone_run__a_g_s.f64",
+   576
+  ],
+  "a_u_j": [
+   "locate_phone_run__a_u_j.f64",
+   576
+  ],
+  "a_rtt_value": [
+   "locate_phone_run__a_rtt_value.f64",
+   576
+  ],
+  "a_rtt_present": [
+   "locate_phone_run__a_rtt_present.f64",
+   576
+  ],
+  "a_rtt_m": [
+   "locate_phone_run__a_rtt_m.f64",
+   576
+  ],
+  "a_rssi_v": [
+   "locate_phone_run__a_rssi_v.f64",
+   576
+  ],
+  "a_rssi_present": [
+   "locate_phone_run__a_rssi_present.f64",
+   576
+  ],
+  "a_rssi_dbm": [
+   "locate_phone_run__a_rssi_dbm.f64",
+   576
+  ],
+  "a_shadow": [
+   "locate_phone_run__a_shadow.f64",
+   576
+  ],
+  "a_rtt_fix_reason": [
+   "locate_phone_run__a_rtt_fix_reason.f64",
+   72
+  ],
+  "a_rtt_fix_x": [
+   "locate_phone_run__a_rtt_fix_x.f64",
+   72
+  ],
+  "a_rtt_fix_y": [
+   "locate_phone_run__a_rtt_fix_y.f64",
+   72
+  ],
+  "a_rtt_fix_inv00": [
+   "locate_phone_run__a_rtt_fix_inv00.f64",
+   72
+  ],
+  "a_rtt_fix_inv01": [
+   "locate_phone_run__a_rtt_fix_inv01.f64",
+   72
+  ],
+  "a_rtt_fix_inv11": [
+   "locate_phone_run__a_rtt_fix_inv11.f64",
+   72
+  ],
+  "a_rtt_fix_r00": [
+   "locate_phone_run__a_rtt_fix_r00.f64",
+   72
+  ],
+  "a_rtt_fix_r01": [
+   "locate_phone_run__a_rtt_fix_r01.f64",
+   72
+  ],
+  "a_rtt_fix_r11": [
+   "locate_phone_run__a_rtt_fix_r11.f64",
+   72
+  ],
+  "a_rtt_fix_chi2": [
+   "locate_phone_run__a_rtt_fix_chi2.f64",
+   72
+  ],
+  "a_rtt_fix_iter": [
+   "locate_phone_run__a_rtt_fix_iter.f64",
+   72
+  ],
+  "a_rtt_kf_reason": [
+   "locate_phone_run__a_rtt_kf_reason.f64",
+   72
+  ],
+  "a_rtt_kf_x": [
+   "locate_phone_run__a_rtt_kf_x.f64",
+   72
+  ],
+  "a_rtt_kf_y": [
+   "locate_phone_run__a_rtt_kf_y.f64",
+   72
+  ],
+  "a_rtt_kf_p00": [
+   "locate_phone_run__a_rtt_kf_p00.f64",
+   72
+  ],
+  "a_rtt_kf_p01": [
+   "locate_phone_run__a_rtt_kf_p01.f64",
+   72
+  ],
+  "a_rtt_kf_p11": [
+   "locate_phone_run__a_rtt_kf_p11.f64",
+   72
+  ],
+  "a_rtt_kf_started": [
+   "locate_phone_run__a_rtt_kf_started.f64",
+   72
+  ],
+  "a_rtt_kf_discarded": [
+   "locate_phone_run__a_rtt_kf_discarded.f64",
+   72
+  ],
+  "a_rtt_reason": [
+   "locate_phone_run__a_rtt_reason.f64",
+   72
+  ],
+  "a_rtt_x": [
+   "locate_phone_run__a_rtt_x.f64",
+   72
+  ],
+  "a_rtt_y": [
+   "locate_phone_run__a_rtt_y.f64",
+   72
+  ],
+  "a_rtt_radius": [
+   "locate_phone_run__a_rtt_radius.f64",
+   72
+  ],
+  "a_rtt_cov_xx": [
+   "locate_phone_run__a_rtt_cov_xx.f64",
+   72
+  ],
+  "a_rtt_cov_xy": [
+   "locate_phone_run__a_rtt_cov_xy.f64",
+   72
+  ],
+  "a_rtt_cov_yy": [
+   "locate_phone_run__a_rtt_cov_yy.f64",
+   72
+  ],
+  "a_rssi_fix_reason": [
+   "locate_phone_run__a_rssi_fix_reason.f64",
+   72
+  ],
+  "a_rssi_fix_x": [
+   "locate_phone_run__a_rssi_fix_x.f64",
+   72
+  ],
+  "a_rssi_fix_y": [
+   "locate_phone_run__a_rssi_fix_y.f64",
+   72
+  ],
+  "a_rssi_fix_inv00": [
+   "locate_phone_run__a_rssi_fix_inv00.f64",
+   72
+  ],
+  "a_rssi_fix_inv01": [
+   "locate_phone_run__a_rssi_fix_inv01.f64",
+   72
+  ],
+  "a_rssi_fix_inv11": [
+   "locate_phone_run__a_rssi_fix_inv11.f64",
+   72
+  ],
+  "a_rssi_fix_r00": [
+   "locate_phone_run__a_rssi_fix_r00.f64",
+   72
+  ],
+  "a_rssi_fix_r01": [
+   "locate_phone_run__a_rssi_fix_r01.f64",
+   72
+  ],
+  "a_rssi_fix_r11": [
+   "locate_phone_run__a_rssi_fix_r11.f64",
+   72
+  ],
+  "a_rssi_fix_chi2": [
+   "locate_phone_run__a_rssi_fix_chi2.f64",
+   72
+  ],
+  "a_rssi_fix_iter": [
+   "locate_phone_run__a_rssi_fix_iter.f64",
+   72
+  ],
+  "a_rssi_kf_reason": [
+   "locate_phone_run__a_rssi_kf_reason.f64",
+   72
+  ],
+  "a_rssi_kf_x": [
+   "locate_phone_run__a_rssi_kf_x.f64",
+   72
+  ],
+  "a_rssi_kf_y": [
+   "locate_phone_run__a_rssi_kf_y.f64",
+   72
+  ],
+  "a_rssi_kf_p00": [
+   "locate_phone_run__a_rssi_kf_p00.f64",
+   72
+  ],
+  "a_rssi_kf_p01": [
+   "locate_phone_run__a_rssi_kf_p01.f64",
+   72
+  ],
+  "a_rssi_kf_p11": [
+   "locate_phone_run__a_rssi_kf_p11.f64",
+   72
+  ],
+  "a_rssi_kf_started": [
+   "locate_phone_run__a_rssi_kf_started.f64",
+   72
+  ],
+  "a_rssi_kf_discarded": [
+   "locate_phone_run__a_rssi_kf_discarded.f64",
+   72
+  ],
+  "a_rssi_reason": [
+   "locate_phone_run__a_rssi_reason.f64",
+   72
+  ],
+  "a_rssi_x": [
+   "locate_phone_run__a_rssi_x.f64",
+   72
+  ],
+  "a_rssi_y": [
+   "locate_phone_run__a_rssi_y.f64",
+   72
+  ],
+  "a_rssi_radius": [
+   "locate_phone_run__a_rssi_radius.f64",
+   72
+  ],
+  "a_rssi_cov_xx": [
+   "locate_phone_run__a_rssi_cov_xx.f64",
+   72
+  ],
+  "a_rssi_cov_xy": [
+   "locate_phone_run__a_rssi_cov_xy.f64",
+   72
+  ],
+  "a_rssi_cov_yy": [
+   "locate_phone_run__a_rssi_cov_yy.f64",
+   72
+  ],
+  "b_offset_m": [
+   "locate_phone_run__b_offset_m.f64",
+   8
+  ],
+  "b_device_db": [
+   "locate_phone_run__b_device_db.f64",
+   8
+  ],
+  "b_ep_j": [
+   "locate_phone_run__b_ep_j.f64",
+   142
+  ],
+  "b_ep_t": [
+   "locate_phone_run__b_ep_t.f64",
+   142
+  ],
+  "b_blocked": [
+   "locate_phone_run__b_blocked.f64",
+   1136
+  ],
+  "b_d": [
+   "locate_phone_run__b_d.f64",
+   1136
+  ],
+  "b_u_fail": [
+   "locate_phone_run__b_u_fail.f64",
+   1136
+  ],
+  "b_g": [
+   "locate_phone_run__b_g.f64",
+   1136
+  ],
+  "b_u_out": [
+   "locate_phone_run__b_u_out.f64",
+   1136
+  ],
+  "b_u_mag": [
+   "locate_phone_run__b_u_mag.f64",
+   1136
+  ],
+  "b_u_b": [
+   "locate_phone_run__b_u_b.f64",
+   1136
+  ],
+  "b_u_fail_s": [
+   "locate_phone_run__b_u_fail_s.f64",
+   1136
+  ],
+  "b_g_s": [
+   "locate_phone_run__b_g_s.f64",
+   1136
+  ],
+  "b_u_j": [
+   "locate_phone_run__b_u_j.f64",
+   1136
+  ],
+  "b_rtt_value": [
+   "locate_phone_run__b_rtt_value.f64",
+   1136
+  ],
+  "b_rtt_present": [
+   "locate_phone_run__b_rtt_present.f64",
+   1136
+  ],
+  "b_rtt_m": [
+   "locate_phone_run__b_rtt_m.f64",
+   1136
+  ],
+  "b_rssi_v": [
+   "locate_phone_run__b_rssi_v.f64",
+   1136
+  ],
+  "b_rssi_present": [
+   "locate_phone_run__b_rssi_present.f64",
+   1136
+  ],
+  "b_rssi_dbm": [
+   "locate_phone_run__b_rssi_dbm.f64",
+   1136
+  ],
+  "b_shadow": [
+   "locate_phone_run__b_shadow.f64",
+   1136
+  ],
+  "b_rtt_fix_reason": [
+   "locate_phone_run__b_rtt_fix_reason.f64",
+   142
+  ],
+  "b_rtt_fix_x": [
+   "locate_phone_run__b_rtt_fix_x.f64",
+   142
+  ],
+  "b_rtt_fix_y": [
+   "locate_phone_run__b_rtt_fix_y.f64",
+   142
+  ],
+  "b_rtt_fix_inv00": [
+   "locate_phone_run__b_rtt_fix_inv00.f64",
+   142
+  ],
+  "b_rtt_fix_inv01": [
+   "locate_phone_run__b_rtt_fix_inv01.f64",
+   142
+  ],
+  "b_rtt_fix_inv11": [
+   "locate_phone_run__b_rtt_fix_inv11.f64",
+   142
+  ],
+  "b_rtt_fix_r00": [
+   "locate_phone_run__b_rtt_fix_r00.f64",
+   142
+  ],
+  "b_rtt_fix_r01": [
+   "locate_phone_run__b_rtt_fix_r01.f64",
+   142
+  ],
+  "b_rtt_fix_r11": [
+   "locate_phone_run__b_rtt_fix_r11.f64",
+   142
+  ],
+  "b_rtt_fix_chi2": [
+   "locate_phone_run__b_rtt_fix_chi2.f64",
+   142
+  ],
+  "b_rtt_fix_iter": [
+   "locate_phone_run__b_rtt_fix_iter.f64",
+   142
+  ],
+  "b_rtt_kf_reason": [
+   "locate_phone_run__b_rtt_kf_reason.f64",
+   142
+  ],
+  "b_rtt_kf_x": [
+   "locate_phone_run__b_rtt_kf_x.f64",
+   142
+  ],
+  "b_rtt_kf_y": [
+   "locate_phone_run__b_rtt_kf_y.f64",
+   142
+  ],
+  "b_rtt_kf_p00": [
+   "locate_phone_run__b_rtt_kf_p00.f64",
+   142
+  ],
+  "b_rtt_kf_p01": [
+   "locate_phone_run__b_rtt_kf_p01.f64",
+   142
+  ],
+  "b_rtt_kf_p11": [
+   "locate_phone_run__b_rtt_kf_p11.f64",
+   142
+  ],
+  "b_rtt_kf_started": [
+   "locate_phone_run__b_rtt_kf_started.f64",
+   142
+  ],
+  "b_rtt_kf_discarded": [
+   "locate_phone_run__b_rtt_kf_discarded.f64",
+   142
+  ],
+  "b_rtt_reason": [
+   "locate_phone_run__b_rtt_reason.f64",
+   142
+  ],
+  "b_rtt_x": [
+   "locate_phone_run__b_rtt_x.f64",
+   142
+  ],
+  "b_rtt_y": [
+   "locate_phone_run__b_rtt_y.f64",
+   142
+  ],
+  "b_rtt_radius": [
+   "locate_phone_run__b_rtt_radius.f64",
+   142
+  ],
+  "b_rtt_cov_xx": [
+   "locate_phone_run__b_rtt_cov_xx.f64",
+   142
+  ],
+  "b_rtt_cov_xy": [
+   "locate_phone_run__b_rtt_cov_xy.f64",
+   142
+  ],
+  "b_rtt_cov_yy": [
+   "locate_phone_run__b_rtt_cov_yy.f64",
+   142
+  ],
+  "b_rssi_fix_reason": [
+   "locate_phone_run__b_rssi_fix_reason.f64",
+   142
+  ],
+  "b_rssi_fix_x": [
+   "locate_phone_run__b_rssi_fix_x.f64",
+   142
+  ],
+  "b_rssi_fix_y": [
+   "locate_phone_run__b_rssi_fix_y.f64",
+   142
+  ],
+  "b_rssi_fix_inv00": [
+   "locate_phone_run__b_rssi_fix_inv00.f64",
+   142
+  ],
+  "b_rssi_fix_inv01": [
+   "locate_phone_run__b_rssi_fix_inv01.f64",
+   142
+  ],
+  "b_rssi_fix_inv11": [
+   "locate_phone_run__b_rssi_fix_inv11.f64",
+   142
+  ],
+  "b_rssi_fix_r00": [
+   "locate_phone_run__b_rssi_fix_r00.f64",
+   142
+  ],
+  "b_rssi_fix_r01": [
+   "locate_phone_run__b_rssi_fix_r01.f64",
+   142
+  ],
+  "b_rssi_fix_r11": [
+   "locate_phone_run__b_rssi_fix_r11.f64",
+   142
+  ],
+  "b_rssi_fix_chi2": [
+   "locate_phone_run__b_rssi_fix_chi2.f64",
+   142
+  ],
+  "b_rssi_fix_iter": [
+   "locate_phone_run__b_rssi_fix_iter.f64",
+   142
+  ],
+  "b_rssi_kf_reason": [
+   "locate_phone_run__b_rssi_kf_reason.f64",
+   142
+  ],
+  "b_rssi_kf_x": [
+   "locate_phone_run__b_rssi_kf_x.f64",
+   142
+  ],
+  "b_rssi_kf_y": [
+   "locate_phone_run__b_rssi_kf_y.f64",
+   142
+  ],
+  "b_rssi_kf_p00": [
+   "locate_phone_run__b_rssi_kf_p00.f64",
+   142
+  ],
+  "b_rssi_kf_p01": [
+   "locate_phone_run__b_rssi_kf_p01.f64",
+   142
+  ],
+  "b_rssi_kf_p11": [
+   "locate_phone_run__b_rssi_kf_p11.f64",
+   142
+  ],
+  "b_rssi_kf_started": [
+   "locate_phone_run__b_rssi_kf_started.f64",
+   142
+  ],
+  "b_rssi_kf_discarded": [
+   "locate_phone_run__b_rssi_kf_discarded.f64",
+   142
+  ],
+  "b_rssi_reason": [
+   "locate_phone_run__b_rssi_reason.f64",
+   142
+  ],
+  "b_rssi_x": [
+   "locate_phone_run__b_rssi_x.f64",
+   142
+  ],
+  "b_rssi_y": [
+   "locate_phone_run__b_rssi_y.f64",
+   142
+  ],
+  "b_rssi_radius": [
+   "locate_phone_run__b_rssi_radius.f64",
+   142
+  ],
+  "b_rssi_cov_xx": [
+   "locate_phone_run__b_rssi_cov_xx.f64",
+   142
+  ],
+  "b_rssi_cov_xy": [
+   "locate_phone_run__b_rssi_cov_xy.f64",
+   142
+  ],
+  "b_rssi_cov_yy": [
+   "locate_phone_run__b_rssi_cov_yy.f64",
+   142
+  ],
+  "c_offset_m": [
+   "locate_phone_run__c_offset_m.f64",
+   8
+  ],
+  "c_device_db": [
+   "locate_phone_run__c_device_db.f64",
+   8
+  ],
+  "c_ep_j": [
+   "locate_phone_run__c_ep_j.f64",
+   72
+  ],
+  "c_ep_t": [
+   "locate_phone_run__c_ep_t.f64",
+   72
+  ],
+  "c_blocked": [
+   "locate_phone_run__c_blocked.f64",
+   576
+  ],
+  "c_d": [
+   "locate_phone_run__c_d.f64",
+   576
+  ],
+  "c_u_fail": [
+   "locate_phone_run__c_u_fail.f64",
+   576
+  ],
+  "c_g": [
+   "locate_phone_run__c_g.f64",
+   576
+  ],
+  "c_u_out": [
+   "locate_phone_run__c_u_out.f64",
+   576
+  ],
+  "c_u_mag": [
+   "locate_phone_run__c_u_mag.f64",
+   576
+  ],
+  "c_u_b": [
+   "locate_phone_run__c_u_b.f64",
+   576
+  ],
+  "c_u_fail_s": [
+   "locate_phone_run__c_u_fail_s.f64",
+   576
+  ],
+  "c_g_s": [
+   "locate_phone_run__c_g_s.f64",
+   576
+  ],
+  "c_u_j": [
+   "locate_phone_run__c_u_j.f64",
+   576
+  ],
+  "c_rtt_value": [
+   "locate_phone_run__c_rtt_value.f64",
+   576
+  ],
+  "c_rtt_present": [
+   "locate_phone_run__c_rtt_present.f64",
+   576
+  ],
+  "c_rtt_m": [
+   "locate_phone_run__c_rtt_m.f64",
+   576
+  ],
+  "c_rssi_v": [
+   "locate_phone_run__c_rssi_v.f64",
+   576
+  ],
+  "c_rssi_present": [
+   "locate_phone_run__c_rssi_present.f64",
+   576
+  ],
+  "c_rssi_dbm": [
+   "locate_phone_run__c_rssi_dbm.f64",
+   576
+  ],
+  "c_shadow": [
+   "locate_phone_run__c_shadow.f64",
+   576
+  ],
+  "c_rtt_fix_reason": [
+   "locate_phone_run__c_rtt_fix_reason.f64",
+   72
+  ],
+  "c_rtt_fix_x": [
+   "locate_phone_run__c_rtt_fix_x.f64",
+   72
+  ],
+  "c_rtt_fix_y": [
+   "locate_phone_run__c_rtt_fix_y.f64",
+   72
+  ],
+  "c_rtt_fix_inv00": [
+   "locate_phone_run__c_rtt_fix_inv00.f64",
+   72
+  ],
+  "c_rtt_fix_inv01": [
+   "locate_phone_run__c_rtt_fix_inv01.f64",
+   72
+  ],
+  "c_rtt_fix_inv11": [
+   "locate_phone_run__c_rtt_fix_inv11.f64",
+   72
+  ],
+  "c_rtt_fix_r00": [
+   "locate_phone_run__c_rtt_fix_r00.f64",
+   72
+  ],
+  "c_rtt_fix_r01": [
+   "locate_phone_run__c_rtt_fix_r01.f64",
+   72
+  ],
+  "c_rtt_fix_r11": [
+   "locate_phone_run__c_rtt_fix_r11.f64",
+   72
+  ],
+  "c_rtt_fix_chi2": [
+   "locate_phone_run__c_rtt_fix_chi2.f64",
+   72
+  ],
+  "c_rtt_fix_iter": [
+   "locate_phone_run__c_rtt_fix_iter.f64",
+   72
+  ],
+  "c_rtt_kf_reason": [
+   "locate_phone_run__c_rtt_kf_reason.f64",
+   72
+  ],
+  "c_rtt_kf_x": [
+   "locate_phone_run__c_rtt_kf_x.f64",
+   72
+  ],
+  "c_rtt_kf_y": [
+   "locate_phone_run__c_rtt_kf_y.f64",
+   72
+  ],
+  "c_rtt_kf_p00": [
+   "locate_phone_run__c_rtt_kf_p00.f64",
+   72
+  ],
+  "c_rtt_kf_p01": [
+   "locate_phone_run__c_rtt_kf_p01.f64",
+   72
+  ],
+  "c_rtt_kf_p11": [
+   "locate_phone_run__c_rtt_kf_p11.f64",
+   72
+  ],
+  "c_rtt_kf_started": [
+   "locate_phone_run__c_rtt_kf_started.f64",
+   72
+  ],
+  "c_rtt_kf_discarded": [
+   "locate_phone_run__c_rtt_kf_discarded.f64",
+   72
+  ],
+  "c_rtt_reason": [
+   "locate_phone_run__c_rtt_reason.f64",
+   72
+  ],
+  "c_rtt_x": [
+   "locate_phone_run__c_rtt_x.f64",
+   72
+  ],
+  "c_rtt_y": [
+   "locate_phone_run__c_rtt_y.f64",
+   72
+  ],
+  "c_rtt_radius": [
+   "locate_phone_run__c_rtt_radius.f64",
+   72
+  ],
+  "c_rtt_cov_xx": [
+   "locate_phone_run__c_rtt_cov_xx.f64",
+   72
+  ],
+  "c_rtt_cov_xy": [
+   "locate_phone_run__c_rtt_cov_xy.f64",
+   72
+  ],
+  "c_rtt_cov_yy": [
+   "locate_phone_run__c_rtt_cov_yy.f64",
+   72
+  ],
+  "c_rssi_fix_reason": [
+   "locate_phone_run__c_rssi_fix_reason.f64",
+   72
+  ],
+  "c_rssi_fix_x": [
+   "locate_phone_run__c_rssi_fix_x.f64",
+   72
+  ],
+  "c_rssi_fix_y": [
+   "locate_phone_run__c_rssi_fix_y.f64",
+   72
+  ],
+  "c_rssi_fix_inv00": [
+   "locate_phone_run__c_rssi_fix_inv00.f64",
+   72
+  ],
+  "c_rssi_fix_inv01": [
+   "locate_phone_run__c_rssi_fix_inv01.f64",
+   72
+  ],
+  "c_rssi_fix_inv11": [
+   "locate_phone_run__c_rssi_fix_inv11.f64",
+   72
+  ],
+  "c_rssi_fix_r00": [
+   "locate_phone_run__c_rssi_fix_r00.f64",
+   72
+  ],
+  "c_rssi_fix_r01": [
+   "locate_phone_run__c_rssi_fix_r01.f64",
+   72
+  ],
+  "c_rssi_fix_r11": [
+   "locate_phone_run__c_rssi_fix_r11.f64",
+   72
+  ],
+  "c_rssi_fix_chi2": [
+   "locate_phone_run__c_rssi_fix_chi2.f64",
+   72
+  ],
+  "c_rssi_fix_iter": [
+   "locate_phone_run__c_rssi_fix_iter.f64",
+   72
+  ],
+  "c_rssi_kf_reason": [
+   "locate_phone_run__c_rssi_kf_reason.f64",
+   72
+  ],
+  "c_rssi_kf_x": [
+   "locate_phone_run__c_rssi_kf_x.f64",
+   72
+  ],
+  "c_rssi_kf_y": [
+   "locate_phone_run__c_rssi_kf_y.f64",
+   72
+  ],
+  "c_rssi_kf_p00": [
+   "locate_phone_run__c_rssi_kf_p00.f64",
+   72
+  ],
+  "c_rssi_kf_p01": [
+   "locate_phone_run__c_rssi_kf_p01.f64",
+   72
+  ],
+  "c_rssi_kf_p11": [
+   "locate_phone_run__c_rssi_kf_p11.f64",
+   72
+  ],
+  "c_rssi_kf_started": [
+   "locate_phone_run__c_rssi_kf_started.f64",
+   72
+  ],
+  "c_rssi_kf_discarded": [
+   "locate_phone_run__c_rssi_kf_discarded.f64",
+   72
+  ],
+  "c_rssi_reason": [
+   "locate_phone_run__c_rssi_reason.f64",
+   72
+  ],
+  "c_rssi_x": [
+   "locate_phone_run__c_rssi_x.f64",
+   72
+  ],
+  "c_rssi_y": [
+   "locate_phone_run__c_rssi_y.f64",
+   72
+  ],
+  "c_rssi_radius": [
+   "locate_phone_run__c_rssi_radius.f64",
+   72
+  ],
+  "c_rssi_cov_xx": [
+   "locate_phone_run__c_rssi_cov_xx.f64",
+   72
+  ],
+  "c_rssi_cov_xy": [
+   "locate_phone_run__c_rssi_cov_xy.f64",
+   72
+  ],
+  "c_rssi_cov_yy": [
+   "locate_phone_run__c_rssi_cov_yy.f64",
+   72
+  ],
+  "clk_t": [
+   "locate_phone_run__clk_t.f64",
+   18
+  ],
+  "clk_fired": [
+   "locate_phone_run__clk_fired.f64",
+   18
+  ],
+  "clk_e_next": [
+   "locate_phone_run__clk_e_next.f64",
+   18
+  ]
+ }
+}

@@ -255,6 +255,14 @@ class PositionEstimate:
     sigma_m: float
     confidence: float
     t: float = 0.0
+    # The filter's position covariance at this estimate (spec/locate.md §3):
+    # `P[0][0]`, `P[0][1]`, `P[1][1]` of the same matrix `sigma_m` is read
+    # from. An estimate built without them has a zero covariance, so radius
+    # 0, which is never published (spec/locate.md §8; min_plausible_radius_m
+    # is validated > 0, §9).
+    cov_xx: float = 0.0
+    cov_xy: float = 0.0
+    cov_yy: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -978,7 +986,9 @@ class Tracker:
             y = min(max(y, 0.0), room.height_m)
 
         sigma_m = self.sigma_m
-        assert sigma_m is not None
+        assert sigma_m is not None and self._cov is not None
+        cov = self._cov
         return PositionEstimate(
-            x=x, y=y, sigma_m=sigma_m, confidence=confidence, t=t
+            x=x, y=y, sigma_m=sigma_m, confidence=confidence, t=t,
+            cov_xx=cov[0][0], cov_xy=cov[0][1], cov_yy=cov[1][1],
         )

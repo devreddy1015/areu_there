@@ -1,0 +1,90 @@
+{
+ "name": "localize_inverter_fine",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "room_w": 8.0,
+  "room_h": 6.0,
+  "pitch_m": 0.25,
+  "lambda_m": 0.3,
+  "n_x": 32,
+  "n_y": 24,
+  "alpha": 1.0,
+  "sigma": 1.0,
+  "delta_c": 0.5,
+  "residual_tol": 1e-06,
+  "n_links": 132,
+  "n_pixels": 768,
+  "n_independent_links": 66,
+  "n_blind": 6,
+  "asymmetry": 1.4445567758259764e-15,
+  "mean_diag_a": 579.9767581395674,
+  "min_diag_a": 151.78947268516023,
+  "inverse_residual": 6.202587136397084e-14,
+  "projection_slots": 405504,
+  "projection_bytes": 1622016,
+  "n_cases": 9,
+  "cases": "blob(0.3W,0.35H);blob(0.55W,0.6H);blob(0.85W,0.2H);two blobs;zero;noisy blob;noise;antisymmetric;mixed signs",
+  "min_boundary_margin": 2.017059318354386e-05,
+  "cmp.a_plus_alpha": "rule:66",
+  "cmp.asymmetry": "le:1e-07",
+  "cmp.blind_pixels": "exact",
+  "cmp.group_idx": "exact",
+  "cmp.group_len": "exact",
+  "cmp.group_scale": "rule",
+  "cmp.inverse_residual": "le:1e-06",
+  "cmp.node_id": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.projection": "rule:66",
+  "cmp.x": "rule:768",
+  "cmp.y": "input"
+ },
+ "arrays": {
+  "node_id": [
+   "localize_inverter_fine__node_id.f64",
+   12
+  ],
+  "node_x": [
+   "localize_inverter_fine__node_x.f64",
+   12
+  ],
+  "node_y": [
+   "localize_inverter_fine__node_y.f64",
+   12
+  ],
+  "blind_pixels": [
+   "localize_inverter_fine__blind_pixels.f64",
+   6
+  ],
+  "group_len": [
+   "localize_inverter_fine__group_len.f64",
+   66
+  ],
+  "group_idx": [
+   "localize_inverter_fine__group_idx.f64",
+   132
+  ],
+  "group_scale": [
+   "localize_inverter_fine__group_scale.f64",
+   66
+  ],
+  "a_plus_alpha": [
+   "localize_inverter_fine__a_plus_alpha.f64",
+   4356
+  ],
+  "projection": [
+   "localize_inverter_fine__projection.f64",
+   50688
+  ],
+  "y": [
+   "localize_inverter_fine__y.f64",
+   1188
+  ],
+  "x": [
+   "localize_inverter_fine__x.f64",
+   6912
+  ]
+ }
+}

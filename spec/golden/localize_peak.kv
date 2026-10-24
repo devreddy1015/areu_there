@@ -1,0 +1,35 @@
+label SIM
+spec locate_v1
+reasons no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated
+n_cases 20
+n_pixels 192
+n_x 16
+n_y 12
+n_err 3
+err.0 extract_peak(geometry, 191 zeros)
+err.1 extract_peak(geometry, case 0, radius_m=0.0)
+err.2 extract_peak(geometry, case 0, radius_m=nan)
+cmp.background rule:each
+cmp.err_code exact
+cmp.image input
+cmp.n_nonfinite exact
+cmp.peak rule:each
+cmp.peak_index exact
+cmp.radius_m input
+cmp.spread rule:each
+cmp.tie_fraction exact
+cmp.x rule
+cmp.y rule
+cmp.z rule:each
+array.image 3840
+array.radius_m 20
+array.x 20
+array.y 20
+array.peak 20
+array.background 20
+array.spread 20
+array.z 20
+array.peak_index 20
+array.n_nonfinite 20
+array.tie_fraction 20
+array.err_code 3

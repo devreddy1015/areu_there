@@ -2015,6 +2015,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "saans-locate"
+version = "0.1.0"
+dependencies = [
+ "saans-dsp",
+ "saans-roomsim",
+ "saans-scene",
+ "saans-sim",
+ "sha2",
+]
+
+[[package]]
 name = "saans-roomsim"
 version = "0.1.0"
 dependencies = [

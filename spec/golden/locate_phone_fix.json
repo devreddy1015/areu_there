@@ -1,0 +1,146 @@
+{
+ "name": "locate_phone_fix",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "n_cases": 447,
+  "huber_shift_m": 2.4272363508558263,
+  "ls_shift_m": 3.0838065922181683,
+  "n_node_sets": 6,
+  "cmp.chi2": "rule:each",
+  "cmp.huber_k": "input",
+  "cmp.inv00": "rule:each",
+  "cmp.inv01": "rule:each",
+  "cmp.inv11": "rule:each",
+  "cmp.iterations": "exact",
+  "cmp.method": "input",
+  "cmp.n_exp": "input",
+  "cmp.n_rep": "input",
+  "cmp.ns": "input",
+  "cmp.ns_id": "input",
+  "cmp.ns_n": "input",
+  "cmp.ns_x": "input",
+  "cmp.ns_y": "input",
+  "cmp.ns_z": "input",
+  "cmp.p0": "input",
+  "cmp.r00": "rule:each",
+  "cmp.r01": "rule:each",
+  "cmp.r11": "rule:each",
+  "cmp.reason": "exact",
+  "cmp.rep_node": "input",
+  "cmp.rep_value": "input",
+  "cmp.sigma": "input",
+  "cmp.x": "rule",
+  "cmp.y": "rule",
+  "cmp.zh": "input"
+ },
+ "arrays": {
+  "method": [
+   "locate_phone_fix__method.f64",
+   447
+  ],
+  "ns": [
+   "locate_phone_fix__ns.f64",
+   447
+  ],
+  "zh": [
+   "locate_phone_fix__zh.f64",
+   447
+  ],
+  "sigma": [
+   "locate_phone_fix__sigma.f64",
+   447
+  ],
+  "huber_k": [
+   "locate_phone_fix__huber_k.f64",
+   447
+  ],
+  "p0": [
+   "locate_phone_fix__p0.f64",
+   447
+  ],
+  "n_exp": [
+   "locate_phone_fix__n_exp.f64",
+   447
+  ],
+  "n_rep": [
+   "locate_phone_fix__n_rep.f64",
+   447
+  ],
+  "rep_node": [
+   "locate_phone_fix__rep_node.f64",
+   1394
+  ],
+  "rep_value": [
+   "locate_phone_fix__rep_value.f64",
+   1394
+  ],
+  "reason": [
+   "locate_phone_fix__reason.f64",
+   447
+  ],
+  "x": [
+   "locate_phone_fix__x.f64",
+   447
+  ],
+  "y": [
+   "locate_phone_fix__y.f64",
+   447
+  ],
+  "inv00": [
+   "locate_phone_fix__inv00.f64",
+   447
+  ],
+  "inv01": [
+   "locate_phone_fix__inv01.f64",
+   447
+  ],
+  "inv11": [
+   "locate_phone_fix__inv11.f64",
+   447
+  ],
+  "r00": [
+   "locate_phone_fix__r00.f64",
+   447
+  ],
+  "r01": [
+   "locate_phone_fix__r01.f64",
+   447
+  ],
+  "r11": [
+   "locate_phone_fix__r11.f64",
+   447
+  ],
+  "chi2": [
+   "locate_phone_fix__chi2.f64",
+   447
+  ],
+  "iterations": [
+   "locate_phone_fix__iterations.f64",
+   447
+  ],
+  "ns_n": [
+   "locate_phone_fix__ns_n.f64",
+   6
+  ],
+  "ns_id": [
+   "locate_phone_fix__ns_id.f64",
+   22
+  ],
+  "ns_x": [
+   "locate_phone_fix__ns_x.f64",
+   22
+  ],
+  "ns_y": [
+   "locate_phone_fix__ns_y.f64",
+   22
+  ],
+  "ns_z": [
+   "locate_phone_fix__ns_z.f64",
+   22
+  ]
+ }
+}

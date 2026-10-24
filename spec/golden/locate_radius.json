@@ -1,0 +1,40 @@
+{
+ "name": "locate_radius",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "K95": 2.4477468306808166,
+  "CHI2_2_99": 9.210340371976182,
+  "LN10": 2.302585092994046,
+  "min_plausible_radius_m": 0.3,
+  "n_cases": 26,
+  "cmp.a": "input",
+  "cmp.b": "input",
+  "cmp.d": "input",
+  "cmp.pub": "exact",
+  "cmp.r": "rule:each"
+ },
+ "arrays": {
+  "a": [
+   "locate_radius__a.f64",
+   26
+  ],
+  "b": [
+   "locate_radius__b.f64",
+   26
+  ],
+  "d": [
+   "locate_radius__d.f64",
+   26
+  ],
+  "r": [
+   "locate_radius__r.f64",
+   26
+  ],
+  "pub": [
+   "locate_radius__pub.f64",
+   26
+  ]
+ }
+}

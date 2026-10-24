@@ -1,0 +1,191 @@
+{
+ "name": "localize_tracker",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "n_steps": 60,
+  "n_pixels": 192,
+  "n_variants": 2,
+  "variants": "a,b",
+  "b_tracker.z_threshold": 4.0,
+  "b_tracker.centroid_radius_m": 0.75,
+  "b_tracker.accel_psd": 0.5,
+  "b_tracker.meas_noise_m": 0.3,
+  "b_tracker.init_speed_std_ms": 0.5,
+  "b_tracker.max_coast_s": 1.0,
+  "b_tracker.clamp_to_room": 0,
+  "cmp.a_confidence": "rule:each",
+  "cmp.a_cov_xx": "rule:each",
+  "cmp.a_cov_xy": "rule:each",
+  "cmp.a_cov_yy": "rule:each",
+  "cmp.a_cz": "rule:each",
+  "cmp.a_est": "exact",
+  "cmp.a_pos_x": "rule",
+  "cmp.a_pos_y": "rule",
+  "cmp.a_sigma": "rule:each",
+  "cmp.a_sigma_m": "rule:each",
+  "cmp.a_tracking": "exact",
+  "cmp.a_vel_x": "rule",
+  "cmp.a_vel_y": "rule",
+  "cmp.a_x": "rule",
+  "cmp.a_y": "rule",
+  "cmp.b_confidence": "rule:each",
+  "cmp.b_cov_xx": "rule:each",
+  "cmp.b_cov_xy": "rule:each",
+  "cmp.b_cov_yy": "rule:each",
+  "cmp.b_cz": "rule:each",
+  "cmp.b_est": "exact",
+  "cmp.b_pos_x": "rule",
+  "cmp.b_pos_y": "rule",
+  "cmp.b_sigma": "rule:each",
+  "cmp.b_sigma_m": "rule:each",
+  "cmp.b_tracking": "exact",
+  "cmp.b_vel_x": "rule",
+  "cmp.b_vel_y": "rule",
+  "cmp.b_x": "rule",
+  "cmp.b_y": "rule",
+  "cmp.cz_z": "input",
+  "cmp.image": "input",
+  "cmp.t": "input",
+  "cmp.z": "rule:each"
+ },
+ "arrays": {
+  "t": [
+   "localize_tracker__t.f64",
+   60
+  ],
+  "image": [
+   "localize_tracker__image.f64",
+   11520
+  ],
+  "z": [
+   "localize_tracker__z.f64",
+   60
+  ],
+  "cz_z": [
+   "localize_tracker__cz_z.f64",
+   9
+  ],
+  "a_est": [
+   "localize_tracker__a_est.f64",
+   60
+  ],
+  "a_x": [
+   "localize_tracker__a_x.f64",
+   60
+  ],
+  "a_y": [
+   "localize_tracker__a_y.f64",
+   60
+  ],
+  "a_sigma_m": [
+   "localize_tracker__a_sigma_m.f64",
+   60
+  ],
+  "a_confidence": [
+   "localize_tracker__a_confidence.f64",
+   60
+  ],
+  "a_cov_xx": [
+   "localize_tracker__a_cov_xx.f64",
+   60
+  ],
+  "a_cov_xy": [
+   "localize_tracker__a_cov_xy.f64",
+   60
+  ],
+  "a_cov_yy": [
+   "localize_tracker__a_cov_yy.f64",
+   60
+  ],
+  "a_tracking": [
+   "localize_tracker__a_tracking.f64",
+   60
+  ],
+  "a_pos_x": [
+   "localize_tracker__a_pos_x.f64",
+   60
+  ],
+  "a_pos_y": [
+   "localize_tracker__a_pos_y.f64",
+   60
+  ],
+  "a_vel_x": [
+   "localize_tracker__a_vel_x.f64",
+   60
+  ],
+  "a_vel_y": [
+   "localize_tracker__a_vel_y.f64",
+   60
+  ],
+  "a_sigma": [
+   "localize_tracker__a_sigma.f64",
+   60
+  ],
+  "a_cz": [
+   "localize_tracker__a_cz.f64",
+   9
+  ],
+  "b_est": [
+   "localize_tracker__b_est.f64",
+   60
+  ],
+  "b_x": [
+   "localize_tracker__b_x.f64",
+   60
+  ],
+  "b_y": [
+   "localize_tracker__b_y.f64",
+   60
+  ],
+  "b_sigma_m": [
+   "localize_tracker__b_sigma_m.f64",
+   60
+  ],
+  "b_confidence": [
+   "localize_tracker__b_confidence.f64",
+   60
+  ],
+  "b_cov_xx": [
+   "localize_tracker__b_cov_xx.f64",
+   60
+  ],
+  "b_cov_xy": [
+   "localize_tracker__b_cov_xy.f64",
+   60
+  ],
+  "b_cov_yy": [
+   "localize_tracker__b_cov_yy.f64",
+   60
+  ],
+  "b_tracking": [
+   "localize_tracker__b_tracking.f64",
+   60
+  ],
+  "b_pos_x": [
+   "localize_tracker__b_pos_x.f64",
+   60
+  ],
+  "b_pos_y": [
+   "localize_tracker__b_pos_y.f64",
+   60
+  ],
+  "b_vel_x": [
+   "localize_tracker__b_vel_x.f64",
+   60
+  ],
+  "b_vel_y": [
+   "localize_tracker__b_vel_y.f64",
+   60
+  ],
+  "b_sigma": [
+   "localize_tracker__b_sigma.f64",
+   60
+  ],
+  "b_cz": [
+   "localize_tracker__b_cz.f64",
+   9
+  ]
+ }
+}

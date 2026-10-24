@@ -21,7 +21,13 @@ const WRITERS: &[(&str, &str)] = &[(
 
 /// May depend on saans-scene WITHOUT `write`: they read scenes to simulate
 /// or draw them, and carry or produce CSI.
-const READERS: &[(&str, &str)] = &[("saans-roomsim", "simulates the CSI a declared room would produce")];
+const READERS: &[(&str, &str)] = &[
+    ("saans-roomsim", "simulates the CSI a declared room would produce"),
+    (
+        "saans-locate",
+        "locates simulated people and a simulated phone; reads scenes only under its `roomsim` feature and in its tests",
+    ),
+];
 
 /// Does this manifest declare a dependency on saans-scene, in any table?
 fn depends_on_scene(manifest: &str) -> bool {

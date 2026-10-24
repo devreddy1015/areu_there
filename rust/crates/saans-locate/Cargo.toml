@@ -1,0 +1,27 @@
+[package]
+name = "saans-locate"
+description = "Locate v1 (spec/locate.md): people and phone positions with uncertainty from Room Sim data. The ported RTI (wifisense/localize), the weighted-link-midpoint baseline, and a simulated phone tracked by Wi-Fi RTT and RSSI. Every output is SIM in Phase 4."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+# The Room Sim pipeline (spec/locate.md §10): reads scenes WITHOUT
+# saans-scene's `write` (ADR-008 decision 1; tests/boundary.rs READERS).
+roomsim = ["dep:saans-roomsim", "dep:saans-scene"]
+
+[dependencies]
+saans-sim = { path = "../saans-sim" }
+saans-dsp = { path = "../saans-dsp" }
+saans-roomsim = { path = "../saans-roomsim", optional = true }
+saans-scene = { path = "../saans-scene", optional = true }
+
+[dev-dependencies]
+saans-roomsim = { path = "../saans-roomsim" }
+saans-scene = { path = "../saans-scene" }
+sha2 = "0.10"
+
+# spec/locate.md §12a's measured numbers (SIM), printed per shipped scene.
+[[example]]
+name = "locate_measure"
+required-features = ["roomsim"]

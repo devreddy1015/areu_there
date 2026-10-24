@@ -1,0 +1,105 @@
+label SIM
+spec locate_v1
+reasons no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated
+n_perimeter_cases 7
+n_grid_cases 12
+n_ni 30
+n_ew 8
+n_err 19
+err.0 Room(0.0, 6.0)
+err.1 Room(8.0, nan)
+err.2 perimeter_nodes(Room(8,6), 1)
+err.3 perimeter_nodes(Room(8,6), 4, inset_m=-0.1)
+err.4 perimeter_nodes(Room(8,6), 4, inset_m=3.0)
+err.5 PixelGrid(Room(8,6), nan)
+err.6 PixelGrid(Room(8,6), 0.0)
+err.7 PixelGrid(Room(8,6), -0.5)
+err.8 PixelGrid(Room(8,6), 0.5).pixel_index(16, 0)
+err.9 PixelGrid(Room(8,6), 0.5).pixel_index(-1, 0)
+err.10 PixelGrid(Room(8,6), 0.5).nearest_index(nan, 1.0)
+err.11 Geometry(Room(8,6), [Node(0, 1, 1)])
+err.12 Geometry(Room(8,6), nodes 0 at (1,1) and 0 at (2,2))
+err.13 Geometry(Room(8,6), nodes 0 and 1 both at (1,1))
+err.14 Geometry(Room(8,6), nodes 0 (1,1), 1 (2,2), lambda_m=0.0)
+err.15 Geometry(Room(8,6), nodes 0 (1,1), 1 (2,2), lambda_m=nan)
+err.16 Geometry.perimeter(8).link_index(0, 0)
+err.17 Geometry.perimeter(8).node(99)
+err.18 ellipse_weight(link (0,0)-(4,0), 1.0, 1.0, 0.0)
+cmp.err_code exact
+cmp.ew_ax input
+cmp.ew_ay input
+cmp.ew_bx input
+cmp.ew_by input
+cmp.ew_excess rule:each
+cmp.ew_lambda input
+cmp.ew_px input
+cmp.ew_py input
+cmp.ew_weight rule:each
+cmp.g_n_pixels exact
+cmp.g_n_x exact
+cmp.g_n_y exact
+cmp.g_pitch input
+cmp.g_pitch_x rule:each
+cmp.g_pitch_y rule:each
+cmp.g_pixel_area rule:each
+cmp.g_room_h input
+cmp.g_room_w input
+cmp.link_len rule
+cmp.link_mid_x rule
+cmp.link_mid_y rule
+cmp.link_rx exact
+cmp.link_tx exact
+cmp.ni_grid input
+cmp.ni_index exact
+cmp.ni_x input
+cmp.ni_y input
+cmp.node_id exact
+cmp.node_x rule
+cmp.node_y rule
+cmp.pc_inset input
+cmp.pc_n input
+cmp.pc_nlinks exact
+cmp.pc_offset input
+cmp.pc_room_h input
+cmp.pc_room_w input
+cmp.pixel_x rule:ptr:g_n_pixels
+cmp.pixel_y rule:ptr:g_n_pixels
+array.pc_room_w 7
+array.pc_room_h 7
+array.pc_n 7
+array.pc_inset 7
+array.pc_offset 7
+array.node_id 45
+array.node_x 45
+array.node_y 45
+array.pc_nlinks 7
+array.link_tx 298
+array.link_rx 298
+array.link_len 298
+array.link_mid_x 298
+array.link_mid_y 298
+array.g_room_w 12
+array.g_room_h 12
+array.g_pitch 12
+array.g_n_x 12
+array.g_n_y 12
+array.g_n_pixels 12
+array.g_pitch_x 12
+array.g_pitch_y 12
+array.g_pixel_area 12
+array.pixel_x 1529
+array.pixel_y 1529
+array.ni_grid 30
+array.ni_x 30
+array.ni_y 30
+array.ni_index 30
+array.ew_ax 8
+array.ew_ay 8
+array.ew_bx 8
+array.ew_by 8
+array.ew_px 8
+array.ew_py 8
+array.ew_lambda 8
+array.ew_weight 8
+array.ew_excess 8
+array.err_code 19

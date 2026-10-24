@@ -1,0 +1,46 @@
+{
+ "name": "localize_forward",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "room_w": 8.0,
+  "room_h": 6.0,
+  "n_nodes": 6,
+  "pitch_m": 0.5,
+  "lambda_m": 0.5,
+  "n_links": 30,
+  "n_pixels": 192,
+  "n_cases": 3,
+  "min_boundary_margin": 0.00029697304516407286,
+  "n_err": 1,
+  "err.0": "forward_project(geometry, 191 zeros)",
+  "cmp.err_code": "exact",
+  "cmp.image": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.y": "rule:30"
+ },
+ "arrays": {
+  "node_x": [
+   "localize_forward__node_x.f64",
+   6
+  ],
+  "node_y": [
+   "localize_forward__node_y.f64",
+   6
+  ],
+  "image": [
+   "localize_forward__image.f64",
+   576
+  ],
+  "y": [
+   "localize_forward__y.f64",
+   90
+  ],
+  "err_code": [
+   "localize_forward__err_code.f64",
+   1
+  ]
+ }
+}
