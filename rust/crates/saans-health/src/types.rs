@@ -40,6 +40,21 @@ pub struct SpaceConfig {
     /// Possible-collapse detection. Off by default: WiFi cannot tell
     /// "fell" from "sat down heavily" (see the S3 evaluation).
     pub collapse_detection: bool,
+    /// Hold presence for up to this long after a fall-shaped motion: a
+    /// burst that stops abruptly, after which the links read empty with
+    /// nothing moving. A person on the floor can be too weak a breather
+    /// for the links to see (NOTES.md §14), and without the hold the space
+    /// reads empty and the inactivity alert never starts counting. Held
+    /// presence is inferred, not measured: `SpaceState::occupied` stays
+    /// what the links say and `presence_held` says it is being held.
+    ///
+    /// Off (0) by default, like collapse detection and for the same
+    /// reason: it cannot tell "fell out of sight" from "walked out". In
+    /// simulation about one departure in four engages it, and in a room
+    /// that then stays empty each of those is an inactivity alert 30 min
+    /// later. To turn it on, set it longer than `inactivity_alert_min`
+    /// (35 for the default 30).
+    pub fall_hold_min: f64,
     pub breathing_pause_min_s: f64,
     pub rate_high_bpm: f64,
     pub rate_low_bpm: f64,
@@ -55,6 +70,7 @@ impl Default for SpaceConfig {
             presence_quorum: 0,
             inactivity_alert_min: 30.0,
             collapse_detection: false,
+            fall_hold_min: 0.0,
             breathing_pause_min_s: 10.0,
             rate_high_bpm: 24.0,
             rate_low_bpm: 8.0,
@@ -213,4 +229,8 @@ pub struct SpaceState {
     pub links_total: u8,
     pub vitals: bool,
     pub active_alerts: Vec<String>,
+    /// The links read empty, but presence is being held after a
+    /// fall-shaped motion (`SpaceConfig::fall_hold_min`). Inferred, not
+    /// measured: `occupied` is what the links say.
+    pub presence_held: bool,
 }

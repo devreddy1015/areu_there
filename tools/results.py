@@ -374,6 +374,26 @@ QUOTES = [
           r"as often lying as upright \((\d+) spots\s+against (\d+)\)",
           [r"lying\s+matched SNR.*under half of matched: (\d+) spots",
            r"upright\s+matched SNR.*under half of matched: (\d+) spots"]),
+    # NOTES.md §14, the presence hold: benefit from `lying`, cost per
+    # column from `detectors` and `detectors-box`.
+    Quote("NOTES.md", "lying",
+          r"\| share of the still period read empty, links only \| ([\d.]+)% \| ([\d.]+)% \|\n"
+          r"\| the same, after the hold \| \*\*([\d.]+)%\*\* \| \*\*([\d.]+)%\*\* \|\n"
+          r"\| spots read mostly empty, after the hold, of 1200 \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|",
+          [r"^  all\s+([\d.]+)%\s+([\d.]+)%",
+           r"AFTER THE PRESENCE HOLD[\s\S]*?^  all\s+([\d.]+)%\s+([\d.]+)%",
+           r"AFTER THE PRESENCE HOLD[\s\S]*?^  all\s+[\d.]+%\s+[\d.]+%\s+(\d+)/1200\s+(\d+)/1200"]),
+    *[Quote("NOTES.md", suite,
+            r"\| departures that engaged the hold \| " + (r"[^|]*\| " if col else "")
+            + r"\*\*(\d+) of (\d+)\*\*[^\n]*\n"
+            r"\| falls flagged as a possible collapse, with / without \| " + (r"[^|]*\| " if col else "")
+            + r"(\d+) / (\d+)[^\n]*\n"
+            r"\| inactivity alerts raised while holding an empty room \| " + (r"[^|]*\| " if col else "")
+            + r"(\d+)",
+            [r"departures that engaged the hold: (\d+) of (\d+)",
+             r"^  collapse\s+36\s+\d+\s+[\d.]+\s+[\d.]+\s+\d+\s+\d+\s+\S+\s+(\d+)/36 \((\d+)\)$",
+             r"raised while holding an empty room: inactivity (\d+)"])
+      for suite, col in (("detectors", 0), ("detectors-box", 1))],
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",
           [r"breathing BNR, best subcarrier, dB\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)"]),

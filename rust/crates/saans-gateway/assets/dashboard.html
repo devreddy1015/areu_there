@@ -742,6 +742,7 @@ function spaceCard(s) {
       'node sends vitals without consent: ' + s.vitals_gated_links.join(', ')));
   }
   if (s.collapse_detection) badges.append(el('span', { class: 'badge' }, 'collapse detection'));
+  if (s.presence_held) badges.append(el('span', { class: 'badge', 'data-k': 'warn' }, 'presence held after a fall-shaped motion'));
   if (s.resting) badges.append(el('span', { class: 'badge' }, 'resting'));
   add(body, badges);
 
@@ -751,6 +752,8 @@ function spaceCard(s) {
     add(st, el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
   } else if (kind === 'blind') {
     add(st, el('small', null, 'no usable link — not "empty"'));
+  } else if (kind === 'empty' && s.presence_held) {
+    add(st, el('small', null, 'by the links — presence held after a fall-shaped motion (inferred, not measured)'));
   }
   add(body, st);
 
@@ -817,6 +820,7 @@ function renderDetail(d, hist) {
   add(head, el('b', null, stateWord(kind)));
   if (kind === 'occ' && s.occupied_since_s != null && s.t_s != null) add(head, el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
   if (kind === 'blind') add(head, el('small', null, 'no usable link — not "empty"'));
+  if (kind === 'empty' && s.presence_held) add(head, el('small', null, 'by the links — presence held after a fall-shaped motion (inferred, not measured)'));
   add(body, head);
 
   const dl = el('dl');
