@@ -760,3 +760,89 @@ someone sitting still *is* a tachypnea false alarm, so this rule removes
 false alerts, not only BPM error. True tachypnea detection is unchanged
 at 31/36, as are occupancy, pause detection and every other alert row:
 the rule did not suppress genuinely fast breathing.
+
+---
+
+## 11. One, two or three links, on layouts the firmware can build (Oct 2026)
+
+Everything here is **SYNTHETIC**. `saans links` (`docs/RESULTS.md`).
+
+### Why `saans eval`'s per-layout rows could not answer this
+
+ADR-006 owes a measurement of the blind-spot rate with 1, 2 and 3 links.
+`saans eval` already prints rows for each, and they were the source of
+CAPABILITY_LIMITS §4's "still-person false-empty goes back up from 0.4%
+to 1.3%" at three links. Two things stop those rows answering the
+question:
+
+- **Its 3-link layout moves the nodes.** One and two links use nodes at
+  (1.5, 2.5), (4.5, 2.5), (3.0, 4.6); three links uses (1.0, 1.0),
+  (5.0, 1.0), (3.0, 4.5). Link count and geometry change together.
+- **It connects every pair of three nodes**, which needs two
+  transmitters. The firmware has one: `rx_role.cpp:76` hard-codes
+  `tx_id = 0xFF`. On hardware, a third link means a fourth board.
+
+So `saans links` keeps one transmitter and adds receivers -- N1, then
+N2, then N3 at (3.0, 0.4), N2's mirror image across the TX–N1 line --
+and runs every row on the same seats and seeds, with `saans eval`'s
+rooms, noise, loss and body.
+
+### Measured
+
+Ground truth only, 10,000 seats: the share where *every* link is weak or
+blind.
+
+| layout | all blind (best < 0.2) | all weak (best < 0.5) |
+|---|---|---|
+| 1 link | 4.5% | 23.4% |
+| 2 links | **0.2%** | 4.6% |
+| 3 links | **0.1%** | 1.6% |
+
+Production path, 1,200 seats per row: 120 s of empty room after
+calibration, then a still breather for 300 s.
+
+| configuration | still false-empty | seats mostly missed | empty false-occupied | breathing coverage |
+|---|---|---|---|---|
+| 1 link | 2.8% | **44**/1200 | 0.2% | 95.6% |
+| 2 links | 0.0% | **0**/1200 | 0.5% | 99.8% |
+| 3 links, quorum 2 (default) | 0.0% | 2/1200 | **0.0%** | 99.9% |
+| 3 links, quorum 1 | 0.0% | 0/1200 | 0.7% | 100.0% |
+| eval's 3-link geometry, quorum 2 | 0.2% | 6/1200 | 0.0% | 99.8% |
+| eval's 3-link geometry, quorum 1 | 0.0% | 0/1200 | 0.5% | 100.0% |
+
+"Mostly missed" is a seat at which a still person was reported empty
+more than 10% of the time: the person, not the sample.
+
+### What it says
+
+1. **The second link is the one that matters.** Seats where a still
+   person is mostly missed fall from 44 to 0, and the share of seats
+   blind to every link from 4.5% to 0.2%. This is ADR-006's decision,
+   measured on the topology it will be built in.
+2. **The third link finds no extra people.** At the default quorum it
+   misses 2 seats where two links missed none -- within noise -- and
+   what it buys instead is false occupancy from noise falling from 0.5%
+   to 0.0%, because a majority of three outvotes one noisy link. So a
+   fourth board, as a third receiver, is a false-alarm measure in a
+   room this size, not a detection one. `docs/HARDWARE.md`'s advice to
+   buy it as a spare stands, now on evidence.
+3. **The quorum alone can cause misses, but only with the geometry.** In
+   eval's 3-link geometry, quorum 2 misses 6 of 1,200 seats and quorum 1
+   none: same seats, so the quorum is the cause there. In the buildable
+   geometry quorum 2 costs nothing measurable. CAPABILITY_LIMITS' 0.4% →
+   1.3% comes from eval's whole scenario mix (nights, lying down) and
+   also changes the geometry; this separates part of it, not all of it.
+
+### Two things that make these numbers easy to misread
+
+- **A first run at 300 seats per row said the single link missed 0.5%
+  of the time, with 3 seats mostly missed.** At 1,200 it is 2.8% and
+  44. The first 150 seeds per room happened to be kind. Rare failures
+  live in a few seats, so a few hundred seats is not enough to see them;
+  this is the second time in two days a small sample would have put a
+  wrong number in a document (§10 has the first).
+- **"Empty false-occupied" here is noise only.** The majority quorum
+  exists so that one link picking up a person in the *next* room cannot
+  mark this one occupied, and the simulator has no next room. The
+  quorum-1 row looks nearly free; in a building it is not, and its real
+  cost is a bench measurement.

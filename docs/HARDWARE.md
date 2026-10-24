@@ -70,10 +70,15 @@ reading room is `links = [{ rx = 1, tx = 255 }, { rx = 2, tx = 255 }]`
 `tx = 255` meaning "an access point / unknown", which is what the
 firmware sends.
 
-**Buy a fourth as a spare.** That is a judgement, not a measurement: a
-dead or flaky board stops a bench session that took a week to schedule,
-and a spare costs less than a second trip. Nothing in the repository
-says four.
+**Buy a fourth as a spare.** That began as a judgement -- a dead or
+flaky board stops a bench session that took a week to schedule, and a
+spare costs less than a second trip -- and a measurement now agrees
+with it. Wired as a third receiver, a fourth board finds no extra
+people in a room this size: in simulation, seats where a still person
+is mostly missed go 44 → 0 of 1,200 from one link to two, and stay
+there at three (`NOTES.md` §11, SYNTHETIC). What the third link does buy
+is fewer false "occupied" readings from noise. Worth knowing before
+buying for detection; not a reason to skip the spare.
 
 Buy them all the same variant. The node id is compile-time
 (`CONFIG_SAANS_NODE_ID`, `edge/firmware/main/Kconfig.projbuild:18-24`),
