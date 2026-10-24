@@ -41,7 +41,7 @@ MAX_WALL_THICKNESS_M = 1.0
 NODE_WALL_CLEARANCE_M = 0.01
 MAX_PEOPLE = 100
 
-PROVENANCES = ("surveyed", "roomplan_import", "hand_written")
+PROVENANCES = ("surveyed", "roomplan_import", "hand_written", "generated")
 WALL_MATERIALS = ("concrete", "brick", "drywall", "glass", "wood")
 OBJECT_KINDS = ("bed", "table", "chair", "almirah", "sofa", "door", "window")
 OBJECT_MATERIALS = ("wood", "metal", "fabric", "glass")

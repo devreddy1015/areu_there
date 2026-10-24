@@ -527,6 +527,7 @@ pub fn provenance_name(p: Provenance) -> &'static str {
         Provenance::Surveyed => "surveyed",
         Provenance::RoomplanImport => "roomplan_import",
         Provenance::HandWritten => "hand_written",
+        Provenance::Generated => "generated",
     }
 }
 
@@ -635,6 +636,7 @@ fn provenance_from_name(s: &str) -> Option<Provenance> {
         Provenance::Surveyed,
         Provenance::RoomplanImport,
         Provenance::HandWritten,
+        Provenance::Generated,
     ]
     .into_iter()
     .find(|p| provenance_name(*p) == s)
@@ -1311,7 +1313,7 @@ fn manifest_at(v: &Value) -> Result<Manifest, String> {
         provenance_from_name(string(scene, "scene", "provenance")?).ok_or_else(|| {
             at(
                 "scene.provenance",
-                "not surveyed, roomplan_import or hand_written",
+                "not surveyed, roomplan_import, hand_written or generated",
             )
         })?;
 

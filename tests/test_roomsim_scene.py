@@ -101,6 +101,10 @@ class TestSceneRejections(unittest.TestCase):
         ]
         for doc in bad:
             self.assertTrue(problems(doc), doc)
+        # Every provenance the scene format names is accepted, the
+        # generated one (spec/dataset.md) included.
+        for provenance in ("surveyed", "roomplan_import", "hand_written", "generated"):
+            self.assertEqual(problems(dict(base, provenance=provenance)), [], provenance)
         self.assertTrue(problems('{"schema_version": 1, "schema_version": 1}'))
         self.assertTrue(problems("not json"))
         self.assertTrue(problems('{"x": NaN}'))

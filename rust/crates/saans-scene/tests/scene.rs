@@ -109,6 +109,19 @@ fn a_scene_round_trips_through_json() {
     }
 }
 
+/// A generated scene (spec/dataset.md) says so, and the word survives a
+/// round trip: it is the only thing telling a training scene from a room.
+#[test]
+fn a_generated_scene_says_so_on_a_round_trip() {
+    let mut s = minimal();
+    s.provenance = Provenance::Generated;
+    let text = s.to_json_pretty();
+    assert!(text.contains("\"provenance\": \"generated\""), "{text}");
+    let back = Scene::from_json_str("generated", &text).expect("re-reading our own output");
+    assert_eq!(back.provenance, Provenance::Generated);
+    assert_eq!(s, back);
+}
+
 /// The written file and the Rust types must not drift apart: anything
 /// serde renames or defaults away shows up here as a difference between
 /// the file on disk and the file we would write.

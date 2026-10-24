@@ -5,6 +5,7 @@
 //!     saans import-roomplan FILE.json --out SCENE.json [--name NAME]
 //!     saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]
 //!     saans roomsim-eval --scene SCENE.json [--seconds S] [--seed N] [--variant declared|with_walker|empty] [--records-out FILE] [--json]
+//!     saans gen-dataset --out DIR [--scenes N] [--seconds S] [--seed N] [--threads N] [--no-impair] [--from DIR] [--overwrite]
 //!
 //! `export` runs a simulated scenario through the node-side FeatureExtractor
 //! and writes the FeatureFrames as a pcap, so `saans-gateway --replay`
@@ -25,8 +26,13 @@
 //! demo's statistics of the run (spec/livedemo.md §10), every line SIM, or
 //! one JSON object with `--json`; `--records-out` writes the run as a
 //! records file for the gateway's `--room-replay` (§6).
+//!
+//! `gen-dataset` draws random scenes, runs Room Sim and Locate on each and
+//! writes one `.npz` shard per scene with a manifest (spec/dataset.md),
+//! every file SIM.
 
 mod eval;
+mod gen_dataset;
 mod pcap;
 mod roomsim_eval;
 mod roomsim_export;
@@ -38,8 +44,9 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}",
-        roomsim_eval::USAGE
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}\n  {}",
+        roomsim_eval::USAGE,
+        gen_dataset::USAGE
     );
     ExitCode::from(2)
 }
@@ -64,6 +71,7 @@ fn main() -> ExitCode {
         Some("import-roomplan") => import_roomplan(&args),
         Some("roomsim-export") => roomsim_export(&args),
         Some("roomsim-eval") => roomsim_eval::main(&args),
+        Some("gen-dataset") => gen_dataset::main(&args),
         _ => usage(),
     }
 }

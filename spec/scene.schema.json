@@ -18,8 +18,8 @@
       "minLength": 1
     },
     "provenance": {
-      "description": "How this geometry was obtained. Shown next to every drawing of the scene (ADR-008 decision 4). surveyed: measured in the real room. roomplan_import: from an Apple RoomPlan scan; geometry measured, materials and wall thickness guessed. hand_written: written without measuring a particular room (an example, a fixture, a plan drawing).",
-      "enum": ["surveyed", "roomplan_import", "hand_written"]
+      "description": "How this geometry was obtained. Shown next to every drawing of the scene (ADR-008 decision 4). surveyed: measured in the real room. roomplan_import: from an Apple RoomPlan scan; geometry measured, materials and wall thickness guessed. hand_written: written without measuring a particular room (an example, a fixture, a plan drawing). generated: drawn at random by a program (saans gen-dataset), describing no real room.",
+      "enum": ["surveyed", "roomplan_import", "hand_written", "generated"]
     },
     "room": { "$ref": "#/$defs/room" },
     "walls": {

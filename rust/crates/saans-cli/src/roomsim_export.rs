@@ -153,6 +153,7 @@ fn provenance_name(p: Provenance) -> &'static str {
         Provenance::Surveyed => "surveyed",
         Provenance::RoomplanImport => "roomplan_import",
         Provenance::HandWritten => "hand_written",
+        Provenance::Generated => "generated",
     }
 }
 

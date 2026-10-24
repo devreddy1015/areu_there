@@ -62,6 +62,7 @@ const PROVENANCE = {
   surveyed: 'surveyed — measured in the real room',
   roomplan_import: 'RoomPlan import — geometry from a scan; materials and wall thickness are guesses',
   hand_written: 'hand-written — an illustration, not a measurement of a real room',
+  generated: 'generated — drawn at random for training data (SIM), not a real room',
 };
 
 /**

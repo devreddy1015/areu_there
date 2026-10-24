@@ -185,3 +185,12 @@ is reworded in the change that makes it false, not before.
 - An immersive view was listed as "a goal worth building *toward*"
   (UI_GAP_ANALYSIS §2). This is that step, taken without also claiming
   the localisation accuracy that would make it mean more than it does.
+
+## Amendments after acceptance
+- **2026-10-24, owner-approved (Phase 6).** Decision 4's provenance list
+  gains `generated`: a scene drawn at random by `saans gen-dataset`
+  (spec/dataset.md) to make simulated training data. It describes no real
+  room, every number derived from it is SIM, and the demo serves only its
+  embedded hand-written scenes, so a generated scene is never drawn as a
+  room. The bullet above ("Every scene is someone's measurement") holds
+  for every other provenance.

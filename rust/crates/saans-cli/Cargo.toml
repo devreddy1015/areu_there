@@ -24,3 +24,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # scene_sha256 in the roomsim-export manifest (the digest of the file's bytes).
 sha2 = "0.10"
+# `saans gen-dataset` (spec/dataset.md): scenes run in parallel; the output
+# does not depend on the thread count (§9).
+rayon = "1"

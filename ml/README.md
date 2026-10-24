@@ -1,0 +1,31 @@
+# ml/ — dataset v1 tooling (SIM)
+
+Python 3.11 with numpy and matplotlib, run in `.venv`. Reads what
+`saans gen-dataset` writes (spec/dataset.md). Every scene, packet, label
+and baseline in it is **SIM**: not a room anyone measured.
+
+```sh
+.venv/bin/python ml/plot_sample.py DIR --scene 0 --window 3 --out sample.png [--links 3]
+.venv/bin/python -m unittest discover -s ml/tests
+SAANS_DATASET_DIR=DIR .venv/bin/python -m unittest discover -s ml/tests   # also checks every real shard
+```
+
+```python
+from ml import roomsim_dataset as rd
+
+manifest = rd.load_manifest(DIR)                 # refuses anything not labelled SIM / "dataset v1"
+split = rd.splits(manifest)                      # {"train", "val", "test"}: by scene, never by window
+scene = rd.load_scene(DIR, split["train"][0], manifest=manifest)   # sha256, label and §7.2 checked
+k = int(scene["window_end_tick"][w])             # the brief's 2 s window w ends at tick 4w + 3
+win = rd.window(scene, k, 2.0)                   # amplitude [L, 56, T] float32, mask [L, T], link_mask [L]
+truth = rd.labels_at(scene, k)                   # presence, count, zone_occupied, people
+wlm = rd.baseline_at(scene, k)["wlm"]            # centre and radius together, or the abstention reason
+```
+
+Windows are never resampled. Slot `j` of every link holds that link's one
+transmission in the `j`-th of `T = ceil(80ℓ/N)` superframe-long intervals
+ending at `t_k`, so the newest packet is always slot `T - 1`; a link with
+one column fewer (when `80ℓ/N` is not an integer), a lost packet, or a
+slot before the stream starts is masked, and its amplitude is NaN unless
+`window(..., fill=0.0)`. Null subcarriers are not masked: use
+`scene["subcarrier_active"]`.

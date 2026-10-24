@@ -74,6 +74,9 @@ pub enum Provenance {
     /// Written by hand without measuring a particular room: an example,
     /// a test fixture, or a plan drawing.
     HandWritten,
+    /// Drawn at random by a program (`saans gen-dataset`, spec/dataset.md
+    /// §2): a simulated room for training data, describing no real room.
+    Generated,
 }
 
 /// The room shell: a box, or a box plus a floor outline for an L-shape.
