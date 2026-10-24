@@ -22,3 +22,4 @@ feature_codec_signed
 features_vitals
 features_private
 sim_geometric
+sim_geometric_3d
