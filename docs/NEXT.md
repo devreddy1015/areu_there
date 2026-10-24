@@ -399,7 +399,20 @@ broker up (~0.44 s for 1200 ticks either way), not against no MQTT at
 all: publishing has a cost of its own (~0.15 s per 1200 ticks, debug
 build), because the core only builds the output stream when something
 consumes it. Not yet run against Home Assistant itself; the exit gate
-used `examples/mqtt_watch.rs` as the subscriber. A4 is next.
+used `examples/mqtt_watch.rs` as the subscriber.
+
+**A4 (browser tests) done**, on branch `saans/browser-tests`. The
+§6 checklist is seven Playwright tests in
+`saans-gateway/tests/browser/`, against the gateway replaying a SYNTHETIC
+night (`examples/fixture_night.rs`) with `--serve`, and a `browser` job
+in CI. The brief's exit gate holds: making the dashboard show withheld
+breathing as "not confidently detected" fails the occupancy-role test.
+So do a 400 px element (the 375 px test), no cap on logins in flight
+(the flood test) and the hall wrongly consented (the leak check), each
+tried. The last one first passed: the fixture's hall was empty at the
+end of the night, so there was nothing to leak. The hall now stays
+occupied to the end, and the check looks for any breathing on its card
+and its Signals panel rather than for one number.
 
 ### 1.10 The basic things
 

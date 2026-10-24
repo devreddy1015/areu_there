@@ -63,6 +63,7 @@ the copy says so on those pages.
 | Simulator (matches Python physics to 1e-14) | `rust/crates/saans-sim` | `cargo test -p saans-sim` |
 | Evaluation | `rust/crates/saans-cli` | `cargo run --release -p saans-cli -- eval` |
 | Gateway, API, dashboard | `rust/crates/saans-gateway` | `cargo test -p saans-gateway` |
+| Dashboard in a browser (Playwright; dev only) | `rust/crates/saans-gateway/tests/browser` | `npm ci && npx playwright install chromium && npx playwright test` |
 | ESP32 DSP + firmware (C++) | `edge/` | `make -C edge/dsp/test check`, `edge/build.sh` |
 
 Rust lives in `rust/` (`~/.cargo/bin/cargo` if cargo is not on PATH).

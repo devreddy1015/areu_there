@@ -242,9 +242,9 @@ now distinguished.
   was acknowledged and resolved from the dashboard, with both actions in
   the audit log. None of that has met a real Telegram bot or paging
   system -- the tests stand in local servers for both.
-- There are no browser end-to-end tests; the UI verification in
-  `COMPLETION_REPORT.md` §6 was manual and is recorded as weaker than a
-  suite (`docs/COMPLETION_REPORT.md:224`).
+- *No longer missing, since 2026-10-24:* browser end-to-end tests. The
+  manual checklist of `COMPLETION_REPORT.md` §6 is a Playwright suite
+  (`saans-gateway/tests/browser/`) run in CI, against a SYNTHETIC replay.
 - `wifisense/roomplan_import.py` is a stub: the mapping table is real,
   the format assumptions are untested (`README.md:335`).
 
