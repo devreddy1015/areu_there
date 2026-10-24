@@ -4,7 +4,9 @@
 use crate::physics::{BodyPoint, LinkChannel, BODY_RCS_M2};
 use crate::plan::{BodyState, Bounds, Plan};
 use crate::rng::Rng;
-use crate::scenario::{Point, Point3, Scenario, SimOptions, Truth, TruthEvent};
+use crate::scenario::{
+    Point, Point3, Scenario, SimOptions, Truth, TruthEvent, Vertical, FLOOR_CHEST_Z_M,
+};
 use saans_dsp::CsiFrame;
 
 /// RSSI of a link whose mean |h| is the unattenuated-LoS 40.
@@ -115,6 +117,49 @@ fn overridden(mut b: BodyState, pos_override: Option<Point>, present: bool) -> B
         b.disp = 0.0;
     }
     b
+}
+
+/// Chest height for a posture `lying` (0 upright .. 1 on the floor), and
+/// whether the chest breathes vertically: only once fully on the floor.
+fn posture(v: &Vertical, lying: f64) -> (f64, bool) {
+    (
+        v.chest_z_m + (FLOOR_CHEST_Z_M - v.chest_z_m) * lying,
+        lying >= 1.0,
+    )
+}
+
+/// The torso in its posture: in a box, at the posture's height and axis;
+/// in the slice, as it always was.
+fn posed_torso(
+    ch: &LinkChannel,
+    sc: &Scenario,
+    centre: Point,
+    lying: f64,
+    pts: &mut Vec<BodyPoint>,
+) {
+    match &sc.room.vertical {
+        None => ch.torso(centre, sc.body_points, sc.body_width_m, BODY_RCS_M2, pts),
+        Some(v) => {
+            let (z, flat) = posture(v, lying);
+            ch.torso_posed(
+                centre,
+                z,
+                flat,
+                sc.body_points,
+                sc.body_width_m,
+                BODY_RCS_M2,
+                pts,
+            );
+        }
+    }
+}
+
+/// The arm at the chest's height in its posture.
+fn posed_arm(ch: &LinkChannel, sc: &Scenario, arm: Point, lying: f64, rcs: f64) -> (f64, f64) {
+    match &sc.room.vertical {
+        None => ch.body_point_path(arm, rcs),
+        Some(v) => ch.body_point_path_at(arm, posture(v, lying).0, rcs),
+    }
 }
 
 // Stream ids for the seed-derived generators.
@@ -390,20 +435,14 @@ impl Simulator {
             re.copy_from_slice(&link.ch.static_re);
             im.copy_from_slice(&link.ch.static_im);
             if body.present {
-                link.ch.torso(
-                    body.centre,
-                    sc.body_points,
-                    sc.body_width_m,
-                    BODY_RCS_M2,
-                    pts,
-                );
+                posed_torso(&link.ch, sc, body.centre, body.lying, pts);
                 for p in pts.iter() {
                     // Chest motion shortens/lengthens the path by gain * disp:
                     // exp(-j k L) * exp(+j k g disp) = exp(-j k (L - g disp)).
                     link.ch.add_path(re, im, p.amp, p.len - p.gain * body.disp);
                 }
                 if opts.arm_rcs_m2 > 0.0 {
-                    let (amp, len) = link.ch.body_point_path(body.arm, opts.arm_rcs_m2);
+                    let (amp, len) = posed_arm(&link.ch, sc, body.arm, body.lying, opts.arm_rcs_m2);
                     link.ch.add_path(re, im, amp, len);
                 }
             }
@@ -532,7 +571,9 @@ impl Simulator {
     /// [`Simulator::sensitivity`] for a body standing at `centre` instead
     /// of where it actually is: what breathing *would* do to this link
     /// from that point. The one physics path both methods use, so the two
-    /// agree bit for bit when `centre` is the current position.
+    /// agree bit for bit when `centre` is the current position. The body
+    /// keeps its current posture: in a box after a fall, this is a map for
+    /// a chest on the floor.
     ///
     /// Independent of [`Simulator::present`]: this is a what-if map, not a
     /// statement that anyone is there.
@@ -551,17 +592,16 @@ impl Simulator {
                 )
             });
         let mut pts = Vec::with_capacity(self.sc.body_points.max(1));
-        l.ch.torso(
-            centre,
-            self.sc.body_points,
-            self.sc.body_width_m,
-            BODY_RCS_M2,
-            &mut pts,
-        );
+        let lying = self.plan.lying(self.now_s);
+        posed_torso(&l.ch, &self.sc, centre, lying, &mut pts);
         let extra: Vec<(f64, f64)> = if self.opts.arm_rcs_m2 > 0.0 {
-            vec![l
-                .ch
-                .body_point_path(self.plan.arm_rest(centre), self.opts.arm_rcs_m2)]
+            vec![posed_arm(
+                &l.ch,
+                &self.sc,
+                self.plan.arm_rest(centre),
+                lying,
+                self.opts.arm_rcs_m2,
+            )]
         } else {
             Vec::new()
         };

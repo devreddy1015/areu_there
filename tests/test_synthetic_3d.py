@@ -225,5 +225,53 @@ class TestHeights(unittest.TestCase):
         self.assertEqual([f.amplitudes for f in a], [f.amplitudes for f in b])
 
 
+
+class TestLyingChest(unittest.TestCase):
+    """chest_axis="vertical": a person lying on their back, whose chest
+    rises and falls instead of moving forward and back."""
+
+    def test_gain_is_the_vertical_part(self):
+        """Gain is (u_tx + u_rx) . z: largest straight below the link, the
+        place an upright chest has none at all."""
+        tx, rx = (1.0, 2.5), (5.0, 2.5)
+        kw = dict(tx_xy_m=tx, rx_xy_m=rx, tx_z_m=1.2, rx_z_m=1.2, body_z_m=0.2, body_xy_m=(3.0, 2.5))
+        lying = SyntheticCsiSource(box(chest_axis="vertical", **kw))
+        upright = SyntheticCsiSource(box(**kw))
+        self.assertAlmostEqual(lying._body_gains[0], 2 * 1.0 / math.sqrt(4.0 + 1.0), places=12)
+        self.assertEqual(upright._body_gains[0], 0.0)
+        self.assertGreater(max(lying.sensitivity()), 0.0)
+
+    def test_level_with_the_link_it_has_none(self):
+        src = SyntheticCsiSource(box(chest_axis="vertical", tx_z_m=1.0, rx_z_m=1.0, body_z_m=1.0))
+        self.assertTrue(all(abs(g) < 1e-12 for g in src._body_gains))
+
+    def test_nodes_below_the_chest_reverse_the_sign(self):
+        """A chest above both nodes (a top bunk) lengthens the path as it
+        rises: the gain is negative, and sensitivity still lands in [0, 1]."""
+        src = SyntheticCsiSource(box(chest_axis="vertical", body_z_m=2.0, body_points=5,
+                                     body_width_m=0.3, n_scatterers=4, seed=3))
+        self.assertTrue(all(g < 0.0 for g in src._body_gains))
+        self.assertTrue(all(0.0 <= v <= 1.0 + 1e-12 for v in src.sensitivity()))
+
+    def test_torso_still_spreads_horizontally(self):
+        src = SyntheticCsiSource(box(chest_axis="vertical", body_points=3, body_width_m=0.4, body_z_m=0.2))
+        self.assertTrue(all(p[2] == 0.2 for p in src.body_point_positions))
+        self.assertAlmostEqual(math.dist(src.body_point_positions[0], src.body_point_positions[-1]), 0.4,
+                               places=12)
+
+    def test_only_in_a_box_and_only_two_axes(self):
+        with self.assertRaises(ValueError):
+            SyntheticCsiSource(geo(chest_axis="vertical"))
+        with self.assertRaises(ValueError):
+            SyntheticCsiSource(box(chest_axis="sideways"))
+
+    def test_horizontal_is_the_default(self):
+        cfg = SyntheticConfig()
+        self.assertEqual(cfg.chest_axis, "horizontal")
+        a = SyntheticCsiSource(box(n_scatterers=3, seed=2)).frames(3)
+        b = SyntheticCsiSource(box(n_scatterers=3, seed=2, chest_axis="horizontal")).frames(3)
+        self.assertEqual([f.amplitudes for f in a], [f.amplitudes for f in b])
+
+
 if __name__ == "__main__":
     unittest.main()

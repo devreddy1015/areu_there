@@ -14,6 +14,10 @@ pub type Point3 = (f64, f64, f64);
 /// `scenes/` puts its nodes at 1.2 m.
 pub const NODE_Z_M: f64 = 1.2;
 
+/// Chest height of a person lying on the floor on their back, where a fall
+/// leaves them in a box ([`Vertical`]).
+pub const FLOOR_CHEST_Z_M: f64 = 0.2;
+
 fn default_node_z() -> f64 {
     NODE_Z_M
 }
@@ -43,10 +47,12 @@ pub struct Vertical {
     /// flip like `wall_reflection`, and like it the same at every angle.
     pub floor_reflection: f64,
     pub ceiling_reflection: f64,
-    /// Chest height: ~1.0 m seated, ~1.3 m standing, ~0.6 m lying in bed.
-    /// One height for the whole timeline; the arm is at it too. The chest
-    /// breathes horizontally, along the horizontal part of the
-    /// tx-chest-rx bisector.
+    /// Upright chest height: ~1.0 m seated, ~1.3 m standing. The person is
+    /// at it whenever upright, standing or seated alike, and breathes
+    /// horizontally, along the horizontal part of the tx-chest-rx
+    /// bisector. A [`crate::scenario::Activity::Fall`] lowers the chest to
+    /// [`FLOOR_CHEST_Z_M`] over the fall, on their back and breathing
+    /// vertically, until they next walk. The arm follows the chest.
     pub chest_z_m: f64,
     /// Heights of the random furniture scatterers, uniform in this range,
     /// drawn after every horizontal draw so a seed puts the same furniture

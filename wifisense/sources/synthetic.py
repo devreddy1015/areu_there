@@ -125,10 +125,14 @@ class SyntheticConfig:
     # Every scene in scenes/ mounts its nodes at 1.2 m.
     tx_z_m: float = 1.2
     rx_z_m: float = 1.2
-    # Chest height: ~1.0 m seated, ~1.3 m standing, ~0.6 m lying in bed.
-    # The chest breathes horizontally, along the horizontal part of the
-    # tx-chest-rx bisector; a torso spreads horizontally at this height.
+    # Chest height: ~1.0 m seated, ~1.3 m standing, ~0.6 m lying in bed,
+    # ~0.2 m lying on the floor. A torso spreads horizontally at this
+    # height, across the horizontal part of the tx-chest-rx bisector.
     body_z_m: float = 1.0
+    # Which way the chest breathes. "horizontal": upright, along the
+    # horizontal part of the bisector. "vertical": lying on the back, the
+    # chest rising and falling. Only in the box.
+    chest_axis: str = "horizontal"
     # |Gamma| of the floor and ceiling, applied with a pi phase flip like
     # the walls'. 0.395 is concrete at 2.437 GHz and normal incidence
     # (ITU-R P.2040, scenes/materials.json); a plasterboard ceiling is
@@ -269,9 +273,13 @@ class SyntheticCsiSource:
         which keeps amplitudes in the int8 range the ESP32 reports.
         """
         cfg = self.config
+        if cfg.chest_axis not in ("horizontal", "vertical"):
+            raise ValueError(f"unknown chest_axis {cfg.chest_axis!r}; use 'horizontal' or 'vertical'")
         if cfg.room_height_m is not None:
             self._init_box()
             return
+        if cfg.chest_axis != "horizontal":
+            raise ValueError("chest_axis='vertical' needs a room height: the 2-D slice has no vertical")
         room, tx, rx, body = cfg.room_m, cfg.tx_xy_m, cfg.rx_xy_m, cfg.body_xy_m
         for name, p in (("tx_xy_m", tx), ("rx_xy_m", rx), ("body_xy_m", body)):
             if not _inside(p, room):
@@ -397,7 +405,11 @@ class SyntheticCsiSource:
                 raise ValueError(f"body point {p} falls outside the room {size}")
             e1, e2 = _dist3(tx, p), _dist3(p, rx)
             amp = math.sqrt(cfg.body_rcs_m2 / n_pts / (4.0 * math.pi)) / (e1 * e2)
-            body_paths.append((amp, e1 + e2, self._chest_motion(tx, rx, p)[1]))
+            if cfg.chest_axis == "vertical":
+                gain = self._chest_rise(tx, rx, p)
+            else:
+                gain = self._chest_motion(tx, rx, p)[1]
+            body_paths.append((amp, e1 + e2, gain))
             self.body_point_positions.append(p)
         self._assemble(scale, paths, body_paths)
 
@@ -473,6 +485,17 @@ class SyntheticCsiSource:
             return ((-hy / hn, hx / hn) if hn > 0.0 else (1.0, 0.0)), 0.0
         return (sx / norm, sy / norm), norm
 
+    @staticmethod
+    def _chest_rise(tx: Point3, rx: Point3, p: Point3) -> float:
+        """Path change per metre of a lying chest rising: (u_tx + u_rx) . z.
+
+        Largest straight below the link, where an upright chest has none,
+        and zero level with both ends. Negative when the chest is above
+        the nodes: rising then lengthens the path.
+        """
+        d1, d2 = _dist3(tx, p), _dist3(p, rx)
+        return (tx[2] - p[2]) / d1 + (rx[2] - p[2]) / d2
+
     # -- physics helpers --------------------------------------------------
 
     def _frequency(self, k: int) -> float:
@@ -498,9 +521,11 @@ class SyntheticCsiSource:
             h0 = s + b
             pts = self._body_points[k] if self._body_points else [b]
             gains = self._body_gains if self._body_gains else [self._path_gain]
-            # dh/dx up to the common factor 2*pi/lambda.
+            # dh/dx up to the common factor 2*pi/lambda. A gain can be
+            # negative (a lying chest above both nodes lengthens the path as
+            # it rises), so the bound uses its magnitude.
             dh = sum((1j * g * bp for bp, g in zip(pts, gains)), 0j)
-            scale = abs(h0) * sum(abs(bp) * g for bp, g in zip(pts, gains))
+            scale = abs(h0) * sum(abs(bp) * abs(g) for bp, g in zip(pts, gains))
             out.append(0.0 if scale == 0.0 else abs((h0.conjugate() * dh).real) / scale)
         return out
 

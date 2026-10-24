@@ -1,0 +1,71 @@
+{
+ "name": "sim_geometric_3d_lying",
+ "scalars": {
+  "n_subcarriers": 56,
+  "fs": 20.0,
+  "carrier_hz": 2437000000.0,
+  "subcarrier_spacing_hz": 312500.0,
+  "room_w": 6.0,
+  "room_h": 5.0,
+  "room_z": 2.7,
+  "tx_x": 1.5,
+  "tx_y": 2.5,
+  "tx_z": 1.2,
+  "rx_x": 4.5,
+  "rx_y": 2.5,
+  "rx_z": 0.8,
+  "body_x": 2.9,
+  "body_y": 3.1,
+  "body_z": 0.2,
+  "chest_vertical": 1,
+  "body_points": 3,
+  "body_width_m": 0.3,
+  "body_rcs_m2": 0.3,
+  "wall_reflection": 0.45,
+  "floor_reflection": 0.395,
+  "ceiling_reflection": 0.247,
+  "reflection_order": 2,
+  "los_attenuation_db": 3.0,
+  "static_magnitude": 40.0,
+  "breathing_bpm": 14.0,
+  "breathing_amplitude_m": 0.005,
+  "heart_bpm": 68.0,
+  "heart_amplitude_m": 0.0004,
+  "excess_path_m": 0.6066145533720322,
+  "n_static_paths": 29
+ },
+ "arrays": {
+  "scatterer_x": [
+   "sim_geometric_3d_lying__scatterer_x.f64",
+   4
+  ],
+  "scatterer_y": [
+   "sim_geometric_3d_lying__scatterer_y.f64",
+   4
+  ],
+  "scatterer_z": [
+   "sim_geometric_3d_lying__scatterer_z.f64",
+   4
+  ],
+  "scatterer_rcs": [
+   "sim_geometric_3d_lying__scatterer_rcs.f64",
+   4
+  ],
+  "body_gain": [
+   "sim_geometric_3d_lying__body_gain.f64",
+   3
+  ],
+  "amplitudes": [
+   "sim_geometric_3d_lying__amplitudes.f64",
+   11200
+  ],
+  "phases": [
+   "sim_geometric_3d_lying__phases.f64",
+   11200
+  ],
+  "sensitivity": [
+   "sim_geometric_3d_lying__sensitivity.f64",
+   56
+  ]
+ }
+}

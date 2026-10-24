@@ -173,8 +173,8 @@ def suites() -> list[Suite]:
              "--room-height", "2.7"],
             rust, "slow",
             "The same runs as the section above, every room a box: concrete floor "
-            "and ceiling, nodes at 1.2 m, chest at 1.0 m for the whole timeline (so "
-            "a fall does not lower it). NOTES.md §13 reads this.",
+            "and ceiling, nodes at 1.2 m, chest at 1.0 m upright and 0.2 m on the "
+            "floor after a fall, breathing vertically there. NOTES.md §13 reads this.",
             scrub=[(r" in \d+ s \(", " (")],
         ),
         Suite(
@@ -317,6 +317,8 @@ QUOTES = [
                         (r"rate alerts in runs whose rate never changes: reader / night / sit-down",
                          r"(\d+) / \**(\d+)\** / (\d+)"),
                         (r"Check alerts per hour on a night, as shipped", r"\**([\d.]+)\**"),
+                        (r"falls flagged as a possible collapse \(detection on to measure it; it ships off\)",
+                         r"\**(\d+)/36\**"),
                     ]),
             [r"OCCUPANCY[^\n]*\n[^\n]*\n  1 link\s+([\d.]+)%",
              r"OCCUPANCY[^\n]*\n(?:[^\n]*\n){2}  2 links\s+([\d.]+)%",
@@ -332,7 +334,8 @@ QUOTES = [
              r"^  reader\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36",
              r"^  night\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36",
              r"^  sit_down\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36",
-             r"^  night\s+36\b.*\s([\d.]+)$"])
+             r"^  night\s+36\b.*\s([\d.]+)$",
+             r"^  collapse\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36"])
       for suite, col in (("detectors", 0), ("detectors-box", 1))],
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",

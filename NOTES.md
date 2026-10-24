@@ -1044,9 +1044,18 @@ What the port adds beyond the reference, because the Rust body moves
 and has an arm:
 
 - **The arm** sits at chest height.
-- **One chest height for the whole timeline.** A fall in a box still
-  ends with the chest at 1.0 m. A chest that drops is the obvious next
-  model change, and per ADR-002 it starts in the reference.
+- **A fall puts the chest on the floor.** Upright, standing or seated
+  alike, the chest is at `Vertical::chest_z_m`. A `Fall` lowers it to
+  0.2 m (`FLOOR_CHEST_Z_M`) on the drop's own smoothstep. There the
+  person lies on their back and breathes vertically, the reference's
+  `chest_axis="vertical"` (golden set `sim_geometric_3d_lying`, matched
+  to 1.5e-14). They stay down until they next walk, and getting up is
+  instant.
+  - Nothing else changes posture. A sit-down stays at one height:
+    standing and seated heights are not separated.
+  - The slice ignores all of it.
+  - Digests on `main` and after the change are identical for every run
+    without a fall, and for every collapse run up to the fall.
 
 Every built-in scenario, `links`, `octave` and the gateway's
 `--simulate` are still the slice; `saans eval --room-height` is the one
@@ -1055,19 +1064,20 @@ way in, below.
 ### Measured: the S3 detectors in a box
 
 `saans eval --room-height 2.7`: the same 252 held-out runs and seeds as
-`saans eval`, every room a box. Both tables are in `docs/RESULTS.md`;
-the slice's reproduced exactly on this code, so the two columns differ
-only by the box.
+`saans eval`, every room a box, with a fall putting the chest on the
+floor. Both tables are in `docs/RESULTS.md`. The slice's reproduced
+exactly on this code, so the two columns differ only by the box.
 
 | held out, 252 runs | slice | box, 2.7 m |
 |---|---|---|
-| occupancy accuracy, 1 / 2 / 3 links | 98.2 / 99.5 / 98.9% | 98.7 / 99.7 / 98.7% |
+| occupancy accuracy, 1 / 2 / 3 links | 98.2 / 99.5 / 98.9% | 98.6 / 99.7 / 98.7% |
 | breathing within 1 BPM, 1 / 2 / 3 links | 93.9 / 100.0 / 100.0% | 91.7 / **96.5** / 100.0% |
 | breathing within 1 BPM, clear-LoS room | 96.2% | **92.3%** |
 | pause sensitivity, 1 / 2 / 3 links | 81.5 / 89.9 / 88.7% | 87.9 / 87.9 / 92.7% |
 | pauses reported on timelines with none | 0 in 70.6 h | **2** in 70.6 h |
 | rate alerts in runs whose rate never changes: reader / night / sit-down | 1 / 0 / 3 | 0 / **3** / 0 |
 | Check alerts per hour on a night, as shipped | 2.88 | **3.34** |
+| falls flagged as a possible collapse (detection on to measure it; it ships off) | 36/36 | **33/36** |
 
 What it says:
 
@@ -1086,9 +1096,23 @@ What it says:
      hour.
 4. **Pause detection improves.** It improves most in the rich-NLoS room
    (82.8% to 93.0%).
-5. **The collapse detector is not tested by this.** The chest stays at
-   1.0 m through a fall, so the box adds nothing about height to the
-   collapse runs.
+5. **The collapse detector misses three falls in a box, all on one
+   seed, for two different reasons.** It needs a motion burst (index
+   >= 8) followed within 5 s by 30 s of stillness with presence held.
+   With the chest staying at 1.0 m the box missed none; dropping it to
+   the floor costs those three.
+   - **A fall too weak to register.** In the clear-LoS room on one and
+     on two links, the fall's peak motion index is 7.1, under the burst
+     threshold; the same fall reads 13.9 in the slice. The three-link
+     layout sees 16.3 and fires.
+   - **A fallen person read as nobody.** In the rich-NLoS room on one
+     link, occupancy reads empty for 92.7% of the five minutes after
+     the fall. The detector takes that as the person having left and
+     drops the burst. Occupancy saying nobody is there while someone
+     lies on the floor is the worse half of this finding. It is one
+     collapse run of 36, on one link, in a simulator; no other collapse
+     run in either model reads empty after the fall. But it is the
+     failure the whole system exists to avoid.
 
 Nothing is retuned on the strength of this. The thresholds were tuned
 on the slice's development seeds, and retuning them on the box would
@@ -1098,7 +1122,11 @@ model does. The S5 recordings decide.
 
 ### Not done
 
-- **A chest that drops in a fall.** Without it the collapse detector
-  has not met height.
+- **Postures beyond a fall.** Standing versus seated heights, getting
+  up, and lying in bed at night are not modelled. Night timelines are
+  upright at 1.0 m.
+- **Why the drop weakens the fall's burst on one and two links.** The
+  geometry of a chest descending through the link's Fresnel zones has
+  not been worked through; the number is measured, not explained.
 - **The 2-D corner bug**, above.
 - **Angle- and polarisation-dependent reflection.**
