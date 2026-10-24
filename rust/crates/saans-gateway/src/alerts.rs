@@ -33,9 +33,17 @@
 //!   route sets `include_health_details`. That is the privacy boundary of
 //!   the alert path, and `outbound` is the one function that crosses it.
 //! - **Secrets.** Tokens and webhook keys come from environment variables
-//!   named in the config. A Telegram request URL *contains the bot token*,
-//!   and `reqwest`'s errors print their URL, so every error is passed
-//!   through `without_url()` before it reaches a log or a stored delivery.
+//!   named in the config, and the service never holds them. At startup it
+//!   checks only *whether* each is set -- a yes or no, which carries
+//!   nothing -- and refuses to start if one is missing; the value is read
+//!   from the environment at the moment a request needs it and dropped
+//!   with the request. The first version kept the token in a field for
+//!   the gateway's lifetime, and CodeQL traced it from there into the
+//!   startup log line: a false positive in substance, since that line
+//!   prints addresses, but correct in shape -- a long-lived secret is one
+//!   careless `{:?}` from a log. A Telegram request URL *contains the bot
+//!   token*, and `reqwest`'s errors print their URL, so every error is
+//!   also passed through `without_url()` before it is stored or logged.
 //! - **Retention.** An alert embeds its event, so a resolved alert is
 //!   dropped once it is older than `event_retention_days` -- the event
 //!   log's clock. Open and acknowledged alerts are never dropped.
@@ -144,13 +152,26 @@ pub struct Outbound {
 struct Telegram {
     chat_id: i64,
     api_base: String,
-    token: String,
+    /// The *name* of the variable holding the bot token, never the token.
+    token_env: String,
     allowed_user_ids: Vec<i64>,
 }
 
 struct Webhook {
     url: String,
-    secret: Option<Vec<u8>>,
+    /// The name of the variable holding the HMAC key, if signing.
+    secret_env: Option<String>,
+}
+
+impl Telegram {
+    /// `{api_base}/bot{token}/{method}`, built for one request. `None`
+    /// when the variable has gone since startup.
+    fn url(&self, method: &str) -> Option<String> {
+        let token = std::env::var(&self.token_env)
+            .ok()
+            .filter(|t| !t.is_empty())?;
+        Some(format!("{}/bot{token}/{method}", self.api_base))
+    }
 }
 
 #[derive(Default)]
@@ -181,13 +202,15 @@ pub struct AlertService {
     inner: Mutex<Inner>,
 }
 
-fn env_secret(what: &str, var: &str) -> io::Result<String> {
-    match std::env::var(var) {
-        Ok(v) if !v.is_empty() => Ok(v),
-        _ => Err(io::Error::new(
+/// Whether `var` is set, and nothing else: the value is not read here.
+fn require_env(what: &str, var: &str) -> io::Result<()> {
+    if std::env::var_os(var).is_some_and(|v| !v.is_empty()) {
+        Ok(())
+    } else {
+        Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("{what}: environment variable {var} is not set"),
-        )),
+        ))
     }
 }
 
@@ -200,27 +223,27 @@ impl AlertService {
     pub fn new(cfg: &GatewayConfig, data_dir: Option<&Path>) -> io::Result<Arc<Self>> {
         let mut telegram = BTreeMap::new();
         for (name, t) in &cfg.telegram {
+            require_env(&format!("telegram.{name}"), &t.bot_token_env)?;
             telegram.insert(
                 name.clone(),
                 Telegram {
                     chat_id: t.chat_id,
                     api_base: t.api_base.trim_end_matches('/').to_string(),
-                    token: env_secret(&format!("telegram.{name}"), &t.bot_token_env)?,
+                    token_env: t.bot_token_env.clone(),
                     allowed_user_ids: t.allowed_user_ids.clone(),
                 },
             );
         }
         let mut webhook = BTreeMap::new();
         for (name, w) in &cfg.webhook {
-            let secret = match &w.secret_env {
-                Some(var) => Some(env_secret(&format!("webhook.{name}"), var)?.into_bytes()),
-                None => None,
-            };
+            if let Some(var) = &w.secret_env {
+                require_env(&format!("webhook.{name}"), var)?;
+            }
             webhook.insert(
                 name.clone(),
                 Webhook {
                     url: w.url.clone(),
-                    secret,
+                    secret_env: w.secret_env.clone(),
                 },
             );
         }
@@ -661,11 +684,19 @@ impl AlertService {
             .post(&w.url)
             .timeout(SEND_TIMEOUT)
             .header(reqwest::header::CONTENT_TYPE, "application/json");
-        if let Some(key) = &w.secret {
-            req = req.header(
-                "X-Saans-Signature",
-                format!("sha256={}", hmac_hex(key, &body)),
-            );
+        if let Some(var) = &w.secret_env {
+            match std::env::var(var) {
+                Ok(key) if !key.is_empty() => {
+                    req = req.header(
+                        "X-Saans-Signature",
+                        format!("sha256={}", hmac_hex(key.as_bytes(), &body)),
+                    );
+                }
+                // Gone since startup: an unsigned page would be refused by
+                // anyone who checks, and accepted silently by anyone who
+                // does not. Neither is a delivery.
+                _ => return (false, format!("{var} is no longer set")),
+            }
         }
         match req.body(body).send().await {
             Ok(r) if r.status().is_success() => (true, format!("HTTP {}", r.status().as_u16())),
@@ -686,7 +717,9 @@ impl AlertService {
                 { "text": "Resolve", "callback_data": format!("saans:res:{}", out.alert_id) },
             ]]},
         });
-        let url = format!("{}/bot{}/sendMessage", t.api_base, t.token);
+        let Some(url) = t.url("sendMessage") else {
+            return (false, format!("{} is no longer set", t.token_env));
+        };
         match self
             .http
             .post(url)
@@ -723,11 +756,17 @@ impl AlertService {
         let Some(t) = self.telegram.get(&name) else {
             return;
         };
-        let url = format!("{}/bot{}/getUpdates", t.api_base, t.token);
         let mut offset: i64 = 0;
         let mut backoff = Duration::from_secs(1);
         loop {
             let started = Instant::now();
+            let Some(url) = t.url("getUpdates") else {
+                tokio::select! {
+                    _ = stop.wait_for(|s| *s) => return,
+                    _ = tokio::time::sleep(Duration::from_secs(60)) => {},
+                }
+                continue;
+            };
             let req = self
                 .http
                 .post(&url)
@@ -803,7 +842,9 @@ impl AlertService {
         } else {
             self.act_from_telegram(name, &who, data)
         };
-        let url = format!("{}/bot{}/answerCallbackQuery", t.api_base, t.token);
+        let Some(url) = t.url("answerCallbackQuery") else {
+            return;
+        };
         let _ = self
             .http
             .post(url)
