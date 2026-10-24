@@ -44,9 +44,9 @@ from typing import NamedTuple
 import numpy as np
 
 __all__ = [
-    "LABEL", "SPEC", "MEMBERS", "META_KEYS", "REASONS", "POSTURES", "SPLITS", "Window",
-    "load_manifest", "load_scene", "load_scene_json", "impairments", "amplitude", "window", "labels_at",
-    "baseline_at", "splits", "zone_of",
+    "LABEL", "SPEC", "MEMBERS", "META_KEYS", "REASONS", "POSTURES", "SPLITS", "Window", "IqWindow",
+    "load_manifest", "load_scene", "load_scene_json", "impairments", "amplitude", "window", "window_iq",
+    "labels_at", "baseline_at", "splits", "zone_of",
 ]
 
 LABEL = "SIM"
@@ -136,6 +136,20 @@ class Window(NamedTuple):
     column: np.ndarray     #: [L, T] int64, the superframe `m` of each slot (may be < 0 near t = 0)
     inside: np.ndarray     #: [L, T] bool, the slot's transmission is in the window and the stream (sent,
     #:                        lost or not): `T` or `T - 1` per link, less only before the stream starts
+
+
+class IqWindow(NamedTuple):
+    """One window of SIM CSI as the stored int8 I/Q, on exactly `Window`'s
+    slots (`window_iq` takes them from `window`): what Phase 7's
+    preprocessing reads, phase included. Masked slots are 0, never NaN."""
+
+    iq: np.ndarray            #: [L, 56, T, 2] int8 `(imag, real)` as stored (§4.2), 0 where masked
+    rssi: np.ndarray          #: [L, T] int8 dBm, 0 where masked
+    mask: np.ndarray          #: [L, T] bool, as `Window.mask`
+    link_mask: np.ndarray     #: [L] bool, as `Window.link_mask`
+    column: np.ndarray        #: [L, T] int64, as `Window.column`
+    inside: np.ndarray        #: [L, T] bool, as `Window.inside`
+    transmission: np.ndarray  #: [L, T] int64, the slot's transmission `n = m*N + tx_slot[l]` (§4.1)
 
 
 def load_manifest(dataset_dir: str) -> dict:
@@ -300,6 +314,30 @@ def window(scene: dict, k: int, length_s: float = 2.0, fill: float = np.nan) -> 
     iq = np.moveaxis(scene["csi_iq"][rows, :, col], 1, 2)   # [L, T, 56, 2] -> [L, 56, T, 2]
     amp = np.where(mask[:, None, :], amplitude(iq), fill).astype(np.float32)
     return Window(amp, mask, mask.any(axis=1), column, inside)
+
+
+def window_iq(scene: dict, k: int, length_s: float = 2.0) -> IqWindow:
+    """The SIM window of `window(scene, k, length_s)` as the stored int8
+    I/Q and RSSI instead of amplitude (§4.2, §4.3), for Phase 7's
+    preprocessing (spec/preprocess.md §2), which needs the phase too.
+
+    The slots are `window`'s exactly (it is called for them), so `mask`,
+    `link_mask`, `column` and `inside` are its arrays. `iq` keeps the
+    datagram's `(imag, real)` order and every stored entry, null
+    subcarriers included (find them by `subcarrier_active`); a masked
+    slot's `iq` and `rssi` are 0. `transmission` is each slot's TDMA index
+    `n = m*N + tx_slot[l]`, from which a packet's exact time follows,
+    `n * 12.5 ms`. Raw: the AGC steps of `window`'s docstring are in it."""
+    win = window(scene, k, length_s, fill=0.0)
+    n_tx = int(scene["meta"]["n_tx"])
+    n_cols = scene["csi_mask"].shape[1]
+    rows = np.arange(win.column.shape[0])[:, None]
+    col = np.clip(win.column, 0, n_cols - 1)
+    iq = np.moveaxis(scene["csi_iq"][rows, :, col], 1, 2)          # [L, T, 56, 2] -> [L, 56, T, 2]
+    iq = np.where(win.mask[:, None, :, None], iq, np.int8(0))
+    rssi = np.where(win.mask, scene["rssi"][rows, col], np.int8(0))
+    transmission = win.column * n_tx + scene["tx_slot"].astype(np.int64)[:, None]
+    return IqWindow(iq, rssi, win.mask, win.link_mask, win.column, win.inside, transmission)
 
 
 def labels_at(scene: dict, k: int) -> dict:

@@ -549,6 +549,46 @@ cd .. && .venv/bin/python -m unittest discover -s ml/tests
 SAANS_DATASET_DIR=/home/Aman/are_u_theone/datasets/roomsim-v1 .venv/bin/python -m unittest discover -s ml/tests   # checks every shard
 ```
 
+## 4g. Shared preprocessing (Phase 7)
+
+One function prepares every CSI source for the ML pipeline
+(`spec/preprocess.md`, `ml/preprocess.py`, numpy in `.venv`): the simulated
+dataset of §4f, Room Sim's `.sim.pcap` exports, and later the public ESP32
+datasets (Phase 9) and your own `wifisense record` captures (Phase 11).
+Each source is read into one record (per link: received packets only, in
+order, with integer-nanosecond times, on the 52 LLTF subcarriers with a
+mask for the ones the source does not carry), and `preprocess` then:
+removes each packet's gain, optionally removes each packet's common phase
+and timing slope (phase is off by default), optionally bins to a common
+rate, and z-scores each link and subcarrier over the window, keeping the
+removed mean and spread as side features. Every window keeps its label:
+a shard or an export is SIM, a recording is REAL, and a caller cannot
+relabel an export.
+
+```python
+from ml import preprocess as pp
+win = pp.from_roomsim_shard("/home/Aman/are_u_theone/datasets/roomsim-v1", 346, 11, 2.0)   # SIM
+out = pp.preprocess(win)                    # amp [links, 52, time] z-scores, mu, sigma, masks; no NaN
+```
+
+A recording made with today's firmware (one transmitter) is read with
+`pp.from_pcap(path, 2.0, end_ns, label="REAL", single_tx=True)`; a
+recording with several transmitters cannot be split per link (the
+datagram carries no transmitter id) and is refused rather than pooled.
+The stdlib reference `ml/preprocess_ref.py` documents the exact arithmetic
+(it is what a later Rust port or golden vectors would be checked
+against). Tests, including one that exports a dataset room as a pcap and
+checks that both reading paths give identical windows:
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there
+.venv/bin/python -m unittest discover -s ml/tests
+SAANS_DATASET_DIR=/home/Aman/are_u_theone/datasets/roomsim-v1 .venv/bin/python -m unittest discover -s ml/tests
+```
+
+(The cross-path test needs the release CLI, `cargo build --release -p
+saans-cli`, and skips cleanly without it or the dataset.)
+
 ## 5. Datasets
 
 The simulated dataset of §4f lives in `/home/Aman/are_u_theone/datasets/`,

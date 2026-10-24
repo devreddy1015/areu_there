@@ -1,8 +1,10 @@
-# ml/ — dataset v1 tooling (SIM)
+# ml/ — dataset v1 tooling (SIM) and shared preprocessing
 
 Python 3.11 with numpy and matplotlib, run in `.venv`. Reads what
 `saans gen-dataset` writes (spec/dataset.md). Every scene, packet, label
-and baseline in it is **SIM**: not a room anyone measured.
+and baseline in it is **SIM**: not a room anyone measured. The shared
+preprocessing (below) also reads recordings, which are **REAL**, and keeps
+each window's label.
 
 ```sh
 .venv/bin/python ml/plot_sample.py DIR --scene 0 --window 3 --out sample.png [--links 3]
@@ -47,3 +49,47 @@ Before training (spec/dataset.md §6, §12):
 - **Baseline validity** is the manifest's `baseline_valid`
   (`baseline_at(...)["valid"]`); the plot says "baseline not valid for
   this dataset" instead of WLM/RTI outcomes when it is false.
+
+## Preprocessing (spec/preprocess.md, Phase 7)
+
+`ml/preprocess.py` is the one input stage for every CSI source: the SIM
+shards, Room Sim's `.sim.pcap` exports, and (Phases 9 and 11) public
+datasets and the owner's recordings, which are **REAL**. Every window and
+every output carries its data's label, `"SIM"` or `"REAL"`, and nothing
+can change it: a shard is SIM, a pcap is SIM when it is a Room Sim export
+(a caller who says REAL is refused) and otherwise needs the caller's label.
+
+```python
+from ml import preprocess as pp
+
+win = pp.from_roomsim_shard(DIR, scene_index, k, 2.0)          # SIM window ending at tick k (a list for a list of k)
+wins = pp.from_pcap("run.sim.pcap", 2.0, [pp.sim_end_ns(k) for k in ticks],
+                    link_map=pp.truth_link_map("run.truth.jsonl"))          # the same SIM run, read as datagrams
+rec = pp.from_pcap("rec.pcap", 2.0, end_ns, label="REAL", single_tx=True)  # a recording: one transmitter heard
+out = pp.preprocess(win, pp.PreprocessConfig(phase=False, bin_hz=None, ref_bins="shared44", min_packets=3))
+out["amp"], out["mu"], out["sigma"]       # [L, 52, T] z-scores, [L, 52] the removed mean and std
+out["sample_mask"], out["link_mask"]      # what is real: masks, never sentinels; no output is NaN
+```
+
+The record (`CsiWindow`) holds complex CSI in `(re, im)` order on the 52
+LLTF bins `k = -26..-1, 1..26` with a `carried` mask (SIM carries 44),
+each link's **received packets only**, right-aligned (newest last), with
+integer-nanosecond times; a lost packet occupies no slot and nothing is
+interpolated. `preprocess` then: normalises each packet's gain over the
+reference bins (`gain_db` keeps the removed scale, which is not channel
+power), optionally removes each packet's common phase and timing slope
+(`phase`, as `(cos, sin)`; the slope is never returned), optionally bins
+to integer-ns bins (`bin_hz`), and z-scores each link and subcarrier over
+the window. Float outputs are float32; `dtype=np.float64` gives the values
+before the cast.
+
+`ml/preprocess_ref.py` is the same computation in stdlib Python (no numpy:
+the golden-vector generator can import it); the tests hold the numpy
+version to it. A cross-path test exports a dataset scene with
+`saans roomsim-export` and checks the pcap path gives the shard path's
+windows bit for bit; it runs when `SAANS_DATASET_DIR` is set and finds the
+binary in `SAANS_BIN`, `$CARGO_TARGET_DIR/release/saans`,
+`rust/target/release/saans` or `PATH`. Measured on SIM 2 s windows (4, 8 and
+12 nodes, one core): about 390 windows/s (2.3 µs per packet) by default,
+110 windows/s with phase, 230 windows/s binned at 10 Hz; the shard adapter
+about 390 windows/s.
