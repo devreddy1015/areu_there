@@ -1,0 +1,43 @@
+# B1 bench session, the RX board. Layered on ../sdkconfig.defaults by
+# `PROFILE=bench-rx ./build.sh build` (edge/build.sh). Every value is the
+# bring-up choice from docs/HARDWARE.md §5-6; edit here, not in menuconfig,
+# so the next build of this board is the same build.
+#
+# The gateway IP, the uplink SSID and its password are NOT here: they come
+# from SAANS_GATEWAY_IP, SAANS_WIFI_SSID and SAANS_WIFI_PASSWORD in the
+# environment at build time, so this file can be committed. (They are still
+# compiled into the firmware and written to build-bench-rx/sdkconfig, which
+# git ignores.)
+
+CONFIG_SAANS_ROLE_RX=y
+CONFIG_SAANS_ROLE_TX=n
+
+# The first RX. A second RX board is this profile with 2 here
+# (PROFILE=bench-rx2); the gateway config lists both links.
+CONFIG_SAANS_NODE_ID=1
+
+CONFIG_SAANS_WIFI_CHANNEL=6
+
+CONFIG_SAANS_CSI_RATE_HZ=20
+# An assumption until this session measures it: HARDWARE.md §9, question 2.
+CONFIG_SAANS_N_SUBCARRIERS=56
+CONFIG_SAANS_FRAME_RATE_HZ=2
+# Plus ~50 s of filter warmup: keep the space empty for the first ~80 s.
+CONFIG_SAANS_CALIBRATION_S=30
+CONFIG_SAANS_COMPUTE_BNR=y
+
+# Off. The RX's own breathing fields stay zero; raw mode below already
+# carries everything B1 needs (bin layout, noise floor, rate), and the
+# seated segment is the author only (PROTOCOL_S5 §2.1).
+CONFIG_SAANS_VITALS_ENABLED=n
+CONFIG_SAANS_HEART_ENABLED=n
+
+# ON, for this session only: both open questions in HARDWARE.md §9 are about
+# what the radio hands the firmware, which only the raw I/Q shows. Every
+# FeatureFrame carries the raw_mode flag while this is on (ADR-001), and raw
+# CSI is never signed, so a gateway with a [[frame_key]] refuses it.
+CONFIG_SAANS_RAW_MODE=y
+
+CONFIG_SAANS_GATEWAY_PORT=5566
+CONFIG_SAANS_WATCHDOG_S=15
+CONFIG_SAANS_TELEMETRY_S=60

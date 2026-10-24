@@ -1,0 +1,47 @@
+# Gateway config for the B1 bench session (bench/README.md).
+#
+# While a segment is being recorded, `wifisense record` owns UDP 5566 and the
+# gateway must NOT run: two listeners on one port split the datagrams between
+# them, which reads exactly like 50% packet loss (PROTOCOL_S5 §3.2). Use this
+# afterwards, on a recording:
+#
+#   saans-gateway -c bench/saans.bench.toml \
+#       --replay data/bench/<session>/empty.pcap --serve      # then open http://127.0.0.1:8080/app
+#
+# or live, between segments, with the recorder stopped:
+#
+#   saans-gateway -c bench/saans.bench.toml
+
+udp_port = 5566
+# The RX reaches this laptop over WiFi, so something has to listen on a
+# network interface. Narrow this to the laptop's address on that network.
+# Raw CSI is never signed (ADR-012), so there is no [[frame_key]] here: a
+# gateway with one refuses raw CSI, and raw is what this session is for.
+udp_bind = "0.0.0.0"
+# Loopback: no sign-in, and the dashboard is reachable from this laptop only.
+http_addr = "127.0.0.1:8080"
+# Git-ignored (`*-data/` in .gitignore): event logs can hold health data.
+data_dir = "bench-data"
+# India Standard Time, so event times read as wall-clock times in the take
+# sheet. Change it if the bench is elsewhere.
+utc_offset_minutes = 330
+
+# The RX streams raw CSI (profiles/bench-rx.defaults) and the gateway runs
+# the same DSP on it. The node's own FeatureFrames for the link take
+# precedence while they arrive (engine.rs, NATIVE_PREFERRED_S).
+[raw]
+sample_rate_hz = 20.0   # profiles/bench-rx.defaults: CONFIG_SAANS_CSI_RATE_HZ
+subcarriers = 0         # 0 = take the count from each node's first datagram
+calibration_s = 30.0    # matches the node; keep the room empty at start
+
+[[space]]
+id = "bench"
+name = "Bench"
+# Off. Turning it on shows breathing on the dashboard for this space, and
+# should be done only while the person in the recording is you, with your
+# own written consent (PROTOCOL_S5 §2.1, §2.3).
+vitals = false
+# The RX writes tx_id 255 (rx_role.cpp), and raw CSI does not say who
+# transmitted, so both links are rx <- 255. RX 2 is the optional second
+# board (profiles/bench-rx2.defaults).
+links = [{ rx = 1, tx = 255 }, { rx = 2, tx = 255 }]

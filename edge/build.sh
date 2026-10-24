@@ -12,16 +12,43 @@
 #   ./build.sh flash           flash over USB (needs a board and --device)
 #   ./build.sh tests           run the host DSP tests instead (no Docker)
 #
+#   PROFILE=bench-rx ./build.sh build        one board, from firmware/profiles/
+#   PROFILE=bench-rx PORT=… ./build.sh flash-monitor
+#
 # Env:
 #   IDF_IMAGE   override the container image
 #   TARGET      override the chip target
 #   PORT        serial port for flash/monitor, e.g. /dev/ttyUSB0
+#   PROFILE     build from firmware/profiles/$PROFILE.defaults, in its own
+#               build-$PROFILE/ with its own sdkconfig (see below)
+#   SAANS_GATEWAY_IP, SAANS_WIFI_SSID, SAANS_WIFI_PASSWORD
+#               with PROFILE: the site's values, kept out of committed files
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IDF_IMAGE="${IDF_IMAGE:-espressif/idf:v5.4.1}"
 TARGET="${TARGET:-esp32s3}"
 CMD="${1:-build}"
+
+# PROFILES. Without one, the build uses firmware/sdkconfig, which
+# `menuconfig` edits and which is shared by every board you build. With
+# PROFILE=<name>, a board is built from sdkconfig.defaults, then
+# profiles/<name>.defaults, then the site's values from the environment, into
+# build-<name>/ with its own sdkconfig, which is regenerated on every build.
+# The profile file is then the whole truth about that board: building the TX
+# cannot change the RX, and `clean` cannot delete anyone's answers.
+IDF_OPTS=()
+BUILD_REL="build"
+if [ -n "${PROFILE:-}" ]; then
+    if [ ! -f "${HERE}/firmware/profiles/${PROFILE}.defaults" ]; then
+        echo "error: no firmware/profiles/${PROFILE}.defaults; have:" \
+             "$(cd "${HERE}/firmware/profiles" && ls ./*.defaults | sed 's|^\./||; s|\.defaults$||' | tr '\n' ' ')" >&2
+        exit 2
+    fi
+    BUILD_REL="build-${PROFILE}"
+    IDF_OPTS=(-B "${BUILD_REL}" -D "SDKCONFIG=${BUILD_REL}/sdkconfig"
+              -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;profiles/${PROFILE}.defaults;${BUILD_REL}/local.defaults")
+fi
 
 run_idf() {
     # The repo root is mounted, not just edge/firmware, because the firmware
@@ -51,17 +78,51 @@ run_idf() {
 
 case "${CMD}" in
     build)
-        echo "==> building for ${TARGET} in ${IDF_IMAGE}"
-        run_idf sh -c "idf.py set-target ${TARGET} >/dev/null && idf.py build"
+        echo "==> building ${PROFILE:-firmware/sdkconfig} for ${TARGET} in ${IDF_IMAGE}"
+        if [ -n "${PROFILE:-}" ]; then
+            mkdir -p "${HERE}/firmware/${BUILD_REL}"
+            # The site's values, quoted for Kconfig, written here and only
+            # here (a later `flash` must not blank them). In the git-ignored
+            # build dir, readable by you alone: the WiFi password is in it.
+            local_defaults="${HERE}/firmware/${BUILD_REL}/local.defaults"
+            ( umask 077; : > "${local_defaults}" )
+            for var in SAANS_GATEWAY_IP SAANS_WIFI_SSID SAANS_WIFI_PASSWORD; do
+                if [ -n "${!var+set}" ]; then
+                    value="${!var//\\/\\\\}"
+                    printf 'CONFIG_%s="%s"\n' "${var}" "${value//\"/\\\"}" >> "${local_defaults}"
+                fi
+            done
+            # Regenerated from the profile every time; see PROFILES above.
+            rm -f "${HERE}/firmware/${BUILD_REL}/sdkconfig" "${HERE}/firmware/${BUILD_REL}/sdkconfig.old"
+        fi
+        # The target as a define, not `idf.py set-target`: set-target replaces
+        # sdkconfig with the defaults (the old one becomes sdkconfig.old), so
+        # running it before every build threw away every `menuconfig` answer
+        # and built each board as the defaults. -D IDF_TARGET sets it on a
+        # fresh checkout and keeps an existing sdkconfig as it is.
+        run_idf idf.py "${IDF_OPTS[@]}" -D "IDF_TARGET=${TARGET}" build
         echo
-        echo "==> artefacts in edge/firmware/build/"
+        echo "==> artefacts in edge/firmware/${BUILD_REL}/"
         ;;
-    menuconfig|size|size-components|reconfigure)
-        run_idf idf.py "${CMD}"
+    menuconfig)
+        if [ -n "${PROFILE:-}" ]; then
+            echo "error: a profile is configured by editing firmware/profiles/${PROFILE}.defaults;" \
+                 "menuconfig answers would be regenerated away on the next build" >&2
+            exit 2
+        fi
+        run_idf idf.py -D "IDF_TARGET=${TARGET}" menuconfig
+        ;;
+    size|size-components|reconfigure)
+        run_idf idf.py "${IDF_OPTS[@]}" -D "IDF_TARGET=${TARGET}" "${CMD}"
         ;;
     clean)
-        echo "==> removing build output"
-        rm -rf "${HERE}/firmware/build" "${HERE}/firmware/sdkconfig" "${HERE}/firmware/sdkconfig.old"
+        if [ -n "${PROFILE:-}" ]; then
+            echo "==> removing edge/firmware/${BUILD_REL}"
+            rm -rf "${HERE:?}/firmware/${BUILD_REL}"
+        else
+            echo "==> removing build output"
+            rm -rf "${HERE}/firmware/build" "${HERE}/firmware/sdkconfig" "${HERE}/firmware/sdkconfig.old"
+        fi
         echo "done"
         ;;
     flash|monitor|flash-monitor)
@@ -70,9 +131,9 @@ case "${CMD}" in
             exit 1
         fi
         case "${CMD}" in
-            flash)         run_idf idf.py -p "${PORT}" flash ;;
-            monitor)       run_idf idf.py -p "${PORT}" monitor ;;
-            flash-monitor) run_idf idf.py -p "${PORT}" flash monitor ;;
+            flash)         run_idf idf.py "${IDF_OPTS[@]}" -p "${PORT}" flash ;;
+            monitor)       run_idf idf.py "${IDF_OPTS[@]}" -p "${PORT}" monitor ;;
+            flash-monitor) run_idf idf.py "${IDF_OPTS[@]}" -p "${PORT}" flash monitor ;;
         esac
         ;;
     tests)
