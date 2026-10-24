@@ -269,13 +269,14 @@ in `audit-YYYY-MM-DD.jsonl` alongside logins and denials.
 ### How long it is kept
 
 Three files in `data_dir`, three clocks, and they are deliberately not
-the same length.
+the same length. `/api/health` reports each one's `retention_days` beside
+what it has written, so an operator can check the policy is in force.
 
 | File | What it holds | Kept |
 |---|---|---|
 | `events-YYYY-MM-DD.jsonl` | What the building did, per event | `event_retention_days`, default 30 |
 | `history.json` | One summary per space per day: occupied seconds, motion bouts, pauses, and for consented spaces a resting breathing median | `history_retention_days`, default 90 |
-| `audit-YYYY-MM-DD.jsonl` | Who read health data and who acted on an alert | not swept yet — see [ADR-010](docs/adr/010-audit-retention.md) |
+| `audit-YYYY-MM-DD.jsonl` | Who read health data and who acted on an alert | `audit_retention_days`, default 365, and never less than `event_retention_days` — [ADR-010](docs/adr/010-audit-retention.md) |
 
 The daily summaries are also capped at 90 entries in memory
 (`HISTORY_MAX_DAYS`). That is a memory bound, not a retention policy: a

@@ -1,6 +1,8 @@
 # ADR-010: The audit log is kept for a year, then deleted
 
-**Status:** accepted, 2026-10-19. **Decided, not built** — `audit_retention_days` does not exist in the code, and the sweep described below is what this ADR asks for, not what runs today.
+**Status:** accepted, 2026-10-19; **built** 2026-10-24 (`store::prune_audit_logs`,
+called from `Hub::housekeeping`; reported in `/api/health` as
+`audit.retention_days`).
 
 ## Context
 `audit-YYYY-MM-DD.jsonl` is the file that answers "who read this space's
@@ -51,6 +53,15 @@ growing into a second surveillance system.
 at least 1 — and additionally required to be at least
 `event_retention_days`: while an event is still on disk, the record of
 who read it should be too.
+
+*As built:* when the key is absent, the default is 365 or
+`event_retention_days`, whichever is longer. A fixed 365 would have made
+a site already keeping events for 400 days refuse to boot on upgrade over
+a key it had never set. Set explicitly below `event_retention_days`, it
+is still refused: that is a choice, not an upgrade. And the sweep is
+an addition rather than a change: `list_logs` and `prune_logs` keep
+their signatures and still mean the event logs; `prune_audit_logs` and
+`list_logs_prefixed` sit beside them over the same private routine.
 
 It is swept by the mechanism already there, not a second one. Both
 families live in one directory, so one sweep over that directory covers

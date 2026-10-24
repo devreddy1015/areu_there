@@ -103,32 +103,65 @@ impl EventLog {
     }
 }
 
-fn log_file_day(name: &str) -> Option<i64> {
-    let date = name.strip_prefix("events-")?.strip_suffix(".jsonl")?;
+/// What the building did: swept on `event_retention_days`.
+pub const EVENT_LOG_PREFIX: &str = "events-";
+/// What people did with the system (`audit.rs`): swept on
+/// `audit_retention_days`, its own clock (ADR-010). Both families live in
+/// `data_dir`, so one dated-file sweep serves both, keyed by prefix.
+pub const AUDIT_LOG_PREFIX: &str = "audit-";
+
+fn log_file_day(name: &str, prefix: &str) -> Option<i64> {
+    let date = name.strip_prefix(prefix)?.strip_suffix(".jsonl")?;
     let ms = crate::timefmt::parse_iso8601(date)?;
     (date.len() == 10).then(|| ms.div_euclid(86_400_000))
 }
 
-/// Event logs in `dir`, oldest first, as (local day, path).
-pub fn list_logs(dir: &Path) -> Vec<(i64, PathBuf)> {
+/// Dated logs of one family in `dir`, oldest first, as (local day, path).
+pub fn list_logs_prefixed(dir: &Path, prefix: &str) -> Vec<(i64, PathBuf)> {
     let mut out: Vec<(i64, PathBuf)> = fs::read_dir(dir)
         .into_iter()
         .flatten()
         .flatten()
         .filter_map(|e| {
             let name = e.file_name().into_string().ok()?;
-            Some((log_file_day(&name)?, e.path()))
+            Some((log_file_day(&name, prefix)?, e.path()))
         })
         .collect();
     out.sort();
     out
 }
 
-/// Delete logs whose every event is older than `retention_days`.
+/// Event logs in `dir`, oldest first, as (local day, path).
+pub fn list_logs(dir: &Path) -> Vec<(i64, PathBuf)> {
+    list_logs_prefixed(dir, EVENT_LOG_PREFIX)
+}
+
+/// Delete event logs whose every event is older than `retention_days`.
 pub fn prune_logs(dir: &Path, retention_days: u32, offset_min: i32, now_ms: i64) -> Vec<PathBuf> {
+    prune_prefixed(dir, EVENT_LOG_PREFIX, retention_days, offset_min, now_ms)
+}
+
+/// Delete audit logs whose every line is older than `retention_days`.
+/// Same day-boundary rule as the event logs, separate clock (ADR-010).
+pub fn prune_audit_logs(
+    dir: &Path,
+    retention_days: u32,
+    offset_min: i32,
+    now_ms: i64,
+) -> Vec<PathBuf> {
+    prune_prefixed(dir, AUDIT_LOG_PREFIX, retention_days, offset_min, now_ms)
+}
+
+fn prune_prefixed(
+    dir: &Path,
+    prefix: &str,
+    retention_days: u32,
+    offset_min: i32,
+    now_ms: i64,
+) -> Vec<PathBuf> {
     let today = local_day(now_ms, offset_min);
     let mut removed = Vec::new();
-    for (day, path) in list_logs(dir) {
+    for (day, path) in list_logs_prefixed(dir, prefix) {
         // The file's newest possible event is at the end of `day`.
         if today - (day + 1) >= retention_days as i64 && fs::remove_file(&path).is_ok() {
             removed.push(path);
@@ -388,6 +421,43 @@ mod tests {
         let mut fresh = BTreeMap::from([("lab".to_string(), vec![summary(500), summary(499)])]);
         assert_eq!(prune_history(&mut fresh, 90, 500), 0);
         assert_eq!(fresh["lab"].len(), 2);
+    }
+
+    #[test]
+    fn audit_logs_are_swept_on_their_own_clock_and_never_by_the_event_sweep() {
+        let dir = tmpdir("audit-ret");
+        let day_ms = 86_400_000;
+        let today = day_of(2026, 10, 24);
+        let touch = |prefix: &str, days_ago: i64| {
+            let name = format!("{prefix}{}.jsonl", date_string(today - days_ago));
+            fs::write(dir.join(name), "{}\n").unwrap();
+        };
+        for d in [400, 366, 364, 40, 1] {
+            touch(AUDIT_LOG_PREFIX, d);
+            touch("events-", d);
+        }
+        touch("history.json.", 0); // not a dated log of either kind
+        let now = today * day_ms + 3_600_000;
+
+        // The event sweep does not touch audit files...
+        let gone = prune_logs(&dir, 30, 0, now);
+        assert_eq!(gone.len(), 4, "events 400, 366, 364 and 40 days old");
+        assert_eq!(list_logs_prefixed(&dir, AUDIT_LOG_PREFIX).len(), 5);
+        // ...and the audit sweep does not touch event files.
+        let gone = prune_audit_logs(&dir, 365, 0, now);
+        let names: Vec<String> = gone
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names.len(), 2, "audit 400 and 366 days old: {names:?}");
+        assert!(names.iter().all(|n| n.starts_with(AUDIT_LOG_PREFIX)));
+        assert_eq!(
+            list_logs(&dir).len(),
+            1,
+            "the one-day-old event log is untouched"
+        );
+        assert_eq!(list_logs_prefixed(&dir, AUDIT_LOG_PREFIX).len(), 3);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
