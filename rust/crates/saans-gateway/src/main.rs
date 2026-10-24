@@ -60,6 +60,18 @@ struct Args {
     /// empty. No config is read; nothing the gateway computes is in it.
     #[arg(long, value_name = "DIR")]
     export_site: Option<PathBuf>,
+    /// Print 32 random bytes as hex: a new site key for signed frames
+    /// (ADR-012). Put it in the environment variable a `[[frame_key]]`
+    /// names; it never goes in the config.
+    #[arg(long)]
+    new_site_key: bool,
+    /// Print the key node NODE_ID is to be flashed with, derived from the
+    /// site key of `--key-id` (read from its environment variable).
+    #[arg(long, value_name = "NODE_ID")]
+    node_key: Option<u8>,
+    /// Which `[[frame_key]]` `--node-key` uses. Default: the only one.
+    #[arg(long, value_name = "ID", requires = "node_key")]
+    key_id: Option<u8>,
 }
 
 fn main() -> ExitCode {
@@ -67,6 +79,18 @@ fn main() -> ExitCode {
     // Before the config: hashing a password is what you do *to write* one.
     if args.hash_password {
         return hash_password();
+    }
+    if args.new_site_key {
+        let mut key = [0u8; 32];
+        if getrandom::getrandom(&mut key).is_err() {
+            eprintln!("saans-gateway: no entropy available");
+            return ExitCode::FAILURE;
+        }
+        println!(
+            "{}",
+            key.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        );
+        return ExitCode::SUCCESS;
     }
     // Before the config too: the site is the same in every deployment.
     if let Some(dir) = &args.export_site {
@@ -88,6 +112,9 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    if let Some(node) = args.node_key {
+        return print_node_key(&cfg, node, args.key_id);
+    }
     if args.check {
         println!(
             "{}: OK ({} spaces)",
@@ -127,6 +154,38 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `saans-gateway --node-key N`: the key to flash into node N, derived
+/// from a site key in the environment. The one place a node key is shown.
+fn print_node_key(cfg: &GatewayConfig, node: u8, key_id: Option<u8>) -> ExitCode {
+    let id = match (key_id, cfg.frame_keys.as_slice()) {
+        (Some(id), _) => id,
+        (None, [only]) => only.id,
+        (None, []) => {
+            eprintln!("saans-gateway: --node-key needs a [[frame_key]] in the config");
+            return ExitCode::from(2);
+        }
+        (None, _) => {
+            eprintln!("saans-gateway: several [[frame_key]]s; say which with --key-id");
+            return ExitCode::from(2);
+        }
+    };
+    let keys = match saans_gateway::frameauth::load_site_keys(cfg) {
+        Ok(k) => k,
+        Err(e) => {
+            eprintln!("saans-gateway: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let Some(site) = keys.get(&id) else {
+        eprintln!("saans-gateway: no [[frame_key]] with id {id}");
+        return ExitCode::from(2);
+    };
+    // Flash it with this key_id: the node puts it in every frame.
+    eprintln!("node {node}, key_id {id}:");
+    println!("{}", site.node_key(node).to_hex());
+    ExitCode::SUCCESS
 }
 
 /// `saans-gateway --hash-password`, the command `config.rs` names when it

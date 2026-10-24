@@ -1,5 +1,11 @@
 //! FeatureFrame v1: what a Saans node sends instead of raw CSI
 //! (port of `wifisense/features.py`; byte layout in `spec/wire.md` §2).
+//!
+//! Also the byte layout of v2, the signed frame (§2b, ADR-012), and
+//! nothing more of it: the tag is HMAC-SHA256, and this crate has no
+//! dependencies, so signing and checking live in the gateway
+//! (`saans_gateway::frameauth`), which supplies the tag over the bytes
+//! laid out here.
 
 use crate::biquad::BiquadBandpass;
 use crate::fft::subcarrier_bnr;
@@ -12,6 +18,14 @@ use std::collections::VecDeque;
 pub const FEATURE_MAGIC: u32 = 0x534E_4153; // b"SANS" on the wire
 pub const FEATURE_VERSION: u8 = 1;
 pub const FEATURE_FRAME_SIZE: usize = 68;
+
+/// FeatureFrame v2 (ADR-012): v1's bytes 0..62 with version 2, `key_id`
+/// in v1's reserved byte, the node's boot counter, then a 16-byte tag.
+pub const FEATURE_VERSION_SIGNED: u8 = 2;
+pub const SIGNED_FRAME_SIZE: usize = 84;
+/// The bytes the tag covers.
+pub const SIGNED_BODY_SIZE: usize = 68;
+pub const TAG_SIZE: usize = 16;
 
 pub const FLAG_CALIBRATED: u8 = 1 << 0;
 pub const FLAG_OCCUPIED: u8 = 1 << 1;
@@ -142,8 +156,27 @@ impl FeatureFrame {
 
     pub fn encode(&self) -> [u8; FEATURE_FRAME_SIZE] {
         let mut b = [0u8; FEATURE_FRAME_SIZE];
+        b[..64].copy_from_slice(&self.body(self.version, 0));
+        let crc = crc32(&b[..64]);
+        b[64..68].copy_from_slice(&crc.to_le_bytes());
+        b
+    }
+
+    /// v2's signed bytes, 0..67: every field, `version` 2, `key_id` and
+    /// `boot`. The tag over them is the caller's. `self.version` is
+    /// ignored.
+    pub fn encode_signed_body(&self, key_id: u8, boot: u32) -> [u8; SIGNED_BODY_SIZE] {
+        let mut b = [0u8; SIGNED_BODY_SIZE];
+        b[..64].copy_from_slice(&self.body(FEATURE_VERSION_SIGNED, key_id));
+        b[64..68].copy_from_slice(&boot.to_le_bytes());
+        b
+    }
+
+    /// Bytes 0..63. The last is v1's `reserved` (0) or v2's `key_id`.
+    fn body(&self, version: u8, last: u8) -> [u8; 64] {
+        let mut b = [0u8; 64];
         b[0..4].copy_from_slice(&FEATURE_MAGIC.to_le_bytes());
-        b[4] = self.version;
+        b[4] = version;
         b[5] = self.node_id;
         b[6] = self.tx_id;
         b[7] = self.flags;
@@ -169,9 +202,7 @@ impl FeatureFrame {
         b[60] = self.rssi_dbm as u8;
         b[61] = self.noise_floor_dbm as u8;
         b[62] = self.n_subcarriers;
-        b[63] = 0;
-        let crc = crc32(&b[..64]);
-        b[64..68].copy_from_slice(&crc.to_le_bytes());
+        b[63] = last;
         b
     }
 
@@ -180,8 +211,6 @@ impl FeatureFrame {
             return Err(DecodeError::Size(data.len()));
         }
         let u32_at = |o: usize| u32::from_le_bytes(data[o..o + 4].try_into().unwrap());
-        let u16_at = |o: usize| u16::from_le_bytes(data[o..o + 2].try_into().unwrap());
-        let f32_at = |o: usize| f32::from_le_bytes(data[o..o + 4].try_into().unwrap());
         if crc32(&data[..64]) != u32_at(64) {
             return Err(DecodeError::Crc);
         }
@@ -191,7 +220,33 @@ impl FeatureFrame {
         if data[4] != FEATURE_VERSION {
             return Err(DecodeError::Version(data[4]));
         }
-        Ok(Self {
+        Ok(Self::fields(data))
+    }
+
+    /// The fields of a v2 frame, with its `key_id` and `boot`, from bytes
+    /// whose tag the caller has **already checked**: this reads offsets and
+    /// checks nothing but the length, magic and version.
+    pub fn decode_signed_body(data: &[u8]) -> Result<(Self, u8, u32), DecodeError> {
+        if data.len() < SIGNED_BODY_SIZE {
+            return Err(DecodeError::Size(data.len()));
+        }
+        let magic = u32::from_le_bytes(data[0..4].try_into().unwrap());
+        if magic != FEATURE_MAGIC {
+            return Err(DecodeError::Magic(magic));
+        }
+        if data[4] != FEATURE_VERSION_SIGNED {
+            return Err(DecodeError::Version(data[4]));
+        }
+        let boot = u32::from_le_bytes(data[64..68].try_into().unwrap());
+        Ok((Self::fields(data), data[63], boot))
+    }
+
+    /// Every field from bytes 0..62, which v1 and v2 lay out alike.
+    fn fields(data: &[u8]) -> Self {
+        let u32_at = |o: usize| u32::from_le_bytes(data[o..o + 4].try_into().unwrap());
+        let u16_at = |o: usize| u16::from_le_bytes(data[o..o + 2].try_into().unwrap());
+        let f32_at = |o: usize| f32::from_le_bytes(data[o..o + 4].try_into().unwrap());
+        Self {
             version: data[4],
             node_id: data[5],
             tx_id: data[6],
@@ -213,7 +268,7 @@ impl FeatureFrame {
             rssi_dbm: data[60] as i8,
             noise_floor_dbm: data[61] as i8,
             n_subcarriers: data[62],
-        })
+        }
     }
 
     /// True if `data` starts with the FeatureFrame magic (cheap dispatch

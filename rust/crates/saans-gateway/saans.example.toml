@@ -128,6 +128,17 @@ rate_low_bpm = 8.0
 # escalate_to = ["webhook:pager"]
 # include_health_details = false
 
+# ------------------------------------------------------------ signed frames
+# FeatureFrame v2 (ADR-012): with a site key here, only signed frames are
+# accepted; unsigned frames and raw CSI are refused. Uncomment to use.
+# `saans-gateway --new-site-key` makes a key; `--node-key N` derives node
+# N's key for flashing. A second entry with another id lets nodes move to a
+# new key one at a time.
+#
+# [[frame_key]]
+# id = 0                                  # the key_id nodes put in their frames
+# env = "SAANS_FRAME_KEY"                 # 64 hex digits; never in this file
+
 # -------------------------------------------------------------------- MQTT
 # Occupancy for facilities systems and Home Assistant (SAANS_PLAN.md §10.2).
 # Uncomment to use. Topics, under base_topic:

@@ -87,6 +87,16 @@ impl fmt::Display for ReplaySummary {
             i.unassigned,
             if self.clock_steps_back > 0 { format!(", {} timestamps stepped back", self.clock_steps_back) } else { String::new() }
         )?;
+        let a = &i.frame_auth;
+        let refused =
+            a.bad_tag + a.unknown_key + a.replayed + a.unsigned_refused + a.raw_refused + a.no_key;
+        if a.accepted + refused > 0 {
+            writeln!(
+                f,
+                "  signed frames: {} accepted; refused {} bad tag, {} unknown key, {} replayed, {} unsigned, {} raw, {} with no key configured",
+                a.accepted, a.bad_tag, a.unknown_key, a.replayed, a.unsigned_refused, a.raw_refused, a.no_key
+            )?;
+        }
         for u in &self.unknown_links {
             writeln!(
                 f,
@@ -159,7 +169,10 @@ pub async fn replay(
         t0,
         unix_ms_at_t0: first.t_ns.div_euclid(1_000_000),
     };
+    let frame_keys =
+        crate::frameauth::load_site_keys(&cfg).map_err(|e| ReplayError(e.to_string()))?;
     let mut hub = Hub::new(cfg, shared, false, wall, t0);
+    hub.engine.set_frame_keys(frame_keys);
     if let Some(out) = &opts.events_out {
         hub.set_events_out(out)
             .map_err(|e| ReplayError(format!("{}: {e}", out.display())))?;

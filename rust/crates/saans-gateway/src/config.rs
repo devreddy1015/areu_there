@@ -60,6 +60,10 @@ pub struct GatewayConfig {
     pub history: crate::history::HistoryConfig,
     #[serde(rename = "space")]
     pub spaces: Vec<SpaceConfig>,
+    /// Site keys for signed FeatureFrames (ADR-012). With any configured,
+    /// only signed (v2) frames are accepted: v1 and raw CSI are refused.
+    #[serde(rename = "frame_key")]
+    pub frame_keys: Vec<FrameKeyConfig>,
     // ---- output interfaces (SAANS_PLAN.md §10) ----
     pub auth: AuthConfig,
     #[serde(rename = "user")]
@@ -233,6 +237,7 @@ impl Default for GatewayConfig {
             utc_offset_minutes: 0,
             raw: RawConfig::default(),
             spaces: Vec::new(),
+            frame_keys: Vec::new(),
             auth: AuthConfig::default(),
             history: crate::history::HistoryConfig::default(),
             users: Vec::new(),
@@ -243,6 +248,17 @@ impl Default for GatewayConfig {
             alert_routes: Vec::new(),
         }
     }
+}
+
+/// One site key for signed FeatureFrames. The key itself is 64 hex
+/// digits in the environment variable `env`, never in this file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrameKeyConfig {
+    /// The `key_id` byte nodes put in their frames. Two ids at once let
+    /// nodes move to a new site key one at a time.
+    pub id: u8,
+    pub env: String,
 }
 
 /// Settings for raw CSI links, whose features the gateway computes
@@ -466,6 +482,18 @@ impl GatewayConfig {
                 crate::history::MIN_CADENCE_S
             ));
         }
+        let mut frame_key_ids = BTreeSet::new();
+        for k in &self.frame_keys {
+            if k.env.is_empty() {
+                return err(format!(
+                    "frame_key {}: env is required (the key itself never goes in the config)",
+                    k.id
+                ));
+            }
+            if !frame_key_ids.insert(k.id) {
+                return err(format!("frame_key id {} appears twice", k.id));
+            }
+        }
         for (name, t) in &self.telegram {
             if t.bot_token_env.is_empty() {
                 return err(format!("telegram.{name}: bot_token_env is required (the token itself never goes in the config)"));
@@ -632,6 +660,58 @@ mod tests {
             vec!["webhook:pager".to_string()]
         );
         assert!(!cfg.alert_routes[0].include_health_details);
+    }
+
+    #[test]
+    fn the_commented_frame_key_example_is_a_valid_config() {
+        let text = include_str!("../saans.example.toml");
+        let start = text
+            .find("# [[frame_key]]")
+            .expect("the example has a frame_key block");
+        let end = text[start..]
+            .find("\n# ---")
+            .map_or(text.len(), |i| start + i);
+        let live: String = text[..start].to_string()
+            + &text[start..end]
+                .lines()
+                .map(|l| l.strip_prefix("# ").unwrap_or(l))
+                .collect::<Vec<_>>()
+                .join("\n")
+            + &text[end..];
+        let cfg = GatewayConfig::from_toml(&live).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(cfg.frame_keys.len(), 1);
+        assert_eq!(
+            (cfg.frame_keys[0].id, cfg.frame_keys[0].env.as_str()),
+            (0, "SAANS_FRAME_KEY")
+        );
+    }
+
+    #[test]
+    fn frame_keys_need_a_variable_and_distinct_ids() {
+        let check = |keys: &str| {
+            GatewayConfig::from_toml(&format!(
+                "[[space]]\nid = \"a\"\nlinks = [{{ rx = 1, tx = 2 }}]\n{keys}"
+            ))
+            .map(|_| ())
+            .map_err(|e| e.0)
+        };
+        assert_eq!(
+            check("[[frame_key]]\nid = 0\nenv = \"K0\"\n[[frame_key]]\nid = 1\nenv = \"K1\"\n"),
+            Ok(())
+        );
+        let e = check("[[frame_key]]\nid = 0\nenv = \"\"\n").unwrap_err();
+        assert!(e.contains("env is required"), "{e}");
+        let e = check("[[frame_key]]\nid = 2\nenv = \"A\"\n[[frame_key]]\nid = 2\nenv = \"B\"\n")
+            .unwrap_err();
+        assert!(e.contains("appears twice"), "{e}");
+        assert!(
+            check("[[frame_key]]\nid = 256\nenv = \"A\"\n").is_err(),
+            "an id is one byte"
+        );
+        assert!(
+            check("[[frame_key]]\nid = 0\nenv = \"A\"\nkey = \"00\"\n").is_err(),
+            "no key in the file"
+        );
     }
 
     #[test]

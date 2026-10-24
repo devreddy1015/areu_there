@@ -1,9 +1,9 @@
 # ADR-012: FeatureFrame v2 — authenticated frames
 
 **Status:** accepted, 2026-10-24. **Decided, not built** until all three
-parts are in: the Python reference and golden vectors (this change), the
-gateway's verification in Rust, and the C++ node with its firmware.
-`docs/NEXT.md` §1.11 tracks them.
+parts are in. Done: the Python reference and golden vectors, and the
+gateway's verification in Rust (`saans-gateway/src/frameauth.rs`). To
+come: the C++ node and its firmware. `docs/NEXT.md` §1.11 tracks them.
 
 ## Context
 FeatureFrame v1 (ADR-004) ends in a CRC-32. A CRC catches a flipped bit;

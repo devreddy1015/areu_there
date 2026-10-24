@@ -3,15 +3,18 @@
 //! live mode, replay and tests all run exactly the same code.
 //!
 //! ```text
-//! datagram ─┬─ FeatureFrame v1 ─────────────────────────┐
+//! datagram ─┬─ FeatureFrame v1, or v2 checked (frameauth) ┐
 //!           └─ raw CSI ─► FeatureExtractor (per node)┴─► route by link ─► SpaceFusion
 //! tick(t) every 0.5 s: SpaceFusion::sample ─► SpaceMonitor::update + SystemMonitor::observe
 //! ```
 
 use crate::config::{GatewayConfig, RawConfig};
+use crate::frameauth::{self, AuthStats, Refused, ReplayGuard, SiteKey};
 use crate::privacy;
 use crate::raw;
-use saans_dsp::features::{DecodeError, FeatureFrame, FLAG_RAW_MODE};
+use saans_dsp::features::{
+    DecodeError, FeatureFrame, FEATURE_VERSION_SIGNED, FLAG_RAW_MODE, SIGNED_FRAME_SIZE,
+};
 use saans_dsp::{CsiFrame, FeatureExtractor, FeatureExtractorConfig};
 use saans_health::{
     HealthEvent, LinkId, SpaceConfig, SpaceFusion, SpaceMonitor, SpaceSample, SpaceState,
@@ -76,6 +79,8 @@ pub struct IngestStats {
     /// Frames that carried vitals for a space with vitals off (zeroed here).
     pub vitals_gated: u64,
     pub errors: DecodeErrors,
+    /// Signed frames (ADR-012): accepted, and refused by reason.
+    pub frame_auth: AuthStats,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -165,6 +170,10 @@ pub struct Engine {
     raw: BTreeMap<u8, RawLink>,
     pub stats: IngestStats,
     pub unknown: BTreeMap<LinkId, UnknownLink>,
+    /// Site keys by `key_id`; empty = authentication off.
+    frame_keys: BTreeMap<u8, SiteKey>,
+    /// The highest (boot, seq) accepted per link; persisted by the hub.
+    pub replay: ReplayGuard,
 }
 
 impl Engine {
@@ -201,7 +210,24 @@ impl Engine {
             raw: BTreeMap::new(),
             stats: IngestStats::default(),
             unknown: BTreeMap::new(),
+            frame_keys: BTreeMap::new(),
+            replay: ReplayGuard::default(),
         }
+    }
+
+    /// Turn frame authentication on (ADR-012): from now on only signed
+    /// frames checked against these keys are accepted. The keys come from
+    /// `frameauth::load_site_keys`; the engine does no I/O itself.
+    pub fn set_frame_keys(&mut self, keys: BTreeMap<u8, SiteKey>) {
+        self.frame_keys = keys;
+    }
+
+    pub fn frame_auth_required(&self) -> bool {
+        !self.frame_keys.is_empty()
+    }
+
+    pub fn frame_key_ids(&self) -> Vec<u8> {
+        self.frame_keys.keys().copied().collect()
     }
 
     pub fn space_index(&self, id: &str) -> Option<usize> {
@@ -211,7 +237,16 @@ impl Engine {
     /// One UDP datagram received at gateway time `t_s`.
     pub fn ingest(&mut self, data: &[u8], t_s: f64, src: Option<SocketAddr>) -> Ingested {
         self.stats.datagrams += 1;
-        if FeatureFrame::sniff(data) {
+        let signed =
+            data.len() == SIGNED_FRAME_SIZE && data.get(4) == Some(&FEATURE_VERSION_SIGNED);
+        if FeatureFrame::sniff(data) && signed {
+            self.ingest_signed(data, t_s, src)
+        } else if FeatureFrame::sniff(data) && self.frame_auth_required() {
+            // A v1 frame, or anything else wearing the magic: accepting
+            // it would leave the unsigned way in open beside the signed one.
+            self.stats.frame_auth.unsigned_refused += 1;
+            Ingested::Rejected("unsigned FeatureFrame")
+        } else if FeatureFrame::sniff(data) {
             match FeatureFrame::decode(data) {
                 Ok(f) if !is_finite(&f) => {
                     self.stats.errors.non_finite += 1;
@@ -232,12 +267,53 @@ impl Engine {
                     Ingested::Rejected("feature frame")
                 }
             }
+        } else if raw::sniff(data) && self.frame_auth_required() {
+            self.stats.frame_auth.raw_refused += 1;
+            Ingested::Rejected("raw CSI is unauthenticated")
         } else if raw::sniff(data) {
             self.ingest_raw(data, t_s, src)
         } else {
             self.stats.errors.unknown_type += 1;
             Ingested::Rejected("unknown datagram type")
         }
+    }
+
+    /// A v2 frame: check the tag, then the replay floor, then route it as
+    /// any frame (ADR-012, `spec/wire.md` §2b).
+    fn ingest_signed(&mut self, data: &[u8], t_s: f64, src: Option<SocketAddr>) -> Ingested {
+        let auth = &mut self.stats.frame_auth;
+        if self.frame_keys.is_empty() {
+            auth.no_key += 1;
+            return Ingested::Rejected("signed FeatureFrame, but no frame_key is configured");
+        }
+        let v = match frameauth::verify(data, &self.frame_keys) {
+            Ok(v) => v,
+            Err(Refused::UnknownKey(_)) => {
+                auth.unknown_key += 1;
+                return Ingested::Rejected("unknown key_id");
+            }
+            Err(Refused::Tag) => {
+                auth.bad_tag += 1;
+                return Ingested::Rejected("bad tag");
+            }
+            // Ruled out by the dispatch in `ingest`.
+            Err(Refused::Size(_) | Refused::Magic | Refused::Version(_)) => {
+                self.stats.errors.version += 1;
+                return Ingested::Rejected("feature frame");
+            }
+        };
+        let f = v.frame;
+        if !self.replay.accept(f.node_id, f.tx_id, v.boot, f.seq) {
+            auth.replayed += 1;
+            return Ingested::Rejected("replayed or stale counter");
+        }
+        auth.accepted += 1;
+        if !is_finite(&f) {
+            self.stats.errors.non_finite += 1;
+            return Ingested::Rejected("non-finite field");
+        }
+        self.stats.feature_frames += 1;
+        self.route_frame(f, t_s, src, true)
     }
 
     fn ingest_raw(&mut self, data: &[u8], t_s: f64, src: Option<SocketAddr>) -> Ingested {

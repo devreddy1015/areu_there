@@ -21,6 +21,7 @@ pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod engine;
+pub mod frameauth;
 pub mod history;
 pub mod http;
 pub mod hub;

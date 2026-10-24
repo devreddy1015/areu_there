@@ -482,9 +482,14 @@ Off by default until nodes send v2. In ADR-002's order:
 1. **Done:** the Python reference (`encode_signed`, `decode_signed`,
    `derive_node_key`, `ReplayGuard` in `wifisense/features.py`) and
    golden vectors (`spec/golden/feature_codec_signed`).
-2. The Rust codec and the gateway: the `[[frame_key]]` config, verification,
-   replay floors persisted in `data_dir`, counters in `/api/health`, and
-   a way to derive a node's key for flashing.
+2. **Done:** the gateway. `saans-dsp` gained only the v2 byte layout and
+   stays dependency-free; keys, signing, checking and the replay floor are
+   in `saans-gateway/src/frameauth.rs`, which already had `hmac` and
+   `sha2`. It has `[[frame_key]]` (the key in an environment variable),
+   floors persisted in `data_dir/frame_counters.json`, refusals counted
+   in `/api/health` and `/metrics`, and `--new-site-key` and `--node-key N`
+   for provisioning. It is held byte for byte to the Python reference's
+   golden frames.
 3. The C++ codec with its own SHA-256 (RFC 4231 vectors), held to the
    golden bytes, and the firmware's key and boot counter in NVS.
 

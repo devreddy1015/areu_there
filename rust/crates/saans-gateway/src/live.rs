@@ -122,7 +122,16 @@ impl Gateway {
             ),
         };
         let t0 = clock.now();
+        // Read once, here: an unset or malformed key variable stops startup
+        // rather than leaving authentication silently off.
+        let frame_keys = crate::frameauth::load_site_keys(&cfg)?;
         let mut hub = Hub::new(cfg, Some(shared.clone()), true, wall, t0);
+        hub.engine.set_frame_keys(frame_keys);
+        if !hub.engine.frame_auth_required() && !udp_bind.ip().is_loopback() {
+            hub.notes.push(format!(
+                "FeatureFrames are not authenticated (no [[frame_key]]): anything that can reach udp {udp_bind} can send them. See ADR-012 and README \"Operating requirements\""
+            ));
+        }
         for n in &hub.notes {
             crate::log(n);
         }
