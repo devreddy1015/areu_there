@@ -1225,8 +1225,9 @@ per row.
 - **The collapse detector cannot tell "fell out of sight" from "left".**
   It drops a burst when presence reads empty afterwards, because that
   usually means the person walked out. A fall that ends where the links
-  see the person weakly looks exactly like that. Changing it is a
-  detector decision and has not been made. Two options:
+  see the person weakly looks exactly like that. The second option below
+  was chosen and built, and it ships off; see "The presence hold". The
+  two options were:
   - require a departure, such as motion and then an empty room long
     enough to rule out a weak reading;
   - hold presence for a while after a fall-shaped burst.
@@ -1241,4 +1242,82 @@ per row.
   person differently. S5 recordings with somebody lying on the floor
   are what settle it.
 
-Measurement only: nothing in the pipeline or the detectors changed.
+### The presence hold (opt-in, off by default)
+
+`SpaceConfig::fall_hold_min` (`fall_hold_min` per space in
+`saans.toml`) is the second option, built.
+
+**How it works.** After a fall-shaped motion, presence is held for up to
+that long, and the detectors carry on as though someone were there. A
+fall-shaped motion is a motion burst (index >= 8) followed within 5 s by
+stillness, and then, within 60 s of the stillness, the links reading
+empty with nothing moving. The hold ends at any motion.
+
+**It is inferred, and everything says so:**
+
+- `occupied` stays what the links measured;
+- `presence_held` says presence is being held, and only admin and safety
+  see it, like the other health inferences;
+- the dashboard shows "presence held after a fall-shaped motion";
+- the inactivity and collapse evidence say "inferred, not measured";
+- a session the hold kept open, if the hold runs out, ends at the last
+  time someone was *measured*.
+
+**Two flaws the evaluation caught in the first version, both fixed and
+pinned by tests:**
+
+1. **It softened an existing alarm.** A breathing pause that ends with
+   the room reading empty is a Check: "a person who stops breathing can
+   look like an empty room". The hold turned that vacancy into held
+   presence, so the pause ended as "signal lost" and dropped to Advisory.
+   On the night timelines that moved 71 Checks to Advisory (a one-off
+   diagnostic, not committed). The pause
+   detector now always sees the measured occupancy.
+2. **It armed indefinitely.** A fidget burst could arm it and a breathing
+   pause minutes later engage it. It now engages only if the links read
+   empty within 60 s of the motion stopping. The presence detector loses
+   a fallen weak breather within its own 10 s hold and 8 s window.
+
+**Measured, SYNTHETIC.** The benefit comes from `saans lying`, 1200
+paired spots. The cost comes from `saans eval`'s second pass with the
+hold on over the reader, night and collapse runs. Every shipped table
+there is the first pass, with the hold off as it ships, and is unchanged.
+
+| | lying | upright |
+|---|---|---|
+| share of the still period read empty, links only | 1.0% | 0.9% |
+| the same, after the hold | **0.3%** | **0.1%** |
+| spots read mostly empty, after the hold, of 1200 | **2** | **1** |
+
+| | slice | box |
+|---|---|---|
+| departures that engaged the hold | **18 of 72** | **21 of 72** |
+| falls flagged as a possible collapse, with / without | 36 / 36 | 34 / 33 |
+| inactivity alerts raised while holding an empty room | 0 | 0 |
+
+**The last row is not reassurance.** The two timelines with a departure
+end 120 s after it, which cuts every false hold short of the 30-minute
+inactivity alert. In a room that stays empty, a hold engaged by somebody
+leaving runs to its cap and raises that alert at 30 minutes. So the
+real cost is the departures row: about one departure in four.
+
+### Why it ships off
+
+The hold trades a rare miss for a common false alarm.
+
+- **The miss it fixes is rare.** In 1200 spots, a fallen person read as
+  nobody for most of five minutes dropped from 10 to 2.
+- **The false alarm is common.** Walking out ends the same way a fall
+  out of sight does: a burst, the motion stopping, an empty reading.
+  About one departure in four would page someone half an hour later.
+
+That is the same trade that keeps collapse detection off, so the hold
+follows it: off by default, and opt-in per space, for example a space
+where a single occupant rarely leaves and a missed fall costs most. To
+turn it on, set `fall_hold_min = 35`, longer than the space's
+`inactivity_alert_min`. What would make it worth turning on by default
+is something that tells leaving from falling, which the current
+features do not. In a one-off diagnostic (not committed), a fallen weak
+breather's presence index (median 0.85 when read empty) overlapped an
+empty room's (90th percentile 0.84), so a lower holding threshold does
+not separate them either.

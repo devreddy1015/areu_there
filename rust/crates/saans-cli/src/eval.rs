@@ -121,6 +121,10 @@ impl Lcg {
     }
 }
 
+/// The presence hold as the evaluation measures it, in a second pass over
+/// the timelines with a departure or a fall (it ships off).
+pub const FALL_HOLD_MIN: f64 = 35.0;
+
 pub const LEAD_IN_S: f64 = 100.0; // filter warmup 50 s + calibration 30 s + margin
 
 fn seg(duration_s: f64, activity: Activity) -> Segment {
@@ -251,12 +255,16 @@ pub fn timeline(kind: Kind, quick: bool, rng: &mut Lcg) -> Vec<Segment> {
     t
 }
 
+#[derive(Clone)]
 pub struct Job {
     pub kind: Kind,
     pub room: &'static str,
     pub layout: &'static str,
     pub seed: u64,
     pub scenario: Scenario,
+    /// `SpaceConfig::fall_hold_min`: 0, as shipped, unless the presence
+    /// hold is what is being measured.
+    pub fall_hold_min: f64,
 }
 
 pub fn jobs(opts: &EvalOptions) -> Vec<Job> {
@@ -300,6 +308,7 @@ pub fn jobs(opts: &EvalOptions) -> Vec<Job> {
                         layout: layout_name,
                         seed,
                         scenario,
+                        fall_hold_min: 0.0,
                     });
                 }
             }
@@ -324,6 +333,7 @@ pub fn run_with_quorum(job: &Job, presence_quorum: usize) -> Run {
         links: links.clone(),
         vitals: true,
         collapse_detection: true,
+        fall_hold_min: job.fall_hold_min,
         presence_quorum,
         ..SpaceConfig::default()
     };
@@ -347,6 +357,7 @@ pub fn run_with_quorum(job: &Job, presence_quorum: usize) -> Run {
     let mut fusion = SpaceFusion::new(config.clone());
     let mut monitor = SpaceMonitor::new(config);
     let mut samples = Vec::new();
+    let mut held = Vec::new();
     let mut events: Vec<HealthEvent> = Vec::new();
     let mut next = 0.5;
     while let Some(tick) = sim.step() {
@@ -367,6 +378,7 @@ pub fn run_with_quorum(job: &Job, presence_quorum: usize) -> Run {
         if tick.truth.t_s + 1e-9 >= next {
             let s = fusion.sample(tick.truth.t_s);
             events.extend(monitor.update(&s));
+            held.push(monitor.presence_held());
             samples.push((tick.truth, s));
             next += 0.5;
         }
@@ -375,6 +387,7 @@ pub fn run_with_quorum(job: &Job, presence_quorum: usize) -> Run {
         label: sc.name.clone(),
         hours: sim.duration_s() / 3600.0,
         samples,
+        held,
         events,
         truth_events: sim.truth_events(),
     }
@@ -384,11 +397,24 @@ struct Done {
     kind: Kind,
     room: &'static str,
     layout: &'static str,
+    /// From the second pass, with the presence hold on.
+    hold: bool,
     run: Run,
 }
 
 pub fn evaluate(opts: &EvalOptions) -> Result<(), String> {
-    let jobs = jobs(opts);
+    let mut jobs = jobs(opts);
+    // The second pass: the presence hold on, over the timelines where it
+    // can do anything, someone leaving (reader, night) or falling.
+    let held: Vec<Job> = jobs
+        .iter()
+        .filter(|j| matches!(j.kind, Kind::Reader | Kind::Night | Kind::Collapse))
+        .map(|j| Job {
+            fall_hold_min: FALL_HOLD_MIN,
+            ..j.clone()
+        })
+        .collect();
+    jobs.extend(held);
     // Every job shares its room's settings with others, so checking each
     // distinct (room, layout) once catches a bad box before hours of runs.
     for job in &jobs {
@@ -416,6 +442,7 @@ pub fn evaluate(opts: &EvalOptions) -> Result<(), String> {
                         kind: job.kind,
                         room: job.room,
                         layout: job.layout,
+                        hold: job.fall_hold_min > 0.0,
                         run,
                     });
                     d.len()
@@ -431,7 +458,7 @@ pub fn evaluate(opts: &EvalOptions) -> Result<(), String> {
     });
     let mut done = done.into_inner().unwrap();
     done.sort_by(|a, b| (a.kind, a.room, a.layout).cmp(&(b.kind, b.room, b.layout)));
-    let hours: f64 = done.iter().map(|d| d.run.hours).sum();
+    let hours: f64 = done.iter().filter(|d| !d.hold).map(|d| d.run.hours).sum();
     report(&done, opts, hours, start.elapsed().as_secs_f64());
     Ok(())
 }
@@ -444,10 +471,19 @@ fn select<'a>(
 ) -> Vec<&'a Run> {
     done.iter()
         .filter(|d| {
-            kinds.contains(&d.kind)
+            !d.hold
+                && kinds.contains(&d.kind)
                 && layout.is_none_or(|l| d.layout == l)
                 && room.is_none_or(|r| d.room == r)
         })
+        .map(|d| &d.run)
+        .collect()
+}
+
+/// The second pass's runs of `kind`, with the presence hold on.
+fn select_hold(done: &[Done], kind: Kind) -> Vec<&Run> {
+    done.iter()
+        .filter(|d| d.hold && d.kind == kind)
         .map(|d| &d.run)
         .collect()
 }
@@ -457,7 +493,7 @@ fn report(done: &[Done], opts: &EvalOptions, hours: f64, wall_s: f64) {
     println!("==========================================================================");
     println!(
         "saans eval -- SYNTHETIC. {} runs, {:.1} simulated hours in {:.0} s ({} seeds per cell from seed {}{})",
-        done.len(), hours, wall_s, opts.seeds, opts.seed_offset,
+        done.iter().filter(|d| !d.hold).count(), hours, wall_s, opts.seeds, opts.seed_offset,
         if opts.seed_offset >= 2 { ", HELD OUT from threshold tuning" } else { ", DEVELOPMENT seeds used for tuning" }
     );
     if opts.quick {
@@ -677,6 +713,113 @@ fn report(done: &[Done], opts: &EvalOptions, hours: f64, wall_s: f64) {
         nights.len(),
         rests.iter().sum::<usize>()
     );
+
+    println!(
+        "\nPRESENCE HOLD (ships OFF). A second pass over the same reader, night and collapse runs with it on:"
+    );
+    println!("after a fall-shaped motion the links read empty with nothing moving, and presence is held, inferred,");
+    println!("for up to 35 min or until motion. Minutes held with the person truly there and with the room truly");
+    println!("empty; alerts raised while it held an empty room are false alarms it caused (inactivity ships on;");
+    println!("possible collapse ships off); falls flagged as a possible collapse, against the first pass.");
+    println!(
+        "  {:12} {:>6} {:>10} {:>12} {:>12} {:>18} {:>16} {:>16} {:>15}",
+        "scenario",
+        "runs",
+        "runs held",
+        "held, there",
+        "held, empty",
+        "inactivity, empty",
+        "collapse, empty",
+        "departures held",
+        "collapse fired"
+    );
+    let (mut false_inactivity_total, mut false_collapse_total) = (0, 0);
+    let (mut departures_total, mut departures_held_total) = (0, 0);
+    for kind in [Kind::Reader, Kind::Night, Kind::Collapse] {
+        let runs = select_hold(done, kind);
+        let fired = |rs: &[&Run]| {
+            rs.iter()
+                .filter(|r| {
+                    score::count(r, |k| matches!(k, EventKind::PossibleCollapse { .. })) > 0
+                })
+                .count()
+        };
+        let collapse_fired = format!(
+            "{}/{} ({})",
+            fired(&runs),
+            runs.len(),
+            fired(&select(done, &[kind], None, None))
+        );
+        let (mut there_s, mut empty_s, mut runs_held) = (0.0, 0.0, 0);
+        let (mut false_inactivity, mut false_collapse) = (0, 0);
+        let (mut departures, mut departures_held) = (0, 0);
+        for r in &runs {
+            if r.held.iter().any(|&h| h) {
+                runs_held += 1;
+            }
+            // A departure is the person leaving; it engaged the hold if the
+            // hold was on at any point while they stayed gone.
+            let (mut was_present, mut waiting) = (false, false);
+            for ((t, _), &h) in r.samples.iter().zip(&r.held) {
+                if was_present && !t.present {
+                    departures += 1;
+                    waiting = true;
+                }
+                if t.present {
+                    waiting = false;
+                } else if waiting && h {
+                    departures_held += 1;
+                    waiting = false;
+                }
+                was_present = t.present;
+            }
+            for ((t, _), &h) in r.samples.iter().zip(&r.held) {
+                if h {
+                    if t.present {
+                        there_s += score::SAMPLE_S;
+                    } else {
+                        empty_s += score::SAMPLE_S;
+                    }
+                }
+            }
+            for e in &r.events {
+                let i = r.samples.partition_point(|(t, _)| t.t_s < e.t_s);
+                if !(i < r.samples.len() && r.held[i] && !r.samples[i].0.present) {
+                    continue;
+                }
+                match e.kind {
+                    EventKind::Inactivity { .. } => false_inactivity += 1,
+                    EventKind::PossibleCollapse { .. } => false_collapse += 1,
+                    _ => {}
+                }
+            }
+        }
+        false_inactivity_total += false_inactivity;
+        false_collapse_total += false_collapse;
+        departures_total += departures;
+        departures_held_total += departures_held;
+        println!(
+            "  {:12} {:>6} {:>10} {:>12.1} {:>12.1} {:>18} {:>16} {:>16} {:>15}",
+            kind.name(),
+            runs.len(),
+            runs_held,
+            there_s / 60.0,
+            empty_s / 60.0,
+            false_inactivity,
+            false_collapse,
+            format!("{departures_held}/{departures}"),
+            collapse_fired
+        );
+    }
+    println!(
+        "  raised while holding an empty room: inactivity {false_inactivity_total}, possible collapse {false_collapse_total}"
+    );
+    println!(
+        "  departures that engaged the hold: {departures_held_total} of {departures_total}. The two timelines with a departure"
+    );
+    println!("  (reader, night) end 120 s after it, which cuts such a hold short. In a room that stays empty it runs to");
+    println!("  its 35 min cap and raises an inactivity alert at 30 min: read 'departures held' as false inactivity alerts.");
+    println!("  'collapse fired': with the hold, and (in brackets) without it.");
 
     println!("\nBY ROOM (all layouts)");
     for (room, _) in rooms() {

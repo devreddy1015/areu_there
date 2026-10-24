@@ -380,6 +380,12 @@ impl GatewayConfig {
                     s.id
                 ));
             }
+            if !(s.fall_hold_min.is_finite() && s.fall_hold_min >= 0.0) {
+                return err(format!(
+                    "space {:?}: fall_hold_min must be 0 (off) or a positive number of minutes",
+                    s.id
+                ));
+            }
         }
         self.validate_outputs(&ids)
     }
@@ -793,6 +799,20 @@ mod tests {
     }
 
     const ONE_SPACE: &str = "[[space]]\nid = \"a\"\nlinks = [{ rx = 1, tx = 2 }]\n";
+
+    #[test]
+    fn the_fall_hold_is_off_by_default_and_refuses_nonsense() {
+        let cfg = GatewayConfig::from_toml(ONE_SPACE).unwrap();
+        assert_eq!(cfg.spaces[0].fall_hold_min, 0.0);
+        let on = GatewayConfig::from_toml(&format!("{ONE_SPACE}fall_hold_min = 35\n")).unwrap();
+        assert_eq!(on.spaces[0].fall_hold_min, 35.0);
+        for bad in ["-1", "nan", "inf"] {
+            let e = GatewayConfig::from_toml(&format!("{ONE_SPACE}fall_hold_min = {bad}\n"))
+                .expect_err(bad)
+                .to_string();
+            assert!(e.contains("fall_hold_min"), "{bad}: {e}");
+        }
+    }
 
     #[test]
     fn audit_retention_defaults_to_a_year() {

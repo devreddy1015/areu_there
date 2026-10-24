@@ -147,6 +147,10 @@ pub fn space_for(v: &Value, principal: &Principal) -> Option<Value> {
     }
     if !principal.can_see_health_alerts(space_id) {
         if let Value::Object(m) = &mut out {
+            // A presence hold says a fall-shaped motion happened: a health
+            // inference, like `possible_collapse`. Without it the space
+            // reads what the links measured.
+            m.remove("presence_held");
             if let Some(Value::Array(a)) = m.get_mut("alerts") {
                 a.retain(|x| !is_health_alert(x.get("name").and_then(Value::as_str).unwrap_or("")));
             }
@@ -282,6 +286,22 @@ mod tests {
         let w = space_for(&no_consent, &safety).expect("in scope");
         assert!(w.get("breathing").is_none());
         assert_eq!(w["occupied"], json!(true));
+    }
+
+    #[test]
+    fn a_presence_hold_is_shown_only_with_health_alerts() {
+        let mut held = consented_space();
+        held["occupied"] = json!(false);
+        held["presence_held"] = json!(true);
+        for role in [Role::Admin, Role::Safety] {
+            let v = space_for(&held, &p(role, None)).expect("in scope");
+            assert_eq!(v["presence_held"], json!(true));
+        }
+        for role in [Role::Ops, Role::Occupancy] {
+            let v = space_for(&held, &p(role, None)).expect("in scope");
+            assert!(v.get("presence_held").is_none());
+            assert_eq!(v["occupied"], json!(false), "the measurement stays");
+        }
     }
 
     #[test]

@@ -305,6 +305,25 @@ Resolve work from the dashboard, from `POST /api/alerts/{id}/ack|resolve`
 (admin and safety, in their spaces), and from Telegram's buttons (users
 in `allowed_user_ids`), and every one is in the audit log.
 
+**Holding presence after a fall (opt-in).** A person on the floor can be
+too weak a breather for the links to see ([NOTES.md](NOTES.md) §14), and
+an empty reading then stops the inactivity alert from ever counting. With
+`fall_hold_min` set (35 for the default 30-minute inactivity alert), the
+monitor does the following:
+- **When it holds.** After a burst of motion that stops abruptly, followed
+  within a minute by the links reading empty with nothing moving, it holds
+  presence for that long.
+- **What ends it.** Any motion.
+- **It is inferred, not measured.** `occupied` stays what the links say,
+  and `presence_held` says presence is being held; only admin and safety
+  see it. The dashboard says so, and so does every alert raised during a
+  hold.
+
+It is off by default, like collapse detection and for the same reason: it
+cannot tell a fall out of sight from someone walking out. In simulation
+about one departure in four engages it, and in a room that then stays
+empty each of those is an inactivity alert 30 minutes later.
+
 **What leaves the building** is, by default, only that an alert of a given
 kind is open in a given space. The evidence sentence, the confidence and
 every number stay home unless a route sets `include_health_details`.

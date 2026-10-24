@@ -167,6 +167,12 @@ pub const BURST_INDEX: f64 = 8.0;
 /// Stillness must begin within this long after the last burst sample: a
 /// fall ends abruptly, whereas continued movement means someone got up.
 pub const COLLAPSE_SETTLE_S: f64 = 5.0;
+/// A presence hold engages only if the links read empty within this long
+/// of the motion stopping. They lose a fallen weak breather within the
+/// presence detector's own hold (10 s) and energy window (8 s); a loss of
+/// presence minutes after a burst (a breathing pause long after a fidget)
+/// is not that pattern, and holding it would mask the pause's own alarm.
+pub const FALL_HOLD_ARM_S: f64 = 60.0;
 /// Stillness after the burst must last this long (plan §2.1).
 pub const COLLAPSE_STILL_S: f64 = 30.0;
 /// Blindness tolerated inside the post-burst stillness window.
@@ -378,6 +384,9 @@ struct Ctx {
     /// Visible (some usable link) and `motion_index >= STILL_INDEX` for
     /// `MOVE_CONFIRM_SAMPLES` in a row, or `>= BOUT_INDEX` at once.
     moving: bool,
+    /// `present` only because the presence hold is in force: the links
+    /// read empty. Evidence must say so.
+    held: bool,
     /// Breathing, only when vitals are on and the space is occupied.
     breathing: Option<Breathing>,
 }
@@ -504,6 +513,19 @@ struct Burst {
     fired: bool,
 }
 
+/// A fall-shaped motion, and the presence hold that follows it
+/// (`SpaceConfig::fall_hold_min`): a burst, stillness within
+/// `COLLAPSE_SETTLE_S` of it, and then the links reading empty.
+#[derive(Debug, Clone, Copy)]
+struct FallHold {
+    /// Last sample at or above `BURST_INDEX`.
+    burst_t: f64,
+    /// When the motion stopped, if it stopped abruptly.
+    still_since: Option<f64>,
+    /// When the links first read empty after that: the hold's start.
+    held_since: Option<f64>,
+}
+
 #[derive(Debug, Clone)]
 struct Rest {
     t_start: f64,
@@ -594,6 +616,10 @@ pub struct SpaceMonitor {
     pause: Option<Pause>,
     rate: RateCheck,
     burst: Option<Burst>,
+    fall_hold: Option<FallHold>,
+    /// Start of a presence hold that just ran out with nothing moving:
+    /// the session it kept open ends at the last measured presence.
+    hold_expired: Option<f64>,
     rest: Option<Rest>,
     // trend
     day: Option<DayAccum>,
@@ -621,6 +647,8 @@ impl SpaceMonitor {
             pause: None,
             rate: RateCheck::default(),
             burst: None,
+            fall_hold: None,
+            hold_expired: None,
             rest: None,
             day: None,
             history: BTreeMap::new(),
@@ -629,6 +657,14 @@ impl SpaceMonitor {
 
     pub fn config(&self) -> &SpaceConfig {
         &self.config
+    }
+
+    /// Whether presence is being held after a fall-shaped motion as of the
+    /// last sample: [`SpaceState::presence_held`] without building the
+    /// whole state.
+    pub fn presence_held(&self) -> bool {
+        self.last.is_some_and(|s| s.occupied == Some(false))
+            && self.fall_hold.is_some_and(|h| h.held_since.is_some())
     }
 
     /// Feed one fused 2 Hz sample; returns events that started, ended or
@@ -655,19 +691,31 @@ impl SpaceMonitor {
         }
         self.roll_day(t, &mut ev);
 
-        let present = s.occupied == Some(true);
+        let measured = *s;
         let visible = s.occupied.is_some();
         self.move_run = if visible && s.motion_index >= STILL_INDEX {
             self.move_run + 1
         } else {
             0
         };
+        let moving =
+            visible && (s.motion_index >= BOUT_INDEX || self.move_run >= MOVE_CONFIRM_SAMPLES);
+        // While the presence hold is in force every detector sees the
+        // space as occupied; the stored sample, and so the state, keeps
+        // what the links measured.
+        let held = self.hold_step(s, t, moving);
+        let eff = SpaceSample {
+            occupied: if held { Some(true) } else { s.occupied },
+            ..measured
+        };
+        let s = &eff;
+        let present = s.occupied == Some(true);
         let c = Ctx {
             t,
             dt,
             present,
-            moving: visible
-                && (s.motion_index >= BOUT_INDEX || self.move_run >= MOVE_CONFIRM_SAMPLES),
+            moving,
+            held,
             breathing: if self.config.vitals && present {
                 s.breathing
             } else {
@@ -678,7 +726,10 @@ impl SpaceMonitor {
         self.occupancy_step(s, &c, &mut ev);
         if self.config.vitals {
             // Before the baselines take this sample: B is the level *before* onset.
-            self.pause_step(s, &c, &mut ev);
+            // On the measured sample: a pause that ends with the room reading
+            // empty is a Check ("a person who stops breathing can look like an
+            // empty room"), and a presence hold must never soften that.
+            self.pause_step(&measured, &c, &mut ev);
         }
         self.motion_step(s, &c);
         self.breathing_step(&c);
@@ -691,8 +742,61 @@ impl SpaceMonitor {
         }
         self.rest_step(&c, &mut ev);
         self.day_step(&c);
-        self.last = Some(*s);
+        self.last = Some(measured);
         ev
+    }
+
+    /// Track a fall-shaped motion and say whether presence is held now.
+    fn hold_step(&mut self, s: &SpaceSample, t: f64, moving: bool) -> bool {
+        let limit_s = self.config.fall_hold_min * 60.0;
+        if !(limit_s > 0.0 && limit_s.is_finite()) {
+            self.fall_hold = None;
+            return false;
+        }
+        if s.occupied.is_some() && s.motion_index >= BURST_INDEX {
+            // A burst: arms a hold, and ends one in force (they moved).
+            self.fall_hold = Some(FallHold {
+                burst_t: t,
+                still_since: None,
+                held_since: None,
+            });
+            return false;
+        }
+        let Some(h) = &mut self.fall_hold else {
+            return false;
+        };
+        if moving {
+            // Motion while it settles is the burst dying away; motion after
+            // it settled, or carrying on past the settle time, is somebody
+            // moving about or walking out.
+            if h.still_since.is_some() || t - h.burst_t > COLLAPSE_SETTLE_S {
+                self.fall_hold = None;
+            }
+            return false;
+        }
+        if h.still_since.is_none() {
+            if t - h.burst_t > COLLAPSE_SETTLE_S {
+                self.fall_hold = None;
+                return false;
+            }
+            h.still_since = Some(t);
+        }
+        if s.occupied != Some(false) {
+            // Measured presence needs no hold; blindness has its own rules.
+            return false;
+        }
+        if h.held_since.is_none() && t - h.still_since.unwrap_or(t) > FALL_HOLD_ARM_S {
+            // Presence lost long after the motion stopped: not a fall.
+            self.fall_hold = None;
+            return false;
+        }
+        let since = *h.held_since.get_or_insert(t);
+        if t - since > limit_s {
+            self.fall_hold = None;
+            self.hold_expired = Some(since);
+            return false;
+        }
+        true
     }
 
     /// Live snapshot for the API and dashboard.
@@ -769,6 +873,7 @@ impl SpaceMonitor {
             links_total: s.links_total,
             vitals,
             active_alerts,
+            presence_held: self.presence_held(),
         }
     }
 
@@ -931,6 +1036,27 @@ impl SpaceMonitor {
     }
 
     fn occupancy_step(&mut self, s: &SpaceSample, c: &Ctx, ev: &mut Vec<HealthEvent>) {
+        if c.held {
+            // Keeps an open session open. It does not start one, and it is
+            // not a sighting: `last_occupied_t` stays the last measured one.
+            self.blind_since = None;
+            self.vacant_since = None;
+            return;
+        }
+        if let Some(since) = self.hold_expired.take() {
+            if s.occupied == Some(false) && self.session_start.is_some() {
+                let end = self.last_occupied_t.unwrap_or(since);
+                let why = format!(
+                    "presence was held for {:.0} min after a fall-shaped motion and nothing has moved since, \
+                     with the links reading empty throughout; the session was closed at the last time someone \
+                     was measured (they may still be there)",
+                    (c.t - since) / 60.0
+                );
+                self.vacant_since.get_or_insert(c.t);
+                self.finish_session(end, c.t, &why, link_confidence(s.links_usable), ev);
+                return;
+            }
+        }
         match s.occupied {
             Some(true) => {
                 self.blind_since = None;
@@ -1393,6 +1519,13 @@ impl SpaceMonitor {
                 .as_ref()
                 .is_some_and(|(bt, _)| t - bt <= BREATHING_RECENT_S);
         let phrase = breathing_phrase(vitals, self.last_breath.as_ref(), t);
+        // Present only by the hold: say so, since nobody measured it.
+        let present = if c.held {
+            "while presence is held after a fall-shaped motion (the links read empty, so this is inferred, \
+             not measured)"
+        } else {
+            "while present"
+        };
         let Some(ep) = &mut self.still else { return };
         let still_s = t - ep.since;
         if still_s < limit_s {
@@ -1405,7 +1538,7 @@ impl SpaceMonitor {
                 (
                     Severity::Check,
                     format!(
-                        "no gross motion for {:.1} min while present; {phrase}; check on the space",
+                        "no gross motion for {:.1} min {present}; {phrase}; check on the space",
                         still_s / 60.0
                     ),
                 )
@@ -1413,7 +1546,7 @@ impl SpaceMonitor {
                 (
                     Severity::Advisory,
                     format!(
-                        "no gross motion for {:.1} min while present; {phrase}",
+                        "no gross motion for {:.1} min {present}; {phrase}",
                         still_s / 60.0
                     ),
                 )
@@ -1423,7 +1556,7 @@ impl SpaceMonitor {
             (
                 Severity::Check,
                 format!(
-                    "still no gross motion after {:.1} min while present, and breathing is no longer detected: {phrase}; \
+                    "still no gross motion after {:.1} min {present}, and breathing is no longer detected: {phrase}; \
                      check on the space",
                     still_s / 60.0
                 ),
@@ -1502,9 +1635,15 @@ impl SpaceMonitor {
         b.fired = true;
         let (peak, settle, burst_t) = (b.peak, still_start - b.last_t, b.last_t);
         let phrase = breathing_phrase(self.config.vitals, self.last_breath.as_ref(), t);
+        let presence = if c.held {
+            "with presence inferred, not measured: the links read empty after the burst and presence is being \
+             held in case someone is on the floor out of their sight"
+        } else {
+            "with presence held"
+        };
         let evidence = format!(
             "a motion burst (index {:.1}, {:.0}x the stillness limit) was followed within {:.1} s by {:.0} s of no \
-             gross motion with presence held; {phrase}. Sitting down heavily looks the same to WiFi, so this is \
+             gross motion {presence}; {phrase}. Sitting down heavily looks the same to WiFi, so this is \
              advisory: check on the space",
             peak,
             peak / STILL_INDEX,
@@ -1597,7 +1736,8 @@ impl SpaceMonitor {
             }
             return;
         }
-        if !c.present {
+        // A person held present after a fall-shaped motion is not resting.
+        if !c.present || c.held {
             return;
         }
         let vitals = self.config.vitals;
@@ -2177,8 +2317,12 @@ mod tests {
             0
         );
 
+        // With the presence hold off, the links reading empty after the
+        // burst is taken as the person having left (the rule before the
+        // hold, NOTES.md §14).
         let mut m = SpaceMonitor::new(SpaceConfig {
             collapse_detection: true,
+            fall_hold_min: 0.0,
             ..cfg(true)
         });
         let mut ev = run(&mut m, 0.0, 1.0, |t| sample(t, Some(true), 12.0, None));
@@ -2192,9 +2336,218 @@ mod tests {
         );
     }
 
+    /// The presence hold on, at the length the docs recommend.
+    fn held(c: SpaceConfig) -> SpaceConfig {
+        SpaceConfig {
+            fall_hold_min: 35.0,
+            ..c
+        }
+    }
+
+    #[test]
+    fn the_presence_hold_is_off_by_default() {
+        assert_eq!(SpaceConfig::default().fall_hold_min, 0.0);
+        let mut m = SpaceMonitor::new(cfg(true));
+        let ev = fell_out_of_sight(&mut m, 5.0);
+        assert!(!m.state().presence_held);
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::OccupancyEnded { .. })),
+            1
+        );
+    }
+
+    /// A fall-shaped motion (burst, abrupt stillness) followed by the
+    /// links reading empty: a person on the floor too weak a breather to
+    /// see. 15 s present, then empty for `minutes`, nothing moving.
+    fn fell_out_of_sight(m: &mut SpaceMonitor, minutes: f64) -> Vec<HealthEvent> {
+        let mut ev = run(m, 0.0, 60.0, |t| sample(t, Some(true), 0.5, None));
+        ev.extend(run(m, 60.0, 61.0, |t| sample(t, Some(true), 12.0, None)));
+        ev.extend(run(m, 61.0, 75.0, |t| sample(t, Some(true), 0.5, None)));
+        ev.extend(run(m, 75.0, 75.0 + minutes * 60.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
+        ev
+    }
+
+    #[test]
+    fn presence_is_held_after_a_fall_shaped_motion() {
+        let mut m = SpaceMonitor::new(SpaceConfig {
+            collapse_detection: true,
+            fall_hold_min: 35.0,
+            ..cfg(true)
+        });
+        // 34 min: inside a 35 min hold.
+        let ev = fell_out_of_sight(&mut m, 34.0);
+        // The session stays open, the inactivity alert fires (and, with
+        // breathing unseen, as a Check), and so does a possible collapse,
+        // every one saying presence is inferred.
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::OccupancyEnded { .. })),
+            0
+        );
+        let inactivity: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::Inactivity { .. }))
+            .collect();
+        assert!(!inactivity.is_empty());
+        assert_eq!(inactivity[0].severity, Severity::Check);
+        assert!(
+            inactivity[0].evidence.contains("inferred, not measured"),
+            "{}",
+            inactivity[0].evidence
+        );
+        let collapse: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::PossibleCollapse { .. }))
+            .collect();
+        assert_eq!(collapse.len(), 1);
+        assert!(
+            collapse[0].evidence.contains("inferred, not measured"),
+            "{}",
+            collapse[0].evidence
+        );
+        // No rest period for a person held present on the floor.
+        assert_eq!(count(&ev, |k| matches!(k, EventKind::RestStarted)), 0);
+        // The state says what the links measured, and that it is held.
+        let st = m.state();
+        assert_eq!(st.occupied, Some(false));
+        assert!(st.presence_held);
+    }
+
+    #[test]
+    fn the_hold_runs_out_and_closes_the_session_at_the_last_sighting() {
+        let mut m = SpaceMonitor::new(SpaceConfig {
+            fall_hold_min: 10.0,
+            ..cfg(true)
+        });
+        let ev = fell_out_of_sight(&mut m, 40.0);
+        let ended: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::OccupancyEnded { .. }))
+            .collect();
+        assert_eq!(ended.len(), 1);
+        // Detected after the 10 min hold; dwell ends at the last measured
+        // presence, just before 75 s, not when the hold gave up.
+        assert!(
+            (ended[0].t_s - (75.0 + 600.0)).abs() <= 1.0,
+            "{}",
+            ended[0].t_s
+        );
+        match ended[0].kind {
+            EventKind::OccupancyEnded { dwell_s } => {
+                assert!((dwell_s - 74.5).abs() <= 0.5, "{dwell_s}")
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            ended[0].evidence.contains("held for 10 min"),
+            "{}",
+            ended[0].evidence
+        );
+        assert!(!m.state().presence_held);
+    }
+
+    #[test]
+    fn walking_out_does_not_arm_the_hold() {
+        // Motion carries on past the settle time after the last burst,
+        // then the links read empty: somebody leaving.
+        let mut m = SpaceMonitor::new(held(cfg(true)));
+        let mut ev = run(&mut m, 0.0, 60.0, |t| sample(t, Some(true), 0.5, None));
+        ev.extend(run(&mut m, 60.0, 61.0, |t| {
+            sample(t, Some(true), 12.0, None)
+        }));
+        ev.extend(run(&mut m, 61.0, 70.0, |t| {
+            sample(t, Some(true), 4.0, None)
+        }));
+        ev.extend(run(&mut m, 70.0, 130.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
+        assert!(!m.state().presence_held);
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::OccupancyEnded { .. })),
+            1
+        );
+    }
+
+    #[test]
+    fn presence_lost_long_after_the_motion_is_not_held() {
+        // A burst, stillness with presence for 2 min, then empty: the
+        // pattern of a breathing pause long after a fidget, not a fall.
+        let mut m = SpaceMonitor::new(held(cfg(true)));
+        let mut ev = run(&mut m, 0.0, 60.0, |t| sample(t, Some(true), 0.5, None));
+        ev.extend(run(&mut m, 60.0, 61.0, |t| {
+            sample(t, Some(true), 12.0, None)
+        }));
+        ev.extend(run(&mut m, 61.0, 181.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
+        ev.extend(run(&mut m, 181.0, 300.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
+        assert!(!m.state().presence_held);
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::OccupancyEnded { .. })),
+            1
+        );
+    }
+
+    #[test]
+    fn a_hold_never_softens_a_pause_that_ends_in_vacancy() {
+        // A burst, then breathing stops and, within the arming window, the
+        // room reads empty: the hold engages, and the pause still ends as
+        // vacancy, a Check.
+        let mut m = SpaceMonitor::new(held(cfg(true)));
+        let mut ev = run(&mut m, 0.0, 120.0, calm);
+        ev.extend(run(&mut m, 120.0, 121.0, |t| {
+            sample(t, Some(true), 12.0, None)
+        }));
+        ev.extend(run(&mut m, 121.0, 150.0, calm));
+        ev.extend(run(&mut m, 150.0, 165.0, |t| {
+            sample(t, Some(true), 0.5, br(14.0, 0.9, 0.05, None))
+        }));
+        ev.extend(run(&mut m, 165.0, 200.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
+        assert!(m.state().presence_held);
+        let pauses: Vec<_> = ev
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::BreathingPause { .. }))
+            .collect();
+        assert_eq!(pauses.len(), 1, "{ev:#?}");
+        assert_eq!(pauses[0].severity, Severity::Check);
+    }
+
+    #[test]
+    fn moving_again_ends_the_hold() {
+        let mut m = SpaceMonitor::new(held(cfg(true)));
+        let mut ev = run(&mut m, 0.0, 60.0, |t| sample(t, Some(true), 0.5, None));
+        ev.extend(run(&mut m, 60.0, 61.0, |t| {
+            sample(t, Some(true), 12.0, None)
+        }));
+        ev.extend(run(&mut m, 61.0, 75.0, |t| {
+            sample(t, Some(true), 0.5, None)
+        }));
+        ev.extend(run(&mut m, 75.0, 200.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
+        assert!(m.state().presence_held);
+        // They get up and move about where the links still read empty.
+        ev.extend(run(&mut m, 200.0, 205.0, |t| {
+            sample(t, Some(false), 4.0, None)
+        }));
+        ev.extend(run(&mut m, 205.0, 240.0, |t| {
+            sample(t, Some(false), 0.5, None)
+        }));
+        assert!(!m.state().presence_held);
+        assert_eq!(
+            count(&ev, |k| matches!(k, EventKind::OccupancyEnded { .. })),
+            1
+        );
+    }
+
     #[test]
     fn rest_period_starts_and_ends() {
-        let mut m = SpaceMonitor::new(cfg(true));
+        let mut m = SpaceMonitor::new(held(cfg(true)));
         let mut ev = run(&mut m, 0.0, 5.0, |t| sample(t, Some(true), 5.0, None));
         ev.extend(run(&mut m, 5.0, 5.0 + 25.0 * 60.0, |t| {
             // A 3 s turn-over at 22 min, once resting, is part of the rest.
@@ -2264,7 +2617,7 @@ mod tests {
 
     #[test]
     fn rest_needs_breathing_with_vitals_but_not_without() {
-        let mut m = SpaceMonitor::new(cfg(true));
+        let mut m = SpaceMonitor::new(held(cfg(true)));
         let ev = run(&mut m, 0.0, 25.0 * 60.0, |t| {
             sample(t, Some(true), 0.5, br(14.0, 0.3, 0.25, NOISE))
         });
@@ -2309,7 +2662,7 @@ mod tests {
 
     #[test]
     fn trend_deviation_after_four_days() {
-        let mut m = SpaceMonitor::new(cfg(true));
+        let mut m = SpaceMonitor::new(held(cfg(true)));
         let mut ev = Vec::new();
         for (d, bpm) in [(0, 14.0), (1, 14.4), (2, 13.8), (3, 19.0)] {
             ev.extend(rest_day(&mut m, d, bpm));
@@ -2350,7 +2703,7 @@ mod tests {
 
     #[test]
     fn history_survives_a_restart() {
-        let mut m = SpaceMonitor::new(cfg(true));
+        let mut m = SpaceMonitor::new(held(cfg(true)));
         for (d, bpm) in [(0, 14.0), (1, 14.4), (2, 13.8)] {
             rest_day(&mut m, d, bpm);
         }
@@ -2433,7 +2786,7 @@ mod tests {
 
     #[test]
     fn state_reports_five_minute_breathing_statistics() {
-        let mut m = SpaceMonitor::new(cfg(true));
+        let mut m = SpaceMonitor::new(held(cfg(true)));
         run(&mut m, 0.0, 300.0, |t| {
             let bpm = if (t * 2.0) as i64 % 2 == 0 {
                 13.0

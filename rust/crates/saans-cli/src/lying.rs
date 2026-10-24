@@ -60,6 +60,9 @@ struct Spot {
     /// Horizontal distance from the spot to the nearest link line.
     off_link_m: f64,
     empty: f64,
+    /// Read empty and not held after a fall-shaped motion: what the
+    /// detectors take as an empty room.
+    empty_unheld: f64,
     unknown: f64,
     /// Matched and plain-average breathing SNR of the link the occupancy
     /// rule depends on.
@@ -223,6 +226,8 @@ fn measure(
         layout: layout_name,
         seed,
         scenario: sc.clone(),
+        // On: the "after the hold" table measures it (it ships off).
+        fall_hold_min: eval::FALL_HOLD_MIN,
     };
     let run = eval::run(&job);
     let event = run
@@ -233,15 +238,25 @@ fn measure(
     let scored: Vec<_> = run
         .samples
         .iter()
-        .filter(|(t, _)| t.t_s >= event.t_end_s + SCORE_FROM_S)
+        .zip(&run.held)
+        .filter(|((t, _), _)| t.t_s >= event.t_end_s + SCORE_FROM_S)
         .collect();
     let n = scored.len().max(1) as f64;
     let empty = scored
         .iter()
-        .filter(|(_, s)| s.occupied == Some(false))
+        .filter(|((_, s), _)| s.occupied == Some(false))
         .count() as f64
         / n;
-    let unknown = scored.iter().filter(|(_, s)| s.occupied.is_none()).count() as f64 / n;
+    let empty_unheld = scored
+        .iter()
+        .filter(|((_, s), &h)| s.occupied == Some(false) && !h)
+        .count() as f64
+        / n;
+    let unknown = scored
+        .iter()
+        .filter(|((_, s), _)| s.occupied.is_none())
+        .count() as f64
+        / n;
 
     let mut gt = ground_truth(&sc, spot, posture);
     gt.sort_by(|a, b| b.0.total_cmp(&a.0));
@@ -263,6 +278,7 @@ fn measure(
         posture,
         off_link_m,
         empty,
+        empty_unheld,
         unknown,
         matched,
         plain,
@@ -406,6 +422,32 @@ fn report(
         "  (occupancy unknown: {:.1}% of all scored samples)",
         100.0 * unknown
     );
+
+    println!("\nAFTER THE PRESENCE HOLD (read empty and not held: what the detectors take as nobody there)");
+    println!(
+        "  {:<19} {:>9} {:>9}   {:>12} {:>12}",
+        "", "lying", "upright", "mostly, lie", "mostly, up"
+    );
+    for (name, layout) in [
+        ("1 link", Some("1 link")),
+        ("2 links", Some("2 links")),
+        ("3 links", Some("3 links")),
+        ("all", None),
+    ] {
+        let (l, u) = (
+            pick(None, layout, Posture::Lying),
+            pick(None, layout, Posture::Upright),
+        );
+        let mostly_unheld = |v: &[&Spot]| v.iter().filter(|s| s.empty_unheld > MOSTLY).count();
+        println!(
+            "  {:<19} {:>8.1}% {:>8.1}%   {:>12} {:>12}",
+            name,
+            100.0 * mean(&l, &|s| s.empty_unheld),
+            100.0 * mean(&u, &|s| s.empty_unheld),
+            format!("{}/{}", mostly_unheld(&l), l.len()),
+            format!("{}/{}", mostly_unheld(&u), u.len()),
+        );
+    }
 
     println!("\n1 LINK, BY HORIZONTAL DISTANCE FROM THE LINK LINE (both rooms)");
     println!(
