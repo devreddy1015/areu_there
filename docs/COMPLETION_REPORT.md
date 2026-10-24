@@ -228,6 +228,8 @@ See `UI_GAP_ANALYSIS.md` §3 for the full list. The ones that matter:
   *Closed 2026-10-24: built, and the dashboard has the buttons now that
   they do something.*
 - **MQTT** — still a stub, now refused at config load.
+  *Closed 2026-10-24: built (`mqtt.rs`), tested against an embedded
+  broker, and `[mqtt]` is accepted again.*
 - **Browser end-to-end tests** — none exist; the above was manual.
 - **Audit log retention** — not swept. Audit records usually outlive
   the events they describe, but "forever" is not a policy either.

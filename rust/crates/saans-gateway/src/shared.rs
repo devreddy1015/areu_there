@@ -46,6 +46,9 @@ pub struct Shared {
     pub history: Mutex<History>,
     /// Fan-out to MQTT and alert routing (crate::outputs).
     pub outputs: broadcast::Sender<OutputMsg>,
+    /// The MQTT publisher's connection state and counters; all zero when
+    /// `[mqtt]` is not configured.
+    pub mqtt: Arc<crate::mqtt::Status>,
 }
 
 impl Shared {
@@ -65,6 +68,7 @@ impl Shared {
             ws_clients: AtomicUsize::new(0),
             history: Mutex::new(History::new(history)),
             outputs,
+            mqtt: Arc::default(),
         })
     }
 

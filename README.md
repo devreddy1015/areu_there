@@ -304,6 +304,37 @@ every number stay home unless a route sets `include_health_details`.
 Tokens and webhook keys come from environment variables; the gateway
 refuses to start if one is missing, rather than starting unable to page.
 
+### MQTT and Home Assistant
+
+With `[mqtt]` configured (`saans.example.toml` has a commented example)
+the gateway publishes occupancy for building systems:
+
+| Topic, under `base_topic` | Retained | What |
+|---|---|---|
+| `gateway/status` | yes | `online`, or `offline` — also the last will, so a crash says so |
+| `<space>/occupancy` | yes | `{"occupied": true \| false \| null, "since", "links_usable", "links_total"}`, on change |
+| `<space>/event` | no | Occupancy and coverage events only |
+| `<space>/vitals` | yes | Only with `vitals_topics = true`, only for `vitals = true` spaces, every 10 s |
+| `system/links` | yes | Link health, no vital signs, every 10 s |
+
+`null` is "unknown": no link is usable. With
+`homeassistant_discovery = true` each space appears in Home Assistant as
+an occupancy `binary_sensor` (unknown for `null`, unavailable while the
+gateway is offline), so lights and air conditioning can follow it with no
+custom code. Everything except the vitals topic is exactly what the
+`occupancy` role sees: health alerts and their events never reach the
+broker. There is no occupancy *confidence* field: the fusion decides by a
+vote of links, and the 0.6 / 0.8 / 0.9 on occupancy events is a lookup on
+how many links are usable, not a measured probability, so the payload
+carries the link count itself.
+
+The connection is plain TCP, so a password (`password_env`) or
+`vitals_topics` are refused unless the broker is on the same machine; to
+reach a campus broker, bridge a local one to it over TLS. A broker that is
+down or never answers costs ingest nothing (tested), events during an
+outage are dropped and counted, and the retained topics are republished on
+reconnect. `/api/health` and `/metrics` show the connection.
+
 ### Recording and replay
 
     python3 -m wifisense record --port 5566 --out run.pcap [--duration-s 600]
@@ -382,7 +413,7 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/roomplan_import.py` | Apple RoomPlan scan to scene file. A stub: the mapping table is real, the format assumptions are untested |
 | `rust/crates/saans-sim/src/scene.rs` | The same format in Rust, with its own reader |
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
-| `tests/` | 547 tests, 239 of them outside `test_localize_*` (which belong to the P0b localization work) |
+| `tests/` | 550 tests, 242 of them outside `test_localize_*` (which belong to the P0b localization work) |
 | `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |
 | `rust/crates/saans-gateway/assets/site/` | The eight public pages, the stylesheet, the scripts and the fonts |
 | `rust/crates/saans-gateway/src/site.rs` | The route table for those pages, and the offline and link tests |

@@ -836,6 +836,30 @@ impl Hub {
         }
         p.family("saans_ws_clients", "gauge", "Connected WebSocket clients.");
         p.sample("saans_ws_clients", &[], shared.ws_clients() as f64);
+        if self.cfg.mqtt.is_some() {
+            let m = &shared.mqtt;
+            p.family(
+                "saans_mqtt_connected",
+                "gauge",
+                "1 while the MQTT publisher is connected to its broker.",
+            );
+            p.sample("saans_mqtt_connected", &[], m.connected() as u8 as f64);
+            p.family(
+                "saans_mqtt_messages_total",
+                "counter",
+                "MQTT messages handed to the client, and those dropped (events during an outage, or refused by a full queue).",
+            );
+            p.sample(
+                "saans_mqtt_messages_total",
+                &[("result", "published")],
+                m.published() as f64,
+            );
+            p.sample(
+                "saans_mqtt_messages_total",
+                &[("result", "dropped")],
+                m.dropped() as f64,
+            );
+        }
         p.out
     }
 

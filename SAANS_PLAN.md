@@ -242,6 +242,13 @@ consent gate allows; roles then show *less*.
   last-will `{base}/gateway/status` = `offline`.
 - Optional Home Assistant discovery: one occupancy `binary_sensor` per
   space, so lights and AC can follow occupancy with no custom code.
+- Built 2026-10-24 (`saans-gateway/src/mqtt.rs`), with two deviations:
+  occupancy carries no `confidence`, because the fusion decides it by a
+  vote of links and the only number on offer is the events' heuristic
+  lookup on links usable (the payload gives links usable of links
+  configured instead); and the connection is plain TCP, so a
+  password or the vitals topics are refused unless the broker is on the
+  gateway's own machine.
 
 ### 10.3 Alerts
 - `[[alert_route]]`: which event kinds and severities in which spaces go

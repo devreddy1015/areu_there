@@ -658,6 +658,11 @@ async fn health(State(app): State<AppState>, h: HeaderMap) -> Response {
         if let Some(alerts) = &app.alerts {
             m.insert("alerts".into(), alerts.status());
         }
+        if let Some(c) = &app.cfg.mqtt {
+            let mut mqtt = app.shared.mqtt.json();
+            mqtt["broker"] = format!("{}:{}", c.host, c.port).into();
+            m.insert("mqtt".into(), mqtt);
+        }
     }
     no_store(Json(v).into_response())
 }

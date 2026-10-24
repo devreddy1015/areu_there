@@ -125,3 +125,26 @@ rate_low_bpm = 8.0
 # ack_timeout_min = 5                      # still unacknowledged after this: escalate, once
 # escalate_to = ["webhook:pager"]
 # include_health_details = false
+
+# -------------------------------------------------------------------- MQTT
+# Occupancy for facilities systems and Home Assistant (SAANS_PLAN.md §10.2).
+# Uncomment to use. Topics, under base_topic:
+#   gateway/status         online / offline (retained; offline is the last will)
+#   <space>/occupancy      {"occupied": true|false|null, "since", ...} (retained)
+#   <space>/event          occupancy and coverage events; never health alerts
+#   <space>/vitals         only with vitals_topics, only for vitals = true spaces
+#   system/links           link health, every 10 s (retained)
+#
+# The connection is plain TCP: a password or vitals_topics are refused
+# unless the broker is on this machine. To reach a campus broker, bridge a
+# local one to it over TLS.
+#
+# [mqtt]
+# host = "127.0.0.1"
+# port = 1883
+# client_id = "saans-gateway"
+# # username = "saans"
+# # password_env = "SAANS_MQTT_PASSWORD"
+# base_topic = "saans/v1"
+# homeassistant_discovery = true          # one occupancy binary_sensor per space
+# vitals_topics = false

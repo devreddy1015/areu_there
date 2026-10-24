@@ -228,9 +228,13 @@ now distinguished.
 
 ### 2.6 What is a stub
 
-- `mqtt::spawn` is `todo!()` (`docs/COMPLETION_REPORT.md:223`), and an
-  `[mqtt]` section is rejected at config load rather than panicking at
-  startup -- honest, but not the same as finished.
+- *No longer a stub, since 2026-10-24:* the MQTT publisher
+  (`mqtt.rs`). Tested against an embedded broker: the topic set and
+  retain flags, no vitals topic for a space without consent, no vital
+  sign on any other topic, the last will when the task is killed,
+  republishing to a broker that appears late, and ingest time with the
+  broker up, refused and silent. Not yet run against Home Assistant
+  itself.
 - *No longer a stub, since 2026-10-24:* the alert service. Routing,
   acknowledgement, escalation, persistence, Telegram and webhooks are
   built and tested, including the brief's exit gate run live: a scripted

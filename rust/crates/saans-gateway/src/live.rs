@@ -136,11 +136,13 @@ impl Gateway {
         if let Some(a) = &alerts {
             outputs.push(a.spawn(shared.outputs.subscribe(), stop_rx.clone()));
         }
-        if cfg_arc.mqtt.is_some() {
-            outputs.push(crate::mqtt::spawn(
+        if let Some(m) = &cfg_arc.mqtt {
+            crate::mqtt::require_env(m)?;
+            outputs.push(crate::mqtt::spawn_with_status(
                 &cfg_arc,
                 shared.outputs.subscribe(),
                 stop_rx.clone(),
+                shared.mqtt.clone(),
             ));
         }
         let core = tokio::spawn(run_core(
