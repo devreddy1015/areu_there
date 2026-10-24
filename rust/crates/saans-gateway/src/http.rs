@@ -2,7 +2,7 @@
 //!
 //! | Route | Returns | Who |
 //! |---|---|---|
-//! | `GET /` | the dashboard (one self-contained HTML file, no external URLs) | anyone |
+//! | `GET /app` | the dashboard (one self-contained HTML file, no external URLs) | anyone |
 //! | `GET /api/me` | who you are, the mode, the version, what you may see | anyone |
 //! | `POST /api/login` | `{user, password}` → session cookie | anyone |
 //! | `POST /api/logout` | ends the session | anyone |
@@ -14,6 +14,10 @@
 //! | `GET /api/health` | gateway self-health | ops |
 //! | `GET /metrics` | Prometheus text format | ops |
 //! | `GET /api/live` | WebSocket: `{"type":"state"}` every 0.5 s, `{"type":"event"}` as they happen | in scope |
+//! | `GET /api/alerts?open=&limit=` | alerts, newest first, each as its event would be shown to you | as the event |
+//! | `GET /api/alerts/{id}` | one alert | as the event |
+//! | `POST /api/alerts/{id}/ack` | acknowledge; audited | admin, safety; in scope |
+//! | `POST /api/alerts/{id}/resolve` | `{"note"}` optional; audited | admin, safety; in scope |
 //!
 //! Simulate mode (`--simulate`) adds four more. They exist only in that
 //! mode, and everything they return is SYNTHETIC ([`crate::simulate`]).
@@ -90,6 +94,11 @@ impl HttpDeps {
         let auth = Arc::new(Auth::new(&cfg));
         let dir = (!cfg.data_dir.as_os_str().is_empty()).then(|| cfg.data_dir.clone());
         let audit = Arc::new(AuditLog::new(dir.as_deref(), cfg.utc_offset_minutes));
+        // A Telegram button press is an acknowledgement like any other and
+        // belongs in the same audit log, which this layer owns.
+        if let Some(a) = &alerts {
+            a.attach_audit(audit.clone());
+        }
         Self {
             shared,
             stop,
@@ -147,6 +156,10 @@ pub fn router(deps: HttpDeps) -> Router {
         .route("/api/history", get(history))
         .route("/api/links", get(links))
         .route("/api/health", get(health))
+        .route("/api/alerts", get(alerts_list))
+        .route("/api/alerts/{id}", get(alert_get))
+        .route("/api/alerts/{id}/ack", post(alert_ack))
+        .route("/api/alerts/{id}/resolve", post(alert_resolve))
         .route("/metrics", get(metrics))
         .route("/api/live", get(live));
     // Registered only in simulate mode: in any other mode these paths
@@ -221,6 +234,21 @@ fn is_https(h: &HeaderMap) -> bool {
 
 /// The principal for a request, or a 401. Denials are audited: a stream
 /// of them is how you notice someone probing the port.
+/// What the dashboard may offer this principal. The one source for both
+/// `/api/me` and the WebSocket `hello` frame: they used to be built
+/// separately, `hello` carried only `system`, and the dashboard replaces its
+/// copy with whichever arrived last -- so once the socket connected it
+/// forgot `audit`, and would have forgotten `alerts`. The gateway checks
+/// every request regardless; this only decides what is shown.
+fn capabilities(p: &Principal) -> Value {
+    json!({
+        "system": p.can_see_system(),
+        "audit": p.can_see_audit(),
+        // Acknowledge / Resolve. Still checked per request, per space.
+        "alerts": matches!(p.role, crate::roles::Role::Admin | crate::roles::Role::Safety),
+    })
+}
+
 fn principal(app: &AppState, h: &HeaderMap, path: &str) -> Result<Principal, Response> {
     let authz = header_str(h, header::AUTHORIZATION);
     let cookie = header_str(h, header::COOKIE);
@@ -298,11 +326,11 @@ async fn me(State(app): State<AppState>, h: HeaderMap) -> Response {
                 Some(s) => s.iter().cloned().collect::<Vec<_>>().into(),
                 None => Value::Null,
             };
-            v["can"] = json!({ "system": p.can_see_system(), "audit": p.can_see_audit() });
+            v["can"] = capabilities(&p);
         }
         Err(_) => {
             v["authenticated"] = false.into();
-            v["can"] = json!({ "system": false, "audit": false });
+            v["can"] = json!({ "system": false, "audit": false, "alerts": false });
         }
     }
     no_store(Json(v).into_response())
@@ -627,6 +655,9 @@ async fn health(State(app): State<AppState>, h: HeaderMap) -> Response {
         // see the second but not the first cannot check ADR-010 is in force.
         audit["retention_days"] = app.cfg.audit_retention_days.into();
         m.insert("audit".into(), audit);
+        if let Some(alerts) = &app.alerts {
+            m.insert("alerts".into(), alerts.status());
+        }
     }
     no_store(Json(v).into_response())
 }
@@ -885,7 +916,7 @@ async fn ws_session(mut socket: WebSocket, app: AppState, who: Principal) {
         "mode": shared.mode,
         "name": who.name,
         "role": who.role.as_str(),
-        "can": { "system": who.can_see_system() },
+        "can": capabilities(&who),
     })
     .to_string();
     let first = shared.read().state_msg.clone();
@@ -1065,4 +1096,166 @@ mod tests {
             Some(r#"{"type":"hello","mode":"live"}"#)
         );
     }
+}
+
+// ---------------------------------------------------------------- alerts
+//
+// Who sees an alert is exactly who would see the event that raised it:
+// `privacy::event_for` decides, so the rules cannot drift between the
+// event list and the alert list. An alert out of a principal's scope, or of
+// a kind their role may not see, answers 404 -- indistinguishable from one
+// that does not exist. Seeing an alert and acting on it are different:
+// `can_act_on_alerts` is admin or safety, in scope, so an ops user who can
+// see a link_down alert gets 403 if they try to acknowledge it.
+
+#[derive(Debug, Deserialize)]
+pub struct AlertsQuery {
+    #[serde(default)]
+    pub open: bool,
+    pub limit: Option<usize>,
+}
+
+/// The alert as `p` may see it, or `None`.
+fn alert_for(a: &crate::alerts::Alert, p: &Principal) -> Option<Value> {
+    let event = privacy::event_for(&a.event, p)?;
+    let mut v = serde_json::to_value(a).ok()?;
+    v["event"] = event;
+    Some(v)
+}
+
+fn alerts_service(app: &AppState) -> Result<&Arc<crate::alerts::AlertService>, Response> {
+    app.alerts.as_ref().ok_or_else(|| {
+        error(
+            StatusCode::NOT_FOUND,
+            "alert routing is not configured on this gateway",
+        )
+    })
+}
+
+async fn alerts_list(
+    State(app): State<AppState>,
+    h: HeaderMap,
+    Query(q): Query<AlertsQuery>,
+) -> Response {
+    let p = match principal(&app, &h, "/api/alerts") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let svc = match alerts_service(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    let limit = q.limit.unwrap_or(50).min(500);
+    // Filter first, then take: a principal scoped to one space must get
+    // `limit` of *their* alerts, not `limit` minus everyone else's.
+    let out: Vec<Value> = svc
+        .list(q.open, usize::MAX)
+        .iter()
+        .filter_map(|a| alert_for(a, &p))
+        .take(limit)
+        .collect();
+    no_store(Json(json!({ "alerts": out })).into_response())
+}
+
+async fn alert_get(State(app): State<AppState>, h: HeaderMap, Path(id): Path<u64>) -> Response {
+    let p = match principal(&app, &h, "/api/alerts/{id}") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let svc = match alerts_service(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    match svc.get(id).as_ref().and_then(|a| alert_for(a, &p)) {
+        Some(v) => no_store(Json(v).into_response()),
+        None => error(StatusCode::NOT_FOUND, "no such alert"),
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ResolveBody {
+    #[serde(default)]
+    note: String,
+}
+
+/// Longer than this is a paste, not a note, and it goes in the audit log.
+const MAX_NOTE_CHARS: usize = 500;
+
+async fn alert_act(app: AppState, h: HeaderMap, id: u64, resolve: bool, note: String) -> Response {
+    let path = if resolve {
+        "/api/alerts/{id}/resolve"
+    } else {
+        "/api/alerts/{id}/ack"
+    };
+    let p = match principal(&app, &h, path) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let svc = match alerts_service(&app) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    let Some(alert) = svc.get(id).filter(|a| alert_for(a, &p).is_some()) else {
+        return error(StatusCode::NOT_FOUND, "no such alert");
+    };
+    if !p.can_act_on_alerts(&alert.space_id) {
+        return error(
+            StatusCode::FORBIDDEN,
+            "your role can see this alert but not act on it",
+        );
+    }
+    let now = now_unix_ms();
+    let note: String = note.chars().take(MAX_NOTE_CHARS).collect();
+    let result = if resolve {
+        svc.resolve(id, &p.name, &note, now)
+    } else {
+        svc.ack(id, &p.name, now)
+    };
+    match result {
+        Ok(a) => {
+            app.audit.record(
+                now,
+                if resolve {
+                    Action::AlertResolve
+                } else {
+                    Action::AlertAck
+                },
+                &p.name,
+                Some(p.role.as_str()),
+                json!({ "via": "api", "alert_id": a.id, "space_id": a.space_id, "kind": a.kind }),
+            );
+            match alert_for(&a, &p) {
+                Some(v) => no_store(Json(v).into_response()),
+                None => error(StatusCode::NOT_FOUND, "no such alert"),
+            }
+        }
+        Err(crate::alerts::AlertError::NotFound) => error(StatusCode::NOT_FOUND, "no such alert"),
+        Err(e) => error(StatusCode::CONFLICT, &e.to_string()),
+    }
+}
+
+async fn alert_ack(State(app): State<AppState>, h: HeaderMap, Path(id): Path<u64>) -> Response {
+    alert_act(app, h, id, false, String::new()).await
+}
+
+async fn alert_resolve(
+    State(app): State<AppState>,
+    h: HeaderMap,
+    Path(id): Path<u64>,
+    body: String,
+) -> Response {
+    let note = if body.trim().is_empty() {
+        String::new()
+    } else {
+        match serde_json::from_str::<ResolveBody>(&body) {
+            Ok(b) => b.note,
+            Err(_) => {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "body must be {\"note\": \"...\"} or empty",
+                )
+            }
+        }
+    };
+    alert_act(app, h, id, true, note).await
 }

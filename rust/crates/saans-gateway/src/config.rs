@@ -496,12 +496,6 @@ impl GatewayConfig {
                 ));
             }
         }
-        if !self.alert_routes.is_empty() {
-            // Checked last, so a route that is also *wrong* still gets
-            // its specific error first. `AlertService::new` is a stub:
-            // without this, --check passes and `Gateway::start` panics.
-            return err("[[alert_route]] is configured but the alert router is not implemented yet; remove the routes");
-        }
         Ok(())
     }
 
@@ -587,6 +581,29 @@ mod tests {
         assert_eq!(cfg.udp_port, 5566);
         assert_eq!(cfg.http_addr, "127.0.0.1:8080");
         assert!(!cfg.spaces.is_empty());
+    }
+
+    #[test]
+    fn the_commented_alert_example_is_a_valid_config() {
+        // Documentation that is never parsed rots. Uncomment the example's
+        // alert block and hold it to the same validation as a real file.
+        let text = include_str!("../saans.example.toml");
+        let start = text
+            .find("# [telegram.wardens]")
+            .expect("the example has an alert block");
+        let live: String = text[..start].to_string()
+            + &text[start..]
+                .lines()
+                .map(|l| l.strip_prefix("# ").unwrap_or(l))
+                .collect::<Vec<_>>()
+                .join("\n");
+        let cfg = GatewayConfig::from_toml(&live).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(cfg.alert_routes.len(), 1);
+        assert_eq!(
+            cfg.alert_routes[0].escalate_to,
+            vec!["webhook:pager".to_string()]
+        );
+        assert!(!cfg.alert_routes[0].include_health_details);
     }
 
     #[test]

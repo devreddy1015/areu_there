@@ -35,6 +35,10 @@ pub enum Action {
     Denied,
     /// A principal read a space's consented vital signs.
     VitalsRead,
+    /// Someone acknowledged an alert (dashboard, API or Telegram).
+    AlertAck,
+    /// Someone resolved an alert.
+    AlertResolve,
 }
 
 impl Action {
@@ -45,6 +49,8 @@ impl Action {
             Action::Logout => "logout",
             Action::Denied => "denied",
             Action::VitalsRead => "vitals_read",
+            Action::AlertAck => "alert_ack",
+            Action::AlertResolve => "alert_resolve",
         }
     }
 }

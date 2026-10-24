@@ -232,7 +232,7 @@ no space claims, which is the quickest way to find a mismatch.
 | Overview | Per-space state, motion, breathing where consented, usable links, open alerts |
 | Signals | Real trends from `/api/history`: occupancy band, motion, breathing and its confidence, and per-link CSI rate, loss, BNR and RSSI |
 | Topology | Which nodes are linked to which, and the quality of each link. Not a floor plan — the configuration has no room coordinates, so node positions are arbitrary and labelled as such |
-| Events | Searchable and filterable event log with the evidence for each |
+| Events | Searchable and filterable event log with the evidence for each. Above it, when alert routing is configured, the open alerts, with Acknowledge and Resolve for admin and safety |
 | System | Gateway health, per-link diagnostics, unknown links, auth and audit status (admin or ops only) |
 
 **Data-source modes are never mixed.** `LIVE` and `REPLAY` are shown as
@@ -268,7 +268,7 @@ in `audit-YYYY-MM-DD.jsonl` alongside logins and denials.
 
 ### How long it is kept
 
-Three files in `data_dir`, three clocks, and they are deliberately not
+Four files in `data_dir`, three clocks, and they are deliberately not
 the same length. `/api/health` reports each one's `retention_days` beside
 what it has written, so an operator can check the policy is in force.
 
@@ -277,6 +277,7 @@ what it has written, so an operator can check the policy is in force.
 | `events-YYYY-MM-DD.jsonl` | What the building did, per event | `event_retention_days`, default 30 |
 | `history.json` | One summary per space per day: occupied seconds, motion bouts, pauses, and for consented spaces a resting breathing median | `history_retention_days`, default 90 |
 | `audit-YYYY-MM-DD.jsonl` | Who read health data and who acted on an alert | `audit_retention_days`, default 365, and never less than `event_retention_days` — [ADR-010](docs/adr/010-audit-retention.md) |
+| `alerts.jsonl` | Each alert and every change to it, including the event that raised it | open and acknowledged: until resolved; resolved: `event_retention_days`, because it carries the event |
 
 The daily summaries are also capped at 90 entries in memory
 (`HISTORY_MAX_DAYS`). That is a memory bound, not a retention policy: a
@@ -284,6 +285,24 @@ gateway that runs one day a month would hold ninety summaries spanning
 years and never exceed the cap. `history_retention_days` is the one that
 bounds age, and it is applied where the data becomes a file — when
 history is loaded and when it is written.
+
+### Alerts
+
+With `[[alert_route]]`s configured, events become advisory alerts on
+Telegram or a webhook (`saans.example.toml` has a commented example).
+Routes are tried in order and the first match owns the alert; `info`
+events never page. One alert per space and kind is open at a time —
+repeats update it rather than paging again — and an alert still open
+after `ack_timeout_min` escalates once to `escalate_to`. Acknowledge and
+Resolve work from the dashboard, from `POST /api/alerts/{id}/ack|resolve`
+(admin and safety, in their spaces), and from Telegram's buttons (users
+in `allowed_user_ids`), and every one is in the audit log.
+
+**What leaves the building** is, by default, only that an alert of a given
+kind is open in a given space. The evidence sentence, the confidence and
+every number stay home unless a route sets `include_health_details`.
+Tokens and webhook keys come from environment variables; the gateway
+refuses to start if one is missing, rather than starting unable to page.
 
 ### Recording and replay
 
