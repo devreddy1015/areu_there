@@ -178,6 +178,14 @@ def suites() -> list[Suite]:
             scrub=[(r" in \d+ s \(", " (")],
         ),
         Suite(
+            "lying", "A fallen person read as an empty room: lying against upright, paired",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "lying", "--spots", "200"],
+            rust, "slow",
+            "At each spot, one seed: a fall that ends lying there and a heavy sit-down "
+            "that ends upright there, in `saans eval`'s rooms and layouts as a 2.7 m box. "
+            "NOTES.md §14 reads this.",
+        ),
+        Suite(
             "links", "What each extra link buys, one transmitter",
             [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "links",
              "--seats", "600", "--blind-seats", "5000"],
@@ -337,6 +345,35 @@ QUOTES = [
              r"^  night\s+36\b.*\s([\d.]+)$",
              r"^  collapse\s+36\s+\d+/36 \(\s*[\d.]+%\)\s+(\d+)/36"])
       for suite, col in (("detectors", 0), ("detectors-box", 1))],
+    # NOTES.md §14: lying against upright, slow tier.
+    Quote("NOTES.md", "lying",
+          r"\| spots read empty for most of the still period, all 1200 \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|\n"
+          r"\| share of the still period read empty, all spots \| ([\d.]+)% \| ([\d.]+)% \|\n"
+          r"\| 1 link, spot within 0\.5 m of the link line \| ([\d.]+)% \| \*\*([\d.]+)%\*\* \|\n"
+          r"\| 1 link, spot 1\.0-1\.5 m from it \| \*\*([\d.]+)%\*\* \| ([\d.]+)% \|\n"
+          r"\| 1 link, spot 1\.5 m or more from it \| \*\*([\d.]+)%\*\* \| ([\d.]+)% \|\n"
+          r"\| spots read mostly empty with 2 links, clear-LoS \+ rich-NLoS \(200 each\) \| (\d+) \+ (\d+) \| (\d+) \+ (\d+) \|\n"
+          r"\| median breathing SNR, the link occupancy depends on \| ([\d.]+) \| ([\d.]+) \|",
+          [r"^  all\s+[\d.]+%\s+[\d.]+%\s+(\d+)/1200\s+(\d+)/1200",
+           r"^  all\s+([\d.]+)%\s+([\d.]+)%",
+           r"^  0\.0-0\.5 m\s+\d+\s+([\d.]+)%\s+([\d.]+)%",
+           r"^  1\.0-1\.5 m\s+\d+\s+([\d.]+)%\s+([\d.]+)%",
+           r"^  >= 1\.5 m\s+\d+\s+([\d.]+)%\s+([\d.]+)%",
+           r"clear-LoS\s+2 links\s+[\d.]+%\s+[\d.]+%\s+(\d+)/200",
+           r"rich-NLoS\s+2 links\s+[\d.]+%\s+[\d.]+%\s+(\d+)/200",
+           r"clear-LoS\s+2 links\s+[\d.]+%\s+[\d.]+%\s+\d+/200\s+(\d+)/200",
+           r"rich-NLoS\s+2 links\s+[\d.]+%\s+[\d.]+%\s+\d+/200\s+(\d+)/200",
+           r"^  all\s+[\d.]+%\s+[\d.]+%\s+\d+/1200\s+\d+/1200\s+([\d.]+)\s+([\d.]+)$"]),
+    Quote("NOTES.md", "lying",
+          r"Every lying spot read\s+mostly empty, and (\d+) of the (\d+) upright ones, has a breathing SNR\s+under 3\. Lying puts more spots under 3 \((\d+) against (\d+)\)",
+          [r"upright\s+matched SNR < 3:\s+\d+ spots,\s+(\d+) mostly empty",
+           r"^  all\s+[\d.]+%\s+[\d.]+%\s+\d+/1200\s+(\d+)/1200",
+           r"lying\s+matched SNR < 3:\s+(\d+) spots",
+           r"upright\s+matched SNR < 3:\s+(\d+) spots"]),
+    Quote("NOTES.md", "lying",
+          r"as often lying as upright \((\d+) spots\s+against (\d+)\)",
+          [r"lying\s+matched SNR.*under half of matched: (\d+) spots",
+           r"upright\s+matched SNR.*under half of matched: (\d+) spots"]),
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",
           [r"breathing BNR, best subcarrier, dB\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)"]),

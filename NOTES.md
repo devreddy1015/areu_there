@@ -1112,7 +1112,9 @@ What it says:
      lies on the floor is the worse half of this finding. It is one
      collapse run of 36, on one link, in a simulator; no other collapse
      run in either model reads empty after the fall. But it is the
-     failure the whole system exists to avoid.
+     failure the whole system exists to avoid. §14 takes it apart: it is
+     the single-link weakness upright people have too, moved by the
+     fall to a different part of the room.
 
 Nothing is retuned on the strength of this. The thresholds were tuned
 on the slice's development seeds, and retuning them on the box would
@@ -1130,3 +1132,113 @@ model does. The S5 recordings decide.
   not been worked through; the number is measured, not explained.
 - **The 2-D corner bug**, above.
 - **Angle- and polarisation-dependent reflection.**
+
+---
+
+## 14. A fallen person read as an empty room (Oct 2026)
+
+Everything here is **SYNTHETIC**. `saans lying --spots 200`, in
+`docs/RESULTS.md`.
+
+§13 found one collapse run, in the rich-NLoS room on one link, where
+occupancy read a fallen person as an empty room for most of five
+minutes. That leaves two questions. Is it a weakness of presence for
+somebody lying low, or something about that room? And does the system
+miss people on the floor?
+
+### The one run, taken apart
+
+The run's own link (0 -> 1) at the fall spot, with that run's
+furniture. The SNR is the breathing modulation of |h| against the
+simulated noise, combined across subcarriers as well as any linear
+fusion could. These figures come from a one-off diagnostic that is not
+committed; the paired table below is the reproducible measurement.
+
+| | upright, 1.0 m | lying, 0.2 m |
+|---|---|---|
+| chest gain (path change per metre) | 1.37 | 0.88 |
+| body echo strength | 7.57 | 6.15 |
+| breathing SNR | 9.5 | **2.1** |
+| subcarriers agreeing in sign | 56/56 | 56/56 |
+| pipeline presence energy / threshold | | **0.77**, read empty 96% |
+
+It is neither a blind spot nor subcarriers cancelling. The breathing
+signal from the chest on the floor is 4.4 times weaker, and the presence
+energy sits just under its threshold. The geometry says why:
+
+- **Upright**, the chest breathes along the horizontal bisector, which
+  changes the path most away from the link line.
+- **Lying**, it breathes vertically, which changes the path most
+  straight under the link and little to its side.
+
+The fall spot is 1.4 m to the side of the link.
+
+### Paired, 1200 spots
+
+At every spot, with one seed (the same furniture and noise), the person
+arrives in one of two ways:
+
+- **a fall** that ends lying there;
+- **a heavy sit-down** that ends upright there.
+
+These are `saans eval`'s rooms and layouts, as a 2.7 m box, 200 spots
+per row.
+
+| | lying | upright |
+|---|---|---|
+| spots read empty for most of the still period, all 1200 | **10** | **12** |
+| share of the still period read empty, all spots | 1.0% | 0.9% |
+| 1 link, spot within 0.5 m of the link line | 0.6% | **8.1%** |
+| 1 link, spot 1.0-1.5 m from it | **3.8%** | 0.8% |
+| 1 link, spot 1.5 m or more from it | **3.1%** | 1.2% |
+| spots read mostly empty with 2 links, clear-LoS + rich-NLoS (200 each) | 0 + 1 | 0 + 0 |
+| median breathing SNR, the link occupancy depends on | 4.1 | 6.8 |
+
+### What it says
+
+1. **Lying is not more often invisible than upright: 10 spots against
+   12 of 1200.** A first run at 60 spots per row said otherwise, 4
+   against 0 of 360, and is the reason the committed table uses 200.
+   The rare event needs the larger sample.
+2. **A fall moves the blind zone.** With one link, an upright person is
+   missed next to the link line, the long-known case: breathing along
+   the bisector barely changes the path there. A lying person is missed
+   to the side, where vertical breathing barely changes it. The two
+   postures fail in complementary places.
+3. **The ground truth predicts the failures.** Every lying spot read
+   mostly empty, and 11 of the 12 upright ones, has a breathing SNR
+   under 3. Lying puts more spots under 3 (384 against 153), but fewer
+   of those fail.
+4. **A second link nearly removes it in both postures.** At three links
+   the occupancy rule needs two of three, and there lying loses 3 spots
+   of 400 to upright's 0.
+5. **Cancellation is not the cause.** The plain average falls under half
+   the best combination about as often lying as upright (43 spots
+   against 62).
+
+### What it means
+
+- **For a single link this is the known single-link weakness, not a new
+  one.** It now has a second shape. ADR-006 already asks for two links
+  wherever breathing matters, and this is the measurement behind it for
+  a person on the floor.
+- **The collapse detector cannot tell "fell out of sight" from "left".**
+  It drops a burst when presence reads empty afterwards, because that
+  usually means the person walked out. A fall that ends where the links
+  see the person weakly looks exactly like that. Changing it is a
+  detector decision and has not been made. Two options:
+  - require a departure, such as motion and then an empty room long
+    enough to rule out a weak reading;
+  - hold presence for a while after a fall-shaped burst.
+- **Not modelled**, any of which could move these numbers:
+  - the floor bounce of the body's own echo (a chest 0.2 m above a
+    reflective floor has an image of itself);
+  - lying on the side, which breathes horizontally;
+  - nodes at other heights;
+  - real floors.
+
+  A node near the floor, or one on the ceiling, would see a lying
+  person differently. S5 recordings with somebody lying on the floor
+  are what settle it.
+
+Measurement only: nothing in the pipeline or the detectors changed.
