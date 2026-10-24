@@ -22,8 +22,12 @@ written: what matched the simulator and what did not.
 - **Two boards and the right cables:** `docs/HARDWARE.md` §1-3.
 - **Docker** with `espressif/idf:v5.4.1` pulled, and your user able to open
   the serial device (on Arch the `uucp` group, on Debian and Ubuntu
-  `dialout`). The board appears as `/dev/ttyACM0` on the S3's native USB
-  port, or `/dev/ttyUSB0` on a UART-bridge port.
+  `dialout`). Many S3 devkits have two USB sockets. Use the one wired to
+  the USB-to-UART bridge, which appears as `/dev/ttyUSB0`: everything here
+  is written for it, and the native-USB socket (`/dev/ttyACM*`) has not
+  been checked with this build (`docs/HARDWARE.md` §3). If no device
+  appears within a second of plugging in, change the cable first: a
+  charge-only cable powers the board and carries no data.
 - **Your written consent for yourself** (`docs/PROTOCOL_S5.md` §2.3), and
   a sign on the door (§2.2). Until an ethics committee says otherwise you
   are the only person who may be recorded (§2.1). The seated segment is you.
@@ -51,12 +55,12 @@ read -rs SAANS_WIFI_PASSWORD && export SAANS_WIFI_PASSWORD
 
 ```bash
 PROFILE=bench-tx ./build.sh build
-PROFILE=bench-tx PORT=/dev/ttyACM0 ./build.sh flash
+PROFILE=bench-tx PORT=/dev/ttyUSB0 ./build.sh flash
 ```
 
 ```bash
 PROFILE=bench-rx ./build.sh build
-PROFILE=bench-rx PORT=/dev/ttyACM0 ./build.sh flash-monitor
+PROFILE=bench-rx PORT=/dev/ttyUSB0 ./build.sh flash-monitor
 ```
 
 Each profile builds into its own `edge/firmware/build-<profile>/`, from
