@@ -108,6 +108,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 cd rust && cargo test --workspace          # all Rust crates
 cargo test -p saans-gateway --features roomsim   # the room demo's tests exist only here
 cargo check -p saans-roomsim --locked && cargo test -p saans-roomsim --locked   # alone, as CI does (see 4c)
+cargo check -p saans-locate --locked && cargo test -p saans-locate --locked && cargo test -p saans-locate --features roomsim --locked   # see 4d
 cd /home/Aman/are_u_theone/are_U_there && python3 -m unittest discover -s tests
 make -C edge/dsp/test check                 # C++ edge DSP against golden vectors
 ```
@@ -354,6 +355,52 @@ Speed (release, one thread): about 1 s of compute per minute of simulated
 bedroom, 3 s per minute of the 8-node hall, a few MB of memory however
 long the run; the Python reference takes about 15 s per 10 s of bedroom and
 is for checking, not for datasets.
+
+## 4d. Locate (Phase 4)
+
+People and phone positions with uncertainty, from Room Sim data
+(`spec/locate.md`). Two implementations, bit for bit: the Python reference
+(`wifisense/localize/`) and the Rust crate `rust/crates/saans-locate`.
+Everything it produces is **SIM**; every estimate is a position with a
+radius (flagged `radius_calibrated: false`) or an abstention with a reason.
+
+The measured numbers (spec §12a/§13): 45 two-minute runs, run in parallel
+(about 12 s of wall time on this 96-core box, about 5 CPU-minutes):
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+cd /home/Aman/are_u_theone/are_U_there/rust
+cargo run --release -p saans-locate --features roomsim --example locate_measure
+```
+
+Each line is labelled SIM and prints, beside every estimator's error and
+radius coverage, the same figures for a fixed reference point (the
+footprint's centroid): an estimator that knows nothing. Read the two
+together; spec §13 says what they show.
+
+From Python (the reference; slower):
+
+```python
+from wifisense.roomsim import load_scene, Config
+from wifisense.localize import run_locate
+run = run_locate(load_scene("spec/scenes/bedroom.json"), Config(duration_s=10.0))
+run.ticks[0]["wlm"], run.epochs[0]["rtt"]   # Estimate dicts or {"reason": ...}
+```
+
+Tests (the standalone builds matter, as for Room Sim):
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there/rust
+cargo test -p saans-locate --locked && cargo test -p saans-locate --features roomsim --locked
+cd .. && python3 -m unittest tests.test_locate_estimators tests.test_locate_phone tests.test_locate_pipeline
+$(.venv/bin/uv python find 3.12) -m unittest tests.test_locate_golden    # ~90 s: re-runs every generator
+```
+
+`saans-locate/tests/golden.rs` and `tests/test_locate_golden.py` pin both
+implementations to `spec/golden/localize_*` and `locate_*`. A change to an
+estimator goes into `spec/locate.md`, the Python and the Rust together,
+then the vectors are regenerated on CPython 3.14 (`generate.py` refuses
+any other version).
 
 ## 5. Datasets
 

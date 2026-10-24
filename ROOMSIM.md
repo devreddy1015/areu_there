@@ -8,7 +8,7 @@ Read it with [RUN.md](RUN.md) (how to run everything on the GPU box) and
 drawn). Every number below comes from a run on this machine; simulator and
 scene numbers are labelled as such.
 
-**Branch:** `saans/scene-format` · **Last updated:** 2026-10-21
+**Branch:** `saans/scene-format` · **Last updated:** 2026-10-24
 
 ## Where it stands
 
@@ -17,12 +17,13 @@ scene numbers are labelled as such.
 | 0 | Environment | **Done.** Rust 1.99, venv with CUDA torch, sionna-rt; RUN.md. |
 | 1 | Scene format | **Done.** `saans-scene` crate, JSON Schema, 3 example scenes, `saans import-roomplan`. |
 | 2 | Static web demo | **Done.** |
-| 3 | Simulator upgrade | **Done — waiting for the owner's review.** Room Sim v1: `spec/roomsim.md`, the Python reference `wifisense/roomsim/` and the Rust crate `saans-roomsim`, bit-identical; `saans roomsim-export`. Three decisions need the owner (*Open items* 7). |
-| 4–7 | Localisation, live demo, dataset, preprocessing | Not started. |
+| 3 | Simulator upgrade | **Done.** Room Sim v1: `spec/roomsim.md`, the Python reference `wifisense/roomsim/` and the Rust crate `saans-roomsim`, bit-identical; `saans roomsim-export`. Three decisions need the owner (*Open items* 7). |
+| 4 | Localisation and phone tracking | **Done — waiting for the owner's review.** Locate v1: `spec/locate.md`, Python additions in `wifisense/localize/` and the Rust crate `saans-locate` (the existing RTI ported, a baseline that abstains, a simulated phone tracked by RTT and RSSI), bit-identical on 24 golden sets; measured on Room Sim. Decisions for the owner: *Open items* 12. |
+| 5–7 | Live demo, dataset, preprocessing | Not started. |
 | 8–12 | Model, real data, Sionna/calibration, recordings, export | Not started. **Blocked on an ADR** for learned models (see *Open items*). |
 
 The working rule is to stop after each phase for review. That is why
-nothing past Phase 3 has been started, not lack of time.
+nothing past Phase 4 has been started, not lack of time.
 
 ## What exists
 
@@ -36,6 +37,10 @@ nothing past Phase 3 has been started, not lack of time.
 | `rust/crates/saans-roomsim/` | The Rust implementation: streaming, constant memory, about 1 s of compute per simulated bedroom-minute. Reads scenes without `saans-scene`'s `write`. |
 | `rust/crates/saans-cli` → `saans roomsim-export` | Scene → `PREFIX.sim.pcap` (raw-CSI datagrams in `wifisense record`'s format), `PREFIX.truth.jsonl`, `PREFIX.manifest.json` (label SIM). RUN.md §4c. |
 | `spec/golden/roomsim_*`, `spec/scenes/fixtures/` | Twelve golden sets that pin both implementations to each other, and two fixture scenes (a polygon room with implied walls and a yawed metal cabinet; a specular-face test room). |
+| `spec/locate.md` | **Locate v1**, the normative spec: the existing RTI ported as is; a link disturbance from RSSI variance; the weighted-link-midpoint baseline with a significance gate, abstention and a radius; a simulated phone (Wi-Fi RTT and RSSI to every node, line of sight from the scene) with Gauss–Newton fixes and a Kalman filter; every estimate a position with a radius or an abstention with a reason. §13 states what the measurements show. |
+| `wifisense/localize/{radius,config,baseline,phone,pipeline}.py` | The Python reference for the new pieces (stdlib only), plus `RssiSignal` in `measure.py` and covariance fields on `track.py`'s `PositionEstimate`. |
+| `rust/crates/saans-locate/` | The Rust crate: the RTI port (`pynum`, `geometry`, `invert`, `measure`, `track`, with a bit-exact port of CPython's `math.hypot`), the new pieces, the Room Sim pipeline behind the `roomsim` feature, and `examples/locate_measure.rs`, which prints the measured numbers. |
+| `spec/golden/localize_*`, `locate_*` | 24 golden sets (2.1 MB) pinning the ported RTI, the new estimators and the Room Sim pipeline. |
 | `rust/crates/saans-gateway/src/roomsim.rs` + `assets/roomsim.*` | The `/roomsim` demo page: routes, its own stricter CSP, embedded scenes served without people or phone. |
 | `rust/crates/saans-gateway/assets/vendor/three-0.186.1/` | Vendored three.js, integrity-checked, pinned by SHA-256, one documented one-line change (VENDOR.md). |
 | `rust/crates/saans-gateway/roomsim-demo.toml` | Loopback config to run the demo. |
@@ -58,12 +63,14 @@ nothing past Phase 3 has been started, not lack of time.
 | 2026-10-21 | `saans-scene` gains a `write` cargo feature: `Serialize`, `Scene::save`, `to_json_pretty` and the RoomPlan importer exist only with it. Only `saans-cli` enables it; `tests/boundary.rs` holds two allowlists (writers; readers such as `saans-roomsim`). A public-API change to `saans-scene`. | Implements ADR-008 decision 1; **owner to confirm the API change** |
 | 2026-10-21 | `saans-cli` is both the scene writer and a SIM CSI producer (`export` already was; `roomsim-export` now too). No command writes a scene from CSI; nothing structural stops a future one. | **Proposed — owner to confirm**, or split `roomsim-export` into its own binary |
 | 2026-10-21 | Scene fixes in files this work wrote: bedroom almirah centre x 3.5 → 3.3 (node 1 was inside it); hall "sitter" (7.0, 1.8) → (7.0, 0.6), onto the sofa; office occupants y 2.5 → 2.1, onto their chairs (they were frozen standing behind them). | Fixes found by the Phase 3 reviews |
+| 2026-10-24 | Locate v1 (spec/locate.md header): Python first, then Rust (ADR-002); the person estimators read RSSI variance on Room Sim data because Room Sim's AGC normalises CSI power away; the radius is a model flagged `radius_calibrated: false` until Phase 5 measures coverage; the baseline abstains rather than guessing the room centre; the phone is SIM only and its radio model lives in `saans-locate`, not Room Sim; one person estimate per estimator; scenes with `roles` or stacked nodes refused by the person pipeline. | **Proposed — owner to confirm** (open item 12) |
 | 2026-10-21 | ESP32 defaults follow the firmware where it says: `ltf_merge` on, smoothing **off** (`channel_filter_en = false`), 56 forwarded entries. TDMA (`slot_s` 12.5 ms) is the *planned* schedule, labelled SIM; today's one-transmitter firmware is a documented config (RUN.md §4c). | Spec §3.2, §10 |
 
 ## How it was verified
 
 All on the GPU box. The rows above **Phase 3** are the Phase 2 record
-(2026-10-21, commit `ce115fa`); the Phase 3 rows are current (2026-10-23).
+(2026-10-21, commit `ce115fa`); the Phase 3 rows are from 2026-10-23 and
+the Phase 4 rows are current (2026-10-24).
 
 | Suite | Command | Result |
 |---|---|---|
@@ -83,7 +90,13 @@ All on the GPU box. The rows above **Phase 3** are the Phase 2 record
 | Room Sim, Python | `python3 -m unittest discover -s tests -p 'test_roomsim*'` on 3.11.5 and 3.12.15 | 100 pass on both (also on 3.10.12); the golden test re-runs every generator and compares every stored array |
 | `roomsim-export` | `cargo test -p saans-cli`; Python vs Rust export on four configurations | 9 unit + 10 integration pass; Python `export_run` and the CLI give byte-identical pcaps and equal truth and manifests on the bedroom (default, 2 s), the hall (one transmitter, `slot_s` 0.05), the office and the multi fixture |
 | Golden regeneration | CPython 3.14.8, `generate.py` | 0 files changed by a full regeneration; 35 sets, of which 12 are Room Sim (3.0 MB); every file committed before Phase 3 is byte-identical to HEAD |
-| Whole suites | workspace `cargo test --locked`; full Python suite on 3.11.5 and 3.12.15; `make -C edge/dsp/test check` | Rust workspace 279 pass, gateway with `roomsim` 79 pass; Python **559** run (459 + 100 Room Sim): on 3.12.15 only the known UDP-buffer error, on 3.11.5 and 3.10.12 that plus the two known pre-3.12 failures — exactly the pre-Phase 3 baseline; edge PASS (g++) |
+| **Phase 4** | | |
+| Locate, Rust | `cargo test -p saans-locate --locked`, and with `--features roomsim` (standalone, as CI) | 167 pass and 1 ignored (the optional 1.2 M-pair `py_hypot` dump) standalone; 180 with `--features roomsim`; `cargo tree` shows `saans-scene` without `write` |
+| Locate parity | `saans-locate/tests/golden.rs` against `spec/golden/localize_*`, `locate_*` | all 24 sets agree **bit for bit** (0 values differ); `py_hypot` bit-exact against CPython 3.14 on 1,403 edge pairs and 10^6 drawn pairs (SHA-256); a mutation in each kind of check fails it |
+| Locate, Python | `tests/test_locate_*.py` and `tests/test_localize_*.py` | 136 locate tests pass on 3.10.12, 3.11.5, 3.12.15 and 3.14.8 (the golden test re-runs every generator and compares every stored array); the full suite runs **695** (559 + 136): on 3.12.15 only the known UDP-buffer error, on 3.11.5 and 3.10.12 that plus the two known pre-3.12 failures — the pre-Phase 4 baseline |
+| Measured (SIM) | `cargo run --release -p saans-locate --features roomsim --example locate_measure` | 45 runs of 120 s in about 12 s; figures in spec/locate.md §13 |
+| Whole suites (Phase 4, from a clean build) | workspace `cargo test --locked`; gateway with `roomsim`; full Python suite on 3.10.12, 3.11.5, 3.12.15; `make -C edge/dsp/test check`; golden regeneration | Rust workspace 446 pass (1 ignored, the optional hypot dump), gateway with `roomsim` 79; Python 695 at the pre-Phase 4 baseline (row above); edge PASS (g++); a full regeneration on CPython 3.14.8 changes 0 of 59 sets' files |
+| Whole suites (Phase 3 record) | workspace `cargo test --locked`; full Python suite on 3.11.5 and 3.12.15; `make -C edge/dsp/test check` | Rust workspace 279 pass, gateway with `roomsim` 79 pass; Python **559** run (459 + 100 Room Sim): on 3.12.15 only the known UDP-buffer error, on 3.11.5 and 3.10.12 that plus the two known pre-3.12 failures — exactly the pre-Phase 3 baseline; edge PASS (g++) |
 
 **Review.** Phase 2 went through two rounds of multi-agent review, each
 finding checked by a second agent who tried to refute it by reproducing
@@ -137,7 +150,23 @@ people switches (a twelfth set now does); and spec and doc statements
 the first fixes had made stale (the non-reciprocal links now reach about
 14% of `max |H|`, SIM).
 
-**GPU.** Phases 0–3 used none. The only GPU work so far was the fp16/bf16
+**Phase 4 review.** As in Phase 3: two implementations from one spec,
+reconciled to bit-identity set by set (one real divergence: Rust took a
+fix's reports in the caller's order, the spec and Python in node order).
+Before any code, a four-lens review of the spec confirmed or partly
+confirmed 50 findings — among them that calibrating on another seed
+calibrates another room, that a per-link 3σ gate over 12–56 links fires in
+an empty room, that a NaN radius could be published, and that undamped
+Gauss–Newton diverged. After the build, a five-lens review with
+differential fuzzing of Python against Rust confirmed or partly confirmed
+44 more: a 50-iteration limit discarded fixes that had converged to a
+millimetre; collinear anchors published a confident mirror-image fix up to
+9.4 m off; a zero radius scale could publish a bare point; Python could label
+Room Sim output REAL; and the measurement printout lacked the reference
+point, the radius sizes and the empty-room rates needed to read it
+honestly. All are fixed except the regeneration hints in `edge/dsp/bench/` (open item 12). A second round (fix audit, regression hunt with differential checks, docs fact-check; each finding again checked by a refuting agent) confirmed 19 and partly confirmed 9 more, all fixed: the collinear test still let through anchors collinear to rounding on an axis-aligned line (a node at `0.1+0.2` published a mirror fix 8.4 m off), now replaced by a test that does not depend on the line's direction; a library caller could still publish a zero radius; Python checked a far-away phone only at epochs; the two implementations resolved phone defaults differently outside Room Sim runs; and several §13 sentences overstated what the measurements show.
+
+**GPU.** Phases 0–4 used none. The only GPU work so far was the fp16/bf16
 benchmark in RUN.md §1.
 
 ## Open items for the owner
@@ -233,6 +262,34 @@ benchmark in RUN.md §1.
     per-board RSSI offset, the Fresnel test for furniture faces ignoring
     obliquity, and exports without the FeatureFrames a raw-mode node also
     sends.
+
+12. **Phase 4 decisions and findings for the owner.**
+    - *Decisions* (spec/locate.md header; *Decisions taken*): Python first;
+      RSSI variance as the Room Sim link disturbance; model radii flagged
+      uncalibrated; the baseline abstains; the phone's radio model in
+      `saans-locate`; one person estimate per estimator; `saans-locate` a
+      READER of scenes (a `boundary.rs` edit); additive changes to
+      `wifisense/localize/measure.py` and `track.py`, a package SAANS_PLAN
+      §3.1 calls "Unchanged API".
+    - *RTI on RSSI does not localise in the bedroom or the office* and
+      false-alarms on 17.6% of the hall's empty-room ticks (spec §13, SIM).
+      ADR-008 d9's "both or neither" would then hide the baseline whenever
+      RTI abstains; Phase 5 must decide how the demo treats that.
+    - *The baseline's radius is room-sized* (3.4–6.3 m, SIM) and very
+      conservative: no estimate's error exceeds 0.43–0.69 of its radius,
+      so a Phase 5 calibration to 95% coverage would set
+      `wlm_radius_scale` near 0.4–0.6 (median radius about 1.3–3.4 m).
+      Its error (median 0.7–1.7 m on walking ticks) is its real limit.
+    - *Zones* (ADR-008 d2, d8) still have no type; the measurements are in
+      metres. Adding them is a public-API change to `saans-scene`.
+    - *FeatureFrame input* (ADR-008 d9's runtime) is Phase 5's: the
+      estimators take any per-link `y`.
+    - *The classic ESP32 cannot be an FTM responder* (ESP32-S2/S3/C3/C6
+      can), so phone RTT to classic nodes is SIM-only in principle, not
+      only by ADR-008 d16.
+    - `edge/dsp/bench/run_bench.sh` and `run_size_report.sh` still print
+      `python3 spec/golden/generate.py`, which `generate.py` now refuses
+      (it runs only on CPython 3.14); `edge/` was left untouched.
 
 ## Changing the simulator
 
