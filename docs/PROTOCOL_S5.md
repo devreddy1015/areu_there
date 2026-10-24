@@ -56,6 +56,23 @@ survives) and 0.18% (presence fails completely), and
 `NOTES.md:580-583` says plainly that narrowing that bracket in simulation
 "still answers nothing a bench recording would not answer better".
 
+*Amended 2026-10-24: done.* The ESP-IDF 5.4.1 header was read. There
+is no documented AGC field for the S3, but Espressif's own
+`esp_csi_gain_ctrl` component reads the AGC gain from byte 23 of
+`wifi_pkt_rx_ctrl_t` and the FFT gain from byte 22, in its builds for
+IDF 4.4 through 6.0. The firmware now reads the same two bytes (route 2
+below):
+- every telemetry period the RX logs `gain: agc=… agc moved on N of M
+  frame pairs (x%)`;
+- each raw-CSI frame carries both values in header bytes 18 and 19
+  (`spec/wire.md` §1);
+- `wifisense stats` reports the moves per node from a recording.
+
+The offset is undocumented, so **first confirm it on the bench**:
+with the TX running, shield it or move it away and back, and check that
+`agc=` changes when the signal does. Only then count ten idle minutes.
+The text below is the reasoning as it stood before.
+
 **The firmware cannot do this today, and that is the first task.**
 Nothing in `edge/firmware/main/` reads or logs an AGC gain; a grep for
 `agc` over the firmware source returns one unrelated comment

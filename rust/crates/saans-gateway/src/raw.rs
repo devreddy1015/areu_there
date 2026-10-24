@@ -6,8 +6,8 @@
 //! [0..3]   magic 0xC5110001        [12..15] sequence (u32)
 //! [4]      node id                 [16]     RSSI (i8, dBm)
 //! [5]      antenna count           [17]     noise floor (i8, dBm)
-//! [6..7]   subcarrier count (u16)  [18]     PPDU type
-//! [8..11]  centre freq MHz (u32)   [19]     bandwidth/flags
+//! [6..7]   subcarrier count (u16)  [18]     AGC gain (u8, ESP32-S3)
+//! [8..11]  centre freq MHz (u32)   [19]     FFT gain (i8, ESP32-S3)
 //! [20..]   int8 I/Q pairs, IMAGINARY FIRST
 //! ```
 

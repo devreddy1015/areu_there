@@ -13,8 +13,10 @@ Layout, little-endian throughout:
     [12..15] sequence number (u32)
     [16]     RSSI (i8, dBm)
     [17]     noise floor (i8, dBm)
-    [18]     PPDU type (0=HT/legacy, 1=HE-SU, 2=HE-MU, 3=HE-TB, 0xFF=unknown)
-    [19]     bandwidth/flags
+    [18]     AGC gain (u8), on ESP32-S3 firmware; 0 where not read
+    [19]     FFT gain (i8), on ESP32-S3 firmware; 0 where not read
+             (spec/wire.md §1. These two bytes were once described as a
+             PPDU type and flags; no Saans firmware ever sent either.)
     [20..]   I/Q payload: int8 pairs, IMAGINARY FIRST
 """
 
@@ -54,8 +56,23 @@ class Esp32Frame:
     rssi_dbm: int
     noise_floor_dbm: int
     ppdu_type: int
+    """Byte 18 as sent. On ESP32-S3 firmware: the AGC gain; see `agc_gain`."""
     flags: int
+    """Byte 19 as sent. On ESP32-S3 firmware: the FFT gain; see `fft_gain`."""
     iq: list[tuple[int, int]]
+
+    @property
+    def agc_gain(self) -> int:
+        """The receiver's AGC gain for this frame (spec/wire.md §1), or 0
+        from firmware that does not report it. Read by the firmware from an
+        undocumented offset Espressif's own tooling uses; unconfirmed until
+        a bench session moves it on purpose (PROTOCOL_S5 §1.1)."""
+        return self.ppdu_type
+
+    @property
+    def fft_gain(self) -> int:
+        """The receiver's FFT gain for this frame, signed (spec/wire.md §1)."""
+        return self.flags - 256 if self.flags > 127 else self.flags
 
     def to_csi_frame(self, sample_rate_hz: float) -> CsiFrame:
         """Convert to the pipeline's frame type.
@@ -138,8 +155,14 @@ def build_esp32_frame(
     rssi_dbm: int = -45,
     noise_floor_dbm: int = -92,
     n_antennas: int = 1,
+    agc_gain: int = 0,
+    fft_gain: int = 0,
 ) -> bytes:
     """Encode a datagram. Used by the tests to round-trip the parser."""
+    if not 0 <= agc_gain <= 255:
+        raise ValueError(f"agc_gain must fit a u8, got {agc_gain}")
+    if not -128 <= fft_gain <= 127:
+        raise ValueError(f"fft_gain must fit an i8, got {fft_gain}")
     header = _HEADER.pack(
         CSI_MAGIC,
         node_id,
@@ -149,8 +172,8 @@ def build_esp32_frame(
         sequence,
         rssi_dbm,
         noise_floor_dbm,
-        0,
-        0,
+        agc_gain,
+        fft_gain & 0xFF,
     )
     payload = bytearray()
     for im, re in iq:

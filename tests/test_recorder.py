@@ -567,6 +567,24 @@ class TestLinkStats(TempDir):
         ls = self.write([(T0_NS + i, 1, s) for i, s in enumerate(seqs)])[0][1]
         self.assertEqual((ls.lost, ls.resets), (3, 0))
 
+    def test_receiver_gain_moves_are_counted(self):
+        # PROTOCOL_S5 §1.1: how often the AGC gain changes, frame to frame.
+        agc = [30, 30, 31, 31, 31, 30, 30]
+        fft = [-2, -2, -2, -3, -3, -3, -3]
+        entries = [
+            (T0_NS + i * 50_000_000,
+             build_esp32_frame([(1, 2)], node_id=1, sequence=i, agc_gain=a, fft_gain=g))
+            for i, (a, g) in enumerate(zip(agc, fft))
+        ]
+        ls = self.write(entries)[0][1]
+        self.assertEqual(ls.gain_frames, 7)
+        self.assertEqual((ls.agc_moves, ls.fft_moves), (2, 1))
+        self.assertEqual((ls.agc_min, ls.agc_max), (30, 31))
+
+    def test_firmware_without_gain_reports_none(self):
+        ls = self.write([(T0_NS + i, 1, i) for i in range(5)])[0][1]
+        self.assertEqual((ls.gain_frames, ls.agc_moves, ls.agc_min), (0, 0, None))
+
     def test_duplicates_and_late_packets_are_not_loss_or_resets(self):
         seqs = [0, 1, 2, 4, 3, 5, 5, 6, 7]
         ls = self.write([(T0_NS + i, 1, s) for i, s in enumerate(seqs)])[0][1]
@@ -680,6 +698,18 @@ class TestCli(TempDir):
         self.assertIn("1 malformed", out)
         self.assertIn("truncated tail: no", out)
         self.assertIn("resets", out)
+
+    def test_stats_reports_gain_moves_or_their_absence(self):
+        with PcapWriter(self.path()) as w:
+            for i, agc in enumerate([40, 40, 41, 41, 41]):
+                w.write(T0_NS + i * 50_000_000, SRC, DST,
+                        build_esp32_frame([(1, 2)], node_id=3, sequence=i, agc_gain=agc, fft_gain=-1))
+            for i in range(5):
+                w.write(T0_NS + i * 50_000_000 + 1, ("10.0.0.12", 4000), DST, tiny_frame(4, i))
+        rc, out = self.cli("stats", self.path())
+        self.assertEqual(rc, 0)
+        self.assertIn("node 3 gain: agc 40-41, moved on 1 of 4 frame pairs (25.000%); fft moved on 0", out)
+        self.assertIn("node 4 gain: not in this recording", out)
 
     def test_replay_runs_pipeline_on_busiest_node_at_measured_rate(self):
         rc, out = self.cli("replay", self.make_recording(), "--calibration-s", "2")

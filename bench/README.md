@@ -38,8 +38,14 @@ written: what matched the simulator and what did not.
   uplink channel").
 - **A tape measure.** Every distance in the session README is measured.
 
-Not covered today: counting AGC gain moves (`PROTOCOL_S5` §1.1). The
-firmware does not read a gain yet, so that needs a firmware change first.
+**The AGC gain (`PROTOCOL_S5` §1.1).** The RX reports it, but from an
+undocumented offset, so confirm it first: with both boards running, put
+a hand or a sheet of foil over the TX, or carry it a few metres away and
+back. The `agc=` value in the RX's `gain:` line should change when the
+signal does. Then, with the room empty and nobody moving, read the
+`gain:` line after ten minutes: "agc moved on N of M frame pairs" is the
+number. Above about 0.1% of frames, stop and write it up before
+recording anyone (§1.1 says why).
 
 ## 1. Build and flash the boards
 
@@ -77,8 +83,9 @@ and `menuconfig` is refused for a profile: change the profile file.
 measures the wrong subcarriers (`HARDWARE.md` §7).
 
 **Write down from the RX's `capture:` line** after a minute: `len=`, the
-subcarrier count it implies, and `first_word_invalid=` against `frames=`.
-That is question 1, and the first half of question 2 (`HARDWARE.md` §9).
+subcarrier count it implies, `first_word_invalid=` against `frames=`, and
+`not_ht=`, which should be 0. That is question 1, and the first half of
+question 2 (`HARDWARE.md` §9). And the `gain:` line: see "Before the day".
 
 ## 2. Record
 
@@ -107,7 +114,10 @@ cd rust && cargo run --release -p saans-gateway -- -c ../bench/saans.bench.toml 
 
 In `stats`, about 1,200 "malformed (not raw CSI)" in a 10-minute segment
 are the RX's own FeatureFrames, which share the port (`PROTOCOL_S5` §1.5).
-Kernel socket drops are this laptop's loss, not the radio's.
+Kernel socket drops are this laptop's loss, not the radio's. The
+`node 1 gain:` line is the AGC count again, from the recording: on
+`empty.pcap` it is the §1.1 number, and it should agree with the RX's own
+`gain:` line.
 
 ## 4. Write it up
 

@@ -34,6 +34,10 @@ struct Frame {
     std::int64_t  timestamp_us;  // esp_timer, for link rate and uptime
     std::int8_t   rssi_dbm;
     std::int8_t   noise_floor_dbm;
+    // The receiver's gain for this frame (0, 0 where unreadable); see
+    // csi_capture.cpp for where they come from and how sure that is.
+    std::uint8_t  agc_gain;
+    std::int8_t   fft_gain;
 #if CONFIG_SAANS_RAW_MODE
     // The ORIGINAL int8 I/Q, kept only in raw builds. Amplitude and phase are
     // lossy derivatives: you cannot reconstruct the pairs from them, and
@@ -60,11 +64,14 @@ bool receive(Frame& out, int timeout_ms);
 // the frames being measured are HT20. Nothing in the firmware can enforce
 // that -- it depends on what the transmitter sends and what the driver
 // reports -- so this says what arrived instead of assuming.
-// `sig_mode`, `cwb` and `rate` exist in `wifi_pkt_rx_ctrl_t` only on the
-// original ESP32, not on the S3, so the PHY mode cannot be read directly
-// here. `len` stands in for it: the LTF layout determines the buffer
-// length, so a change in length is a change in what a subcarrier index
-// means.
+// The PHY mode is read directly (`sig_mode`, `cwb`), and `len` is kept
+// beside it: the LTF layout determines the buffer length, so a change in
+// length is a change in what a subcarrier index means.
+//
+// And the receiver's gain (PROTOCOL_S5 §1.1): an AGC step scales every
+// subcarrier at once, which in simulation inverts the presence detector
+// (NOTES.md §9). How often it moves is the first number a bench session
+// owes. Counted over every frame the radio delivered, in order.
 struct Stats {
     std::uint32_t layout_changed;     // frames whose len differed from the first seen
     std::uint32_t first_word_invalid; // frames where subcarriers 0-1 were dropped
@@ -73,6 +80,16 @@ struct Stats {
     std::uint16_t first_len;          // bytes in the first CSI buffer seen
     std::uint16_t last_len;           // bytes in the most recent one
     std::uint8_t  secondary_channel;  // 0 none, 1 above, 2 below -- 40 MHz tells here
+    std::uint32_t not_ht;             // frames with sig_mode != HT: L-LTF only
+    std::uint32_t wide;               // frames with cwb set: 40 MHz
+    bool          gain_readable;      // false on a target without the gain bytes
+    std::uint32_t gain_frames;        // frames whose gain was read
+    std::uint32_t agc_moves;          // frames whose AGC gain differed from the previous one
+    std::uint32_t fft_moves;          // the same for the FFT gain
+    std::uint8_t  agc_gain;           // the most recent frame's
+    std::uint8_t  agc_min;            // 0xFF until a frame is read
+    std::uint8_t  agc_max;
+    std::int8_t   fft_gain;           // the most recent frame's
 };
 
 Stats capture_stats();
@@ -97,7 +114,8 @@ std::uint32_t channel_to_mhz(std::uint8_t channel);
 // it would not fit.
 std::size_t serialize_raw(const std::int8_t* iq, std::size_t iq_len, std::uint8_t node_id,
                           std::uint32_t sequence, std::int8_t rssi, std::int8_t noise,
-                          std::uint32_t freq_mhz, std::uint8_t* buf, std::size_t buf_len);
+                          std::uint32_t freq_mhz, std::uint8_t agc_gain, std::int8_t fft_gain,
+                          std::uint8_t* buf, std::size_t buf_len);
 
 }  // namespace csi
 }  // namespace saans

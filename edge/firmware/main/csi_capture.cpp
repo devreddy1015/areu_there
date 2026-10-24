@@ -30,6 +30,45 @@ std::uint32_t s_dropped_short = 0;
 std::uint16_t s_last_len = 0;
 std::uint16_t s_first_len = 0;
 std::uint8_t  s_secondary_channel = 0xFF;
+// The PHY mode of what arrived, which the S3 does report after all (see the
+// callback): frames that are not HT, and frames that are 40 MHz wide.
+std::uint32_t s_not_ht = 0;
+std::uint32_t s_wide = 0;
+// The receiver's gain, frame to frame (PROTOCOL_S5 §1.1). Every callback is
+// counted, including frames later dropped, because the question is how often
+// the radio changes its gain, not how often the DSP saw it change.
+std::uint32_t s_gain_frames = 0;
+std::uint32_t s_agc_moves = 0;
+std::uint32_t s_fft_moves = 0;
+std::uint8_t  s_agc_last = 0;
+std::uint8_t  s_agc_min = 0xFF;
+std::uint8_t  s_agc_max = 0;
+std::int8_t   s_fft_last = 0;
+
+// THE AGC AND FFT GAIN ARE NOT DOCUMENTED FIELDS. In IDF 5.4.1's
+// `wifi_pkt_rx_ctrl_t` for the S3 they sit in the 24 reserved bits after
+// `noise_floor` (byte 20). Espressif's own esp_csi_gain_ctrl component
+// (v0.1.5, Apache-2.0, binary-only) reads them there: disassembled, its
+// esp_csi_gain_ctrl_get_rx_gain is two byte loads, AGC from byte 23 and the
+// signed FFT gain from byte 22, identically in its builds for IDF 4.4
+// through 6.0 (checked 2026-10-24). That is the vendor's reading, not a
+// measurement: until a bench session attenuates the TX and watches the AGC
+// value move (PROTOCOL_S5 §1.1), treat these numbers as unconfirmed.
+#if CONFIG_IDF_TARGET_ESP32S3
+constexpr bool kGainReadable = true;
+static_assert(sizeof(wifi_pkt_rx_ctrl_t) >= 24, "rx_ctrl is shorter than the gain offsets");
+void read_gain(const wifi_pkt_rx_ctrl_t& rx, std::uint8_t& agc, std::int8_t& fft) {
+    const auto* bytes = reinterpret_cast<const unsigned char*>(&rx);
+    agc = bytes[23];
+    fft = static_cast<std::int8_t>(bytes[22]);
+}
+#else
+constexpr bool kGainReadable = false;
+void read_gain(const wifi_pkt_rx_ctrl_t&, std::uint8_t& agc, std::int8_t& fft) {
+    agc = 0;
+    fft = 0;
+}
+#endif
 
 // Runs in WiFi TASK context — not an ISR. Everything here is O(n_subcarriers)
 // with no allocation, no logging and no blocking send: a slow callback drops
@@ -46,19 +85,37 @@ void csi_callback(void* /*ctx*/, wifi_csi_info_t* info) {
         return;
     }
 
+    std::uint8_t agc = 0;
+    std::int8_t  fft = 0;
+    read_gain(info->rx_ctrl, agc, fft);
+    if (kGainReadable) {
+        if (s_gain_frames != 0) {
+            s_agc_moves += (agc != s_agc_last) ? 1U : 0U;
+            s_fft_moves += (fft != s_fft_last) ? 1U : 0U;
+        }
+        ++s_gain_frames;
+        s_agc_last = agc;
+        s_fft_last = fft;
+        s_agc_min = agc < s_agc_min ? agc : s_agc_min;
+        s_agc_max = agc > s_agc_max ? agc : s_agc_max;
+    }
+
     // WHICH LTF BLOCK IS THIS? The buffer layout depends on the PHY mode of
     // the frame that was received, and we do not get to assume it: a non-HT
     // frame carries only L-LTF, and slicing the first kNSubcarriers pairs
     // from byte 0 would then hand the DSP a different set of subcarriers
     // from the one it was sized for.
     //
-    // On the S3 we cannot ask directly: `wifi_pkt_rx_ctrl_t` carries
-    // sig_mode, cwb and rate only on the original ESP32. What is available
-    // here is `len`, and that is enough, because the LTF layout determines
-    // it -- a change in `len` IS a change in what the subcarrier indices
-    // mean. So record the first length seen and count departures from it.
-    // The first job on real hardware is to find out what the radio does,
-    // not to assume it.
+    // The S3 does report the mode: IDF 5.4.1's `wifi_pkt_rx_ctrl_t` has
+    // sig_mode (0 non-HT, 1 HT) and cwb (0 20 MHz, 1 40 MHz) on every target
+    // without 11ax, the S3 included. (An earlier comment here said those
+    // fields existed on the original ESP32 only; the header says otherwise.)
+    // `len` is kept as well: the LTF layout determines it, so a change in
+    // `len` is a change in what the subcarrier indices mean, whatever the
+    // mode fields say. The first job on real hardware is to find out what the
+    // radio does, not to assume it.
+    s_not_ht += (info->rx_ctrl.sig_mode != 1) ? 1U : 0U;
+    s_wide += (info->rx_ctrl.cwb != 0) ? 1U : 0U;
     s_last_len = static_cast<std::uint16_t>(info->len);
     s_secondary_channel = static_cast<std::uint8_t>(info->rx_ctrl.secondary_channel);
     if (s_first_len == 0) {
@@ -106,6 +163,8 @@ void csi_callback(void* /*ctx*/, wifi_csi_info_t* info) {
     frame.timestamp_us = esp_timer_get_time();
     frame.rssi_dbm = static_cast<std::int8_t>(info->rx_ctrl.rssi);
     frame.noise_floor_dbm = static_cast<std::int8_t>(info->rx_ctrl.noise_floor);
+    frame.agc_gain = agc;
+    frame.fft_gain = fft;
     s_channel = static_cast<std::uint8_t>(info->rx_ctrl.channel);
 
     for (std::size_t k = 0; k < n; ++k) {
@@ -204,13 +263,31 @@ bool receive(Frame& out, int timeout_ms) {
 std::uint32_t dropped() { return s_dropped; }
 
 Stats capture_stats() {
-    return Stats{s_layout_changed, s_first_word_invalid, s_short_frames, s_dropped_short,
-                 s_first_len, s_last_len, s_secondary_channel};
+    Stats st{};
+    st.layout_changed = s_layout_changed;
+    st.first_word_invalid = s_first_word_invalid;
+    st.short_frames = s_short_frames;
+    st.dropped_short = s_dropped_short;
+    st.first_len = s_first_len;
+    st.last_len = s_last_len;
+    st.secondary_channel = s_secondary_channel;
+    st.not_ht = s_not_ht;
+    st.wide = s_wide;
+    st.gain_readable = kGainReadable;
+    st.gain_frames = s_gain_frames;
+    st.agc_moves = s_agc_moves;
+    st.fft_moves = s_fft_moves;
+    st.agc_gain = s_agc_last;
+    st.agc_min = s_agc_min;
+    st.agc_max = s_agc_max;
+    st.fft_gain = s_fft_last;
+    return st;
 }
 
 std::size_t serialize_raw(const std::int8_t* iq, std::size_t iq_len, std::uint8_t node_id,
                           std::uint32_t sequence, std::int8_t rssi, std::int8_t noise,
-                          std::uint32_t freq_mhz, std::uint8_t* buf, std::size_t buf_len) {
+                          std::uint32_t freq_mhz, std::uint8_t agc_gain, std::int8_t fft_gain,
+                          std::uint8_t* buf, std::size_t buf_len) {
     if (iq == nullptr || buf == nullptr) {
         return 0;
     }
@@ -233,8 +310,11 @@ std::size_t serialize_raw(const std::int8_t* iq, std::size_t iq_len, std::uint8_
     std::memcpy(&buf[12], &sequence, 4);
     buf[16] = static_cast<std::uint8_t>(rssi);
     buf[17] = static_cast<std::uint8_t>(noise);
-    buf[18] = 0;  // PPDU type: unused here
-    buf[19] = 0;  // flags
+    // spec/wire.md §1: the receiver's AGC and FFT gain for this frame (0, 0
+    // from a build that cannot read them). The parsers still name these
+    // bytes `ppdu_type` and `flags`.
+    buf[18] = agc_gain;
+    buf[19] = static_cast<std::uint8_t>(fft_gain);
     std::memcpy(&buf[kRawHeaderSize], iq, iq_len);
     return total;
 }

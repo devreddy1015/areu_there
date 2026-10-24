@@ -14,6 +14,15 @@ See `wifisense/sources/esp32_udp.py` for the
 byte-exact reference. 20-byte header, then int8 I/Q pairs, **imaginary
 first**. Sequence number at bytes 12..15.
 
+Bytes 18 and 19 carry the receiver's gain for the frame, as ESP32-S3
+firmware reads it (2026-10-24): **18 = AGC gain** (u8) and **19 = FFT
+gain** (i8). A build that cannot read them writes 0, 0. The parsers still
+call these fields `ppdu_type` and `flags`, and expose them as `agc_gain`
+and `fft_gain`. Neither is a documented ESP-IDF field. The firmware reads
+them where Espressif's own gain-control component does, which is why
+`edge/firmware/main/csi_capture.cpp` labels them unconfirmed until a
+bench session moves the AGC on purpose (`docs/PROTOCOL_S5.md` §1.1).
+
 ## 2. FeatureFrame v1 — 68 bytes, fixed size
 
 One frame per link (rx node, tx id) every `1 / frame_rate_hz` seconds

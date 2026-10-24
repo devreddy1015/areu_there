@@ -273,6 +273,22 @@ def cmd_stats(args: argparse.Namespace) -> int:
                 f"WARNING node {ls.node_id} arrived from {len(ls.sources)} addresses "
                 f"({', '.join(ls.sources)}): two boards sharing a node_id?"
             )
+    # PROTOCOL_S5 §1.1: how often the receiver changed its gain, from the
+    # raw header (spec/wire.md §1). On an idle node in an empty room this
+    # is the fraction to report; above ~0.1% presence is at risk.
+    for ls in links.values():
+        if not ls.gain_frames:
+            print(
+                f"node {ls.node_id} gain: not in this recording "
+                "(header bytes 18-19 are zero: firmware without gain logging, or not an ESP32-S3)"
+            )
+            continue
+        pairs = ls.packets - 1
+        pct = 100.0 * ls.agc_moves / pairs if pairs else 0.0
+        print(
+            f"node {ls.node_id} gain: agc {ls.agc_min}-{ls.agc_max}, moved on "
+            f"{ls.agc_moves} of {pairs} frame pairs ({pct:.3f}%); fft moved on {ls.fft_moves}"
+        )
     print(f"file: {_read_summary(read)}")
     return 0
 

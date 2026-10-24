@@ -127,16 +127,21 @@ them is in this firmware's gift:
   loudly if that call fails; without it the default is a non-HT rate,
   which carries only L-LTF, and the RX would be slicing a different set
   of subcarriers from the one the DSP was sized for.
-- **The driver must deliver what we think it delivers.** On the S3 the
-  PHY mode cannot be read back: `sig_mode`, `cwb` and `rate` are fields
-  of `wifi_pkt_rx_ctrl_t` on the original ESP32 only. What is available
-  is `len`, and the LTF layout determines it, so the RX records the first
-  length it sees and counts departures from it.
+- **The driver must deliver what we think it delivers.** The RX counts
+  frames that arrive without HT (`sig_mode`) or 40 MHz wide (`cwb`); the
+  S3 reports both. (An earlier version of this section said it did not.
+  The ESP-IDF 5.4.1 header shows the fields on every target without
+  11ax.) It also records the first `len` it sees and counts departures
+  from it, because the LTF layout determines `len`.
+- **And the receiver's gain** (`docs/PROTOCOL_S5.md` §1.1). Every
+  telemetry period the RX reports how often the AGC gain moved, and in
+  raw mode each frame carries its AGC and FFT gain (`spec/wire.md` §1).
+  The values come from an undocumented offset; see `csi_capture.cpp`.
 
 Every `kTelemetryS` the RX prints what actually arrived:
 
 ```
-capture: len=128 (first 128) -> 64 subcarriers, expecting 56; 2nd_ch=0 first_word_invalid=0 short=0 layout_changed=0 too_short=0
+capture: len=128 (first 128) -> 64 subcarriers, expecting 56; 2nd_ch=0 first_word_invalid=0 short=0 layout_changed=0 too_short=0 not_ht=0 40mhz=0
 ```
 
 and warns if the radio delivers fewer subcarriers than the DSP expects,
