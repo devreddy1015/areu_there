@@ -12,6 +12,7 @@ use saans_sim::scenario::{
 };
 use saans_sim::Simulator;
 use std::collections::HashMap;
+use std::f64::consts::PI;
 use std::path::PathBuf;
 
 const REL: f64 = 1e-9;
@@ -211,23 +212,7 @@ fn box_scene_matches_python() {
     // which the 2-D set cannot test (level with the link it is the
     // slice's 2 cos(beta/2) by construction).
     let sc = python_scene(&v);
-    let opts = python_options(&v);
-    let (tx, rx) = (&sc.nodes[0], &sc.nodes[1]);
-    let placed: Vec<_> = sc
-        .room
-        .scatterers
-        .iter()
-        .map(|s| ((s.pos.0, s.pos.1, s.z_m.unwrap()), s.rcs_m2))
-        .collect();
-    let ch = LinkChannel::new(
-        &sc.room,
-        &placed,
-        (tx.pos.0, tx.pos.1, tx.z_m),
-        (rx.pos.0, rx.pos.1, rx.z_m),
-        opts.carrier_hz,
-        opts.subcarrier_spacing_hz,
-        sc.n_subcarriers,
-    );
+    let ch = channel(&v, &sc);
     let mut pts = Vec::new();
     ch.torso(
         (v.f("body_x"), v.f("body_y")),
@@ -239,6 +224,83 @@ fn box_scene_matches_python() {
     let gains: Vec<f64> = pts.iter().map(|p| p.gain).collect();
     let worst = compare("body_gain", &gains, &v.a("body_gain"));
     println!("box parity: max rel err body gains {worst:.2e}");
+}
+
+/// The vector set's link as a bare channel, scatterers at their heights.
+fn channel(v: &Vectors, sc: &Scenario) -> LinkChannel {
+    let opts = python_options(v);
+    let (tx, rx) = (&sc.nodes[0], &sc.nodes[1]);
+    let placed: Vec<_> = sc
+        .room
+        .scatterers
+        .iter()
+        .map(|s| ((s.pos.0, s.pos.1, s.z_m.unwrap()), s.rcs_m2))
+        .collect();
+    LinkChannel::new(
+        &sc.room,
+        &placed,
+        (tx.pos.0, tx.pos.1, tx.z_m),
+        (rx.pos.0, rx.pos.1, rx.z_m),
+        opts.carrier_hz,
+        opts.subcarrier_spacing_hz,
+        sc.n_subcarriers,
+    )
+}
+
+/// A chest lying on the floor, breathing vertically: the reference's
+/// `chest_axis="vertical"`, what a fall leaves behind in a box. The
+/// reference is a static scene, and in the simulator a lying chest only
+/// comes from a fall in a timeline, so this drives the channel directly,
+/// the way `Simulator::step` does: the torso in its posture, every point's
+/// path shortened by gain x displacement.
+#[test]
+fn lying_chest_matches_python() {
+    let v = Vectors::load("sim_geometric_3d_lying");
+    constants_match(&v);
+    assert_eq!(v.f("chest_vertical"), 1.0);
+    let sc = python_scene(&v);
+    let ch = channel(&v, &sc);
+    let mut pts = Vec::new();
+    ch.torso_posed(
+        (v.f("body_x"), v.f("body_y")),
+        v.f("body_z"),
+        true,
+        sc.body_points,
+        sc.body_width_m,
+        BODY_RCS_M2,
+        &mut pts,
+    );
+    let gains: Vec<f64> = pts.iter().map(|p| p.gain).collect();
+    let worst_gain = compare("body_gain", &gains, &v.a("body_gain"));
+    let worst_sens = compare(
+        "sensitivity",
+        &ch.sensitivity(&pts, &[]),
+        &v.a("sensitivity"),
+    );
+
+    let n = sc.n_subcarriers;
+    let fs = v.f("fs");
+    let n_frames = v.a("amplitudes").len() / n;
+    let (fb, fh) = (v.f("breathing_bpm") / 60.0, v.f("heart_bpm") / 60.0);
+    let (mut amps, mut phases) = (Vec::new(), Vec::new());
+    for i in 0..n_frames {
+        let t = i as f64 / fs;
+        let disp = v.f("breathing_amplitude_m") * (2.0 * PI * fb * t).sin()
+            + v.f("heart_amplitude_m") * (2.0 * PI * fh * t).sin();
+        let (mut re, mut im) = (ch.static_re.clone(), ch.static_im.clone());
+        for p in &pts {
+            ch.add_path(&mut re, &mut im, p.amp, p.len - p.gain * disp);
+        }
+        for k in 0..n {
+            amps.push(re[k].hypot(im[k]));
+            phases.push(im[k].atan2(re[k]));
+        }
+    }
+    let worst_amp = compare("amplitudes", &amps, &v.a("amplitudes"));
+    let worst_phase = compare("phases", &phases, &v.a("phases"));
+    println!(
+        "lying parity: max rel err amplitudes {worst_amp:.2e}, phases {worst_phase:.2e}, sensitivity {worst_sens:.2e}, gains {worst_gain:.2e}"
+    );
 }
 
 fn matches_python(v: &Vectors) {

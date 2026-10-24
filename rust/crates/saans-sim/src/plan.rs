@@ -58,6 +58,10 @@ struct Leg {
     from: Point,
     to: Point,
     kind: LegKind,
+    /// Lying at the start and end of the leg: 0 upright, 1 on the floor.
+    /// Only a fall's drop leg changes it; only the box uses it.
+    lie0: f64,
+    lie1: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -141,6 +145,8 @@ pub struct BodyState {
     /// Chest displacement along the bisector (m): breathing + heart.
     pub disp: f64,
     pub arm: Point,
+    /// 0 upright, 1 lying on the floor, in between during a fall.
+    pub lying: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -226,17 +232,22 @@ struct Builder<'a> {
     arms: Vec<ArmMove>,
     events: Vec<TruthEvent>,
     pos: Point,
+    /// On the floor since a fall, until the next walk.
+    lying: bool,
 }
 
 impl Builder<'_> {
     fn hold(&mut self, t0: f64, t1: f64) {
         if t1 > t0 {
+            let lie = if self.lying { 1.0 } else { 0.0 };
             self.legs.push(Leg {
                 t0,
                 t1,
                 from: self.pos,
                 to: self.pos,
                 kind: LegKind::Hold,
+                lie0: lie,
+                lie1: lie,
             });
         }
     }
@@ -252,6 +263,8 @@ impl Builder<'_> {
         if t1 <= t0 {
             return t0;
         }
+        // Walking means getting up first (instantly: not modelled).
+        self.lying = false;
         let dur = d / speed;
         if t0 + dur <= t1 {
             self.legs.push(Leg {
@@ -260,6 +273,8 @@ impl Builder<'_> {
                 from: self.pos,
                 to: target,
                 kind: LegKind::Walk,
+                lie0: 0.0,
+                lie1: 0.0,
             });
             self.pos = target;
             t0 + dur
@@ -271,6 +286,8 @@ impl Builder<'_> {
                 from: self.pos,
                 to: end,
                 kind: LegKind::Walk,
+                lie0: 0.0,
+                lie1: 0.0,
             });
             self.pos = end;
             t1
@@ -278,8 +295,8 @@ impl Builder<'_> {
     }
 
     /// A fast move to `target` taking `dur` (compressed if the segment is
-    /// shorter). Returns its end time.
-    fn drop_to(&mut self, t0: f64, t1: f64, dur: f64, target: Point) -> f64 {
+    /// shorter), ending on the floor when `to_floor`. Returns its end time.
+    fn drop_to(&mut self, t0: f64, t1: f64, dur: f64, target: Point, to_floor: bool) -> f64 {
         let te = (t0 + dur).min(t1);
         if te > t0 {
             self.legs.push(Leg {
@@ -288,9 +305,12 @@ impl Builder<'_> {
                 from: self.pos,
                 to: target,
                 kind: LegKind::Drop,
+                lie0: if self.lying { 1.0 } else { 0.0 },
+                lie1: if to_floor { 1.0 } else { 0.0 },
             });
         }
         self.pos = target;
+        self.lying = to_floor;
         te
     }
 
@@ -333,6 +353,7 @@ impl Builder<'_> {
         let target = self.bx.clamp(at);
         if !present {
             self.pos = target;
+            self.lying = false;
             self.hold(t0, t1);
             return t0;
         }
@@ -386,6 +407,7 @@ impl Plan {
             arms: Vec::new(),
             events: Vec::new(),
             pos: door,
+            lying: false,
         };
         let mut segs: Vec<SegPlan> = Vec::with_capacity(sc.timeline.len());
         let (mut t, mut present, mut rate, mut phase) = (0.0f64, false, DEFAULT_BPM, 0.0f64);
@@ -399,6 +421,7 @@ impl Plan {
             let mut pause = false;
             let (bpm0, bpm1) = match &seg.activity {
                 Activity::Absent => {
+                    b.lying = false;
                     b.hold(t0, t1);
                     (rate, rate)
                 }
@@ -440,7 +463,7 @@ impl Plan {
                     if !present {
                         b.pos = door;
                     }
-                    let te = b.drop_to(t0, t1, FALL_S, bx.clamp(*to));
+                    let te = b.drop_to(t0, t1, FALL_S, bx.clamp(*to), true);
                     if te > t0 {
                         let freq_hz = b.rng.range(1.5, 2.5);
                         let dir = b.rng.unit_vector();
@@ -476,7 +499,7 @@ impl Plan {
                         ts = b.walk_to(t0, t1, approach, RELOCATE_SPEED_MPS);
                     }
                     if ts < t1 {
-                        let te = b.drop_to(ts, t1, SIT_DOWN_S, target);
+                        let te = b.drop_to(ts, t1, SIT_DOWN_S, target, false);
                         b.events.push(TruthEvent {
                             kind: TruthKind::SitDown,
                             t_start_s: ts,
@@ -630,6 +653,21 @@ impl Plan {
         }
     }
 
+    /// 0 upright, 1 lying on the floor; a fall's drop leg goes between
+    /// them on the same smoothstep as its horizontal move.
+    pub fn lying(&self, t: f64) -> f64 {
+        let Some(l) = self.leg_at(t) else {
+            return 0.0;
+        };
+        let span = l.t1 - l.t0;
+        let u = if span > 0.0 {
+            ((t - l.t0) / span).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        l.lie0 + (l.lie1 - l.lie0) * smoothstep(u)
+    }
+
     fn moving(&self, t: f64) -> bool {
         self.leg_at(t)
             .is_some_and(|l| l.kind != LegKind::Hold && t >= l.t0 && t < l.t1)
@@ -690,6 +728,7 @@ impl Plan {
             centre,
             disp,
             arm,
+            lying: self.lying(t),
         }
     }
 

@@ -13,7 +13,7 @@ use saans_health::{
     EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceFusion, SpaceMonitor,
 };
 use saans_sim::scenario::{
-    Activity, Node, Point, Room, Scenario, Segment, TruthKind, Vertical, NODE_Z_M,
+    Activity, Node, Point, Room, Scenario, Segment, TruthKind, Vertical, FLOOR_CHEST_Z_M, NODE_Z_M,
 };
 use saans_sim::Simulator;
 use std::collections::BTreeMap;
@@ -28,7 +28,8 @@ pub struct EvalOptions {
     pub threads: usize,
     /// Run every room as a box this high (`Room::vertical`, the
     /// [`Vertical`] defaults otherwise: concrete floor and ceiling, nodes
-    /// at 1.2 m, chest at 1.0 m). `None` is the 2-D slice.
+    /// at 1.2 m, chest at 1.0 m upright and on the floor after a fall).
+    /// `None` is the 2-D slice.
     pub room_height_m: Option<f64>,
 }
 
@@ -470,7 +471,10 @@ fn report(done: &[Done], opts: &EvalOptions, hours: f64, wall_s: f64) {
             "BOX MODEL: rooms {h} m high, floor and ceiling |Gamma| {} / {}, nodes at {} m, chest at {} m",
             v.floor_reflection, v.ceiling_reflection, NODE_Z_M, v.chest_z_m
         );
-        println!("for the whole timeline: a fall moves the chest sideways but does not lower it.");
+        println!(
+            "upright (standing and seated alike); a fall lowers it to {FLOOR_CHEST_Z_M} m, lying on the back and"
+        );
+        println!("breathing vertically, until the next walk.");
     }
     println!("==========================================================================");
 

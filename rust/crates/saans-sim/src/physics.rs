@@ -164,6 +164,15 @@ pub fn point_path(tx: Point, rx: Point, p: Point, rcs_m2: f64) -> (f64, f64) {
     (amp, d1 + d2)
 }
 
+/// Path change per metre of a lying chest rising: (u_tx + u_rx) . z, the
+/// reference's `_chest_rise` (`chest_axis="vertical"`). Largest straight
+/// below the link, zero level with both ends, negative above both nodes.
+pub fn chest_rise(tx: Point3, rx: Point3, p: Point3) -> f64 {
+    let d1 = dist3(tx, p).max(1e-12);
+    let d2 = dist3(p, rx).max(1e-12);
+    (tx.2 - p.2) / d1 + (rx.2 - p.2) / d2
+}
+
 /// [`point_path`] in a box.
 pub fn point_path3(tx: Point3, rx: Point3, p: Point3, rcs_m2: f64) -> (f64, f64) {
     let d1 = dist3(tx, p);
@@ -353,9 +362,15 @@ impl LinkChannel {
     /// A point scatterer on the body at `p` (the arm), as this link sees
     /// it: in the box, at chest height.
     pub fn body_point_path(&self, p: Point, rcs_m2: f64) -> (f64, f64) {
+        let z = self.vertical.map_or(0.0, |v| v.chest_z_m);
+        self.body_point_path_at(p, z, rcs_m2)
+    }
+
+    /// [`LinkChannel::body_point_path`] at height `z` (ignored in the slice).
+    pub fn body_point_path_at(&self, p: Point, z: f64, rcs_m2: f64) -> (f64, f64) {
         match &self.vertical {
             None => point_path(xy(self.tx), xy(self.rx), p, rcs_m2),
-            Some(v) => point_path3(self.tx, self.rx, (p.0, p.1, v.chest_z_m), rcs_m2),
+            Some(_) => point_path3(self.tx, self.rx, (p.0, p.1, z), rcs_m2),
         }
     }
 
@@ -390,10 +405,32 @@ impl LinkChannel {
 
     /// The torso as this link sees it: `n_points` scatterers spread across
     /// `width_m` perpendicular to the tx-centre-rx bisector, RCS split
-    /// equally (the reference's extended body).
+    /// equally (the reference's extended body). In a box, upright at the
+    /// room's [`Vertical::chest_z_m`]; [`LinkChannel::torso_posed`] for any
+    /// other posture.
     pub fn torso(
         &self,
         centre: Point,
+        n_points: usize,
+        width_m: f64,
+        rcs_m2: f64,
+        out: &mut Vec<BodyPoint>,
+    ) {
+        let z = self.vertical.map_or(0.0, |v| v.chest_z_m);
+        self.torso_posed(centre, z, false, n_points, width_m, rcs_m2, out);
+    }
+
+    /// [`LinkChannel::torso`] with the chest at height `z` and, when `lying`,
+    /// breathing vertically ([`chest_rise`]) rather than horizontally: the
+    /// reference's `body_z_m` and `chest_axis`. The torso spreads
+    /// horizontally either way. In the 2-D slice `z` and `lying` are
+    /// ignored.
+    #[allow(clippy::too_many_arguments)]
+    pub fn torso_posed(
+        &self,
+        centre: Point,
+        z: f64,
+        lying: bool,
         n_points: usize,
         width_m: f64,
         rcs_m2: f64,
@@ -409,10 +446,9 @@ impl LinkChannel {
                 width_m * (i as f64 / (n - 1) as f64 - 0.5)
             }
         };
-        if let Some(v) = &self.vertical {
+        if self.vertical.is_some() {
             // The reference's `_init_box`: points across the horizontal
-            // bisector at chest height, each with its own horizontal gain.
-            let z = v.chest_z_m;
+            // bisector at chest height, each with its own gain.
             let (b, _) = chest_motion(self.tx, self.rx, (centre.0, centre.1, z));
             let across = (-b.1, b.0);
             for i in 0..n {
@@ -424,7 +460,11 @@ impl LinkChannel {
                     pos: xy(p),
                     amp: k / (e1.max(MIN_RANGE_M) * e2.max(MIN_RANGE_M)),
                     len: e1 + e2,
-                    gain: chest_motion(self.tx, self.rx, p).1,
+                    gain: if lying {
+                        chest_rise(self.tx, self.rx, p)
+                    } else {
+                        chest_motion(self.tx, self.rx, p).1
+                    },
                 });
             }
             return;
@@ -470,7 +510,8 @@ impl LinkChannel {
                 // 1j * g * bp
                 dr.add(-(p.gain * b.1));
                 di.add(p.gain * b.0);
-                mag.add(b.0.hypot(b.1) * p.gain);
+                // |gain|: a lying chest above both nodes has a negative one.
+                mag.add(b.0.hypot(b.1) * p.gain.abs());
             }
             let mut h0r = self.static_re[k] + br.value();
             let mut h0i = self.static_im[k] + bi.value();
@@ -629,6 +670,30 @@ mod tests {
         // Straight below the midpoint: none at first order, and the
         // direction falls back to across the link.
         assert_eq!(chest_motion(tx, rx, (3.0, 2.5, 1.0)), ((-0.0, 1.0), 0.0));
+    }
+
+    #[test]
+    fn a_lying_chest_breathes_vertically() {
+        let (tx, rx) = ((1.0, 2.5, 1.2), (5.0, 2.5, 1.2));
+        // Straight below the link: all of it, where upright has none.
+        let below = (3.0, 2.5, 0.2);
+        assert!((chest_rise(tx, rx, below) - 2.0 / (4.0f64 + 1.0).sqrt()).abs() < 1e-12);
+        assert_eq!(chest_motion(tx, rx, below).1, 0.0);
+        // Level with the link: none.
+        assert!(chest_rise(tx, rx, (3.0, 4.0, 1.2)).abs() < 1e-12);
+        // Above both nodes the path lengthens as the chest rises, and the
+        // sensitivity bound has to use the gain's magnitude.
+        let room = Room {
+            vertical: Some(Vertical::default()),
+            ..Room::default()
+        };
+        let ch = LinkChannel::new(&room, &[], TX, RX, 2.437e9, 312_500.0, 56);
+        let mut pts = Vec::new();
+        ch.torso_posed((3.0, 3.6), 2.0, true, 5, 0.3, BODY_RCS_M2, &mut pts);
+        assert!(pts.iter().all(|p| p.gain < 0.0));
+        let s = ch.sensitivity(&pts, &[]);
+        assert!(s.iter().all(|v| (0.0..=1.0 + 1e-12).contains(v)), "{s:?}");
+        assert!(s.iter().any(|&v| v > 0.1));
     }
 
     #[test]

@@ -110,7 +110,7 @@ pub use plan::{
 };
 pub use scenario::{
     Activity, Node, Point, Point3, Room, Scatterer, Scenario, Segment, SimOptions, Truth,
-    TruthEvent, TruthKind, Vertical, NODE_Z_M,
+    TruthEvent, TruthKind, Vertical, FLOOR_CHEST_Z_M, NODE_Z_M,
 };
 pub use scene::{
     MaterialConstants, ObjectMaterial, ObjectType, Person, Phone, Scene, SceneError, SceneNode,
