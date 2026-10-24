@@ -732,6 +732,16 @@ class LinkStats:
     sources: tuple[str, ...] = ()
     """Sender IPs. More than one usually means two boards flashed with the
     same node_id, whose interleaved sequences read as constant resets."""
+    gain_frames: int = 0
+    """Frames carrying a receiver gain (header bytes 18-19 not both zero,
+    spec/wire.md §1). 0 means the firmware did not report one."""
+    agc_moves: int = 0
+    """Received frames whose AGC gain differed from the frame received
+    before it, in arrival order (PROTOCOL_S5 §1.1). A lost frame between
+    two received ones can hide a move and its reversal."""
+    fft_moves: int = 0
+    agc_min: int | None = None
+    agc_max: int | None = None
 
 
 def _percentile(sorted_values: list[int], q: float) -> float:
@@ -761,6 +771,11 @@ class _LinkAccumulator:
         self.dts = array("q")
         self.subcarriers: list[int] = []
         self.sources: list[str] = []
+        self.gain_frames = 0
+        self.agc_moves = 0
+        self.fft_moves = 0
+        self.agc_seen: list[int] = []
+        self.prev_gain: tuple[int, int] | None = None
 
     def add(self, t_ns: int, frame: Esp32Frame, src_ip: str) -> None:
         if self.packets:
@@ -773,7 +788,19 @@ class _LinkAccumulator:
             self.subcarriers.append(frame.n_subcarriers)
         if src_ip not in self.sources:
             self.sources.append(src_ip)
+        self._gain(frame.agc_gain, frame.fft_gain)
         self._sequence(frame.sequence)
+
+    def _gain(self, agc: int, fft: int) -> None:
+        if (agc, fft) != (0, 0):
+            self.gain_frames += 1
+            if not self.agc_seen:
+                self.agc_seen = [agc, agc]
+            self.agc_seen = [min(self.agc_seen[0], agc), max(self.agc_seen[1], agc)]
+        if self.prev_gain is not None:
+            self.agc_moves += agc != self.prev_gain[0]
+            self.fft_moves += fft != self.prev_gain[1]
+        self.prev_gain = (agc, fft)
 
     def _sequence(self, seq: int) -> None:
         prev = self.prev_seq
@@ -827,6 +854,11 @@ class _LinkAccumulator:
             dt_max_ms=dts[-1] / 1e6 if dts else math.nan,
             subcarriers=tuple(self.subcarriers),
             sources=tuple(self.sources),
+            gain_frames=self.gain_frames,
+            agc_moves=self.agc_moves if self.gain_frames else 0,
+            fft_moves=self.fft_moves if self.gain_frames else 0,
+            agc_min=self.agc_seen[0] if self.agc_seen else None,
+            agc_max=self.agc_seen[1] if self.agc_seen else None,
         )
 
 

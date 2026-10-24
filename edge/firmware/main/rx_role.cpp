@@ -232,7 +232,7 @@ void run_rx_role() {
         {
             const std::size_t n = csi::serialize_raw(
                 frame.iq, frame.iq_len, cfg::kNodeId, frame.sequence, frame.rssi_dbm,
-                frame.noise_floor_dbm, freq_mhz, raw, sizeof(raw));
+                frame.noise_floor_dbm, freq_mhz, frame.agc_gain, frame.fft_gain, raw, sizeof(raw));
             if (n > 0) {
                 net::udp_send(raw, n);
             }
@@ -262,14 +262,43 @@ void run_rx_role() {
             // has confirmed it, this line is the evidence.
             const csi::Stats cs = csi::capture_stats();
             ESP_LOGI(kTag, "capture: len=%u (first %u) -> %u subcarriers, expecting %u; "
-                           "2nd_ch=%u first_word_invalid=%lu short=%lu layout_changed=%lu too_short=%lu",
+                           "2nd_ch=%u first_word_invalid=%lu short=%lu layout_changed=%lu too_short=%lu "
+                           "not_ht=%lu 40mhz=%lu",
                      static_cast<unsigned>(cs.last_len), static_cast<unsigned>(cs.first_len),
                      static_cast<unsigned>(cs.last_len / 2U), static_cast<unsigned>(cfg::kNSubcarriers),
                      static_cast<unsigned>(cs.secondary_channel),
                      static_cast<unsigned long>(cs.first_word_invalid),
                      static_cast<unsigned long>(cs.short_frames),
                      static_cast<unsigned long>(cs.layout_changed),
-                     static_cast<unsigned long>(cs.dropped_short));
+                     static_cast<unsigned long>(cs.dropped_short),
+                     static_cast<unsigned long>(cs.not_ht),
+                     static_cast<unsigned long>(cs.wide));
+            if (cs.not_ht != 0U) {
+                ESP_LOGW(kTag, "%lu frames arrived without HT (L-LTF only): those measure a "
+                               "different set of subcarriers. The TX should log "
+                               "'ESP-NOW rate: HT20 MCS0 LGI'.",
+                         static_cast<unsigned long>(cs.not_ht));
+            }
+
+            // THE NUMBER PROTOCOL_S5 §1.1 ASKS FOR: how often the receiver
+            // changes its gain. Cumulative since boot; on an idle node in an
+            // empty room for ten minutes, `agc moved on N of M frames` is the
+            // fraction to report. The source of the values is undocumented and
+            // unconfirmed until the bench check in §1.1 (csi_capture.cpp).
+            if (cs.gain_readable && cs.gain_frames > 1U) {
+                const double pairs = static_cast<double>(cs.gain_frames - 1U);
+                ESP_LOGI(kTag, "gain: agc=%u (range %u-%u) fft=%d; agc moved on %lu of %lu frame "
+                               "pairs (%.3f%%), fft on %lu",
+                         static_cast<unsigned>(cs.agc_gain), static_cast<unsigned>(cs.agc_min),
+                         static_cast<unsigned>(cs.agc_max), static_cast<int>(cs.fft_gain),
+                         static_cast<unsigned long>(cs.agc_moves),
+                         static_cast<unsigned long>(cs.gain_frames - 1U),
+                         100.0 * static_cast<double>(cs.agc_moves) / pairs,
+                         static_cast<unsigned long>(cs.fft_moves));
+            } else if (!cs.gain_readable) {
+                ESP_LOGW(kTag, "gain: not readable on this target; PROTOCOL_S5 §1.1 needs the "
+                               "RSSI proxy instead");
+            }
             if (cs.last_len != 0U && cs.last_len / 2U < cfg::kNSubcarriers) {
                 ESP_LOGW(kTag, "THE RADIO IS DELIVERING FEWER SUBCARRIERS THAN THE DSP EXPECTS. "
                                "The tail is zero-padded, which the BNR stage reads as a quiet "

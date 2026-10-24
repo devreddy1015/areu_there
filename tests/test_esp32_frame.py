@@ -61,6 +61,19 @@ class TestEsp32Frame(unittest.TestCase):
     def test_magic_value_matches_firmware(self):
         self.assertEqual(CSI_MAGIC, 0xC5110001)
 
+    def test_receiver_gain_rides_in_bytes_18_and_19(self):
+        # spec/wire.md §1: on ESP32-S3 firmware, the AGC gain (u8) and the
+        # FFT gain (i8). The legacy field names keep the raw bytes.
+        data = build_esp32_frame([(1, 2)], agc_gain=37, fft_gain=-4)
+        self.assertEqual((data[18], data[19]), (37, 0xFC))
+        f = parse_esp32_frame(data)
+        self.assertEqual((f.agc_gain, f.fft_gain), (37, -4))
+        self.assertEqual((f.ppdu_type, f.flags), (37, 0xFC))
+        self.assertEqual(parse_esp32_frame(build_esp32_frame([(1, 2)])).agc_gain, 0)
+        for bad in ({"agc_gain": 256}, {"agc_gain": -1}, {"fft_gain": 128}, {"fft_gain": -129}):
+            with self.assertRaises(ValueError, msg=str(bad)):
+                build_esp32_frame([(1, 2)], **bad)
+
 
 if __name__ == "__main__":
     unittest.main()

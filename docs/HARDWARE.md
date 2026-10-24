@@ -458,14 +458,20 @@ that is actually true of the node"; 45,408 and 6,404 are the values
 `node_config.hpp:458-459` predicts for this configuration with
 `best_bnr` on.
 
-**Then every 60 s**, three lines (`rx_role.cpp:230-250`,
-`telemetry.cpp:60`):
+**Then every 60 s**, four lines (`rx_role.cpp`, `telemetry.cpp:60`):
 
 ```
 I saans.rx: csi=20.0 Hz frames=120 dropped=0 send_fail=0
-I saans.rx: capture: len=... (first ...) -> ... subcarriers, expecting 56; 2nd_ch=0 first_word_invalid=0 short=0 layout_changed=0 too_short=0
+I saans.rx: capture: len=... (first ...) -> ... subcarriers, expecting 56; 2nd_ch=0 first_word_invalid=0 short=0 layout_changed=0 too_short=0 not_ht=0 40mhz=0
+I saans.rx: gain: agc=... (range ...-...) fft=...; agc moved on N of M frame pairs (...%), fft on N
 I saans.health: up=60s heap=... min=... reboots=1 rssi=-48
 ```
+
+`not_ht` should stay 0: a non-HT frame carries L-LTF only, a different
+set of subcarriers. The `gain:` line is the number `PROTOCOL_S5` §1.1
+asks for; see "A third number" in §9 for what it is and how sure it is.
+(`reboots=` is now a real count. Until 2026-10-24 the reboot counter was
+read before NVS was initialised, and every boot reported 0.)
 
 Healthy means: `csi=` within a few percent of the configured rate,
 `dropped=0`, `send_fail=0`, the subcarrier count in the `capture:` line
@@ -581,12 +587,11 @@ how often the two-bin shift happens.
 
 This is the one that decides whether anything else from the session can
 be compared against the simulator. The evidence is already plumbed:
-`capture:` prints `len=` and the first `len` seen, and
-`csi_capture.cpp:54-58` explains why `len` is the right proxy — on the
-S3 the PHY mode cannot be read back, since `sig_mode`, `cwb` and `rate`
-are fields of `wifi_pkt_rx_ctrl_t` on the original ESP32 only, and the
-LTF layout determines the buffer length, so "a change in `len` IS a
-change in what the subcarrier indices mean".
+`capture:` prints `len=` and the first `len` seen, and since 2026-10-24
+also `not_ht=` and `40mhz=`: the S3 does report `sig_mode` and `cwb`,
+which this section used to say it did not. `len` stays the check that
+matters for indices: the LTF layout determines the buffer length, so a
+change in `len` is a change in what the subcarrier indices mean.
 
 `edge/README.md:140-144` is explicit about the order of operations:
 "**Read that line on the first bench session before trusting any
@@ -612,18 +617,20 @@ sweep (`NOTES.md:574-576`, SYNTHETIC) is:
 > once every twenty-eight seconds (0.002: 0.18%). The sweep brackets the
 > breakpoint between those two and does not locate it any more finely.
 
-**The firmware cannot do this today.** Nothing in `edge/firmware/main/`
-logs an AGC gain; the per-frame radio fields it records are `rssi` and
-`noise_floor` (`csi_capture.cpp:107-108`), and both are carried in the
-raw CSI header at bytes 16 and 17 (`csi_capture.cpp:234-235`). [UNVERIFIED:
-whether the S3's `wifi_pkt_rx_ctrl_t` exposes an AGC gain field at all —
-not checked against the ESP-IDF headers, which are inside the Docker
-image.] The usable approximation with today's firmware is to record ten
-minutes of raw CSI from an idle node in an empty room and count the
-step changes in per-frame RSSI and in whole-frame mean amplitude; a
-converged AGC loop that moves shows up as a staircase in both. Whether
-that is the same quantity as `agc_gain` is the thing to establish before
-the number is quoted anywhere.
+**The firmware logs it, as of 2026-10-24.** The RX's `gain:` line
+counts AGC moves since boot, and in raw mode every frame carries its AGC
+and FFT gain in header bytes 18 and 19, so `wifisense stats` reports the
+moves from a recording too.
+
+How sure that is: the ESP-IDF 5.4.1 header has no documented gain field
+for the S3. Espressif's own `esp_csi_gain_ctrl` component reads the AGC
+gain from byte 23 of `wifi_pkt_rx_ctrl_t` and the FFT gain from byte 22,
+both in bits the header marks reserved. That component is binary-only,
+but disassembled it is just those two loads, in every build from IDF 4.4
+to 6.0. The firmware reads the same two bytes and nothing else from that
+component. So **confirm it before quoting it** (`PROTOCOL_S5` §1.1):
+move or shield the TX and watch the `agc=` value change. If it does not
+move with a deliberate change in signal, these are not the gain.
 
 ---
 

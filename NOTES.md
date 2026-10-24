@@ -595,6 +595,12 @@ node in an empty room for ten minutes and count the moves. It is the
 single most valuable number in the first recording, and until someone
 takes it the table above ranks nothing.
 
+*2026-10-24:* the firmware now logs it: the RX's `gain:` telemetry line,
+and raw header bytes 18-19 for `wifisense stats`. It reads the offset
+Espressif's own gain-control component uses, undocumented, so the bench
+confirms it first by moving the AGC on purpose (`docs/PROTOCOL_S5.md`
+§1.1).
+
 Deliberately **not** acted on: a per-packet common-mode gain is
 something the DSP could normalise away, and the static suppressor
 cannot. Changing the detectors on the strength of an uncalibrated model
@@ -650,10 +656,11 @@ The oracle row is exactly what a node would get if the firmware logged
 the true AGC gain per packet and divided it out. That moves
 `docs/PROTOCOL_S5.md` §1.1 route 1 -- read the gain from
 `wifi_pkt_rx_ctrl_t`, if the S3 exposes it -- from "a way to count the
-moves" to "the fix, if the moves turn out to matter". [UNVERIFIED:
-whether the ESP32-S3's rx_ctrl carries an AGC gain field; the ESP-IDF
-headers have not been read.] If it does not, presence on real hardware
-depends on how rarely the real AGC moves, which only a bench answers.
+moves" to "the fix, if the moves turn out to matter". *2026-10-24:* the
+headers were read. There is no documented field, but the gain sits at
+an offset Espressif's own tooling reads, and the firmware now logs it
+per frame. Whether it is the true gain is confirmed on the bench; if it
+is, dividing it out is the oracle row above, built.
 
 One caveat about the oracle's clean result: in this model the gain step
 is the only impairment that varies packet to packet in amplitude, so
