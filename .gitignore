@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 edge/firmware/build/
+# One per board profile (edge/build.sh PROFILE=…); holds the WiFi password.
+edge/firmware/build-*/
 edge/firmware/sdkconfig
 edge/firmware/sdkconfig.old
 edge/dsp/build/

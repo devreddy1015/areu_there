@@ -1,0 +1,22 @@
+# B1 bench session, the TX board. Layered on ../sdkconfig.defaults by
+# `PROFILE=bench-tx ./build.sh build` (edge/build.sh). Every value is the
+# bring-up choice from docs/HARDWARE.md §5; edit here, not in menuconfig, so
+# the next build of this board is the same build.
+
+CONFIG_SAANS_ROLE_TX=y
+CONFIG_SAANS_ROLE_RX=n
+
+# Not on the wire: the RX writes tx_id 0xFF (rx_role.cpp), so this only
+# names the board in its own serial log. HARDWARE.md §5 numbers it 0.
+CONFIG_SAANS_NODE_ID=0
+
+# Must equal the RX's channel; ESP-NOW is connectionless and this is the
+# only thing tying the two boards together.
+CONFIG_SAANS_WIFI_CHANNEL=6
+
+# Must equal the RX's CSI rate (bench-rx: 20). Faster scales the RX's sample
+# clock, vitals bands and gap filler wrongly (Kconfig help).
+CONFIG_SAANS_TX_RATE_HZ=20
+
+CONFIG_SAANS_WATCHDOG_S=15
+CONFIG_SAANS_TELEMETRY_S=60

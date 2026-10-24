@@ -468,6 +468,7 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `docs/UI_IMPLEMENTATION_PLAN.md` | The design the dashboard was built to, and the rules it keeps |
 | `docs/NEXT.md` | The plan: what is done, what is next, what waits for hardware |
 | `CONTRIBUTING.md` | The rules every change is held to, and the commands that check them |
+| `bench/` | The first bench session (B1): its order of work, the gateway config and a recording helper; the board profiles are in `edge/firmware/profiles/` |
 | `rust/crates/saans-gateway/tests/browser/` | Playwright smoke tests for the dashboard, against a SYNTHETIC replay |
 
 ## Licence

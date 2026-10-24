@@ -24,6 +24,7 @@ edge/
 ./build.sh menuconfig     # configure role, channel, consent, gateway
 PORT=/dev/ttyUSB0 ./build.sh flash-monitor
 SAANS_NODE_KEY=… KEY_ID=0 PORT=/dev/ttyUSB0 ./build.sh provision   # signed frames, ADR-012; see docs/HARDWARE.md
+PROFILE=bench-rx ./build.sh build   # one board from firmware/profiles/; see bench/README.md
 ```
 
 Nothing needs installing beyond Docker: the toolchain lives in

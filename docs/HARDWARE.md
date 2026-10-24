@@ -125,7 +125,7 @@ one so the question does not get re-asked after the boards arrive.
 
 **ESP32-S3.** Not a guess, and not interchangeable with the C6 that
 `README.md:304` mentions as an alternative CSI receiver. The build
-script defaults `TARGET` to `esp32s3` (`edge/build.sh:23`) and
+script defaults `TARGET` to `esp32s3` (`edge/build.sh:30`) and
 `edge/firmware/sdkconfig.defaults:4` pins `CONFIG_IDF_TARGET="esp32s3"`.
 `edge/README.md:15` names the same target.
 
@@ -173,7 +173,7 @@ The second cable trap is the connector on the board. Many ESP32-S3
 devkits expose **two** USB sockets — one wired to a USB-to-UART bridge
 chip and one wired to the chip's native USB peripheral — and they do not
 enumerate the same way on the host. Everything in this repository is
-written for the bridge: `edge/build.sh:18` documents `PORT` as "serial
+written for the bridge: `edge/build.sh:21` documents `PORT` as "serial
 port for flash/monitor, e.g. `/dev/ttyUSB0`", and `edge/README.md:25`
 uses the same path. [UNVERIFIED: which socket on a given devkit
 enumerates as which device node, and whether the native-USB port works
@@ -198,7 +198,7 @@ exists rather than a README line telling you to install IDF."
 `edge/README.md:28-29` repeats it: "Nothing needs installing beyond
 Docker."
 
-The pinned image is **`espressif/idf:v5.4.1`** (`edge/build.sh:22`),
+The pinned image is **`espressif/idf:v5.4.1`** (`edge/build.sh:29`),
 overridable with the `IDF_IMAGE` environment variable. The first build
 pulls it; budget time for that on a campus connection. [UNVERIFIED:
 image download size not checked.]
@@ -207,15 +207,15 @@ Three things the script does that matter when something goes wrong:
 
 - It mounts the **repository root**, not `edge/firmware`, because the
   firmware includes `../../dsp` and a narrower mount breaks the include
-  path "in a way that is tedious to diagnose" (`edge/build.sh:27-30`).
+  path "in a way that is tedious to diagnose" (`edge/build.sh:54-56`).
 - It runs the container as the **invoking user**, not root
-  (`edge/build.sh:33-36`), so `build/` and `sdkconfig` stay cleanable
+  (`edge/build.sh:59-63`), so `build/` and `sdkconfig` stay cleanable
   from the host. It also means the invoking user needs read/write access
   to the serial device: `--device "${PORT}"` is passed through to Docker
-  (`edge/build.sh:37-39`), and a permission error there surfaces as a
+  (`edge/build.sh:70-72`), and a permission error there surfaces as a
   flash failure, not as a permissions message.
 - `./build.sh tests` needs **no container at all** — it is `make -C
-  edge/dsp/test check` on the host with `g++` (`edge/build.sh:72-75`).
+  edge/dsp/test check` on the host with `g++` (`edge/build.sh:139-143`).
   That is the one command to run before touching hardware, because it
   compiles the same headers the firmware compiles and checks them
   against the golden vectors (`edge/README.md:152-159`).
@@ -240,8 +240,23 @@ PORT=/dev/ttyUSB0 ./build.sh flash-monitor
 
 For a three-board bench that sequence runs **three times**, because role
 and node id are both compile-time. There is one `build/` directory and
-one `sdkconfig` (`edge/build.sh:58`), so the boards are done in turn:
+one `sdkconfig` (`edge/build.sh:124`), so the boards are done in turn:
 configure, build, flash that board, reconfigure, build, flash the next.
+
+**Or, for the bench, use the profiles** (`bench/README.md`):
+`PROFILE=bench-tx ./build.sh build`, then `PROFILE=bench-rx …`. Each board
+is built from its own file in `edge/firmware/profiles/` into its own
+`build-<profile>/`, so there is no `menuconfig` and no reconfiguring
+between boards. The gateway IP, SSID and password come from the
+environment.
+
+*Amended 2026-10-24:* until this date `./build.sh build` ran `idf.py
+set-target` before every build. That replaces `sdkconfig` with the
+defaults (the old file becomes `sdkconfig.old`), so the `menuconfig`
+answers in the table below were thrown away at each build, and every
+board came out as the defaults: RX, node 0, raw mode off, gateway
+`192.168.1.10`. `build.sh` now passes the target as `-D IDF_TARGET`,
+which keeps an existing `sdkconfig`.
 
 | Board | `menuconfig → Saans node` | Then |
 |---|---|---|
@@ -280,7 +295,7 @@ is fine — that is what the gap filler exists for. Note that
 50 Hz; the Kconfig default is `SAANS_CSI_RATE_HZ`, which is 20. Read the
 value in `menuconfig`, not the README.
 
-**`./build.sh clean` deletes `sdkconfig`** (`edge/build.sh:58`), which
+**`./build.sh clean` deletes `sdkconfig`** (`edge/build.sh:124`), which
 means it deletes your `menuconfig` answers along with the build output.
 
 ### Signing the frames (ADR-012)

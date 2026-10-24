@@ -506,7 +506,9 @@ Off by default until nodes send v2. In ADR-002's order:
 ## 2. Start when the boards land
 
 In B1 → B2 → B3 order, as the brief says, and `docs/PROTOCOL_S5.md`
-§1 is the first hour. What each one changes in this plan:
+§1 is the first hour. **B1 is ready to run:** `bench/README.md` is the
+order of work, with board profiles, a gateway config and a recording
+helper, each tested without a board. What each one changes in this plan:
 
 - **B1 §1.1 (AGC move rate)** flips §1.4's switch, or leaves it. It
   cannot be done with the firmware as it is -- nothing in
