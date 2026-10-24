@@ -62,8 +62,20 @@ STD   := -std=c++17
 OPT   := -O2
 WARN  := -Wall -Wextra -Wpedantic -Wconversion -Wdouble-promotion
 EMBED := -fno-exceptions -fno-rtti
+# No floating-point contraction: a*b + c is two roundings, never one fused
+# multiply-add. The Python reference is two roundings by construction, so a
+# build that fuses is not implementing the same spec -- and the compiler is
+# free to fuse at one call site and not another, which breaks every
+# bit-for-bit check in this suite. Plain x86-64 has no FMA, so this never
+# showed until CI's runner moved to Ubuntu 26.04, whose build targets a CPU
+# that has one: test_vitals' compensated-sum check then failed under g++
+# (reproduced locally with -march=x86-64-v3, and gone with this flag). The
+# ESP32-S3 FPU has a fused multiply-add too. Kept apart from OPT so that a
+# run overriding OPT cannot drop it; CI builds once with -march=x86-64-v3
+# precisely to catch anyone who does.
+FPFLAGS := -ffp-contract=off
 
-CXXFLAGS := $(STD) $(OPT) $(WARN) $(EMBED) -I$(DSP_DIR) -I$(HERE) \
+CXXFLAGS := $(STD) $(OPT) $(FPFLAGS) $(WARN) $(EMBED) -I$(DSP_DIR) -I$(HERE) \
             -DSAANS_GOLDEN_DIR='"$(GOLDEN_DIR)"'
 
 HEADERS := $(wildcard $(DSP_DIR)/*.hpp) $(HERE)/golden.hpp

@@ -47,6 +47,20 @@ that encoded a requirement nobody had. The bound here is set by what the
 check must catch, and the observed drift is printed on every run so the
 margin between the two stays visible rather than assumed.
 
+MEASURED AGAINST WHAT
+---------------------
+For an array, against the array's own scale (its largest magnitude), not
+each element's. The first version divided every difference by the
+element itself, and failed on Ubuntu 26.04: `extractors__input.f64[761]`
+is 1.05e-5, a unit-scale test signal caught near a zero crossing, and it
+moved by 6.8e-16 -- three ULPs of 1.0 -- which divided by 1.05e-5 reads as
+6.4e-11. SAANS_PLAN.md §4 says it in so many words: "a relative tolerance
+is meaningless near 0". Against the array's scale that same value moved by
+7e-16, and the negative control below still fails by orders of
+magnitude. The tolerance is unchanged; the metric is now the one the spec
+mandates. Scalars in .kv and .json have no array to scale by and are still
+compared each to itself.
+
 USAGE
 -----
     python3 spec/golden/check_drift.py
@@ -104,8 +118,18 @@ def compare_f64(name: str, old: str, new: str, bad: list, worst: dict) -> None:
     if len(a) != len(b):
         bad.append(f"{name}: length {len(a)} -> {len(b)}")
         return
+    finite = [abs(v) for v in a + b if v == v and abs(v) != float("inf")]
+    scale = max(finite) if finite else 0.0
     for i, (x, y) in enumerate(zip(a, b)):
-        d = rel(x, y)
+        if x == y or (x != x and y != y):
+            continue
+        if (x != x) or (y != y) or abs(x) == float("inf") or abs(y) == float("inf"):
+            # A NaN or an infinity on one side only. Without this branch the
+            # difference is NaN, NaN compares false against the tolerance,
+            # and the value would pass.
+            bad.append(f"{name}[{i}]: {x!r} -> {y!r}")
+            continue
+        d = abs(x - y) / scale if scale > 1e-300 else abs(x - y)
         if d > worst.get(name, 0.0):
             worst[name] = d
         if d > DRIFT_TOL:

@@ -1,5 +1,6 @@
-import hashlib
 import math
+import os
+import struct
 import unittest
 
 from wifisense.dsp import band_peak
@@ -12,13 +13,47 @@ def geo(**kw):
     return SyntheticConfig(scene="geometric", **kw)
 
 
+REFERENCE = os.path.join(os.path.dirname(__file__), "data", "random_scene_200.f64")
+
+# Two orders tighter than the 1e-9 the Rust port is held to (ADR-002), and
+# the same bound spec/golden/check_drift.py uses, for the same reason.
+TOL = 1e-11
+
+
 class TestRandomSceneUnchanged(unittest.TestCase):
-    def test_default_output_is_bit_identical_to_original(self):
+    def test_default_output_matches_the_original(self):
         """The original evaluation numbers and every existing test depend on
-        this exact sequence. Hash taken from the pre-P0a source."""
+        this sequence: the default scene must not change.
+
+        This used to be a SHA-256 of `repr()` of the output, taken from the
+        pre-P0a source, and it held until CI moved to Ubuntu 26.04. A digest
+        of floats is a statement about one libm: math.sin and math.cos are
+        not required to be correctly rounded, two platforms may disagree in
+        the last place, and one ULP anywhere in 22,400 values changes every
+        bit of the hash. The reference file is that same output -- written
+        from a run whose digest still matched the pin -- compared
+        numerically: amplitudes against their own scale, phases as wrapped
+        angles, both at 1e-11. Any change to the generator moves values by
+        far more than that; a different libm moves them by about 1e-15.
+        """
         frames = SyntheticCsiSource(SyntheticConfig()).frames(200)
-        digest = hashlib.sha256(repr([(f.amplitudes, f.phases) for f in frames]).encode()).hexdigest()
-        self.assertEqual(digest, "dfee084a5a2f644a1b0d87aae9cf6deb75c0c2838e28c045f625424b759ef184")
+        amps = [a for f in frames for a in f.amplitudes]
+        phases = [p for f in frames for p in f.phases]
+        with open(REFERENCE, "rb") as fh:
+            raw = fh.read()
+        ref = struct.unpack(f"<{len(raw) // 8}d", raw)
+        self.assertEqual(len(ref), len(amps) + len(phases), "frame count or subcarrier count changed")
+        ref_amps, ref_phases = ref[: len(amps)], ref[len(amps):]
+
+        scale = max(abs(a) for a in ref_amps)
+        worst_amp = max(abs(a - b) for a, b in zip(amps, ref_amps)) / scale
+        # A phase one ULP either side of +/-pi wraps to the other end; compare
+        # the angle between them, not the difference of the numbers.
+        worst_phase = max(
+            abs((a - b + math.pi) % (2.0 * math.pi) - math.pi) for a, b in zip(phases, ref_phases)
+        ) / math.pi
+        self.assertLess(worst_amp, TOL, f"amplitudes moved by {worst_amp:.3e} of their scale")
+        self.assertLess(worst_phase, TOL, f"phases moved by {worst_phase:.3e} of pi")
 
     def test_rejects_unknown_scene(self):
         with self.assertRaises(ValueError):
