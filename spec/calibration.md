@@ -52,8 +52,11 @@ the walking one.
 
 **SIM:** 30 s runs per room and state:
 - `empty`: `n_people = 0`;
-- `still`: one person, `people_mode {0: stationary}`;
-- `moving`: one person, `people_mode {0: walk}`.
+- `still`: one person, `people_mode {0: stationary}`, at the scene's first
+  person's start, or the door;
+- `moving`: one person, `people_mode {0: walk}`, from the door. The scene's
+  people are dropped from a copy, since a declared start on furniture
+  cannot walk.
 
 Windows end every 2 s from 4 s. Runs use the dataset's stored configs, so
 seeds and the clutter, noise and device draws are common random numbers
@@ -66,12 +69,12 @@ Nine global parameters, each an existing config field:
 | Parameter | Field | Default | Range | Scale |
 |---|---|---|---|---|
 | `tx_power_dbm` | `tx_power_dbm` | 10 | −5..20 | linear |
-| `noise_shift_db` | added to both ends of `noise_floor_dbm` | 0 | −10..20 | linear |
+| `noise_shift_db` | added to both ends of `noise_floor_dbm` | 0 | −20..20 | linear |
 | `chip_noise_counts` | `chip_noise_counts` | 0.5 | 0.05..4 | log |
 | `tail_power_db` | `tail_power_db` | −15 | −30..−3 | linear |
-| `clutter_scale` | multiplies `clutter_rcs_m2` | 1 | 0.1..10 | log |
-| `body_rcs_m2` | `body_rcs_m2` | 0.5 | 0.05..10 | log |
-| `breathing_scale` | multiplies `breathing_p2p_m` | 1 | 0.5..4 | log |
+| `clutter_scale` | multiplies `clutter_rcs_m2` | 1 | 0.03..30 | log |
+| `body_rcs_m2` | `body_rcs_m2` | 0.5 | 0.05..50 | log |
+| `breathing_scale` | multiplies `breathing_p2p_m` | 1 | 0.5..10 | log |
 | `rssi_jitter_db` | `rssi_jitter_db` | 1 | 0.2..4 | log |
 | `ripple_amp` | `ripple_amp` | 0.05 | 0..0.3 | linear |
 
@@ -82,6 +85,12 @@ Each parameter's place in the feature table:
   `ripple_amp`.
 - **The person's effect:** `body_rcs_m2` and `breathing_scale`.
 - **RSSI spread:** `rssi_jitter_db`.
+
+The ranges are wide on purpose. A first run with narrower ones (body RCS
+up to 10 m², breathing ×4, noise shift from −10 dB, clutter ×0.1–10) put
+body RCS and breathing at their upper bounds in every fold, so the second
+run widened them. A fitted value that is physically implausible is
+reported as a missing mechanism, not as a measurement (§6).
 
 ## 4. Method (`ml/calibrate/calibrate.py`)
 

@@ -2,7 +2,7 @@
 //! `.npz` shard per scene and a manifest (spec/dataset.md).
 //!
 //!     saans gen-dataset --out DIR [--scenes N] [--seconds S] [--seed N]
-//!         [--threads N] [--no-impair] [--from DIR] [--overwrite]
+//!         [--threads N] [--no-impair] [--from DIR] [--overrides FILE] [--overwrite]
 //!
 //! - **Phase 1** (§8) draws and checks every scene in parallel ([`generator`],
 //!   §2, §9), or with `--from DIR` reads DIR's scene files, configs and
@@ -26,6 +26,11 @@
 //!   so, so the scene files, the configs but those switches, the people
 //!   and the labels are the impairments-on dataset's. `baseline_valid` is
 //!   true when every scene's calibration has a link with `null_sigma > 0`.
+//! - **`--overrides FILE`** (with `--from` only; Phase 10b,
+//!   spec/calibration.md) sets some of Room Sim's SIM-assumption
+//!   parameters ([`OVERRIDABLE`]) in every scene's config, so the dataset
+//!   is the source's scenes, people and labels under other physics
+//!   parameters (a calibrated set). The manifest records the overrides.
 //! - **Refusals** name the parameter and exit with code 2: a bad or empty
 //!   option, a non-empty `--out` without `--overwrite` (which removes only
 //!   `manifest.json`, `scenes/` and `shards/` there), too little free
@@ -70,7 +75,23 @@ use generator::{scene_id, wall_material_name, Impairments, Rejections};
 pub const SPEC: &str = "dataset v1";
 
 /// The command line, as the usage text prints it.
-pub const USAGE: &str = "saans gen-dataset --out DIR [--scenes N] [--seconds S] [--seed N] [--threads N] [--no-impair] [--from DIR] [--overwrite]";
+pub const USAGE: &str = "saans gen-dataset --out DIR [--scenes N] [--seconds S] [--seed N] [--threads N] [--no-impair] [--from DIR] [--overrides FILE] [--overwrite]";
+
+/// The Room Sim parameters `--overrides` may set: SIM assumptions of the
+/// radio, the receiver and the body (spec/roomsim.md §3.2) that change no
+/// person's motion, so the source's labels stay true (spec/calibration.md).
+pub const OVERRIDABLE: &[&str] = &[
+    "tx_power_dbm",
+    "noise_floor_dbm",
+    "chip_noise_counts",
+    "tail_power_db",
+    "clutter_rcs_m2",
+    "body_rcs_m2",
+    "breathing_p2p_m",
+    "rssi_jitter_db",
+    "ripple_amp",
+    "object_scatter_scale",
+];
 
 /// §1's defaults and bounds.
 pub const DEFAULT_SCENES: usize = 2000;
@@ -138,6 +159,7 @@ pub struct Options {
     pub threads: usize,
     pub no_impair: bool,
     pub from: Option<String>,
+    pub overrides: Option<String>,
     pub overwrite: bool,
 }
 
@@ -153,6 +175,7 @@ impl Options {
         let mut seed: Option<u64> = None;
         let mut threads: Option<usize> = None;
         let mut from: Option<String> = None;
+        let mut overrides: Option<String> = None;
         let (mut no_impair, mut overwrite) = (false, false);
         let mut it = args.iter();
         while let Some(a) = it.next() {
@@ -185,6 +208,13 @@ impl Options {
             match a.as_str() {
                 "--out" => out = Some(path(value(out.is_some())?)?),
                 "--from" => from = Some(path(value(from.is_some())?)?),
+                "--overrides" => {
+                    let v = value(overrides.is_some())?;
+                    if v.is_empty() {
+                        return Err(Refused::new(a, "is empty; give a JSON file"));
+                    }
+                    overrides = Some(v.clone());
+                }
                 "--scenes" => {
                     let v = value(scenes.is_some())?;
                     scenes = Some(
@@ -235,6 +265,12 @@ impl Options {
                 }
             }
         }
+        if overrides.is_some() && from.is_none() {
+            return Err(Refused::new(
+                "--overrides",
+                "needs --from: the scenes, people and labels must be the source dataset's",
+            ));
+        }
         Ok(Options {
             out: out.ok_or_else(|| Refused::new("--out", "is required"))?,
             scenes,
@@ -244,9 +280,51 @@ impl Options {
                 .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get())),
             no_impair,
             from,
+            overrides,
             overwrite,
         })
     }
+}
+
+/// `--overrides FILE`: a non-empty JSON object whose keys are all in
+/// [`OVERRIDABLE`]; the values are checked when each scene's config is
+/// rebuilt with them.
+fn read_overrides(file: &str) -> Result<Map<String, Value>, Failure> {
+    let refused = |why: String| Failure::Refused(Refused::new("--overrides", why));
+    let path = Path::new(file);
+    let text = fs::read_to_string(path).map_err(|e| io_err(path, e))?;
+    let v: Value = serde_json::from_str(&text).map_err(|e| refused(format!("{file}: not JSON: {e}")))?;
+    let Value::Object(map) = v else {
+        return Err(refused(format!("{file}: not a JSON object")));
+    };
+    if map.is_empty() {
+        return Err(refused(format!("{file}: overrides nothing")));
+    }
+    for k in map.keys() {
+        if !OVERRIDABLE.contains(&k.as_str()) {
+            return Err(refused(format!(
+                "{file}: \"{k}\" may not be overridden (only {})",
+                OVERRIDABLE.join(", ")
+            )));
+        }
+    }
+    Ok(map)
+}
+
+/// `rs` with `overrides` set, through Room Sim's own JSON reader (so its
+/// validation applies).
+fn apply_overrides(
+    rs: &RoomSimConfig,
+    overrides: &Map<String, Value>,
+) -> Result<RoomSimConfig, String> {
+    let mut v = serde_json::to_value(rs).map_err(|e| e.to_string())?;
+    let obj = v
+        .as_object_mut()
+        .ok_or_else(|| "a Room Sim config is not a JSON object".to_string())?;
+    for (k, x) in overrides {
+        obj.insert(k.clone(), x.clone());
+    }
+    RoomSimConfig::from_json_str(&v.to_string()).map_err(|e| e.to_string())
 }
 
 /// One line on stderr. A closed or failing stderr is ignored: progress is
@@ -450,7 +528,12 @@ fn read_source(dir: &str, opts: &Options) -> Result<Source, Failure> {
 /// manifest's), its run config and its manifest entry; make the §2.6
 /// checks again with the impairments on, as a fresh draw makes them (§8);
 /// then apply the asked profile to the run config.
-fn plan_from(src: &Source, i: usize, impairments: Impairments) -> Result<Plan, Failure> {
+fn plan_from(
+    src: &Source,
+    i: usize,
+    impairments: Impairments,
+    overrides: Option<&Map<String, Value>>,
+) -> Result<Plan, Failure> {
     let id = scene_id(i);
     let refused = |why: String| Failure::Refused(Refused::new("--from", format!("{id}: {why}")));
     let e = &src.entries[i];
@@ -504,6 +587,11 @@ fn plan_from(src: &Source, i: usize, impairments: Impairments) -> Result<Plan, F
     shard::tx_per_tick(&rs).map_err(refused)?;
     generator::check(&scene, &rs).map_err(|(_, why)| refused(why))?;
     impairments.apply(&mut rs);
+    if let Some(ovr) = overrides {
+        rs = apply_overrides(&rs, ovr).map_err(|e| {
+            Failure::Refused(Refused::new("--overrides", format!("{id}: {e}")))
+        })?;
+    }
     let openings = get("openings")?;
     let opening = |k: &str| {
         openings
@@ -902,6 +990,7 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         .as_deref()
         .map(|d| read_source(d, opts))
         .transpose()?;
+    let overrides = opts.overrides.as_deref().map(read_overrides).transpose()?;
     let (scenes, seconds, seed) = match &source {
         Some(s) => (s.scenes, s.seconds, s.seed),
         None => (
@@ -927,7 +1016,7 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
             let plans = pool.install(|| {
                 (0..src.scenes)
                     .into_par_iter()
-                    .map(|i| plan_from(src, i, impairments))
+                    .map(|i| plan_from(src, i, impairments, overrides.as_ref()))
                     .collect::<Result<Vec<_>, _>>()
             })?;
             (plans, src.rejections)
@@ -1055,6 +1144,10 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
     if let Some(f) = &from {
         command.push_str(&format!(" --from {f}"));
     }
+    if let Some(o) = &opts.overrides {
+        let canon = fs::canonicalize(o).map_or_else(|_| o.clone(), |p| p.display().to_string());
+        command.push_str(&format!(" --overrides {canon}"));
+    }
     // §8: every scene's calibration has a link with null_sigma > 0, so
     // WLM can publish (RSSI jitter keeps it so with the hardware off).
     let baseline_valid = done.iter().all(|d| d.calibrated_noise);
@@ -1074,6 +1167,7 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         "impairment_switches": impairments.switches_json(),
         "baseline_valid": baseline_valid,
         "from": from,
+        "overrides": overrides.clone().map_or(Value::Null, Value::Object),
         "roomsim_defaults": serde_json::to_value(RoomSimConfig::default()).expect("a config always serializes"),
         "locate_config": locate_config_json(&LocateConfig::default()),
         "generator": source.as_ref().map_or_else(generator::generator_json, |s| s.generator.clone()),
@@ -1231,9 +1325,44 @@ mod tests {
                 threads: 3,
                 no_impair: true,
                 from: Some("src".into()),
+                overrides: None,
                 overwrite: true,
             }
         );
+        let o = parse(&["--out", "d", "--from", "s", "--overrides", "o.json"]).unwrap();
+        assert_eq!(o.overrides.as_deref(), Some("o.json"));
+    }
+
+    #[test]
+    fn overrides_need_from_and_name_only_overridable_fields() {
+        for (args, param) in [
+            (vec!["--out", "d", "--overrides", "o.json"], "--overrides"),
+            (vec!["--out", "d", "--from", "s", "--overrides"], "--overrides"),
+            (vec!["--out", "d", "--from", "s", "--overrides", ""], "--overrides"),
+            (
+                vec!["--out", "d", "--from", "s", "--overrides", "a", "--overrides", "b"],
+                "--overrides",
+            ),
+        ] {
+            let e = parse(&args).expect_err(&format!("{args:?}"));
+            assert_eq!(e.param, param, "{args:?}: {e}");
+        }
+        let dir = std::env::temp_dir().join(format!("saans-overrides-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let good = dir.join("good.json");
+        fs::write(&good, r#"{"body_rcs_m2": 4.5, "noise_floor_dbm": [-90.0, -85.0]}"#).unwrap();
+        let map = read_overrides(good.to_str().unwrap()).unwrap();
+        let rs = apply_overrides(&RoomSimConfig::default(), &map).unwrap();
+        assert_eq!(rs.body_rcs_m2, 4.5);
+        assert_eq!(rs.noise_floor_dbm, (-90.0, -85.0));
+        for bad in [r#"{"seed": 1}"#, r#"{}"#, r#"[1]"#, r#"{"speed_mps": [0.1, 0.2]}"#] {
+            let f = dir.join("bad.json");
+            fs::write(&f, bad).unwrap();
+            assert!(read_overrides(f.to_str().unwrap()).is_err(), "{bad}");
+        }
+        let invalid = serde_json::from_str::<Map<String, Value>>(r#"{"ripple_amp": 5.0}"#).unwrap();
+        assert!(apply_overrides(&RoomSimConfig::default(), &invalid).is_err(), "Room Sim validates the value");
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

@@ -56,7 +56,7 @@ it too). Splits are by scene, never by window or tick.
 ## 1. What it is
 
 `saans gen-dataset --out DIR [--scenes N] [--seconds S] [--seed N]
-[--threads N] [--no-impair] [--from DIR] [--overwrite]` draws `N` random
+[--threads N] [--no-impair] [--from DIR] [--overrides FILE] [--overwrite]` draws `N` random
 scenes (§2), runs Room Sim and Locate on each (§3, §6), and writes per
 scene the scene file, its exact run configs and one `.npz` shard, plus one
 manifest for the whole dataset (§7). Scenes are independent and run in
@@ -403,6 +403,23 @@ windows.
   drawing them (its §2.6 checks run with the ON profile, like a fresh
   draw) (`--scenes`, `--seconds`, `--seed` are then taken from DIR's
   manifest and refused if given differently).
+- **`--overrides FILE`** (Phase 10b amendment, spec/calibration.md; only
+  with `--from`) sets the listed Room Sim fields in every scene's config:
+  a JSON object whose keys are among `tx_power_dbm`, `noise_floor_dbm`,
+  `chip_noise_counts`, `tail_power_db`, `clutter_rcs_m2`, `body_rcs_m2`,
+  `breathing_p2p_m`, `rssi_jitter_db`, `ripple_amp`,
+  `object_scatter_scale`. These are SIM assumptions of the radio, the
+  receiver and the body; none moves a person, so the scenes, people and
+  every §5 label stay the source's.
+  - The values go through Room Sim's own config reader, so its
+    validation applies, and are written into each scene's
+    `.roomsim.json`.
+  - The manifest's `"overrides"` records the object (null without one),
+    and its `"command"` names the file.
+  - Anything else in the file, an empty object or a missing `--from` is
+    refused (exit 2, naming `--overrides`).
+  - A calibrated set is a configuration, never Room Sim's default
+    (spec/calibration.md).
 
 ## 9. Determinism
 

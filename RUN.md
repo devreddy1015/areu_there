@@ -591,11 +591,120 @@ SAANS_DATASET_DIR=/home/Aman/are_u_theone/datasets/roomsim-v1 .venv/bin/python -
 (The cross-path test needs the release CLI, `cargo build --release -p
 saans-cli`, and skips cleanly without it or the dataset.)
 
+## 4h. Model v1 on SIM (Phase 8)
+
+`spec/model.md`, code in `ml/train/` (`.venv`, the GPU). Everything this
+section produces is **SIM**. Three steps: build the window caches once,
+sweep the configurations, then run the chosen one with three seeds and the
+ablations.
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there
+# 1. caches in /dev/shm (about 70 GB for all four; 46-286 s each on 90 workers)
+.venv/bin/python -m ml.train.cache /home/Aman/are_u_theone/datasets/roomsim-v1 --length 1 2 4
+.venv/bin/python -m ml.train.cache /home/Aman/are_u_theone/datasets/roomsim-v1-hwoff --length 2
+# baselines: recomputed WLM/RTI (from the shards) and the variance forest and MLP (from a cache)
+.venv/bin/python -m ml.train.baselines recompute /home/Aman/are_u_theone/datasets/roomsim-v1
+.venv/bin/python -m ml.train.baselines variance /dev/shm/saans-phase8-cache/roomsim-v1/2
+# 2. the 27-run sweep (lr x width x window), 9 runs at once, resume-safe; then the val table
+tmux new -s sweep
+.venv/bin/python -m ml.train.sweep --concurrency 9 --workers 4
+.venv/bin/python -m ml.train.sweep --collect --intervals
+# 3. the chosen configuration x 3 seeds, its ablations, and the test evaluation
+.venv/bin/python -m ml.train.sweep --final --concurrency 9
+.venv/bin/python -m ml.train.evaluate --run RUN_S0 RUN_S1 RUN_S2 --split test --baselines
+```
+
+Runs, logs and checkpoints are written to `/home/Aman/are_u_theone/runs/phase8/`,
+outside git; `log.jsonl` has one line per epoch (losses, validation
+figures, throughput, GPU memory). Each run writes `done.json` last, so a
+run without it is unfinished. Starting the sweep again resumes it.
+
+Measured on this box:
+- **Speed:** compiled fp16 at D = 256, batch 128 runs 19–23 ms a step
+  alone, against 50 ms eager.
+- **Concurrency:** 9 runs at once keep the GPU about 97% busy in about
+  23 GB.
+- **Sweep length:** about 7,200 GPU-seconds at 30 epochs, longer when
+  other jobs load the CPU.
+
+## 4i. Public ESP32 data (Phase 9)
+
+`spec/phase9.md`. OpenCSI LCN 2026 (CC BY 4.0) is downloaded to
+`/home/Aman/are_u_theone/datasets/public/opencsi/`, outside git (md5
+`5cde01eb260d1497ca6ee8b046fce1f3` for `opencsi-dataset.tar.gz`). Read
+it with `python -I` from outside its directory: it is downloaded data.
+
+**Labels:** recordings and methods trained only on them are **REAL**. A
+SIM-trained model scored on them is **SIM->REAL**.
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there
+.venv/bin/uv pip install --python .venv/bin/python zstandard          # once
+.venv/bin/python -m ml.phase9.real_cache --length 2 4                 # parse (cached) + window caches
+.venv/bin/python -m ml.phase9.run baselines --length 2                # DSP, WLM gate, variance forest/MLP, prior
+.venv/bin/python -m ml.train.cache /home/Aman/are_u_theone/datasets/roomsim-v1 --length 2 --ref-bins shared40
+.venv/bin/python -m ml.phase9.run simvar --length 2                   # SIM-trained variance baselines
+.venv/bin/python -m ml.phase9.run models --length 2 --pretrained R0/best.pt R1/best.pt R2/best.pt --lr-scratch LR
+.venv/bin/python -m ml.phase9.run report --length 2                   # ml/results/phase9/*.json
+SAANS_OPENCSI=1 .venv/bin/python -m unittest ml.tests.test_opencsi ml.tests.test_phase9
+```
+
+`ml/opencsi.py` parses each session once (about 35 s) into
+`datasets/public/opencsi/parsed/`. The splits are leave-one-room-out, and
+the fine-tuning recipe was fixed before any test figure existed
+(spec/phase9.md §4). LoFi and WiCount are not used: they have no licence
+(ADR-009 d6).
+
+## 4j. Sionna audit and calibration (Phase 10)
+
+**The Sionna RT audit** (`spec/sionna_audit.md`, `ml/sionna_audit/`) runs
+Room Sim and Sionna RT 2.2.0 on the same random rooms and compares their
+channels. Both are simulators, so everything is **SIM**.
+
+**The calibration** (`spec/calibration.md`, `ml/calibrate/`) fits nine of
+Room Sim's global SIM parameters to OpenCSI's feature distributions. It
+uses a differentiable emulator, per Phase 9 fold, and changes no default.
+
+```bash
+cd /home/Aman/are_u_theone/are_U_there
+cargo build --release -p saans-cli --manifest-path rust/Cargo.toml   # the calibration runs the release CLI
+.venv/bin/python -m ml.calibrate.calibrate --design 128 --fit-rooms 24 --check-rooms 24 --workers 48
+# a dataset of the same rooms under one fold's calibrated parameters
+rust/target/release/saans gen-dataset --from /home/Aman/are_u_theone/datasets/roomsim-v1 \
+    --overrides OVERRIDES.json --out /home/Aman/are_u_theone/datasets/roomsim-v1-calA
+```
+
+## 4k. Your own recordings (Phase 11)
+
+`spec/recording.md` is the protocol: what to record, how to label it, and
+where to keep it (`saans-data/`, never committed). Once a session
+exists:
+
+```bash
+.venv/bin/python -c "from ml.phase11 import recordings as r; print(r.build_cache('saans-data/recordings/ROOM/DATE_1', 2.0))"
+```
+
+It writes Phase 9's REAL cache format, so every Phase 9 method runs on it.
+
+## 4l. ONNX export (Phase 12)
+
+```bash
+.venv/bin/python -m ml.export.onnx_export RUN/best.pt --out model.onnx --window-s 2 \
+    --check-cache /dev/shm/saans-phase8-cache/roomsim-v1/2
+```
+
+It exports one checkpoint (opset 17, dynamic batch and link axes), then
+checks onnxruntime against PyTorch on random and cached batches; the bar
+is 1e-4. `docs/onnx-ort.md` is the note on loading it from Rust. Nothing
+loads it in the gateway (ADR-009 d4).
+
 ## 5. Datasets
 
 The simulated dataset of §4f lives in `/home/Aman/are_u_theone/datasets/`,
-outside the repository. Nothing real is downloaded yet. When Phases 9 and
-11 need LoFi, OpenCSI, WiCount or your own pcaps: **no dataset is ever
-committed**. Keep them under `saans-data/`, which `.gitignore` already
+outside the repository. So does the one real dataset downloaded,
+OpenCSI (`datasets/public/opencsi/`, §4i). LoFi and WiCount are not
+downloaded: they have no licence. For those and for your own pcaps:
+**no dataset is ever committed**. Keep them under `saans-data/`, which `.gitignore` already
 excludes along with `*.pcap`, for the health-data reasons in ADR-001 and
 ADR-005.

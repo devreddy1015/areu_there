@@ -221,7 +221,9 @@ def run(design: int = 128, fit_rooms: int = 24, check_rooms: int = 24, *, worker
         "params": [{"name": p[0], "default": p[1], "lo": p[2], "hi": p[3], "scale": p[4]} for p in cs.PARAMS],
         "groups": list(cf.GROUPS), "quantile_levels": J, "design": int(u.shape[0]), "design_ok": int(ok.sum()),
         "fit_rooms": rooms_fit, "check_rooms": rooms_check, "seconds_per_run": cs.SECONDS,
-        "failed_design_runs": failed, "emulator": {"holdout": rep_cv, "final": rep}, "folds": folds,
+        "failed_design_runs": failed,
+        "failed_examples": sorted({f"{st}: {err[-120:]}" for s in sims for _r, st, err in s["failed"]})[:10],
+        "emulator": {"holdout": rep_cv, "final": rep}, "folds": folds,
         "real_quantiles": {t: quantiles(real[t]).tolist() for t in real},
         "default_check_quantiles": quantiles(default_feats).tolist(), "wall_s": round(time.time() - t0, 1),
     }

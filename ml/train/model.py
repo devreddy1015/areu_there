@@ -40,7 +40,16 @@ Choices the spec leaves open (flagged in the Phase 8 report):
   would freeze a slot whose `sigma` reached the cap);
 - `2.448 * 0.1225 = 0.29988 m`, not quite 0.3 m: the reported 95% radius
   is `max(2.448 sigma, 0.3)` (spec/model.md decision 3's floor,
-  `radius95`), which is what guarantees 0.3 m.
+  `radius95`), which is what guarantees 0.3 m;
+- the max pooling is `max(dim)` with a finite fill: `amax`'s backward came
+  out NaN under torch.compile with float16 (every step skipped; caught by
+  the GPU smoke test, held by a regression test).
+
+Speed (not function): `TimeConv` writes the kernel-3 convolution as one
+GEMM (cuDNN's Conv1d spent a fifth of the step converting channel
+layouts), and an optional `pack_index` runs the link encoder on the
+batch's real links only (training batches are about a third real links
+once padded to 132; measured 1.75x per step at D = 256, l = 4 s).
 
 Matching (the loss's Hungarian assignment of slots to present people on
 the Euclidean distance in metres) has two exact solvers: `scipy`

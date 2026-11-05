@@ -141,6 +141,54 @@ def run_baselines(length_s: float, *, workers: int = 56, log=print) -> None:
             log(f"[phase9 REAL] fold {fold} f={frac:g}: variance baselines and prior, 3 seeds")
 
 
+def run_models(length_s: float, pretrained: list, *, lr_scratch: float, steps: int | None = None,
+               device: str = "cuda", log=print) -> None:
+    """spec/phase9.md §4: per fold, fraction and seed `s` (P9-SIM checkpoint
+    `pretrained[s]`): zero-shot (SIM->REAL), fine-tuned (SIM->REAL) and
+    real-only (REAL) predictions on every test session's evaluation windows."""
+    from ml.phase9 import finetune as ft
+    if len(pretrained) != len(SEEDS):
+        raise ValueError(f"one P9-SIM checkpoint per seed {SEEDS}, got {len(pretrained)}")
+    steps = ft.STEPS if steps is None else int(steps)
+    caches = load_caches(length_s)
+    names = list(oc.TRIALS)
+    runlog = []
+    for seed, ckpt in zip(SEEDS, pretrained):
+        base, mcfg, _ = ft.load_pretrained(ckpt, device=device)
+        if mcfg["n_ref"] != caches[names[0]]["meta"]["n_ref"]:
+            raise ValueError(f"{ckpt}: n_ref {mcfg['n_ref']}, the REAL caches have {caches[names[0]]['meta']['n_ref']}")
+        for trial in names:                                               # zero-shot: no REAL data at all
+            c = caches[trial]
+            save_pred(_pred_path("zeroshot", trial, length_s, seed=seed), ft.predict(base, c, eval_windows(c),
+                      device=device), label="SIM->REAL", extra={"pretrained": ckpt})
+        for fold, f in FOLDS.items():
+            train_c = [caches[t] for t in f["train"]]
+            for frac in FRACTIONS:
+                items = [(ci, int(w)) for ci, c in enumerate(train_c) for w in rdm.fraction_positions(c, frac, seed)]
+                for mode in ("finetune", "realonly"):
+                    if mode == "finetune":
+                        model, _, _ = ft.load_pretrained(ckpt, device=device)
+                        lr, label = ft.LR_FINETUNE, "SIM->REAL"
+                    else:
+                        model = ft.fresh_model(mcfg, seed, device=device)
+                        lr, label = lr_scratch, "REAL"
+                    info = ft.train_real(model, train_c, items, lr=lr, seed=seed, steps=steps, device=device)
+                    for trial in f["test"]:
+                        c = caches[trial]
+                        save_pred(_pred_path(mode, trial, length_s, frac, seed), ft.predict(model, c, eval_windows(c),
+                                  device=device), label=label,
+                                  extra={"fold": fold, "train": f["train"], "pretrained": ckpt if mode == "finetune"
+                                         else None, "n_train": len(items), "lr": lr, "steps": steps,
+                                         "skipped_steps": info["skipped_steps"], "gpu_mb": info["gpu_mb"]})
+                    runlog.append({"seed": seed, "fold": fold, "fraction": frac, "mode": mode, **{
+                        k: info[k] for k in ("steps", "skipped_steps", "seconds", "gpu_mb", "n_train")}})
+                    log(f"[phase9] seed {seed} fold {fold} f={frac:g} {mode}: {info['seconds']:.0f} s, "
+                        f"{info['skipped_steps']} skipped steps")
+    os.makedirs(RUNS, exist_ok=True)
+    with open(os.path.join(RUNS, f"models_l{length_s:g}.json"), "w", encoding="utf-8") as fh:
+        json.dump(runlog, fh, indent=1)
+
+
 def sim_variance_features(cache_dir: str, split: str = "train", min_t: float = 4.0) -> tuple:
     """Geometry-free variance features (`baselines_real.variance_features`'s
     nine) of a SIM cache's windows of `split` with `t_k >= min_t`, with
@@ -265,13 +313,20 @@ def report(length_s: float, *, n_boot: int = mr.N_BOOT, out_dir: str = RESULTS, 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Phase 9 runner (spec/phase9.md).")
-    ap.add_argument("what", choices=("baselines", "simvar", "report"))
+    ap.add_argument("what", choices=("baselines", "simvar", "models", "report"))
     ap.add_argument("--length", type=float, required=True)
     ap.add_argument("--sim-cache", default=None, help="the shared40 SIM cache (simvar)")
+    ap.add_argument("--pretrained", nargs="+", default=None, help="models: one P9-SIM best.pt per seed")
+    ap.add_argument("--lr-scratch", type=float, default=None, help="models: Phase 8's chosen lr (real-only)")
+    ap.add_argument("--steps", type=int, default=None, help="models: steps (default the recipe's 600; tests)")
     ap.add_argument("--n-boot", type=int, default=mr.N_BOOT)
     args = ap.parse_args(argv)
     if args.what == "baselines":
         run_baselines(args.length)
+    elif args.what == "models":
+        if not args.pretrained or args.lr_scratch is None:
+            ap.error("models needs --pretrained (3 checkpoints) and --lr-scratch")
+        run_models(args.length, args.pretrained, lr_scratch=args.lr_scratch, steps=args.steps)
     elif args.what == "simvar":
         run_sim_variance(args.length, args.sim_cache or f"/dev/shm/saans-phase8-cache/roomsim-v1-shared40/{args.length:g}")
     else:

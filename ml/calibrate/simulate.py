@@ -5,8 +5,11 @@ SIM windows through the shared reader and turned into calibration features.
 
 Each (room, state) is one 30 s run:
 - `empty`: `n_people = 0`;
-- `still`: one person, `people_mode {0: stationary}`;
-- `moving`: one person, `people_mode {0: walk}`.
+- `still`: one person, `people_mode {0: stationary}`, at the scene's first
+  person's start (or the door);
+- `moving`: one person, `people_mode {0: walk}`, starting at the door. The
+  scene's people are dropped from a copy of the scene, since a declared
+  start on furniture cannot walk.
 
 Windows are 2 s long, ending every 2 s from 4 s to 30 s. Nothing here
 changes Room Sim: every parameter is an existing config field
@@ -39,12 +42,12 @@ LENGTH_S = 2.0
 #: (name, default, lo, hi, scale): the calibrated parameters (spec/calibration.md §3).
 PARAMS = (
     ("tx_power_dbm", 10.0, -5.0, 20.0, "lin"),
-    ("noise_shift_db", 0.0, -10.0, 20.0, "lin"),        # added to both ends of noise_floor_dbm
+    ("noise_shift_db", 0.0, -20.0, 20.0, "lin"),        # added to both ends of noise_floor_dbm
     ("chip_noise_counts", 0.5, 0.05, 4.0, "log"),
     ("tail_power_db", -15.0, -30.0, -3.0, "lin"),
-    ("clutter_scale", 1.0, 0.1, 10.0, "log"),           # multiplies both ends of clutter_rcs_m2
-    ("body_rcs_m2", 0.5, 0.05, 10.0, "log"),
-    ("breathing_scale", 1.0, 0.5, 4.0, "log"),          # multiplies both ends of breathing_p2p_m
+    ("clutter_scale", 1.0, 0.03, 30.0, "log"),          # multiplies both ends of clutter_rcs_m2
+    ("body_rcs_m2", 0.5, 0.05, 50.0, "log"),
+    ("breathing_scale", 1.0, 0.5, 10.0, "log"),         # multiplies both ends of breathing_p2p_m
     ("rssi_jitter_db", 1.0, 0.2, 4.0, "log"),
     ("ripple_amp", 0.05, 0.0, 0.3, "lin"),
 )
@@ -121,6 +124,13 @@ def run_one(task: tuple) -> dict:
         cfg = apply(json.load(fh), theta, state)
     d = tempfile.mkdtemp(prefix="cal-", dir=workdir)
     try:
+        if state == "moving":                     # walk from the door: a declared start may be on furniture
+            with open(scene, encoding="utf-8") as fh:
+                sj = json.load(fh)
+            sj["people"] = []
+            scene = os.path.join(d, os.path.basename(scene))
+            with open(scene, "w", encoding="utf-8") as fh:
+                json.dump(sj, fh)
         cp = os.path.join(d, "cfg.json")
         with open(cp, "w", encoding="utf-8") as fh:
             json.dump(cfg, fh)
