@@ -345,7 +345,9 @@ Exact bytes, so byte-identity (§9) holds:
 "seconds", "label_hz":2, "impair"` (Room Sim's master switch, true in
 both profiles), `"impairments"` (`"on"` or `"hardware_off"`, §8),
 `"impairment_switches"` (the values used), `"baseline_valid"` (§8),
-`"from"` (the source dataset of `--from`, or null),
+`"from"` (the source dataset of `--from`, or null), `"overrides"` and
+`"overrides_sha256"` (`--overrides`' object and the sha256 of its file's
+bytes, or null),
 `"roomsim_defaults", "locate_config", "generator"` (every §2 distribution),
 `"rejections"` (counts by reason), `"splits": {"train":[…], "val":[…],
 "test":[…]}`, `"split_counts"` (by `n_people`, `n_nodes`, `l_shape`),
@@ -411,13 +413,25 @@ windows.
   `object_scatter_scale`. These are SIM assumptions of the radio, the
   receiver and the body; none moves a person, so the scenes, people and
   every §5 label stay the source's.
-  - The values go through Room Sim's own config reader, so its
-    validation applies, and are written into each scene's
-    `.roomsim.json`.
-  - The manifest's `"overrides"` records the object (null without one),
-    and its `"command"` names the file.
-  - Anything else in the file, an empty object or a missing `--from` is
-    refused (exit 2, naming `--overrides`).
+  - The file is read and checked before anything else, `--out` and
+    `--from` included, so a bad file is one refusal and an existing
+    `--out` is untouched even with `--overwrite`. Its values go through
+    Room Sim's own config reader on the default config, so its
+    validation applies, and again on each scene's config, ahead of the
+    §2.6 checks (which so see the run's physics), naming the scene if one
+    refuses. No impairment profile sets an overridable key.
+  - The values are written into each scene's `.roomsim.json`; Locate's
+    `.locate.json` takes `tx_power_dbm` from it, as for any run.
+  - The manifest's `"overrides"` records the object and
+    `"overrides_sha256"` the sha256 of the file's bytes (both null without
+    one), and its `"command"` names the file.
+  - Refused (exit 2, naming `--overrides`): a missing `--from`; and,
+    naming the file too, a missing file or one that is not a file, text
+    that is not JSON, anything but a non-empty object, a key given twice
+    (a JSON reader would keep one silently), a key not listed above, a
+    value Room Sim's reader refuses (a wrong type, `null`, out of range).
+  - `ripple_amp` with `--no-impair` is accepted with a warning on stderr:
+    the ripple is off, so it does nothing.
   - A calibrated set is a configuration, never Room Sim's default
     (spec/calibration.md).
 

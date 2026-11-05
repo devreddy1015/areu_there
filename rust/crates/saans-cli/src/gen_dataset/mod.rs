@@ -30,13 +30,18 @@
 //!   spec/calibration.md) sets some of Room Sim's SIM-assumption
 //!   parameters ([`OVERRIDABLE`]) in every scene's config, so the dataset
 //!   is the source's scenes, people and labels under other physics
-//!   parameters (a calibrated set). The manifest records the overrides.
+//!   parameters (a calibrated set). The file is checked first, through
+//!   Room Sim's reader on its default config, and each scene's config is
+//!   checked again with it before §2.6's checks. The manifest records the
+//!   overrides and the file's sha256.
 //! - **Refusals** name the parameter and exit with code 2: a bad or empty
 //!   option, a non-empty `--out` without `--overwrite` (which removes only
 //!   `manifest.json`, `scenes/` and `shards/` there), too little free
 //!   space, a `--from` that is not a directory with a manifest, is `--out`
 //!   or lies in its `scenes/` or `shards/`, or disagrees with `--scenes`,
-//!   `--seconds` or `--seed`. An I/O error, a generator that finds no
+//!   `--seconds` or `--seed`, an `--overrides` file that is missing, not a
+//!   non-empty JSON object, gives a key twice, or names a key or value it
+//!   may not. An I/O error, a generator that finds no
 //!   valid draw in 100 attempts, or a run Locate or Room Sim refuses exits
 //!   with code 1, naming the scene.
 //!
@@ -51,7 +56,7 @@ mod generator;
 mod npz;
 mod shard;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, ErrorKind, Write};
@@ -66,6 +71,7 @@ use saans_locate::phone::Config as LocateConfig;
 use saans_locate::records::locate_config_json;
 use saans_roomsim::Config as RoomSimConfig;
 use saans_scene::Scene;
+use serde::de::{Deserializer as _, IgnoredAny, MapAccess, Visitor};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -286,29 +292,85 @@ impl Options {
     }
 }
 
-/// `--overrides FILE`: a non-empty JSON object whose keys are all in
-/// [`OVERRIDABLE`]; the values are checked when each scene's config is
-/// rebuilt with them.
-fn read_overrides(file: &str) -> Result<Map<String, Value>, Failure> {
-    let refused = |why: String| Failure::Refused(Refused::new("--overrides", why));
+/// `--overrides FILE`, read and checked.
+#[derive(Debug, Clone)]
+struct Overrides {
+    map: Map<String, Value>,
+    /// The sha256 of the file's bytes, for the manifest.
+    sha256: String,
+}
+
+/// `--overrides FILE`: a non-empty JSON object, each key once and in
+/// [`OVERRIDABLE`], whose values Room Sim's own reader accepts in its
+/// default config. Read before anything else is, so a bad file is one
+/// refusal that costs nothing. Room Sim's checks of these keys look at no
+/// other parameter, so the default config stands for every scene's; each
+/// scene's config is still checked again with them in [`plan_from`].
+fn read_overrides(file: &str) -> Result<Overrides, Failure> {
+    let refused =
+        |why: String| Failure::Refused(Refused::new("--overrides", format!("{file}: {why}")));
     let path = Path::new(file);
-    let text = fs::read_to_string(path).map_err(|e| io_err(path, e))?;
-    let v: Value = serde_json::from_str(&text).map_err(|e| refused(format!("{file}: not JSON: {e}")))?;
+    match fs::metadata(path) {
+        Err(e) if e.kind() == ErrorKind::NotFound => return Err(refused("no such file".into())),
+        Err(e) => return Err(io_err(path, e)),
+        Ok(m) if !m.is_file() => return Err(refused("not a file".into())),
+        Ok(_) => {}
+    }
+    let bytes = fs::read(path).map_err(|e| io_err(path, e))?;
+    let v: Value = serde_json::from_slice(&bytes).map_err(|e| refused(format!("not JSON: {e}")))?;
     let Value::Object(map) = v else {
-        return Err(refused(format!("{file}: not a JSON object")));
+        return Err(refused("not a JSON object".into()));
     };
     if map.is_empty() {
-        return Err(refused(format!("{file}: overrides nothing")));
+        return Err(refused("overrides nothing".into()));
+    }
+    if let Some(k) = duplicate_key(&bytes) {
+        return Err(refused(format!("\"{k}\" is given twice")));
     }
     for k in map.keys() {
         if !OVERRIDABLE.contains(&k.as_str()) {
             return Err(refused(format!(
-                "{file}: \"{k}\" may not be overridden (only {})",
+                "\"{k}\" may not be overridden (only {})",
                 OVERRIDABLE.join(", ")
             )));
         }
     }
-    Ok(map)
+    apply_overrides(&RoomSimConfig::default(), &map).map_err(refused)?;
+    Ok(Overrides {
+        map,
+        sha256: sha256_hex(&bytes),
+    })
+}
+
+/// The first key that the top-level JSON object in `bytes` gives twice
+/// (after unescaping), which serde_json would otherwise let the last
+/// occurrence win.
+fn duplicate_key(bytes: &[u8]) -> Option<String> {
+    struct Keys;
+    impl<'de> Visitor<'de> for Keys {
+        type Value = Option<String>;
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("a JSON object")
+        }
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Option<String>, A::Error> {
+            let mut seen = BTreeSet::new();
+            let mut twice = None;
+            // Read to the end: serde_json refuses an object left unfinished.
+            while let Some(k) = map.next_key::<String>()? {
+                map.next_value::<IgnoredAny>()?;
+                if seen.contains(&k) {
+                    twice.get_or_insert(k);
+                } else {
+                    seen.insert(k);
+                }
+            }
+            Ok(twice)
+        }
+    }
+    serde_json::Deserializer::from_slice(bytes)
+        .deserialize_map(Keys)
+        .ok()
+        .flatten()
 }
 
 /// `rs` with `overrides` set, through Room Sim's own JSON reader (so its
@@ -525,9 +587,9 @@ fn read_source(dir: &str, opts: &Options) -> Result<Source, Failure> {
 }
 
 /// Phase 1 with `--from`: read each scene file (its sha256 must be the
-/// manifest's), its run config and its manifest entry; make the §2.6
-/// checks again with the impairments on, as a fresh draw makes them (§8);
-/// then apply the asked profile to the run config.
+/// manifest's), its run config and its manifest entry; set the overrides;
+/// make the §2.6 checks again with the impairments on, as a fresh draw
+/// makes them (§8); then apply the asked profile to the run config.
 fn plan_from(
     src: &Source,
     i: usize,
@@ -578,6 +640,14 @@ fn plan_from(
     let mut rs = RoomSimConfig::from_json_str(&cfg_text)
         .map_err(|e| refused(format!("its Room Sim config: {e}")))?;
     Impairments::On.apply(&mut rs);
+    // Before the checks, so they see the physics the run will have (a
+    // value Room Sim or Locate refuses for this scene stops phase 1, before
+    // `--overwrite` removes anything). No profile sets an overridable key,
+    // so the profile applied after them keeps the overrides.
+    if let Some(ovr) = overrides {
+        rs = apply_overrides(&rs, ovr)
+            .map_err(|e| Failure::Refused(Refused::new("--overrides", format!("{id}: {e}"))))?;
+    }
     if rs.duration_s != f64::from(src.seconds) + 0.5 {
         return Err(refused(format!(
             "its config's duration_s is {}, not seconds + 0.5",
@@ -587,11 +657,6 @@ fn plan_from(
     shard::tx_per_tick(&rs).map_err(refused)?;
     generator::check(&scene, &rs).map_err(|(_, why)| refused(why))?;
     impairments.apply(&mut rs);
-    if let Some(ovr) = overrides {
-        rs = apply_overrides(&rs, ovr).map_err(|e| {
-            Failure::Refused(Refused::new("--overrides", format!("{id}: {e}")))
-        })?;
-    }
     let openings = get("openings")?;
     let opening = |k: &str| {
         openings
@@ -979,6 +1044,8 @@ fn of(k: usize, n: usize) -> String {
 fn run(opts: &Options) -> Result<Vec<String>, Failure> {
     let started = Instant::now();
     let out = PathBuf::from(&opts.out);
+    // First: a bad file is refused before `--out` or `--from` is looked at.
+    let overrides = opts.overrides.as_deref().map(read_overrides).transpose()?;
     check_out(opts)?;
     let impairments = if opts.no_impair {
         Impairments::HardwareOff
@@ -990,7 +1057,13 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         .as_deref()
         .map(|d| read_source(d, opts))
         .transpose()?;
-    let overrides = opts.overrides.as_deref().map(read_overrides).transpose()?;
+    if impairments == Impairments::HardwareOff
+        && overrides
+            .as_ref()
+            .is_some_and(|o| o.map.contains_key("ripple_amp"))
+    {
+        note("SIM  gen-dataset: warning: --overrides sets ripple_amp, which does nothing with --no-impair (the ripple is off)");
+    }
     let (scenes, seconds, seed) = match &source {
         Some(s) => (s.scenes, s.seconds, s.seed),
         None => (
@@ -1016,7 +1089,7 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
             let plans = pool.install(|| {
                 (0..src.scenes)
                     .into_par_iter()
-                    .map(|i| plan_from(src, i, impairments, overrides.as_ref()))
+                    .map(|i| plan_from(src, i, impairments, overrides.as_ref().map(|o| &o.map)))
                     .collect::<Result<Vec<_>, _>>()
             })?;
             (plans, src.rejections)
@@ -1167,7 +1240,8 @@ fn run(opts: &Options) -> Result<Vec<String>, Failure> {
         "impairment_switches": impairments.switches_json(),
         "baseline_valid": baseline_valid,
         "from": from,
-        "overrides": overrides.clone().map_or(Value::Null, Value::Object),
+        "overrides": overrides.as_ref().map_or(Value::Null, |o| Value::Object(o.map.clone())),
+        "overrides_sha256": overrides.as_ref().map(|o| o.sha256.clone()),
         "roomsim_defaults": serde_json::to_value(RoomSimConfig::default()).expect("a config always serializes"),
         "locate_config": locate_config_json(&LocateConfig::default()),
         "generator": source.as_ref().map_or_else(generator::generator_json, |s| s.generator.clone()),
@@ -1337,32 +1411,168 @@ mod tests {
     fn overrides_need_from_and_name_only_overridable_fields() {
         for (args, param) in [
             (vec!["--out", "d", "--overrides", "o.json"], "--overrides"),
-            (vec!["--out", "d", "--from", "s", "--overrides"], "--overrides"),
-            (vec!["--out", "d", "--from", "s", "--overrides", ""], "--overrides"),
             (
-                vec!["--out", "d", "--from", "s", "--overrides", "a", "--overrides", "b"],
+                vec!["--out", "d", "--from", "s", "--overrides"],
+                "--overrides",
+            ),
+            (
+                vec!["--out", "d", "--from", "s", "--overrides", ""],
+                "--overrides",
+            ),
+            (
+                vec![
+                    "--out",
+                    "d",
+                    "--from",
+                    "s",
+                    "--overrides",
+                    "a",
+                    "--overrides",
+                    "b",
+                ],
                 "--overrides",
             ),
         ] {
             let e = parse(&args).expect_err(&format!("{args:?}"));
             assert_eq!(e.param, param, "{args:?}: {e}");
         }
-        let dir = std::env::temp_dir().join(format!("saans-overrides-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
+        let dir = TempDir::new("overrides");
         let good = dir.join("good.json");
-        fs::write(&good, r#"{"body_rcs_m2": 4.5, "noise_floor_dbm": [-90.0, -85.0]}"#).unwrap();
-        let map = read_overrides(good.to_str().unwrap()).unwrap();
-        let rs = apply_overrides(&RoomSimConfig::default(), &map).unwrap();
+        let text = r#"{"body_rcs_m2": 4.5, "noise_floor_dbm": [-90.0, -85.0]}"#;
+        fs::write(&good, text).unwrap();
+        let o = read_overrides(good.to_str().unwrap()).unwrap();
+        assert_eq!(o.sha256, sha256_hex(text.as_bytes()), "the file's bytes");
+        let rs = apply_overrides(&RoomSimConfig::default(), &o.map).unwrap();
         assert_eq!(rs.body_rcs_m2, 4.5);
         assert_eq!(rs.noise_floor_dbm, (-90.0, -85.0));
-        for bad in [r#"{"seed": 1}"#, r#"{}"#, r#"[1]"#, r#"{"speed_mps": [0.1, 0.2]}"#] {
-            let f = dir.join("bad.json");
-            fs::write(&f, bad).unwrap();
-            assert!(read_overrides(f.to_str().unwrap()).is_err(), "{bad}");
+    }
+
+    /// A temporary directory for one test, removed when the test ends,
+    /// passed or failed.
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(name: &str) -> TempDir {
+            let d = std::env::temp_dir().join(format!(
+                "saans-gen-dataset-unit-{}-{name}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&d);
+            fs::create_dir_all(&d).unwrap();
+            TempDir(d)
         }
-        let invalid = serde_json::from_str::<Map<String, Value>>(r#"{"ripple_amp": 5.0}"#).unwrap();
-        assert!(apply_overrides(&RoomSimConfig::default(), &invalid).is_err(), "Room Sim validates the value");
-        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    impl std::ops::Deref for TempDir {
+        type Target = Path;
+        fn deref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// The refusal `read_overrides` gives, which must name `--overrides`
+    /// and the file.
+    fn overrides_refusal(file: &Path) -> String {
+        let f = file.to_str().unwrap();
+        match read_overrides(f) {
+            Err(Failure::Refused(r)) => {
+                assert_eq!(r.param, "--overrides", "{f}: {r}");
+                assert!(r.reason.starts_with(&format!("{f}: ")), "{f}: {r}");
+                r.reason
+            }
+            Err(e) => panic!("{f}: not a refusal: {e:?}"),
+            Ok(o) => panic!("{f}: accepted: {:?}", o.map),
+        }
+    }
+
+    #[test]
+    fn a_bad_overrides_file_is_refused_once_naming_the_problem() {
+        let dir = TempDir::new("bad-overrides");
+        for (text, says) in [
+            (r#"{"seed": 1}"#, "\"seed\" may not be overridden"),
+            (r#"{"speed_mps": [0.1, 0.2]}"#, "\"speed_mps\" may not be"),
+            (r#"{}"#, "overrides nothing"),
+            (r#"[1]"#, "not a JSON object"),
+            ("{\"body_rcs_m2\": ", "not JSON"),
+            ("body_rcs_m2 = 0.7\n", "not JSON"),
+            // Wrong types and values on allow-listed keys: Room Sim's own
+            // reader refuses them, naming the key.
+            (r#"{"body_rcs_m2": "x"}"#, "body_rcs_m2"),
+            (r#"{"tx_power_dbm": null}"#, "tx_power_dbm"),
+            (r#"{"noise_floor_dbm": -90.0}"#, "noise_floor_dbm"),
+            (r#"{"ripple_amp": 5.0}"#, "ripple_amp"),
+            // serde_json would keep the last silently.
+            (
+                r#"{"body_rcs_m2": 0.7, "tx_power_dbm": 12.0, "body_rcs_m2": 0.9}"#,
+                "\"body_rcs_m2\" is given twice",
+            ),
+            (
+                r#"{"body_rcs_m2": 0.7, "body_rcs_m2": 0.9}"#,
+                "\"body_rcs_m2\" is given twice",
+            ),
+        ] {
+            let f = dir.join("bad.json");
+            fs::write(&f, text).unwrap();
+            let why = overrides_refusal(&f);
+            assert!(why.contains(says), "{text}: {why}");
+            assert!(!why.contains("gen-0"), "{text}: no scene named: {why}");
+        }
+        assert!(overrides_refusal(&dir.join("missing.json")).contains("no such file"));
+        assert!(overrides_refusal(&dir).contains("not a file"));
+    }
+
+    /// A value for every [`OVERRIDABLE`] key, none Room Sim's default.
+    const EVERY_OVERRIDE: &str = r#"{
+        "tx_power_dbm": 12.0,
+        "noise_floor_dbm": [-95.0, -90.0],
+        "chip_noise_counts": 0.75,
+        "tail_power_db": -12.0,
+        "clutter_rcs_m2": [0.01, 0.15],
+        "body_rcs_m2": 0.7,
+        "breathing_p2p_m": [0.005, 0.01],
+        "rssi_jitter_db": 1.5,
+        "ripple_amp": 0.1,
+        "object_scatter_scale": 1.2
+    }"#;
+
+    /// `plan_from` applies the overrides before the §2.6 checks and the
+    /// impairment profile after them; that is the same config either way
+    /// only while no profile sets an overridable key.
+    #[test]
+    fn no_impairment_profile_sets_an_overridable_key() {
+        let every: Map<String, Value> = serde_json::from_str(EVERY_OVERRIDE).unwrap();
+        assert_eq!(
+            every
+                .keys()
+                .map(String::as_str)
+                .collect::<std::collections::BTreeSet<_>>(),
+            OVERRIDABLE.iter().copied().collect(),
+            "EVERY_OVERRIDE names every overridable key"
+        );
+        let defaults = serde_json::to_value(RoomSimConfig::default()).unwrap();
+        let overridden = apply_overrides(&RoomSimConfig::default(), &every).unwrap();
+        for profile in [Impairments::On, Impairments::HardwareOff] {
+            let mut rs = overridden.clone();
+            profile.apply(&mut rs);
+            let v = serde_json::to_value(&rs).unwrap();
+            for (k, x) in &every {
+                assert_ne!(&defaults[k], x, "{k}: not the default");
+                assert_eq!(&v[k], x, "{}: {k}", profile.name());
+            }
+            for k in profile.switches_json().as_object().unwrap().keys() {
+                assert!(
+                    !OVERRIDABLE.contains(&k.as_str()),
+                    "{}: {k}",
+                    profile.name()
+                );
+            }
+        }
     }
 
     #[test]
