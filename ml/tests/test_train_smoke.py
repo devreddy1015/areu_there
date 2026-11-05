@@ -209,8 +209,12 @@ class TestSweepPlan(unittest.TestCase):
         try:
             runs = [dict(cpu_cfg(tmp), run_id=f"r{i}", lr=1e-3 * (i + 1)) for i in range(2)]
             os.makedirs(os.path.join(tmp, "r0"))
-            with open(os.path.join(tmp, "r0", "done.json"), "w") as f:
-                json.dump({"label": "SIM", "best_val_loss": 1.0}, f)
+            with open(os.path.join(tmp, "r0", "done.json"), "w") as f:     # done: best epoch, best.pt, same config
+                json.dump({"label": "SIM", "best_epoch": 0, "best_val_loss": 1.0}, f)
+            with open(os.path.join(tmp, "r0", "config.json"), "w") as f:
+                json.dump(tr.resolve_config(runs[0]), f)
+            with open(os.path.join(tmp, "r0", "best.pt"), "wb") as f:
+                f.write(b"weights")
             todo = sw.pending(runs)
             self.assertEqual([r["run_id"] for r in todo], ["r1"])
         finally:

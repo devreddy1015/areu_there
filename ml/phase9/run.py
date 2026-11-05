@@ -26,6 +26,7 @@ from ml.phase9 import baselines_real as br
 from ml.phase9 import metrics_real as mr
 from ml.phase9 import real_cache as rc
 from ml.phase9 import real_data as rdm
+from ml.train import integrity as integ
 
 __all__ = ["FOLDS", "FRACTIONS", "SEEDS", "RUNS", "RESULTS", "fold_of", "load_caches", "eval_windows",
            "run_baselines", "report"]
@@ -145,10 +146,22 @@ def run_models(length_s: float, pretrained: list, *, lr_scratch: float, steps: i
                device: str = "cuda", log=print) -> None:
     """spec/phase9.md §4: per fold, fraction and seed `s` (P9-SIM checkpoint
     `pretrained[s]`): zero-shot (SIM->REAL), fine-tuned (SIM->REAL) and
-    real-only (REAL) predictions on every test session's evaluation windows."""
+    real-only (REAL) predictions on every test session's evaluation windows.
+
+    Every checkpoint is checked first, before hours of fine-tuning: its run
+    config must be P9-SIM seed `s` at this window (roomsim-v1, shared40,
+    phase and gain off; ml.train.integrity.p9_pretrained_problems). The
+    predictions record the run config they came from."""
     from ml.phase9 import finetune as ft
     if len(pretrained) != len(SEEDS):
         raise ValueError(f"one P9-SIM checkpoint per seed {SEEDS}, got {len(pretrained)}")
+    run_configs = {}
+    for seed, ckpt in zip(SEEDS, pretrained):
+        _, _, rcfg = ft.load_pretrained(ckpt, device="cpu")
+        problems = integ.p9_pretrained_problems(rcfg, length_s, seed, integ.recorded_ref_bins(os.path.dirname(ckpt)))
+        if problems:
+            raise ValueError(f"{ckpt} is not P9-SIM seed {seed} at l={length_s:g}: {'; '.join(problems)}")
+        run_configs[seed] = rcfg
     steps = ft.STEPS if steps is None else int(steps)
     caches = load_caches(length_s)
     names = list(oc.TRIALS)
@@ -160,7 +173,8 @@ def run_models(length_s: float, pretrained: list, *, lr_scratch: float, steps: i
         for trial in names:                                               # zero-shot: no REAL data at all
             c = caches[trial]
             save_pred(_pred_path("zeroshot", trial, length_s, seed=seed), ft.predict(base, c, eval_windows(c),
-                      device=device), label="SIM->REAL", extra={"pretrained": ckpt})
+                      device=device), label="SIM->REAL",
+                      extra={"pretrained": ckpt, "pretrained_config": run_configs[seed]})
         for fold, f in FOLDS.items():
             train_c = [caches[t] for t in f["train"]]
             for frac in FRACTIONS:
@@ -178,6 +192,7 @@ def run_models(length_s: float, pretrained: list, *, lr_scratch: float, steps: i
                         save_pred(_pred_path(mode, trial, length_s, frac, seed), ft.predict(model, c, eval_windows(c),
                                   device=device), label=label,
                                   extra={"fold": fold, "train": f["train"], "pretrained": ckpt if mode == "finetune"
+                                         else None, "pretrained_config": run_configs[seed] if mode == "finetune"
                                          else None, "n_train": len(items), "lr": lr, "steps": steps,
                                          "skipped_steps": info["skipped_steps"], "gpu_mb": info["gpu_mb"]})
                     runlog.append({"seed": seed, "fold": fold, "fraction": frac, "mode": mode, **{

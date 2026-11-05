@@ -11,8 +11,16 @@ loss (patience 5). Each run writes `<out_root>/<run_id>/`: `config.json` (the
 resolved config, loss weights and link-subset rules included), `log.jsonl`
 (one line per epoch: losses, a validation metrics summary, times,
 throughput, GPU memory), `best.pt` (the best validation loss), `last.pt`
-(resume state, every epoch) and `done.json` (written last: a run without it
-is unfinished and resumes from `last.pt`).
+(resume state, every epoch; saved before `best.pt`, which a resume restores
+from it after a kill between the two) and `done.json` (written last: a run
+without it is unfinished and resumes from `last.pt`).
+
+A run that has stopped learning ends without `done.json` and with a
+nonzero exit (ml.train.integrity): more than half of a 50-step window
+skipped for non-finite gradients, a non-finite validation loss, or no
+`best.pt` of the best epoch at the end. A finished run is returned again
+only for the same configuration (every setting but where and how fast it
+runs); another one needs `--overwrite` or another run id.
 
 Data come from the Phase 8 cache through `ml.train.data` (the data side's
 Dataset and collate, which apply spec/model.md §2's link-subset and
@@ -59,9 +67,11 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from ml.train import integrity as integ  # noqa: E402
 from ml.train import model as mdl  # noqa: E402
 
 LABEL = "SIM"
+SKIP_WINDOW = integ.SKIP_WINDOW      # optimiser steps per skipped-step check (a module name, so tests can shrink it)
 RUNS_ROOT = "/home/Aman/are_u_theone/runs/phase8"
 MAX_LINKS = 132                      # 12 nodes x 11 (spec/dataset.md §2.4)
 BIN_HZ = 5                           # spec/model.md decision 2: T = 5 l bins
@@ -433,7 +443,8 @@ class CacheSource:
                 "train_samples_per_epoch": len(self.sampler),
                 "subset_rules": {"p_one_tx": self.data.P_ONE_TX, "p_one_link": self.data.P_ONE_LINK,
                                  "p_drop_link": self.data.P_DROP, "p_unknown_geometry": self.data.P_UNKNOWN_GEOMETRY},
-                "eval_min_t": self.data.EVAL_MIN_T, "manifest_sha256": m.get("manifest_sha256")}
+                "eval_min_t": self.data.EVAL_MIN_T, "manifest_sha256": m.get("manifest_sha256"),
+                "ref_bins": m.get("preprocess", {}).get("ref_bins")}
 
     def train_loader(self, epoch: int):
         self.sampler.set_epoch(epoch)
@@ -737,15 +748,6 @@ def _set_rng_state(st: dict) -> None:
         torch.cuda.set_rng_state_all(st["cuda"])
 
 
-_RESUME_IGNORED = {"overwrite", "workers", "device", "out_root", "compile", "compile_mode", "eval_batch",
-                   "interrupt_after_epochs"}
-
-
-def _same_run(a: dict, b: dict) -> bool:
-    return {k: v for k, v in a.items() if k not in _RESUME_IGNORED} == \
-        {k: v for k, v in b.items() if k not in _RESUME_IGNORED}
-
-
 def _save(obj, path: str) -> None:
     tmp = path + ".tmp"
     torch.save(obj, tmp)
@@ -845,6 +847,9 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
             with contextlib.suppress(FileNotFoundError):
                 os.remove(os.path.join(run_dir, name))
     if os.path.exists(done_path):
+        problem = integ.done_problem(run_dir, cfg)        # the run id does not name every setting
+        if problem:
+            raise SystemExit(f"{run_dir}: {problem}; use --overwrite (or another run id)")
         with open(done_path) as f:
             return json.load(f)
 
@@ -878,10 +883,12 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     start_epoch, step, best, bad, elapsed0 = 0, 0, float("inf"), 0, 0.0
-    best_epoch = -1
-    if os.path.exists(last_path):
+    best_epoch, best_pt_epoch = -1, None                  # best_pt_epoch: the epoch best.pt holds
+    best_path = os.path.join(run_dir, "best.pt")
+    resumed = os.path.exists(last_path)
+    if resumed:
         st = torch.load(last_path, map_location="cpu", weights_only=False)
-        if not _same_run(st["run_config"], cfg):
+        if not integ.same_run(st["run_config"], cfg):
             raise SystemExit(f"{run_dir}: last.pt was written by another configuration; use --overwrite")
         model.load_state_dict(st["model"])
         opt.load_state_dict(st["optimizer"])
@@ -891,6 +898,11 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
         start_epoch, step, best, bad = st["epoch"] + 1, st["step"], st["best_val"], st["bad_epochs"]
         best_epoch, elapsed0 = st["best_epoch"], st["elapsed_s"]
         _truncate_log(log_path, start_epoch)
+        if os.path.isfile(best_path):
+            best_pt_epoch = torch.load(best_path, map_location="cpu", weights_only=False)["epoch"]
+        if integ.restore_best(st["epoch"], best_epoch, best_pt_epoch):   # killed between last.pt and best.pt
+            _save(_best_state(st["model"], mcfg, cfg, st["epoch"], st["step"], best), best_path)
+            best_pt_epoch = st["epoch"]
     else:
         with contextlib.suppress(FileNotFoundError):
             os.remove(log_path)
@@ -903,6 +915,8 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
     pad_l = cfg["pad_links"] or None
     t_start = time.time() - elapsed0
     stop_reason = "epochs"
+    if resumed and bad >= cfg["patience"]:                # killed after its early stop, before done.json
+        stop_reason, start_epoch = "early_stopping", cfg["epochs"]
     for epoch in range(start_epoch, cfg["epochs"]):
         if cfg["max_steps"] and step >= cfg["max_steps"]:
             stop_reason = "max_steps"
@@ -913,6 +927,7 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
         sums = {t: torch.zeros((), device=device) for t in ("total",) + TERMS}
         n_steps, n_samples = 0, 0
         n_skipped = torch.zeros((), device=device)
+        win_skipped = 0                                   # n_skipped when the current skip window began
         t0 = time.time()
         t_warm, n_warm = None, 0
         loader = source.train_loader(epoch)
@@ -957,6 +972,12 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
                 if device.type == "cuda":
                     torch.cuda.synchronize(device)
                 t_warm, n_warm = time.time(), n_samples
+            if n_steps % SKIP_WINDOW == 0:                        # one sync per window: a frozen run stops here
+                skipped = int(n_skipped)
+                problem = integ.skip_problem(skipped - win_skipped, SKIP_WINDOW)
+                if problem:
+                    raise SystemExit(f"{run_dir}: {problem} (epoch {epoch}, step {step}); no done.json written")
+                win_skipped = skipped
         if device.type == "cuda":
             torch.cuda.synchronize(device)
         t_end = time.time()
@@ -969,13 +990,12 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
                        matcher=cfg["matcher"], n_links=pad_l if fwd.enabled else None,
                        n_batch=cfg["eval_batch"] if (pad_l and fwd.enabled) else None,
                        max_batches=cfg["val_max_batches"], pack=cfg["pack_links"], bucket=cfg["pack_bucket"])
-        summary = metrics_summary(val)
+        val_ok = math.isfinite(val["loss"])
+        summary = metrics_summary(val) if val_ok else {"source": None, "metrics_error": "non-finite validation loss"}
         val_s = time.time() - t1
-        improved = val["loss"] < best
+        improved = val_ok and val["loss"] < best
         if improved:
             best, bad, best_epoch = val["loss"], 0, epoch
-            _save({"label": LABEL, "model": model.state_dict(), "model_config": asdict(mcfg), "run_config": cfg,
-                   "epoch": epoch, "step": step, "val_loss": val["loss"]}, os.path.join(run_dir, "best.pt"))
         else:
             bad += 1
         rec = {
@@ -995,10 +1015,16 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
                           "max_reserved_mb": torch.cuda.max_memory_reserved(device) / 2 ** 20}
         with open(log_path, "a") as f:
             f.write(json.dumps(rec, default=_json_default) + "\n")
+        if not val_ok:                                    # logged for the post-mortem; last.pt keeps the epoch before
+            raise SystemExit(f"{run_dir}: validation loss {val['loss']} at epoch {epoch} (step {step}): the run "
+                             f"diverged; no done.json written")
         _save({"label": LABEL, "model": model.state_dict(), "optimizer": opt.state_dict(),
                "scheduler": sched.state_dict(), "scaler": scaler.state_dict(), "rng": _rng_state(),
                "run_config": cfg, "model_config": asdict(mcfg), "epoch": epoch, "step": step, "best_val": best,
                "bad_epochs": bad, "best_epoch": best_epoch, "elapsed_s": time.time() - t_start}, last_path)
+        if improved:                                      # after last.pt: a kill in between is restored on resume
+            _save(_best_state(model.state_dict(), mcfg, cfg, epoch, step, best), best_path)
+            best_pt_epoch = epoch
         print(f"[{cfg['run_id']}] epoch {epoch} step {step} train {train_means['total']:.4f} "
               f"val {val['loss']:.4f}{' *' if improved else ''} ({train_s:.0f}+{val_s:.0f} s, "
               f"{rec['throughput']['samples_per_s']:.0f} samples/s) SIM", flush=True)
@@ -1007,15 +1033,22 @@ def _train_locked(cfg: dict, run_dir: str) -> dict:
             break
         if cfg["interrupt_after_epochs"] and epoch + 1 - start_epoch >= cfg["interrupt_after_epochs"]:
             return {"label": LABEL, "run_id": cfg["run_id"], "interrupted_after_epoch": epoch}
-    else:
-        stop_reason = "epochs"
     if cfg["max_steps"] and step >= cfg["max_steps"]:
         stop_reason = "max_steps"
+    problem = integ.best_problem(best_epoch, best, best_pt_epoch if os.path.isfile(best_path) else None)
+    if problem:
+        raise SystemExit(f"{run_dir}: {problem}; no done.json written")
     done = {"label": LABEL, "run_id": cfg["run_id"], "best_epoch": best_epoch, "best_val_loss": best,
             "steps": step, "stop": stop_reason, "elapsed_s": time.time() - t_start, "n_params": n_params,
             "compiled": fwd.enabled, "compile_error": fwd.error}
     _write_json(done, done_path)
     return done
+
+
+def _best_state(model_state: dict, mcfg: mdl.ModelConfig, cfg: dict, epoch: int, step: int, val_loss: float) -> dict:
+    """`best.pt`'s contents: the model of the best epoch so far."""
+    return {"label": LABEL, "model": model_state, "model_config": asdict(mcfg), "run_config": cfg, "epoch": epoch,
+            "step": step, "val_loss": val_loss}
 
 
 def _truncate_log(path: str, n_epochs: int) -> None:

@@ -620,6 +620,24 @@ outside git; `log.jsonl` has one line per epoch (losses, validation
 figures, throughput, GPU memory). Each run writes `done.json` last, so a
 run without it is unfinished. Starting the sweep again resumes it.
 
+A run that stops learning exits nonzero without `done.json`. That happens
+when more than half of a 50-step window is skipped for non-finite fp16
+gradients, or when the validation loss is non-finite. Its log says why;
+the sweep reports it as failed. A run directory that finished under
+another configuration is refused, not reused. Retrain it with
+`.venv/bin/python -m ml.train.train --config <run>/launch.json --overwrite true`.
+`--final` refuses until all 27 sweep runs are done (`sweep_table.md`
+lists the ones that are not and why). To pick from a partial grid anyway,
+pass `--choose RUN_ID`. Final evaluations are redone automatically when a
+checkpoint changed since they were written.
+
+Tests (CPU, synthetic; the integrity tests also run without torch):
+
+```bash
+.venv/bin/python -m unittest discover -s ml/tests
+python3 -m unittest ml.tests.test_integrity                 # the run-integrity rules alone, stdlib only
+```
+
 Measured on this box:
 - **Speed:** compiled fp16 at D = 256, batch 128 runs 19–23 ms a step
   alone, against 50 ms eager.
