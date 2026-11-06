@@ -186,6 +186,15 @@ def suites() -> list[Suite]:
             "NOTES.md §14 reads this.",
         ),
         Suite(
+            "longlie", "Long lie: miss rate and false alarms together, by N",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "longlie", "--seeds", "20"],
+            rust, "slow",
+            "Issue #38. Lies (a fall, a slow slide, a fall with a limb moving) and "
+            "everything that is not one, simulated once each and replayed through the "
+            "long lie for every N, presence hold off and on. docs/ELDER_CARE.md §3.3 "
+            "and NOTES.md §15 read this.",
+        ),
+        Suite(
             "links", "What each extra link buys, one transmitter",
             [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "links",
              "--seats", "600", "--blind-seats", "5000"],
@@ -222,6 +231,18 @@ class Quote:
     suite: str
     doc: str
     out: list[str]
+
+
+def _ll_miss(hold: str, n: str) -> str:
+    """The `longlie` miss-rate row for N = n, hold OFF or ON, up to its first cell."""
+    return (r"MISS RATE AND FALSE ALARMS TOGETHER, presence hold " + hold
+            + r"[^\n]*\n[^\n]*\n(?:[^\n]*\n)*?\s+" + n + r"\s+")
+
+
+def _ll_runs(hold: str, row: str, col: int) -> str:
+    """One cell (runs alerted) of a `longlie` RUNS ALERTED table."""
+    return (r"RUNS ALERTED, presence hold " + hold + r"[\s\S]*?^  " + row
+            + r"(?:\s+\d+/120){" + str(col) + r"}\s+(\d+)/120")
 
 
 QUOTES = [
@@ -394,6 +415,62 @@ QUOTES = [
              r"^  collapse\s+36\s+\d+\s+[\d.]+\s+[\d.]+\s+\d+\s+\d+\s+\S+\s+(\d+)/36 \((\d+)\)$",
              r"raised while holding an empty room: inactivity (\d+)"])
       for suite, col in (("detectors", 0), ("detectors-box", 1))],
+    # NOTES.md §15 and docs/ELDER_CARE.md §3.3: the long lie, slow tier.
+    # Columns of the "RUNS ALERTED" tables are N = 3, 5, 10, 15, 20, 30.
+    Quote("NOTES.md", "longlie",
+          "".join(r"\| " + n + r" min \| ([\d.]+)% \| ([\d.]+)% \| (\d+)/120 \| (\d+)/120 \| (\d+)/120 \| ([\d.]+) \|\n"
+                  for n in ("3", "15", "30")),
+          [p for n, col in (("3", 0), ("15", 3), ("30", 5)) for p in (
+              _ll_miss("OFF", n) + r"([\d.]+)%\s+([\d.]+)%",
+              _ll_runs("OFF", "sit down hard, still 45m", col),
+              _ll_runs("OFF", "into bed quickly, 90m", col),
+              _ll_runs("OFF", "sit down, fidgeting 45m", col),
+              _ll_miss("OFF", n) + r"[\d.]+%\s+[\d.]+%\s+-?\d+ s\s+\d+\s+([\d.]+)",
+          )]),
+    Quote("NOTES.md", "longlie",
+          r"comes (\d+) s after N \(median\), and an empty room\nraised none",
+          [_ll_miss("OFF", "15") + r"[\d.]+%\s+[\d.]+%\s+(-?\d+) s"]),
+    Quote("NOTES.md", "longlie",
+          r"In\s+(\d+) of (\d+) falls the motion reached the burst threshold, and (\d+)\s+were caught",
+          [r"^  fall, then still \(\+\)\s+(\d+)/(\d+)$", _ll_runs("OFF", r"fall, then still \(\+\)", 0)]),
+    Quote("NOTES.md", "longlie",
+          r"by\s+layout: (\d+)/40 on one link, (\d+)/40 on two and (\d+)/40 on three",
+          [r"^  1 link\s+falls missed\s+(\d+)/40", r"^  2 links\s+falls missed\s+(\d+)/40",
+           r"^  3 links\s+falls missed\s+(\d+)/40"]),
+    Quote("NOTES.md", "longlie",
+          r"Only (\d+) of 120 slides reach the burst threshold, yet (\d+) are caught\s+at N = 15",
+          [r"^  slide to the floor \(\+\)\s+(\d+)/120$", _ll_runs("OFF", r"slide to the floor \(\+\)", 3)]),
+    Quote("NOTES.md", "longlie",
+          r"every 2-6 minutes, (\d+) of 120 are caught at N = 15",
+          [_ll_runs("OFF", r"fall, a limb moves \(\+\)", 3)]),
+    Quote("NOTES.md", "longlie",
+          r"is alerted in (\d+) of 120 runs at N = 30",
+          [_ll_runs("OFF", "sit down hard, still 45m", 5)]),
+    Quote("NOTES.md", "longlie",
+          r"alerted (\d+) times in 120 at N = 15",
+          [_ll_runs("OFF", "sit down, fidgeting 45m", 3)]),
+    Quote("NOTES.md", "longlie",
+          r"it is alerted in (\d+) of\s+120 runs at N = 15 and (\d+) at N = 30",
+          [_ll_runs("OFF", "into bed quickly, 90m", 3), _ll_runs("OFF", "into bed quickly, 90m", 5)]),
+    Quote("NOTES.md", "longlie",
+          r"falls missed drop from ([\d.]+)% to ([\d.]+)%\. The\ncost is the walk-out: in (\d+) of 120 runs",
+          [_ll_miss("OFF", "15") + r"([\d.]+)%", _ll_miss("ON", "15") + r"([\d.]+)%",
+           r"^  left the home\s+(\d+)/120"]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"falls that end still: ([\d.]+)% missed at every N from 3 to 30 minutes,\n  and (\d+)/40 on two links at N = 15",
+          [_ll_miss("OFF", "15") + r"([\d.]+)%", r"^  2 links\s+falls missed\s+(\d+)/40"]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"slow slides to the floor: ([\d.]+)% missed at N = 15",
+          [_ll_miss("OFF", "15") + r"[\d.]+%\s+([\d.]+)%"]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"alerted in (\d+) of 120 at\n  N = 30",
+          [_ll_runs("OFF", "sit down hard, still 45m", 5)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"alerted in\n  (\d+) of 120 at N = 15",
+          [_ll_runs("OFF", "into bed quickly, 90m", 3)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"presence hold on: (\d+) of 120\n  alert on the empty room",
+          [r"^  left the home\s+(\d+)/120"]),
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",
           [r"breathing BNR, best subcarrier, dB\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)"]),

@@ -1321,3 +1321,101 @@ features do not. In a one-off diagnostic (not committed), a fallen weak
 breather's presence index (median 0.85 when read empty) overlapped an
 empty room's (90th percentile 0.84), so a lower holding threshold does
 not separate them either.
+
+## 15. The long lie (Nov 2026)
+
+Everything here is **SYNTHETIC**. `saans longlie --seeds 20`, in
+`docs/RESULTS.md`, section "Long lie". Issue #38; the definition is
+`docs/ELDER_CARE.md` §3.3 and the code `saans-health/src/longlie.rs`.
+
+**What it is.** In one space, a `Check` alert when a sudden movement
+(motion index >= 8) stops within 5 s and the space then stays present
+without gross motion for N minutes (`long_lie_min`). Presence may be
+held by the presence hold (§14) if that is on. Gross motion in a space
+listed in `long_lie_elsewhere` stops the count. It needs no vitals and
+not `collapse_detection`, and it ships off.
+
+**How it was measured.** Every timeline was simulated once, through the
+production path, in `saans eval`'s rooms and layouts as a 2.7 m box: 120
+runs per scenario. The fused samples were then replayed through the
+detector for N = 3, 5, 10, 15, 20 and 30 minutes, with the hold off and
+on, so each column of the table sees identical data. A lie counts as
+caught when the alert comes within N + 2 minutes of it starting
+(ELDER_CARE.md §4.6). Every alert in any other scenario is false.
+
+### Presence hold off, as shipped
+
+| N | falls missed | slow slides missed | sat down hard, then still 45 min | into bed quickly, 90 min | sat down, fidgeting 45 min | false alerts per occupied hour |
+|---|---|---|---|---|---|---|
+| 3 min | 6.7% | 45.8% | 119/120 | 117/120 | 73/120 | 2.005 |
+| 15 min | 6.7% | 46.7% | 118/120 | 94/120 | 5/120 | 0.673 |
+| 30 min | 6.7% | 47.5% | 118/120 | 51/120 | 2/120 | 0.445 |
+
+The alert, when it comes, comes 2 s after N (median), and an empty room
+raised none in 120 hours at any N. The last column pools the false
+alerts of every scenario that is not a lie over its occupied hours: it
+depends on this mix of scenarios and is not a rate for a home.
+
+### What it says
+
+1. **N does not change the miss rate for a fall that ends still.** In
+   113 of 120 falls the motion reached the burst threshold, and 112
+   were caught, at every N. A fall is missed when its motion stays under
+   the threshold or the links lose the person on the floor, and neither
+   depends on N.
+2. **The miss target needs two links.** Missed falls at N = 15, by
+   layout: 6/40 on one link, 2/40 on two and 0/40 on three, against
+   the spec's staged target of at most 1 in 20.
+3. **A slow slide is missed about half the time, by construction.**
+   Only 16 of 120 slides reach the burst threshold, yet 64 are caught
+   at N = 15: most were armed by something other than the slide, most
+   likely the walk to the spot, which the slow descent then did not
+   interrupt. That is luck, not detection.
+4. **A person who moves a limb on the floor is missed.** With a limb
+   moving every 2-6 minutes, 12 of 120 are caught at N = 15. Gross
+   motion stops the count, as the definition says.
+5. **Time does not separate a fall from sitting down hard and staying
+   still.** A heavy sit-down followed by 45 minutes of reading still
+   is alerted in 118 of 120 runs at N = 30. No N below the length of
+   the stillness helps, because the sit-down is as sudden as a fall
+   and the stillness after it is the same.
+6. **What time does filter is activity.** A sit-down followed by getting
+   up within 5 minutes is never alerted from N = 5. A reader who shifts
+   every 1-5 minutes is alerted 5 times in 120 at N = 15.
+7. **Lying down into bed quickly is the bedroom case, and it is bad.**
+   Turning over every 10-30 minutes on average, it is alerted in 94 of
+   120 runs at N = 15 and 51 at N = 30.
+
+### The presence hold, and motion in another room
+
+With the hold on (35 min), falls missed drop from 6.7% to 5.8%. The
+cost is the walk-out: in 33 of 120 runs the hold engaged as the person
+walked out, and the long lie then alerted on the empty room, at every
+N. With the person seen moving in another room 10 s after leaving
+(`long_lie_elsewhere`; the harness says so, as the simulator has one
+room), none of the 120 did. That removes the hold's cost for moves
+inside the home, not for leaving it, which needs a door sensor
+(ELDER_CARE.md §8, question 2).
+
+### What it means
+
+- **The long lie is the right shape for a lie that follows a fall and
+  the wrong one for telling it from a nap.** In simulation it fires on
+  nearly every heavy sit-down followed by long stillness. One such
+  sitting a day is about seven false urgent alerts a week, against a
+  budget of one a month (ELDER_CARE.md §4.6). That is arithmetic on
+  the table, not a measured home week: the simulator has no home
+  timelines.
+- **So it ships off,** like collapse detection and the presence hold,
+  and per room: a bathroom, where nobody sits still for 30 minutes,
+  is where it can be switched on first.
+- **N does not need to be long for falls.** The miss rate is the same
+  at 3 minutes as at 30, so N is set by the false alarms, and per room.
+- **Walking in reaches the burst threshold too.** A person who walks in
+  and sits down gently for 5 minutes was alerted at N = 3 and 5 in
+  nearly every run of the walk-out scenario. The burst condition does
+  little to separate events in this simulator.
+- **Not modelled:** a bed's height (into bed is a heavy sit-down at the
+  bed, chest upright), lying on the side, a second room (motion
+  elsewhere is the harness's word), real falls, real naps. Staged
+  real lies (#46) settle it.
