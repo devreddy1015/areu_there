@@ -85,6 +85,7 @@ is not able to see.
 | `rust/saans-dsp` | Rust | lead | Port of the wifisense core: biquad, Goertzel, band peak, static suppression, presence, breathing, heart, gap filling, RespirFi. No dependencies. |
 | `rust/saans-health` | Rust | lead | Health detectors (§2.1) over feature streams. |
 | `rust/saans-sim` | Rust | lead | Geometric scene simulator (port of `scene="geometric"`) plus scripted timelines: enter, sit, breathe, pause, burst, leave. Ground truth for S3. |
+| `rust/saans-scene` | Rust | lead | Declared room geometry: `scene.json` types, validation and the Apple RoomPlan importer. Geometry is SCENE, never inferred from CSI (ADR-013). |
 | `rust/saans-gateway` | Rust | lead | The gateway binary. |
 | `rust/saans-cli` | Rust | lead | `saans sim | replay | eval | bench`. |
 | `edge/dsp` | C++17 | edge | Header-only DSP for the ESP32: no heap after init, `float` (the S3 FPU is single precision). Host tests on golden vectors. |
@@ -166,6 +167,9 @@ See `spec/wire.md`. Two datagram types share the sensor port:
 | 009 | A static copy of the site is published, and says on every page that it has no gateway behind it. |
 | 010 | The audit log is kept for a year (and never less than the events), then deleted. Built 2026-10-24. |
 | 011 | One gateway per site. A hosted control plane is ruled out; multi-site, if built, is read-only federation. *Decided, not built.* |
+| 012 | FeatureFrame v2: frames are signed with a per-node key and carry a counter the gateway will not accept twice. Built 2026-10-24. |
+| 013 | Room geometry is declared in a scene file, never inferred from WiFi. The room may be drawn; a person only as an estimate with an uncertainty radius, gated by role and consent, SIM/REPLAY only. |
+| 014 | Learned models are trained and evaluated offline, for research only; none runs in the S0-S5 path, the gateway, the room stream or on a node. |
 
 ## 7. Roadmap with exit gates
 

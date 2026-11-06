@@ -1,0 +1,1479 @@
+{
+ "label": "SIM",
+ "spec": "sionna audit v1 (spec/sionna_audit.md)",
+ "note": "Room Sim and Sionna RT are both simulators: every number here is SIM, an agreement or disagreement between two models of the same declared rooms, never a property of a real room.",
+ "dataset": {
+  "dir": "/home/Aman/are_u_theone/datasets/roomsim-v1",
+  "split": "test",
+  "scene_seed": 10,
+  "forced_l_shape": false,
+  "scenes": [
+   {
+    "index": 224,
+    "id": "gen-000224",
+    "n_nodes": 11,
+    "n_links": 110,
+    "l_shape": false,
+    "wall_material": "brick",
+    "wall_thickness_m": 0.232,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [3.6, 4.97, 3.34],
+    "furniture": ["chair:fabric", "almirah:metal", "almirah:wood", "sofa:fabric"],
+    "approximations": {
+     "shell": ["objects [4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "objects [4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.4403, "sionna_shell_s": 8.992635, "sionna_furnished_s": 9.753749, "sionna_furnished_panel_s": 9.984656, "sionna_diffuse_S0.3_s": 15.765927, "sionna_diffuse_S0.7_s": 21.458567},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 6810, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 11},
+     "furnished": {"candidates_stored_max": 16170, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 11},
+     "furnished_panel": {"candidates_stored_max": 16948, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 11},
+     "diffuse_S0.3": {"candidates_stored_max": 509267, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 11},
+     "diffuse_S0.7": {"candidates_stored_max": 2558138, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 11}
+    }
+   },
+   {
+    "index": 288,
+    "id": "gen-000288",
+    "n_nodes": 11,
+    "n_links": 110,
+    "l_shape": true,
+    "wall_material": "drywall",
+    "wall_thickness_m": 0.082,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [9.08, 3.32, 3.13],
+    "furniture": ["chair:fabric", "almirah:wood", "almirah:metal"],
+    "approximations": {
+     "shell": ["walls[4] has nodes on both sides of its line: placed on its room-facing face, so Room Sim's bounces off its other face (reached through another wall) differ by up to t = 0.082 m in path length", "walls[5] has nodes on both sides of its line: placed on its room-facing face, so Room Sim's bounces off its other face (reached through another wall) differ by up to t = 0.082 m in path length", "objects [3, 4, 5] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["walls[4] has nodes on both sides of its line: placed on its room-facing face, so Room Sim's bounces off its other face (reached through another wall) differ by up to t = 0.082 m in path length", "walls[5] has nodes on both sides of its line: placed on its room-facing face, so Room Sim's bounces off its other face (reached through another wall) differ by up to t = 0.082 m in path length", "fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [3, 4, 5] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["walls[4] has nodes on both sides of its line: placed on its room-facing face, so Room Sim's bounces off its other face (reached through another wall) differ by up to t = 0.082 m in path length", "walls[5] has nodes on both sides of its line: placed on its room-facing face, so Room Sim's bounces off its other face (reached through another wall) differ by up to t = 0.082 m in path length", "fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "objects [3, 4, 5] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.400072, "sionna_shell_s": 8.903488, "sionna_furnished_s": 8.889132, "sionna_furnished_panel_s": 9.261619, "sionna_diffuse_S0.3_s": 14.476228, "sionna_diffuse_S0.7_s": 17.243072},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 7970, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 11},
+     "furnished": {"candidates_stored_max": 13191, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 11},
+     "furnished_panel": {"candidates_stored_max": 13515, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 11},
+     "diffuse_S0.3": {"candidates_stored_max": 335274, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 11},
+     "diffuse_S0.7": {"candidates_stored_max": 1603598, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 11}
+    }
+   },
+   {
+    "index": 393,
+    "id": "gen-000393",
+    "n_nodes": 10,
+    "n_links": 90,
+    "l_shape": false,
+    "wall_material": "drywall",
+    "wall_thickness_m": 0.087,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [7.45, 3.47, 3.3],
+    "furniture": [],
+    "approximations": {
+     "shell": ["objects [0] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["objects [0] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["objects [0] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.133641, "sionna_shell_s": 9.057932, "sionna_furnished_s": 9.468563, "sionna_furnished_panel_s": 9.409156, "sionna_diffuse_S0.3_s": 14.248021, "sionna_diffuse_S0.7_s": 18.121988},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 5496, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished": {"candidates_stored_max": 5496, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished_panel": {"candidates_stored_max": 5496, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "diffuse_S0.3": {"candidates_stored_max": 283077, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10},
+     "diffuse_S0.7": {"candidates_stored_max": 1386545, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10}
+    }
+   },
+   {
+    "index": 1018,
+    "id": "gen-001018",
+    "n_nodes": 10,
+    "n_links": 90,
+    "l_shape": false,
+    "wall_material": "wood",
+    "wall_thickness_m": 0.076,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [7.92, 3.8, 3.11],
+    "furniture": ["almirah:metal", "sofa:fabric", "table:metal", "chair:fabric", "sofa:fabric", "table:metal"],
+    "approximations": {
+     "shell": ["objects [6, 7] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [6, 7] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "objects [6, 7] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.390776, "sionna_shell_s": 9.519035, "sionna_furnished_s": 11.926958, "sionna_furnished_panel_s": 11.49635, "sionna_diffuse_S0.3_s": 15.324243, "sionna_diffuse_S0.7_s": 18.20588},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 5340, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished": {"candidates_stored_max": 15023, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished_panel": {"candidates_stored_max": 15023, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "diffuse_S0.3": {"candidates_stored_max": 336802, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10},
+     "diffuse_S0.7": {"candidates_stored_max": 1619429, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10}
+    }
+   },
+   {
+    "index": 1023,
+    "id": "gen-001023",
+    "n_nodes": 12,
+    "n_links": 132,
+    "l_shape": false,
+    "wall_material": "brick",
+    "wall_thickness_m": 0.164,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [3.75, 6.68, 2.83],
+    "furniture": ["chair:wood", "bed:fabric", "bed:fabric"],
+    "approximations": {
+     "shell": ["objects [3, 4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [3, 4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "objects [3, 4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.834582, "sionna_shell_s": 13.782542, "sionna_furnished_s": 13.842274, "sionna_furnished_panel_s": 14.110429, "sionna_diffuse_S0.3_s": 21.499197, "sionna_diffuse_S0.7_s": 28.049182},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 7228, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 12},
+     "furnished": {"candidates_stored_max": 17161, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 12},
+     "furnished_panel": {"candidates_stored_max": 17298, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 12},
+     "diffuse_S0.3": {"candidates_stored_max": 503692, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 12},
+     "diffuse_S0.7": {"candidates_stored_max": 2515030, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 12}
+    }
+   },
+   {
+    "index": 1515,
+    "id": "gen-001515",
+    "n_nodes": 5,
+    "n_links": 20,
+    "l_shape": false,
+    "wall_material": "wood",
+    "wall_thickness_m": 0.072,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [7.01, 4.57, 2.58],
+    "furniture": ["almirah:metal", "sofa:fabric", "almirah:metal"],
+    "approximations": {
+     "shell": ["objects [3] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [3] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "objects [3] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 0.258637, "sionna_shell_s": 2.472785, "sionna_furnished_s": 2.797451, "sionna_furnished_panel_s": 2.80234, "sionna_diffuse_S0.3_s": 4.742101, "sionna_diffuse_S0.7_s": 5.969049},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 2704, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 5},
+     "furnished": {"candidates_stored_max": 5851, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 5},
+     "furnished_panel": {"candidates_stored_max": 5851, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 5},
+     "diffuse_S0.3": {"candidates_stored_max": 185874, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 5},
+     "diffuse_S0.7": {"candidates_stored_max": 910801, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 5}
+    }
+   },
+   {
+    "index": 1600,
+    "id": "gen-001600",
+    "n_nodes": 10,
+    "n_links": 90,
+    "l_shape": false,
+    "wall_material": "brick",
+    "wall_thickness_m": 0.224,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [3.17, 8.96, 2.91],
+    "furniture": ["sofa:fabric", "table:metal", "chair:metal", "table:wood", "table:wood"],
+    "approximations": {
+     "shell": ["objects [5, 6] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [5, 6] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["fabric has no ITU material: a non-reflecting stand-in (eps_r 1) losing Room Sim's 3 dB per crossing at normal incidence", "objects [5, 6] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.435686, "sionna_shell_s": 9.950882, "sionna_furnished_s": 11.231102, "sionna_furnished_panel_s": 10.686914, "sionna_diffuse_S0.3_s": 15.625131, "sionna_diffuse_S0.7_s": 21.582362},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 6042, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished": {"candidates_stored_max": 20155, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished_panel": {"candidates_stored_max": 20923, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "diffuse_S0.3": {"candidates_stored_max": 569193, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10},
+     "diffuse_S0.7": {"candidates_stored_max": 2814857, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10}
+    }
+   },
+   {
+    "index": 1691,
+    "id": "gen-001691",
+    "n_nodes": 10,
+    "n_links": 90,
+    "l_shape": false,
+    "wall_material": "drywall",
+    "wall_thickness_m": 0.084,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [6.93, 3.42, 2.59],
+    "furniture": ["table:metal", "chair:wood", "almirah:metal"],
+    "approximations": {
+     "shell": ["objects [3, 4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [3, 4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["objects [3, 4] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.213582, "sionna_shell_s": 9.525268, "sionna_furnished_s": 9.167349, "sionna_furnished_panel_s": 9.292589, "sionna_diffuse_S0.3_s": 14.983558, "sionna_diffuse_S0.7_s": 19.810978},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 5181, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished": {"candidates_stored_max": 12499, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "furnished_panel": {"candidates_stored_max": 12941, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 10},
+     "diffuse_S0.3": {"candidates_stored_max": 333586, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10},
+     "diffuse_S0.7": {"candidates_stored_max": 1603909, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 10}
+    }
+   },
+   {
+    "index": 1722,
+    "id": "gen-001722",
+    "n_nodes": 7,
+    "n_links": 42,
+    "l_shape": false,
+    "wall_material": "drywall",
+    "wall_thickness_m": 0.09,
+    "floor_material": "concrete",
+    "ceiling_material": "drywall",
+    "room_m": [4.43, 3.89, 3.27],
+    "furniture": ["table:metal"],
+    "approximations": {
+     "shell": ["objects [1] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [1] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["objects [1] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 0.692654, "sionna_shell_s": 4.54986, "sionna_furnished_s": 4.610163, "sionna_furnished_panel_s": 4.603873, "sionna_diffuse_S0.3_s": 7.753941, "sionna_diffuse_S0.7_s": 9.43005},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 3958, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 7},
+     "furnished": {"candidates_stored_max": 6209, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 7},
+     "furnished_panel": {"candidates_stored_max": 6209, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 7},
+     "diffuse_S0.3": {"candidates_stored_max": 126828, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 7},
+     "diffuse_S0.7": {"candidates_stored_max": 641433, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 7}
+    }
+   },
+   {
+    "index": 1865,
+    "id": "gen-001865",
+    "n_nodes": 12,
+    "n_links": 132,
+    "l_shape": false,
+    "wall_material": "brick",
+    "wall_thickness_m": 0.185,
+    "floor_material": "concrete",
+    "ceiling_material": "concrete",
+    "room_m": [5.5, 5.96, 2.92],
+    "furniture": ["almirah:metal", "chair:wood"],
+    "approximations": {
+     "shell": ["objects [2] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished": ["furniture faces are half-spaces (Room Sim's single-interface G): the boxes are opaque in Sionna, where Room Sim charges a fixed L_db per crossing", "objects [2] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"],
+     "furnished_panel": ["objects [2] (doors/windows) are not converted: Room Sim models the wall whole (§6.5)"]
+    },
+    "timing_s": {"roomsim_s": 1.758592, "sionna_shell_s": 13.403847, "sionna_furnished_s": 12.255318, "sionna_furnished_panel_s": 10.915809, "sionna_diffuse_S0.3_s": 17.136713, "sionna_diffuse_S0.7_s": 25.311875},
+    "solver_stats": {
+     "shell": {"candidates_stored_max": 7145, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 12},
+     "furnished": {"candidates_stored_max": 14384, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 12},
+     "furnished_panel": {"candidates_stored_max": 15178, "max_num_paths_per_src": 2000000, "truncated": false, "solves": 12},
+     "diffuse_S0.3": {"candidates_stored_max": 712746, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 12},
+     "diffuse_S0.7": {"candidates_stored_max": 3584155, "max_num_paths_per_src": 4000000, "truncated": false, "solves": 12}
+    }
+   }
+  ]
+ },
+ "settings": {
+  "backend_variant": "llvm_ad_mono_polarized",
+  "libllvm": "/home/Aman/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/libLLVM.so.23.1-rust-1.99.0-stable",
+  "versions": {"python": "3.11.5", "numpy": "2.4.6", "sionna.rt": "2.2.0", "mitsuba": "3.9.1", "drjit": "1.5.0"},
+  "antennas": "iso pattern, V polarisation, at every node (tx and rx)",
+  "frequencies": "carrier (channel 6, 2.437 GHz) + k * 312.5 kHz, k = -26..-1, 1..26",
+  "spec_max_depth": 4,
+  "spec_samples_per_src": 1000000,
+  "spec_max_num_paths_per_src": 2000000,
+  "diffuse_max_depth": 4,
+  "diffuse_samples_per_src": 500000,
+  "diffuse_scattering_coefficients": [0.3, 0.7],
+  "diffuse_pattern": "lambertian",
+  "sionna_seed": 42,
+  "one_receiver_per_solve": true,
+  "diffraction": false,
+  "roomsim_reflection_order": 2,
+  "sionna_max_reflections_compared": 2
+ },
+ "metrics": {
+  "specular": {
+   "d_los_db": {"unit": "dB", "meaning": "LoS (direct) path power, Room Sim minus Sionna"},
+   "d_spec_db": {"unit": "dB", "meaning": "total specular power up to order 2, Room Sim minus Sionna"},
+   "cfr_corr": {"unit": "", "meaning": "correlation of |H| (dB) over the 52 LLTF subcarriers"},
+   "cfr_corr_selective": {"unit": "", "meaning": "the same correlation, links where both selectivities are >= 1 dB"},
+   "cfr_rms_db": {"unit": "dB", "meaning": "RMS of the |H| difference (dB) after removing its mean"},
+   "cfr_offset_db": {"unit": "dB", "meaning": "mean |H| difference (dB), Room Sim minus Sionna"},
+   "ds_rs_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim"},
+   "ds_s_ns": {"unit": "ns", "meaning": "RMS delay spread, Sionna (order <= 2)"},
+   "d_ds_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim minus Sionna"},
+   "sel_rs_db": {"unit": "dB", "meaning": "frequency selectivity (std of |H| dB over 52 subcarriers), Room Sim"},
+   "sel_s_db": {"unit": "dB", "meaning": "frequency selectivity, Sionna (order <= 2)"},
+   "d_sel_db": {"unit": "dB", "meaning": "frequency selectivity, Room Sim minus Sionna"},
+   "higher_order_db": {"unit": "dB", "meaning": "Sionna power with 3..4 reflections added, relative to order <= 2"},
+   "rs_only_frac_db": {"unit": "dB", "meaning": "power of Room Sim paths Sionna lacks, relative to Room Sim's specular power"},
+   "s_only_frac_db": {"unit": "dB", "meaning": "power of Sionna paths Room Sim lacks, relative to Sionna's order <= 2 power"}
+  },
+  "full": {
+   "ds_rs_full_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim full model (realized tail and clutter)"},
+   "ds_rs_full_expected_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim full model with the tail by expectation"},
+   "ds_s_full_ns": {"unit": "ns", "meaning": "RMS delay spread, Sionna with diffuse reflection"},
+   "d_ds_full_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim full (realized) minus Sionna diffuse"},
+   "sel_rs_full_db": {"unit": "dB", "meaning": "frequency selectivity, Room Sim full model"},
+   "sel_s_full_db": {"unit": "dB", "meaning": "frequency selectivity, Sionna with diffuse reflection"},
+   "d_sel_full_db": {"unit": "dB", "meaning": "frequency selectivity, Room Sim full minus Sionna diffuse"},
+   "ds_rs_spec_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim kinds 0..3 only"},
+   "ds_s_spec_ns": {"unit": "ns", "meaning": "RMS delay spread, the specular paths of Sionna's diffuse run (orders <= 4)"},
+   "stoch_rs_db": {"unit": "dB", "meaning": "Room Sim points + clutter + tail power, relative to its kinds 0..3"},
+   "diffuse_s_db": {"unit": "dB", "meaning": "Sionna diffuse power, relative to its specular paths in the same run"},
+   "points_rs_db": {"unit": "dB", "meaning": "Room Sim object point scatterers (kind 4), relative to kinds 0..3"},
+   "clutter_rs_db": {"unit": "dB", "meaning": "Room Sim clutter (kind 5), relative to kinds 0..3"},
+   "tail_rs_db": {"unit": "dB", "meaning": "Room Sim tail (kind 6, realized), relative to kinds 0..3"},
+   "ds_rs_spec_plus_points_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim kinds 0..3 + point scatterers"},
+   "ds_rs_spec_plus_clutter_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim kinds 0..3 + clutter"},
+   "ds_rs_spec_plus_tail_ns": {"unit": "ns", "meaning": "RMS delay spread, Room Sim kinds 0..3 + tail (realized)"},
+   "ds_rs_tail_at_los_expected_ns": {"unit": "ns", "meaning": "what-if, not Room Sim's model: full-model delay spread, tail by expectation but starting at the LoS delay"}
+  }
+ },
+ "variants": {
+  "shell": {
+   "label": "SIM",
+   "overall": {
+    "d_los_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 2e-06, "mean": 0.012022, "min": -0.023294, "max": 5.507501},
+    "d_spec_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.028039, "p10": 0.004457, "p90": 0.126672, "mean": 0.067945, "min": -0.005162, "max": 4.141798},
+    "cfr_corr": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.999712, "p10": 0.964127, "p90": 0.999998, "mean": 0.961369, "min": -0.7293, "max": 1.0},
+    "cfr_corr_selective": {"label": "SIM", "n": 180, "n_nonfinite": 726, "median": 0.999861, "p10": 0.985631, "p90": 0.999999, "mean": 0.987898, "min": 0.640951, "max": 1.0},
+    "cfr_rms_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.037882, "p10": 0.003859, "p90": 0.236031, "mean": 0.125821, "min": 0.00038, "max": 7.393806},
+    "cfr_offset_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.046184, "p10": -0.379394, "p90": 0.662866, "mean": 0.149399, "min": -4.06678, "max": 6.493037},
+    "ds_rs_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 3.012319, "p10": 2.042586, "p90": 3.753292, "mean": 2.951621, "min": 0.961889, "max": 7.04258},
+    "ds_s_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.996973, "p10": 2.023739, "p90": 3.734663, "mean": 2.929847, "min": 0.961645, "max": 6.103948},
+    "d_ds_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.010914, "p10": 0.001059, "p90": 0.055005, "mean": 0.021774, "min": -2.009021, "max": 1.563548},
+    "sel_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.44925, "p10": 0.135863, "p90": 1.485797, "mean": 0.746879, "min": 0.022938, "max": 9.561684},
+    "sel_s_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.459175, "p10": 0.134286, "p90": 1.448768, "mean": 0.732714, "min": 0.011274, "max": 8.329091},
+    "d_sel_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.002028, "p10": -0.078243, "p90": 0.108429, "mean": 0.014164, "min": -1.642627, "max": 2.540504},
+    "higher_order_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.030509, "p10": 0.010223, "p90": 0.093477, "mean": 0.042912, "min": 0.001617, "max": 0.159913},
+    "rs_only_frac_db": {"label": "SIM", "n": 46, "n_nonfinite": 860, "median": -43.667862, "p10": -52.507978, "p90": -26.559903, "mean": -40.768542, "min": -59.803227, "max": -23.279718},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 906, "median": null, "p10": null, "p90": null, "mean": null, "min": null, "max": null}
+   },
+   "overall_los_clear_in_sionna": {
+    "d_spec_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.028039, "p10": 0.004457, "p90": 0.126672},
+    "cfr_corr": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.999712, "p10": 0.964127, "p90": 0.999998},
+    "cfr_rms_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.037882, "p10": 0.003859, "p90": 0.236031},
+    "d_ds_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.010914, "p10": 0.001059, "p90": 0.055005},
+    "d_sel_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.002028, "p10": -0.078243, "p90": 0.108429},
+    "los_excess_db_rs": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0}
+   },
+   "overall_los_blocked_in_sionna": {
+    "d_spec_db": {"label": "SIM", "n": 0, "n_nonfinite": 0, "median": null, "p10": null, "p90": null},
+    "cfr_corr": {"label": "SIM", "n": 0, "n_nonfinite": 0, "median": null, "p10": null, "p90": null},
+    "cfr_rms_db": {"label": "SIM", "n": 0, "n_nonfinite": 0, "median": null, "p10": null, "p90": null},
+    "d_ds_ns": {"label": "SIM", "n": 0, "n_nonfinite": 0, "median": null, "p10": null, "p90": null},
+    "d_sel_db": {"label": "SIM", "n": 0, "n_nonfinite": 0, "median": null, "p10": null, "p90": null},
+    "los_excess_db_rs": {"label": "SIM", "n": 0, "n_nonfinite": 0, "median": null, "p10": null, "p90": null}
+   },
+   "paths_matched": {
+    "los": {
+     "label": "SIM",
+     "n": 896,
+     "dP_db": {"label": "SIM", "n": 896, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 2e-06, "mean": -1e-06, "min": -8e-06, "max": 5e-06},
+     "abs_dphi_rad": {"label": "SIM", "n": 896, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 0.0},
+     "abs_dL_m": {"label": "SIM", "n": 896, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "los+T": {
+     "label": "SIM",
+     "n": 10,
+     "dP_db": {"label": "SIM", "n": 10, "n_nonfinite": 0, "median": -0.012318, "p10": -0.023133, "p90": 5.505882, "mean": 1.089284, "min": -0.023294, "max": 5.507501},
+     "abs_dphi_rad": {"label": "SIM", "n": 10, "n_nonfinite": 0, "median": 1.015337, "p10": 0.211981, "p90": 1.196834, "mean": 0.917785, "min": 0.211759, "max": 1.196907},
+     "abs_dL_m": {"label": "SIM", "n": 10, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_floor_ceiling": {
+     "label": "SIM",
+     "n": 1792,
+     "dP_db": {"label": "SIM", "n": 1792, "n_nonfinite": 0, "median": -7.4e-05, "p10": -0.000434, "p90": 0.000172, "mean": -9.7e-05, "min": -0.003088, "max": 0.003395},
+     "abs_dphi_rad": {"label": "SIM", "n": 1792, "n_nonfinite": 0, "median": 2e-06, "p10": 0.0, "p90": 5.2e-05, "mean": 2e-05, "min": 0.0, "max": 0.000761},
+     "abs_dL_m": {"label": "SIM", "n": 1792, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 16,
+     "dP_db": {"label": "SIM", "n": 16, "n_nonfinite": 0, "median": -0.271013, "p10": -0.406669, "p90": 5.909046, "mean": 1.23861, "min": -0.467006, "max": 6.108772},
+     "abs_dphi_rad": {"label": "SIM", "n": 16, "n_nonfinite": 0, "median": 1.821148, "p10": 0.540427, "p90": 2.012264, "mean": 1.537316, "min": 0.410167, "max": 2.138681},
+     "abs_dL_m": {"label": "SIM", "n": 16, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_wall": {
+     "label": "SIM",
+     "n": 3576,
+     "dP_db": {"label": "SIM", "n": 3576, "n_nonfinite": 0, "median": 0.023463, "p10": 0.000566, "p90": 0.246845, "mean": 0.124354, "min": -0.002725, "max": 8.371056},
+     "abs_dphi_rad": {"label": "SIM", "n": 3576, "n_nonfinite": 0, "median": 9.4e-05, "p10": 4e-06, "p90": 0.001016, "mean": 0.000554, "min": 0.0, "max": 0.072934},
+     "abs_dL_m": {"label": "SIM", "n": 3576, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 4e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_wall+T": {
+     "label": "SIM",
+     "n": 54,
+     "dP_db": {"label": "SIM", "n": 54, "n_nonfinite": 0, "median": 0.011741, "p10": 0.000255, "p90": 0.091169, "mean": 0.430557, "min": -0.002834, "max": 10.889754},
+     "abs_dphi_rad": {"label": "SIM", "n": 54, "n_nonfinite": 0, "median": 0.95623, "p10": 0.500574, "p90": 1.414832, "mean": 0.935611, "min": 0.463927, "max": 1.612693},
+     "abs_dL_m": {"label": "SIM", "n": 54, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_floor_ceiling": {
+     "label": "SIM",
+     "n": 1792,
+     "dP_db": {"label": "SIM", "n": 1792, "n_nonfinite": 0, "median": -2.7e-05, "p10": -0.000119, "p90": -5e-06, "mean": -5.2e-05, "min": -0.000758, "max": 2.4e-05},
+     "abs_dphi_rad": {"label": "SIM", "n": 1792, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 3e-06, "mean": 1e-06, "min": 0.0, "max": 2.8e-05},
+     "abs_dL_m": {"label": "SIM", "n": 1792, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 8,
+     "dP_db": {"label": "SIM", "n": 8, "n_nonfinite": 0, "median": 3.188394, "p10": -0.668273, "p90": 7.407771, "mean": 3.279406, "min": -0.668668, "max": 7.409453},
+     "abs_dphi_rad": {"label": "SIM", "n": 8, "n_nonfinite": 0, "median": 1.696605, "p10": 0.96059, "p90": 2.531805, "mean": 1.721395, "min": 0.960517, "max": 2.531819},
+     "abs_dL_m": {"label": "SIM", "n": 8, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_floor_ceiling": {
+     "label": "SIM",
+     "n": 7109,
+     "dP_db": {"label": "SIM", "n": 7109, "n_nonfinite": 0, "median": 1.332411, "p10": 0.216579, "p90": 5.965625, "mean": 2.554726, "min": -0.063467, "max": 37.137721},
+     "abs_dphi_rad": {"label": "SIM", "n": 7109, "n_nonfinite": 0, "median": 0.005197, "p10": 0.00052, "p90": 0.028104, "mean": 0.042616, "min": 0.0, "max": 3.137711},
+     "abs_dL_m": {"label": "SIM", "n": 7109, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 4e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 90,
+     "dP_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.915758, "p10": 0.281731, "p90": 2.058482, "mean": 1.388963, "min": 0.076452, "max": 12.125822},
+     "abs_dphi_rad": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 1.293091, "p10": 0.832395, "p90": 1.862707, "mean": 1.345547, "min": 0.584203, "max": 2.156078},
+     "abs_dL_m": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 1e-06, "p10": 0.0, "p90": 2e-06, "mean": 1e-06, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_wall": {
+     "label": "SIM",
+     "n": 7144,
+     "dP_db": {"label": "SIM", "n": 7144, "n_nonfinite": 0, "median": 0.024769, "p10": 0.00092, "p90": 0.211692, "mean": 0.106916, "min": -0.006438, "max": 12.813763},
+     "abs_dphi_rad": {"label": "SIM", "n": 7144, "n_nonfinite": 0, "median": 0.00011, "p10": 7e-06, "p90": 0.000921, "mean": 0.000482, "min": 0.0, "max": 0.105928},
+     "abs_dL_m": {"label": "SIM", "n": 7144, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 1e-06, "min": 0.0, "max": 6e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_wall+T": {
+     "label": "SIM",
+     "n": 127,
+     "dP_db": {"label": "SIM", "n": 127, "n_nonfinite": 0, "median": 0.022847, "p10": 0.000714, "p90": 0.16427, "mean": 0.412728, "min": -0.004125, "max": 11.118107},
+     "abs_dphi_rad": {"label": "SIM", "n": 127, "n_nonfinite": 0, "median": 0.844451, "p10": 0.486002, "p90": 1.302118, "mean": 0.862283, "min": 0.419238, "max": 1.575487},
+     "abs_dL_m": {"label": "SIM", "n": 127, "n_nonfinite": 0, "median": 1e-06, "p10": 0.0, "p90": 2e-06, "mean": 1e-06, "min": 0.0, "max": 4e-06},
+     "n_dL_over_1cm": 0
+    }
+   },
+   "unmatched": {
+    "label": "SIM",
+    "links": 906,
+    "links_with_rs_only": 46,
+    "links_with_s_only": 0,
+    "rs_only_paths_by_kind": {"order2": 50},
+    "s_only_paths_by_class": {},
+    "links_with_los_blocked_in_sionna": 0,
+    "sionna_paths_dropped_as_blocked": 0
+   }
+  },
+  "furnished": {
+   "label": "SIM",
+   "overall": {
+    "d_los_db": {"label": "SIM", "n": 802, "n_nonfinite": 104, "median": -1e-06, "p10": -3e-06, "p90": 2e-06, "mean": 0.013685, "min": -0.012323, "max": 5.507501},
+    "d_spec_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.017414, "p10": -0.261347, "p90": 0.32143, "mean": 0.386837, "min": -3.734818, "max": 14.265936},
+    "cfr_corr": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.990994, "p10": -0.103953, "p90": 0.999943, "mean": 0.74527, "min": -0.999464, "max": 1.0},
+    "cfr_corr_selective": {"label": "SIM", "n": 126, "n_nonfinite": 780, "median": 0.998902, "p10": 0.679524, "p90": 0.999988, "mean": 0.807151, "min": -0.973512, "max": 1.0},
+    "cfr_rms_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.135238, "p10": 0.012638, "p90": 1.163393, "mean": 0.44966, "min": 0.001146, "max": 7.259052},
+    "cfr_offset_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.052174, "p10": -1.78539, "p90": 2.302616, "mean": 0.259093, "min": -18.915245, "max": 14.943986},
+    "ds_rs_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.741754, "p10": 1.717937, "p90": 3.850815, "mean": 2.870947, "min": 0.520492, "max": 11.129219},
+    "ds_s_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.787685, "p10": 1.615245, "p90": 3.939645, "mean": 2.87221, "min": 0.485583, "max": 10.461924},
+    "d_ds_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.010605, "p10": -0.521913, "p90": 0.368438, "mean": -0.001263, "min": -4.998763, "max": 4.323423},
+    "sel_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.4232, "p10": 0.120238, "p90": 1.541421, "mean": 0.723661, "min": 0.024801, "max": 7.963557},
+    "sel_s_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.381479, "p10": 0.104175, "p90": 1.560205, "mean": 0.748614, "min": 0.011057, "max": 10.809424},
+    "d_sel_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.002338, "p10": -0.394456, "p90": 0.361457, "mean": -0.024954, "min": -5.741401, "max": 3.08644},
+    "higher_order_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.04102, "p10": 0.011599, "p90": 0.336495, "mean": 0.156371, "min": 0.002138, "max": 3.999973},
+    "rs_only_frac_db": {"label": "SIM", "n": 728, "n_nonfinite": 178, "median": -38.964278, "p10": -62.165081, "p90": -9.635859, "mean": -38.252221, "min": -116.615219, "max": -0.034416},
+    "s_only_frac_db": {"label": "SIM", "n": 548, "n_nonfinite": 358, "median": -20.30107, "p10": -42.692531, "p90": -7.429321, "mean": -23.224937, "min": -79.697752, "max": -0.407621}
+   },
+   "overall_los_clear_in_sionna": {
+    "d_spec_db": {"label": "SIM", "n": 802, "n_nonfinite": 0, "median": 0.014201, "p10": -0.255936, "p90": 0.132754},
+    "cfr_corr": {"label": "SIM", "n": 802, "n_nonfinite": 0, "median": 0.994133, "p10": 0.227217, "p90": 0.999956},
+    "cfr_rms_db": {"label": "SIM", "n": 802, "n_nonfinite": 0, "median": 0.116744, "p10": 0.011589, "p90": 0.87176},
+    "d_ds_ns": {"label": "SIM", "n": 802, "n_nonfinite": 0, "median": 0.009319, "p10": -0.38928, "p90": 0.145582},
+    "d_sel_db": {"label": "SIM", "n": 802, "n_nonfinite": 0, "median": 0.001531, "p10": -0.319666, "p90": 0.265069},
+    "los_excess_db_rs": {"label": "SIM", "n": 802, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0}
+   },
+   "overall_los_blocked_in_sionna": {
+    "d_spec_db": {"label": "SIM", "n": 104, "n_nonfinite": 0, "median": 1.340458, "p10": -0.390109, "p90": 11.166286},
+    "cfr_corr": {"label": "SIM", "n": 104, "n_nonfinite": 0, "median": 0.768046, "p10": -0.967779, "p90": 0.999052},
+    "cfr_rms_db": {"label": "SIM", "n": 104, "n_nonfinite": 0, "median": 0.586972, "p10": 0.096793, "p90": 1.905507},
+    "d_ds_ns": {"label": "SIM", "n": 104, "n_nonfinite": 0, "median": 0.505797, "p10": -2.013704, "p90": 2.636893},
+    "d_sel_db": {"label": "SIM", "n": 104, "n_nonfinite": 0, "median": 0.096556, "p10": -0.732435, "p90": 1.022246},
+    "los_excess_db_rs": {"label": "SIM", "n": 104, "n_nonfinite": 0, "median": -20.0, "p10": -24.0, "p90": -4.0}
+   },
+   "paths_matched": {
+    "los": {
+     "label": "SIM",
+     "n": 796,
+     "dP_db": {"label": "SIM", "n": 796, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 2e-06, "mean": -1e-06, "min": -8e-06, "max": 5e-06},
+     "abs_dphi_rad": {"label": "SIM", "n": 796, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 0.0},
+     "abs_dL_m": {"label": "SIM", "n": 796, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "los+T": {
+     "label": "SIM",
+     "n": 6,
+     "dP_db": {"label": "SIM", "n": 6, "n_nonfinite": 0, "median": -0.00615, "p10": -0.012318, "p90": 5.506601, "mean": 1.829378, "min": -0.012323, "max": 5.507501},
+     "abs_dphi_rad": {"label": "SIM", "n": 6, "n_nonfinite": 0, "median": 0.969401, "p10": 0.211882, "p90": 1.015337, "mean": 0.732207, "min": 0.211759, "max": 1.015338},
+     "abs_dL_m": {"label": "SIM", "n": 6, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "object_specular": {
+     "label": "SIM",
+     "n": 74,
+     "dP_db": {"label": "SIM", "n": 74, "n_nonfinite": 0, "median": 3e-06, "p10": -4e-06, "p90": 0.133638, "mean": 0.03735, "min": -9e-06, "max": 0.356118},
+     "abs_dphi_rad": {"label": "SIM", "n": 74, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.000284, "mean": 7.4e-05, "min": 0.0, "max": 0.000809},
+     "abs_dL_m": {"label": "SIM", "n": 74, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "object_specular+T": {
+     "label": "SIM",
+     "n": 4,
+     "dP_db": {"label": "SIM", "n": 4, "n_nonfinite": 0, "median": 0.044296, "p10": 0.024285, "p90": 0.063442, "mean": 0.043987, "min": 0.023882, "max": 0.063474},
+     "abs_dphi_rad": {"label": "SIM", "n": 4, "n_nonfinite": 0, "median": 1.172417, "p10": 1.170546, "p90": 1.174344, "mean": 1.172437, "min": 1.170545, "max": 1.174369},
+     "abs_dL_m": {"label": "SIM", "n": 4, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 1e-06, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_floor_ceiling": {
+     "label": "SIM",
+     "n": 1462,
+     "dP_db": {"label": "SIM", "n": 1462, "n_nonfinite": 0, "median": -6.7e-05, "p10": -0.000406, "p90": 7e-06, "mean": -9.6e-05, "min": -0.003088, "max": 0.003395},
+     "abs_dphi_rad": {"label": "SIM", "n": 1462, "n_nonfinite": 0, "median": 2e-06, "p10": 0.0, "p90": 4.3e-05, "mean": 1.9e-05, "min": 0.0, "max": 0.000761},
+     "abs_dL_m": {"label": "SIM", "n": 1462, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 112,
+     "dP_db": {"label": "SIM", "n": 112, "n_nonfinite": 0, "median": -0.337547, "p10": -1.74526, "p90": 4.336725, "mean": 0.496756, "min": -2.791845, "max": 6.673175},
+     "abs_dphi_rad": {"label": "SIM", "n": 112, "n_nonfinite": 0, "median": 0.670753, "p10": 0.104479, "p90": 1.831176, "mean": 0.877032, "min": 0.013241, "max": 2.998998},
+     "abs_dL_m": {"label": "SIM", "n": 112, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_wall": {
+     "label": "SIM",
+     "n": 3018,
+     "dP_db": {"label": "SIM", "n": 3018, "n_nonfinite": 0, "median": 0.025459, "p10": 0.00059, "p90": 0.283631, "mean": 0.140775, "min": -0.002725, "max": 8.371056},
+     "abs_dphi_rad": {"label": "SIM", "n": 3018, "n_nonfinite": 0, "median": 0.000106, "p10": 4e-06, "p90": 0.001104, "mean": 0.000627, "min": 0.0, "max": 0.072934},
+     "abs_dL_m": {"label": "SIM", "n": 3018, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 4e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_wall+T": {
+     "label": "SIM",
+     "n": 30,
+     "dP_db": {"label": "SIM", "n": 30, "n_nonfinite": 0, "median": 0.021423, "p10": 0.001832, "p90": 0.093249, "mean": 2.220639, "min": 0.000222, "max": 32.961245},
+     "abs_dphi_rad": {"label": "SIM", "n": 30, "n_nonfinite": 0, "median": 0.904489, "p10": 0.561548, "p90": 1.147642, "mean": 0.894306, "min": 0.499332, "max": 1.452694},
+     "abs_dL_m": {"label": "SIM", "n": 30, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_floor_ceiling": {
+     "label": "SIM",
+     "n": 1354,
+     "dP_db": {"label": "SIM", "n": 1354, "n_nonfinite": 0, "median": -2.3e-05, "p10": -0.000109, "p90": -4e-06, "mean": -4.6e-05, "min": -0.000595, "max": 2.4e-05},
+     "abs_dphi_rad": {"label": "SIM", "n": 1354, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 2e-06, "mean": 1e-06, "min": 0.0, "max": 2.8e-05},
+     "abs_dL_m": {"label": "SIM", "n": 1354, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 162,
+     "dP_db": {"label": "SIM", "n": 162, "n_nonfinite": 0, "median": 1.291157, "p10": -2.307544, "p90": 3.423627, "mean": 0.909861, "min": -2.68383, "max": 8.328001},
+     "abs_dphi_rad": {"label": "SIM", "n": 162, "n_nonfinite": 0, "median": 0.718256, "p10": 0.232728, "p90": 2.654236, "mean": 1.124003, "min": 0.018632, "max": 3.034167},
+     "abs_dL_m": {"label": "SIM", "n": 162, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_floor_ceiling": {
+     "label": "SIM",
+     "n": 5407,
+     "dP_db": {"label": "SIM", "n": 5407, "n_nonfinite": 0, "median": 1.415937, "p10": 0.184972, "p90": 6.954915, "mean": 2.826358, "min": -0.063467, "max": 37.137721},
+     "abs_dphi_rad": {"label": "SIM", "n": 5407, "n_nonfinite": 0, "median": 0.005751, "p10": 0.000454, "p90": 0.032046, "mean": 0.052765, "min": 0.0, "max": 3.137711},
+     "abs_dL_m": {"label": "SIM", "n": 5407, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 3e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 436,
+     "dP_db": {"label": "SIM", "n": 436, "n_nonfinite": 0, "median": 2.326068, "p10": 0.335942, "p90": 5.677983, "mean": 3.020186, "min": -2.526826, "max": 40.041234},
+     "abs_dphi_rad": {"label": "SIM", "n": 436, "n_nonfinite": 0, "median": 0.614872, "p10": 0.093465, "p90": 1.818161, "mean": 0.824128, "min": 0.002626, "max": 3.059275},
+     "abs_dL_m": {"label": "SIM", "n": 436, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_wall": {
+     "label": "SIM",
+     "n": 5572,
+     "dP_db": {"label": "SIM", "n": 5572, "n_nonfinite": 0, "median": 0.028417, "p10": 0.000989, "p90": 0.255845, "mean": 0.124882, "min": -0.005429, "max": 12.813763},
+     "abs_dphi_rad": {"label": "SIM", "n": 5572, "n_nonfinite": 0, "median": 0.00013, "p10": 8e-06, "p90": 0.001065, "mean": 0.000568, "min": 0.0, "max": 0.105928},
+     "abs_dL_m": {"label": "SIM", "n": 5572, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 1e-06, "min": 0.0, "max": 6e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_wall+T": {
+     "label": "SIM",
+     "n": 55,
+     "dP_db": {"label": "SIM", "n": 55, "n_nonfinite": 0, "median": 0.034488, "p10": 0.002247, "p90": 0.193055, "mean": 1.849803, "min": -0.002533, "max": 32.973605},
+     "abs_dphi_rad": {"label": "SIM", "n": 55, "n_nonfinite": 0, "median": 0.856541, "p10": 0.48273, "p90": 1.268682, "mean": 0.857823, "min": 0.455544, "max": 1.462763},
+     "abs_dL_m": {"label": "SIM", "n": 55, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 1e-06, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    }
+   },
+   "unmatched": {
+    "label": "SIM",
+    "links": 906,
+    "links_with_rs_only": 728,
+    "links_with_s_only": 548,
+    "rs_only_paths_by_kind": {"order1": 816, "order2": 3334, "los": 104, "object_specular": 16},
+    "s_only_paths_by_class": {"order2_object": 1168, "order1_object": 80},
+    "links_with_los_blocked_in_sionna": 104,
+    "sionna_paths_dropped_as_blocked": 277
+   }
+  },
+  "furnished_panel": {
+   "label": "SIM",
+   "overall": {
+    "d_los_db": {"label": "SIM", "n": 834, "n_nonfinite": 72, "median": -1e-06, "p10": -3e-06, "p90": 2e-06, "mean": 0.002633, "min": -2.365353, "max": 5.507501},
+    "d_spec_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.00889, "p10": -0.599351, "p90": 0.155063, "mean": -0.097359, "min": -3.734818, "max": 2.909794},
+    "cfr_corr": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.98942, "p10": -0.51932, "p90": 0.999942, "mean": 0.701028, "min": -0.999677, "max": 1.0},
+    "cfr_corr_selective": {"label": "SIM", "n": 130, "n_nonfinite": 776, "median": 0.998518, "p10": -0.806793, "p90": 0.999987, "mean": 0.74955, "min": -0.973512, "max": 1.0},
+    "cfr_rms_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.148115, "p10": 0.012777, "p90": 1.20688, "mean": 0.507852, "min": 0.001146, "max": 7.731774},
+    "cfr_offset_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.020863, "p10": -2.710181, "p90": 1.719665, "mean": -0.159047, "min": -18.609957, "max": 23.519238},
+    "ds_rs_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.741754, "p10": 1.717937, "p90": 3.850815, "mean": 2.870947, "min": 0.520492, "max": 11.129219},
+    "ds_s_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.819919, "p10": 1.796884, "p90": 3.939645, "mean": 2.928932, "min": 0.621001, "max": 10.461924},
+    "d_ds_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.007218, "p10": -0.580851, "p90": 0.210018, "mean": -0.057984, "min": -4.998763, "max": 4.323423},
+    "sel_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.4232, "p10": 0.120238, "p90": 1.541421, "mean": 0.723661, "min": 0.024801, "max": 7.963557},
+    "sel_s_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.385243, "p10": 0.117398, "p90": 1.638891, "mean": 0.785159, "min": 0.011274, "max": 10.809424},
+    "d_sel_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.000971, "p10": -0.403906, "p90": 0.362869, "mean": -0.061498, "min": -7.652066, "max": 3.186793},
+    "higher_order_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.039509, "p10": 0.011317, "p90": 0.276945, "mean": 0.131862, "min": 0.002152, "max": 3.988874},
+    "rs_only_frac_db": {"label": "SIM", "n": 688, "n_nonfinite": 218, "median": -40.673069, "p10": -64.425178, "p90": -15.856481, "mean": -41.83668, "min": -116.615219, "max": -2.493855},
+    "s_only_frac_db": {"label": "SIM", "n": 588, "n_nonfinite": 318, "median": -19.39242, "p10": -40.291083, "p90": -7.200394, "mean": -21.827464, "min": -76.935735, "max": -1.88024}
+   },
+   "overall_los_clear_in_sionna": {
+    "d_spec_db": {"label": "SIM", "n": 834, "n_nonfinite": 0, "median": 0.00889, "p10": -0.512764, "p90": 0.106148},
+    "cfr_corr": {"label": "SIM", "n": 834, "n_nonfinite": 0, "median": 0.991871, "p10": -0.117837, "p90": 0.999944},
+    "cfr_rms_db": {"label": "SIM", "n": 834, "n_nonfinite": 0, "median": 0.132186, "p10": 0.012226, "p90": 1.042666},
+    "d_ds_ns": {"label": "SIM", "n": 834, "n_nonfinite": 0, "median": 0.006058, "p10": -0.523447, "p90": 0.097382},
+    "d_sel_db": {"label": "SIM", "n": 834, "n_nonfinite": 0, "median": 0.000425, "p10": -0.38766, "p90": 0.294276},
+    "los_excess_db_rs": {"label": "SIM", "n": 834, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0}
+   },
+   "overall_los_blocked_in_sionna": {
+    "d_spec_db": {"label": "SIM", "n": 72, "n_nonfinite": 0, "median": 0.029635, "p10": -1.879801, "p90": 1.112327},
+    "cfr_corr": {"label": "SIM", "n": 72, "n_nonfinite": 0, "median": 0.374827, "p10": -0.973439, "p90": 0.997951},
+    "cfr_rms_db": {"label": "SIM", "n": 72, "n_nonfinite": 0, "median": 0.699809, "p10": 0.164372, "p90": 3.763932},
+    "d_ds_ns": {"label": "SIM", "n": 72, "n_nonfinite": 0, "median": 0.630084, "p10": -1.310333, "p90": 1.904351},
+    "d_sel_db": {"label": "SIM", "n": 72, "n_nonfinite": 0, "median": 0.169125, "p10": -0.593616, "p90": 0.841369},
+    "los_excess_db_rs": {"label": "SIM", "n": 72, "n_nonfinite": 0, "median": -20.0, "p10": -24.0, "p90": -20.0}
+   },
+   "paths_matched": {
+    "los": {
+     "label": "SIM",
+     "n": 796,
+     "dP_db": {"label": "SIM", "n": 796, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 2e-06, "mean": -1e-06, "min": -8e-06, "max": 5e-06},
+     "abs_dphi_rad": {"label": "SIM", "n": 796, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 0.0},
+     "abs_dL_m": {"label": "SIM", "n": 796, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.0, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "los+T": {
+     "label": "SIM",
+     "n": 38,
+     "dP_db": {"label": "SIM", "n": 38, "n_nonfinite": 0, "median": -0.231378, "p10": -2.301518, "p90": 3.018833, "mean": 0.057798, "min": -2.365353, "max": 5.507501},
+     "abs_dphi_rad": {"label": "SIM", "n": 38, "n_nonfinite": 0, "median": 2.554576, "p10": 1.001573, "p90": 2.785003, "mean": 2.211058, "min": 0.211759, "max": 2.841332},
+     "abs_dL_m": {"label": "SIM", "n": 38, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "object_specular": {
+     "label": "SIM",
+     "n": 74,
+     "dP_db": {"label": "SIM", "n": 74, "n_nonfinite": 0, "median": -1e-06, "p10": -4.921267, "p90": 1.1e-05, "mean": -1.187727, "min": -5.239544, "max": 4.7e-05},
+     "abs_dphi_rad": {"label": "SIM", "n": 74, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 0.32058, "mean": 0.076449, "min": 0.0, "max": 0.403583},
+     "abs_dL_m": {"label": "SIM", "n": 74, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "object_specular+T": {
+     "label": "SIM",
+     "n": 10,
+     "dP_db": {"label": "SIM", "n": 10, "n_nonfinite": 0, "median": -2.412128, "p10": -5.35654, "p90": 6.696426, "mean": -1.206264, "min": -5.357743, "max": 6.706552},
+     "abs_dphi_rad": {"label": "SIM", "n": 10, "n_nonfinite": 0, "median": 2.572065, "p10": 1.315995, "p90": 2.825796, "mean": 2.142496, "min": 1.315989, "max": 2.825797},
+     "abs_dL_m": {"label": "SIM", "n": 10, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_floor_ceiling": {
+     "label": "SIM",
+     "n": 1462,
+     "dP_db": {"label": "SIM", "n": 1462, "n_nonfinite": 0, "median": -6.7e-05, "p10": -0.000406, "p90": 7e-06, "mean": -9.6e-05, "min": -0.003088, "max": 0.003395},
+     "abs_dphi_rad": {"label": "SIM", "n": 1462, "n_nonfinite": 0, "median": 2e-06, "p10": 0.0, "p90": 4.3e-05, "mean": 1.9e-05, "min": 0.0, "max": 0.000761},
+     "abs_dL_m": {"label": "SIM", "n": 1462, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 150,
+     "dP_db": {"label": "SIM", "n": 150, "n_nonfinite": 0, "median": -0.327867, "p10": -2.206726, "p90": 4.461565, "mean": 0.178379, "min": -7.067383, "max": 6.673175},
+     "abs_dphi_rad": {"label": "SIM", "n": 150, "n_nonfinite": 0, "median": 1.032936, "p10": 0.132958, "p90": 2.512482, "mean": 1.287417, "min": 0.013241, "max": 2.998998},
+     "abs_dL_m": {"label": "SIM", "n": 150, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_wall": {
+     "label": "SIM",
+     "n": 3018,
+     "dP_db": {"label": "SIM", "n": 3018, "n_nonfinite": 0, "median": 0.025459, "p10": 0.00059, "p90": 0.283631, "mean": 0.140775, "min": -0.002725, "max": 8.371056},
+     "abs_dphi_rad": {"label": "SIM", "n": 3018, "n_nonfinite": 0, "median": 0.000106, "p10": 4e-06, "p90": 0.001104, "mean": 0.000627, "min": 0.0, "max": 0.072934},
+     "abs_dL_m": {"label": "SIM", "n": 3018, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 4e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order1_wall+T": {
+     "label": "SIM",
+     "n": 170,
+     "dP_db": {"label": "SIM", "n": 170, "n_nonfinite": 0, "median": -0.31332, "p10": -2.312085, "p90": 3.773151, "mean": 0.446077, "min": -2.426569, "max": 32.961245},
+     "abs_dphi_rad": {"label": "SIM", "n": 170, "n_nonfinite": 0, "median": 2.57343, "p10": 0.952139, "p90": 2.82516, "mean": 2.321169, "min": 0.499332, "max": 2.868114},
+     "abs_dL_m": {"label": "SIM", "n": 170, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_floor_ceiling": {
+     "label": "SIM",
+     "n": 1354,
+     "dP_db": {"label": "SIM", "n": 1354, "n_nonfinite": 0, "median": -2.3e-05, "p10": -0.000109, "p90": -4e-06, "mean": -4.6e-05, "min": -0.000595, "max": 2.4e-05},
+     "abs_dphi_rad": {"label": "SIM", "n": 1354, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 2e-06, "mean": 1e-06, "min": 0.0, "max": 2.8e-05},
+     "abs_dL_m": {"label": "SIM", "n": 1354, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 2e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 228,
+     "dP_db": {"label": "SIM", "n": 228, "n_nonfinite": 0, "median": 0.312826, "p10": -2.766946, "p90": 3.4225, "mean": 0.356766, "min": -6.847919, "max": 8.978267},
+     "abs_dphi_rad": {"label": "SIM", "n": 228, "n_nonfinite": 0, "median": 1.492092, "p10": 0.267957, "p90": 2.55869, "mean": 1.496982, "min": 0.018632, "max": 3.034167},
+     "abs_dL_m": {"label": "SIM", "n": 228, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 1e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_floor_ceiling": {
+     "label": "SIM",
+     "n": 5407,
+     "dP_db": {"label": "SIM", "n": 5407, "n_nonfinite": 0, "median": 1.415937, "p10": 0.184972, "p90": 6.954915, "mean": 2.826357, "min": -0.063467, "max": 37.137721},
+     "abs_dphi_rad": {"label": "SIM", "n": 5407, "n_nonfinite": 0, "median": 0.005751, "p10": 0.000454, "p90": 0.032046, "mean": 0.052765, "min": 0.0, "max": 3.137711},
+     "abs_dL_m": {"label": "SIM", "n": 5407, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 3e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_floor_ceiling+T": {
+     "label": "SIM",
+     "n": 639,
+     "dP_db": {"label": "SIM", "n": 639, "n_nonfinite": 0, "median": 1.564387, "p10": -0.886303, "p90": 5.568185, "mean": 2.38624, "min": -6.77269, "max": 40.042441},
+     "abs_dphi_rad": {"label": "SIM", "n": 639, "n_nonfinite": 0, "median": 1.142993, "p10": 0.146792, "p90": 2.612469, "mean": 1.365778, "min": 0.00262, "max": 3.059275},
+     "abs_dL_m": {"label": "SIM", "n": 639, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 0.0, "min": 0.0, "max": 3e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_wall": {
+     "label": "SIM",
+     "n": 5572,
+     "dP_db": {"label": "SIM", "n": 5572, "n_nonfinite": 0, "median": 0.028417, "p10": 0.000989, "p90": 0.255845, "mean": 0.124882, "min": -0.005429, "max": 12.813763},
+     "abs_dphi_rad": {"label": "SIM", "n": 5572, "n_nonfinite": 0, "median": 0.00013, "p10": 8e-06, "p90": 0.001065, "mean": 0.000568, "min": 0.0, "max": 0.105928},
+     "abs_dL_m": {"label": "SIM", "n": 5572, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 1e-06, "min": 0.0, "max": 6e-06},
+     "n_dL_over_1cm": 0
+    },
+    "order2_wall_wall+T": {
+     "label": "SIM",
+     "n": 359,
+     "dP_db": {"label": "SIM", "n": 359, "n_nonfinite": 0, "median": -0.447275, "p10": -2.360491, "p90": 2.34168, "mean": 0.171937, "min": -2.441972, "max": 32.973605},
+     "abs_dphi_rad": {"label": "SIM", "n": 359, "n_nonfinite": 0, "median": 2.596594, "p10": 0.981312, "p90": 2.849186, "mean": 2.387592, "min": 0.455544, "max": 2.877752},
+     "abs_dL_m": {"label": "SIM", "n": 359, "n_nonfinite": 0, "median": 0.0, "p10": 0.0, "p90": 1e-06, "mean": 1e-06, "min": 0.0, "max": 3e-06},
+     "n_dL_over_1cm": 0
+    }
+   },
+   "unmatched": {
+    "label": "SIM",
+    "links": 906,
+    "links_with_rs_only": 688,
+    "links_with_s_only": 588,
+    "rs_only_paths_by_kind": {"order1": 638, "order2": 2761, "los": 72, "object_specular": 10},
+    "s_only_paths_by_class": {"order2_object": 1502, "order1_object": 116},
+    "links_with_los_blocked_in_sionna": 72,
+    "sionna_paths_dropped_as_blocked": 0
+   }
+  }
+ },
+ "full": {
+  "S0.3": {
+   "label": "SIM",
+   "overall": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 11.34639, "p10": 9.047906, "p90": 13.663823, "mean": 11.349357, "min": 6.726254, "max": 15.908878},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 11.452285, "p10": 9.140711, "p90": 13.702061, "mean": 11.392943, "min": 7.383556, "max": 14.269391},
+    "ds_s_full_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 3.309757, "p10": 2.219947, "p90": 4.694633, "mean": 3.469525, "min": 1.317814, "max": 11.031192},
+    "d_ds_full_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 7.932486, "p10": 5.177122, "p90": 10.524683, "mean": 7.879832, "min": 1.321982, "max": 14.354666},
+    "sel_rs_full_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 1.22211, "p10": 0.469971, "p90": 4.1662, "mean": 1.829605, "min": 0.185058, "max": 8.264633},
+    "sel_s_full_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.311719, "p10": 0.075403, "p90": 1.32611, "mean": 0.567263, "min": 0.009131, "max": 7.407301},
+    "d_sel_full_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.834407, "p10": -0.05839, "p90": 3.516868, "mean": 1.262342, "min": -4.277059, "max": 7.688817},
+    "ds_rs_spec_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.741754, "p10": 1.717937, "p90": 3.850815, "mean": 2.870947, "min": 0.520492, "max": 11.129219},
+    "ds_s_spec_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 3.185638, "p10": 2.132008, "p90": 4.623396, "mean": 3.374825, "min": 1.129039, "max": 11.285625},
+    "stoch_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -11.763501, "p10": -13.83333, "p90": -8.497901, "mean": -11.268748, "min": -14.88381, "max": -0.728548},
+    "diffuse_s_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -14.044578, "p10": -19.828431, "p90": -10.335534, "mean": -14.295884, "min": -22.469521, "max": 0.011474},
+    "points_rs_db": {"label": "SIM", "n": 810, "n_nonfinite": 96, "median": -17.67538, "p10": -29.575687, "p90": -11.528681, "mean": -19.255995, "min": -51.710422, "max": -1.320143},
+    "clutter_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -17.664915, "p10": -23.663859, "p90": -13.460663, "mean": -18.203495, "min": -43.45792, "max": -3.442737},
+    "tail_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -15.0, "p10": -15.0, "p90": -15.0, "mean": -15.0, "min": -15.0, "max": -15.0},
+    "ds_rs_spec_plus_points_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.804521, "p10": 1.752141, "p90": 3.863664, "mean": 2.907708, "min": 0.520493, "max": 10.278304},
+    "ds_rs_spec_plus_clutter_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.758406, "p10": 1.766988, "p90": 3.841625, "mean": 2.88631, "min": 0.533217, "max": 10.779851},
+    "ds_rs_spec_plus_tail_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 11.602324, "p10": 9.226391, "p90": 13.932295, "mean": 11.614763, "min": 6.906417, "max": 16.073997},
+    "ds_rs_tail_at_los_expected_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 5.44839, "p10": 5.019655, "p90": 6.017064, "mean": 5.54367, "min": 4.490377, "max": 10.286947}
+   },
+   "roomsim_cfr_check_max_rel_err": 0.0
+  },
+  "S0.7": {
+   "label": "SIM",
+   "overall": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 11.34639, "p10": 9.047906, "p90": 13.663823, "mean": 11.349357, "min": 6.726254, "max": 15.908878},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 11.452285, "p10": 9.140711, "p90": 13.702061, "mean": 11.392943, "min": 7.383556, "max": 14.269391},
+    "ds_s_full_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.991809, "p10": 2.145133, "p90": 4.267103, "mean": 3.186473, "min": 1.16159, "max": 8.367689},
+    "d_ds_full_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 8.270414, "p10": 5.329586, "p90": 10.882056, "mean": 8.162883, "min": 2.565589, "max": 14.250887},
+    "sel_rs_full_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 1.22211, "p10": 0.469971, "p90": 4.1662, "mean": 1.829605, "min": 0.185058, "max": 8.264633},
+    "sel_s_full_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 0.096973, "p10": 0.025888, "p90": 0.530895, "mean": 0.216268, "min": 0.002203, "max": 4.249161},
+    "d_sel_full_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 1.107536, "p10": 0.287942, "p90": 3.954389, "mean": 1.613337, "min": -3.062747, "max": 8.168598},
+    "ds_rs_spec_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.741754, "p10": 1.717937, "p90": 3.850815, "mean": 2.870947, "min": 0.520492, "max": 11.129219},
+    "ds_s_spec_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.12565, "p10": 1.336289, "p90": 3.021066, "mean": 2.297616, "min": 0.318197, "max": 10.913959},
+    "stoch_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -11.763501, "p10": -13.83333, "p90": -8.497901, "mean": -11.268748, "min": -14.88381, "max": -0.728548},
+    "diffuse_s_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -5.578069, "p10": -11.266974, "p90": 0.532748, "mean": -5.50322, "min": -13.662495, "max": 14.127187},
+    "points_rs_db": {"label": "SIM", "n": 810, "n_nonfinite": 96, "median": -17.67538, "p10": -29.575687, "p90": -11.528681, "mean": -19.255995, "min": -51.710422, "max": -1.320143},
+    "clutter_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -17.664915, "p10": -23.663859, "p90": -13.460663, "mean": -18.203495, "min": -43.45792, "max": -3.442737},
+    "tail_rs_db": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": -15.0, "p10": -15.0, "p90": -15.0, "mean": -15.0, "min": -15.0, "max": -15.0},
+    "ds_rs_spec_plus_points_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.804521, "p10": 1.752141, "p90": 3.863664, "mean": 2.907708, "min": 0.520493, "max": 10.278304},
+    "ds_rs_spec_plus_clutter_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 2.758406, "p10": 1.766988, "p90": 3.841625, "mean": 2.88631, "min": 0.533217, "max": 10.779851},
+    "ds_rs_spec_plus_tail_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 11.602324, "p10": 9.226391, "p90": 13.932295, "mean": 11.614763, "min": 6.906417, "max": 16.073997},
+    "ds_rs_tail_at_los_expected_ns": {"label": "SIM", "n": 906, "n_nonfinite": 0, "median": 5.44839, "p10": 5.019655, "p90": 6.017064, "mean": 5.54367, "min": 4.490377, "max": 10.286947}
+   },
+   "roomsim_cfr_check_max_rel_err": 0.0
+  }
+ },
+ "per_scene": {
+  "gen-000224": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -1e-06, "p10": -4e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.050793, "p10": 0.016065, "p90": 0.187613},
+    "cfr_corr": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.999668, "p10": 0.942013, "p90": 0.999998},
+    "cfr_corr_selective": {"label": "SIM", "n": 34, "n_nonfinite": 76, "median": 0.999905, "p10": 0.88251, "p90": 0.999999},
+    "cfr_rms_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.066038, "p10": 0.010789, "p90": 0.436666},
+    "cfr_offset_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.097108, "p10": -0.489532, "p90": 1.755693},
+    "ds_rs_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 3.016789, "p10": 2.239075, "p90": 3.365076},
+    "ds_s_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.983829, "p10": 2.229109, "p90": 3.344183},
+    "d_ds_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.017107, "p10": 0.0056, "p90": 0.07194},
+    "sel_rs_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.728626, "p10": 0.230895, "p90": 1.935512},
+    "sel_s_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.756207, "p10": 0.186913, "p90": 2.020087},
+    "d_sel_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.004101, "p10": -0.263283, "p90": 0.211623},
+    "higher_order_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.06331, "p10": 0.016691, "p90": 0.102561},
+    "rs_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 110, "median": null, "p10": null, "p90": null},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 110, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 76, "n_nonfinite": 34, "median": -0.0, "p10": -4e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.161876, "p10": -0.660138, "p90": 10.559852},
+    "cfr_corr": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.887677, "p10": -0.949821, "p90": 0.999007},
+    "cfr_corr_selective": {"label": "SIM", "n": 10, "n_nonfinite": 100, "median": 0.947716, "p10": -0.777332, "p90": 1.0},
+    "cfr_rms_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.278637, "p10": 0.063706, "p90": 1.832803},
+    "cfr_offset_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 1.044942, "p10": -4.590565, "p90": 11.318791},
+    "ds_rs_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.427878, "p10": 1.531726, "p90": 3.326734},
+    "ds_s_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.080987, "p10": 1.161214, "p90": 2.921284},
+    "d_ds_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.086682, "p10": -0.521911, "p90": 1.155659},
+    "sel_rs_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.350485, "p10": 0.101905, "p90": 1.741861},
+    "sel_s_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.247041, "p10": 0.07603, "p90": 1.408986},
+    "d_sel_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.073391, "p10": -0.3087, "p90": 1.155818},
+    "higher_order_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.098011, "p10": 0.016849, "p90": 1.022694},
+    "rs_only_frac_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -21.74286, "p10": -48.585228, "p90": -0.454545},
+    "s_only_frac_db": {"label": "SIM", "n": 80, "n_nonfinite": 30, "median": -15.880051, "p10": -41.064978, "p90": -5.359095}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 8.878885, "p10": 7.629849, "p90": 10.208025},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 9.153805, "p10": 8.244234, "p90": 9.650201},
+    "ds_s_full_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.789368, "p10": 2.105689, "p90": 5.032758},
+    "d_ds_full_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 6.207798, "p10": 3.384443, "p90": 7.467193},
+    "sel_rs_full_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 1.094437, "p10": 0.364892, "p90": 3.629167},
+    "sel_s_full_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.193958, "p10": 0.047705, "p90": 0.836947},
+    "d_sel_full_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.842449, "p10": -0.195749, "p90": 3.290026},
+    "stoch_rs_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -12.177205, "p10": -13.610998, "p90": -6.166317},
+    "diffuse_s_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -13.146068, "p10": -19.003006, "p90": -3.612239}
+   }
+  },
+  "gen-000288": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -1e-06, "p10": -5e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.014291, "p10": 0.002101, "p90": 0.113137},
+    "cfr_corr": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.991778, "p10": 0.739007, "p90": 0.999973},
+    "cfr_corr_selective": {"label": "SIM", "n": 20, "n_nonfinite": 90, "median": 0.999511, "p10": 0.964727, "p90": 0.999997},
+    "cfr_rms_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.095652, "p10": 0.034165, "p90": 0.396687},
+    "cfr_offset_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -0.010088, "p10": -0.431206, "p90": 0.614589},
+    "ds_rs_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.698482, "p10": 1.764577, "p90": 3.460701},
+    "ds_s_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.665719, "p10": 1.730375, "p90": 3.447054},
+    "d_ds_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.014693, "p10": 0.003626, "p90": 0.150777},
+    "sel_rs_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.433665, "p10": 0.104813, "p90": 1.547027},
+    "sel_s_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.440049, "p10": 0.130693, "p90": 1.475748},
+    "d_sel_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.00763, "p10": -0.117329, "p90": 0.211676},
+    "higher_order_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.02293, "p10": 0.009045, "p90": 0.071954},
+    "rs_only_frac_db": {"label": "SIM", "n": 13, "n_nonfinite": 97, "median": -48.697897, "p10": -58.43224, "p90": -45.06251},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 110, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 84, "n_nonfinite": 26, "median": -1e-06, "p10": -5e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.022456, "p10": -0.284413, "p90": 4.100475},
+    "cfr_corr": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.948916, "p10": -0.399333, "p90": 0.999095},
+    "cfr_corr_selective": {"label": "SIM", "n": 16, "n_nonfinite": 94, "median": 0.963012, "p10": -0.144202, "p90": 0.99748},
+    "cfr_rms_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.25367, "p10": 0.047783, "p90": 1.70164},
+    "cfr_offset_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -0.013513, "p10": -5.334714, "p90": 10.282239},
+    "ds_rs_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.237992, "p10": 1.344182, "p90": 4.065108},
+    "ds_s_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.490712, "p10": 1.334912, "p90": 4.765071},
+    "d_ds_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.022719, "p10": -2.26554, "p90": 1.144251},
+    "sel_rs_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.352856, "p10": 0.114877, "p90": 1.544483},
+    "sel_s_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.398441, "p10": 0.081709, "p90": 2.019716},
+    "d_sel_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.014051, "p10": -0.726794, "p90": 0.482346},
+    "higher_order_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.040813, "p10": 0.010937, "p90": 0.445838},
+    "rs_only_frac_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -34.924798, "p10": -54.430192, "p90": -2.493855},
+    "s_only_frac_db": {"label": "SIM", "n": 74, "n_nonfinite": 36, "median": -18.596824, "p10": -31.430931, "p90": -5.085595}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 13.494326, "p10": 10.418755, "p90": 14.438059},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 13.782865, "p10": 10.590975, "p90": 14.113786},
+    "ds_s_full_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 2.872213, "p10": 1.74021, "p90": 4.97387},
+    "d_ds_full_ns": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 10.492134, "p10": 5.92502, "p90": 12.050418},
+    "sel_rs_full_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 1.269148, "p10": 0.458201, "p90": 6.172645},
+    "sel_s_full_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.37869, "p10": 0.064255, "p90": 1.533286},
+    "d_sel_full_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": 0.79762, "p10": -0.127297, "p90": 5.20683},
+    "stoch_rs_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -10.339555, "p10": -14.243263, "p90": -6.753152},
+    "diffuse_s_db": {"label": "SIM", "n": 110, "n_nonfinite": 0, "median": -14.882686, "p10": -19.771986, "p90": -5.618721}
+   }
+  },
+  "gen-000393": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -1e-06, "p10": -2e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.028928, "p10": 0.00652, "p90": 0.195152},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.999282, "p10": 0.958259, "p90": 0.999995},
+    "cfr_corr_selective": {"label": "SIM", "n": 20, "n_nonfinite": 70, "median": 0.999498, "p10": 0.994836, "p90": 0.999999},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.030988, "p10": 0.005108, "p90": 0.150155},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.067703, "p10": -0.318802, "p90": 0.592753},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.333694, "p10": 2.266553, "p90": 3.957226},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.263141, "p10": 2.260276, "p90": 3.928995},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.011388, "p10": 0.000607, "p90": 0.063389},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.403919, "p10": 0.120797, "p90": 1.238763},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.36909, "p10": 0.124566, "p90": 1.318468},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.000385, "p10": -0.053364, "p90": 0.116851},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.022902, "p10": 0.010239, "p90": 0.034002},
+    "rs_only_frac_db": {"label": "SIM", "n": 16, "n_nonfinite": 74, "median": -38.990427, "p10": -47.396517, "p90": -27.514508},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -1e-06, "p10": -2e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.028928, "p10": 0.00652, "p90": 0.195152},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.999281, "p10": 0.958262, "p90": 0.999995},
+    "cfr_corr_selective": {"label": "SIM", "n": 20, "n_nonfinite": 70, "median": 0.999498, "p10": 0.994836, "p90": 0.999999},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.030988, "p10": 0.005106, "p90": 0.150155},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.067701, "p10": -0.318801, "p90": 0.592754},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.333694, "p10": 2.266553, "p90": 3.957226},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.263142, "p10": 2.260277, "p90": 3.928995},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.011388, "p10": 0.000607, "p90": 0.063389},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.403919, "p10": 0.120797, "p90": 1.238763},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.369089, "p10": 0.124566, "p90": 1.318462},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.000385, "p10": -0.053369, "p90": 0.116849},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.022902, "p10": 0.010239, "p90": 0.034002},
+    "rs_only_frac_db": {"label": "SIM", "n": 16, "n_nonfinite": 74, "median": -38.990427, "p10": -47.396517, "p90": -27.514508},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 12.102919, "p10": 10.944098, "p90": 13.002751},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 12.257089, "p10": 11.723372, "p90": 12.61517},
+    "ds_s_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.533477, "p10": 2.718015, "p90": 4.171506},
+    "d_ds_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 8.488048, "p10": 7.297026, "p90": 9.938762},
+    "sel_rs_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 1.344301, "p10": 0.65986, "p90": 2.642691},
+    "sel_s_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.355778, "p10": 0.095595, "p90": 1.164447},
+    "d_sel_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.968198, "p10": 0.231224, "p90": 2.312132},
+    "stoch_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -12.892223, "p10": -14.222232, "p90": -11.71101},
+    "diffuse_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -15.379746, "p10": -21.034626, "p90": -13.326161}
+   }
+  },
+  "gen-001018": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.045189, "p10": 0.005936, "p90": 0.104029},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.999691, "p10": 0.946773, "p90": 0.999997},
+    "cfr_corr_selective": {"label": "SIM", "n": 12, "n_nonfinite": 78, "median": 0.99951, "p10": 0.974652, "p90": 0.999894},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.048078, "p10": 0.00539, "p90": 0.307696},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.174277, "p10": -0.299538, "p90": 1.342861},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.953475, "p10": 2.021618, "p90": 3.441016},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.906043, "p10": 2.019428, "p90": 3.422846},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.01806, "p10": 0.004253, "p90": 0.094566},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.440494, "p10": 0.178966, "p90": 1.450351},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.463774, "p10": 0.146023, "p90": 1.31132},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.002632, "p10": -0.146068, "p90": 0.08785},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.026548, "p10": 0.007877, "p90": 0.065142},
+    "rs_only_frac_db": {"label": "SIM", "n": 4, "n_nonfinite": 86, "median": -40.138225, "p10": -50.102358, "p90": -30.174092},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 74, "n_nonfinite": 16, "median": -1e-06, "p10": -3e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -0.026677, "p10": -0.678236, "p90": 0.428423},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.977842, "p10": -0.767435, "p90": 0.999729},
+    "cfr_corr_selective": {"label": "SIM", "n": 6, "n_nonfinite": 84, "median": 0.681082, "p10": -0.934872, "p90": 0.99973},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.345786, "p10": 0.055037, "p90": 1.493421},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -0.023406, "p10": -4.550233, "p90": 1.848113},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.624794, "p10": 1.776296, "p90": 5.409229},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.61842, "p10": 1.797023, "p90": 5.380961},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -0.043175, "p10": -0.705493, "p90": 0.628321},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.478509, "p10": 0.146388, "p90": 1.940413},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.583581, "p10": 0.137878, "p90": 1.114573},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -0.000252, "p10": -0.506856, "p90": 0.735716},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.0728, "p10": 0.024773, "p90": 0.521789},
+    "rs_only_frac_db": {"label": "SIM", "n": 86, "n_nonfinite": 4, "median": -40.895946, "p10": -56.715032, "p90": -10.031217},
+    "s_only_frac_db": {"label": "SIM", "n": 74, "n_nonfinite": 16, "median": -15.902841, "p10": -26.093994, "p90": -7.078551}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 12.129915, "p10": 11.144903, "p90": 12.890207},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 12.380083, "p10": 11.278238, "p90": 12.794259},
+    "ds_s_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.104, "p10": 2.228847, "p90": 6.859524},
+    "d_ds_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 8.84025, "p10": 4.954978, "p90": 10.205212},
+    "sel_rs_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 1.282486, "p10": 0.560106, "p90": 3.693001},
+    "sel_s_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.38731, "p10": 0.111356, "p90": 1.202217},
+    "d_sel_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.820118, "p10": -0.073992, "p90": 3.097583},
+    "stoch_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -10.102598, "p10": -12.473946, "p90": -4.661527},
+    "diffuse_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -13.551869, "p10": -18.024424, "p90": -10.280679}
+   }
+  },
+  "gen-001023": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -1e-06, "p10": -2e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.043144, "p10": 0.006948, "p90": 0.149252},
+    "cfr_corr": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.999857, "p10": 0.990805, "p90": 0.999995},
+    "cfr_corr_selective": {"label": "SIM", "n": 36, "n_nonfinite": 96, "median": 0.999851, "p10": 0.979969, "p90": 0.999993},
+    "cfr_rms_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.023183, "p10": 0.004206, "p90": 0.172186},
+    "cfr_offset_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.082567, "p10": -0.443762, "p90": 0.491788},
+    "ds_rs_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.315199, "p10": 2.256009, "p90": 3.974345},
+    "ds_s_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.315563, "p10": 2.250631, "p90": 3.967952},
+    "d_ds_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.007498, "p10": -0.003412, "p90": 0.039704},
+    "sel_rs_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.44677, "p10": 0.131587, "p90": 1.578056},
+    "sel_s_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.463575, "p10": 0.134472, "p90": 1.456996},
+    "d_sel_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -0.000724, "p10": -0.045255, "p90": 0.069745},
+    "higher_order_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.041304, "p10": 0.017572, "p90": 0.078659},
+    "rs_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 132, "median": null, "p10": null, "p90": null},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 132, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 130, "n_nonfinite": 2, "median": -1e-06, "p10": -2e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.035669, "p10": -0.014399, "p90": 0.151484},
+    "cfr_corr": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.998055, "p10": 0.119197, "p90": 0.999968},
+    "cfr_corr_selective": {"label": "SIM", "n": 30, "n_nonfinite": 102, "median": 0.999662, "p10": 0.98785, "p90": 0.999981},
+    "cfr_rms_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.084121, "p10": 0.017941, "p90": 0.583958},
+    "cfr_offset_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.147732, "p10": -1.092628, "p90": 1.562992},
+    "ds_rs_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.256257, "p10": 2.44744, "p90": 3.94941},
+    "ds_s_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.271001, "p10": 2.219062, "p90": 3.946347},
+    "d_ds_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.010674, "p10": -0.012266, "p90": 0.232493},
+    "sel_rs_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.450446, "p10": 0.151034, "p90": 1.552946},
+    "sel_s_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.481039, "p10": 0.153974, "p90": 1.719349},
+    "d_sel_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -0.010158, "p10": -0.219085, "p90": 0.178775},
+    "higher_order_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.04102, "p10": 0.01758, "p90": 0.073177},
+    "rs_only_frac_db": {"label": "SIM", "n": 60, "n_nonfinite": 72, "median": -40.647543, "p10": -51.103541, "p90": -23.678365},
+    "s_only_frac_db": {"label": "SIM", "n": 106, "n_nonfinite": 26, "median": -31.288537, "p10": -63.436494, "p90": -17.309251}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 10.970204, "p10": 9.944778, "p90": 12.173835},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 11.248625, "p10": 10.451882, "p90": 11.646064},
+    "ds_s_full_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.629264, "p10": 2.695939, "p90": 4.489435},
+    "d_ds_full_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 7.467809, "p10": 5.857343, "p90": 8.964644},
+    "sel_rs_full_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 1.204072, "p10": 0.541548, "p90": 5.610434},
+    "sel_s_full_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.339485, "p10": 0.123087, "p90": 1.654225},
+    "d_sel_full_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.76654, "p10": 0.023001, "p90": 4.240183},
+    "stoch_rs_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -11.752577, "p10": -13.686236, "p90": -10.308608},
+    "diffuse_s_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -13.54402, "p10": -20.593626, "p90": -11.73084}
+   }
+  },
+  "gen-001515": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.020885, "p10": 0.011677, "p90": 0.057997},
+    "cfr_corr": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.999928, "p10": 0.997191, "p90": 0.999994},
+    "cfr_corr_selective": {"label": "SIM", "n": 8, "n_nonfinite": 12, "median": 0.999831, "p10": 0.986274, "p90": 0.999999},
+    "cfr_rms_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.040887, "p10": 0.003252, "p90": 0.249312},
+    "cfr_offset_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.136804, "p10": -0.449361, "p90": 1.304886},
+    "ds_rs_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 3.415319, "p10": 2.220006, "p90": 3.72148},
+    "ds_s_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 3.400073, "p10": 2.192764, "p90": 3.70767},
+    "d_ds_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.010696, "p10": 0.001033, "p90": 0.020756},
+    "sel_rs_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.789184, "p10": 0.293186, "p90": 2.312916},
+    "sel_s_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.826235, "p10": 0.293138, "p90": 2.089223},
+    "d_sel_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": -0.004819, "p10": -0.03925, "p90": 0.223548},
+    "higher_order_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.042903, "p10": 0.02976, "p90": 0.090155},
+    "rs_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 20, "median": null, "p10": null, "p90": null},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 20, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 14, "n_nonfinite": 6, "median": -1e-06, "p10": -6e-06, "p90": 0.0},
+    "d_spec_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.029916, "p10": -0.22576, "p90": 0.399048},
+    "cfr_corr": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.945136, "p10": -0.961579, "p90": 0.999223},
+    "cfr_corr_selective": {"label": "SIM", "n": 6, "n_nonfinite": 14, "median": 0.948347, "p10": -0.973503, "p90": 0.999532},
+    "cfr_rms_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.212741, "p10": 0.045872, "p90": 1.833405},
+    "cfr_offset_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.139383, "p10": -0.273202, "p90": 1.409577},
+    "ds_rs_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 2.759344, "p10": 1.655378, "p90": 5.415623},
+    "ds_s_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 2.806531, "p10": 1.565296, "p90": 5.244765},
+    "d_ds_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.022017, "p10": -0.513218, "p90": 0.525508},
+    "sel_rs_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.579029, "p10": 0.095238, "p90": 1.771721},
+    "sel_s_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.424387, "p10": 0.086443, "p90": 2.308836},
+    "d_sel_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.007933, "p10": -0.251357, "p90": 0.204275},
+    "higher_order_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.057818, "p10": 0.028377, "p90": 1.020377},
+    "rs_only_frac_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": -32.077295, "p10": -50.631687, "p90": -14.761689},
+    "s_only_frac_db": {"label": "SIM", "n": 11, "n_nonfinite": 9, "median": -15.943101, "p10": -45.306635, "p90": -11.354835}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 11.761532, "p10": 10.734154, "p90": 12.652765},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 11.696057, "p10": 10.993121, "p90": 12.193545},
+    "ds_s_full_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 3.235072, "p10": 2.457132, "p90": 5.797129},
+    "d_ds_full_ns": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 8.334102, "p10": 4.514799, "p90": 9.304352},
+    "sel_rs_full_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 1.489963, "p10": 0.644504, "p90": 6.983326},
+    "sel_s_full_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 0.287451, "p10": 0.073333, "p90": 2.109768},
+    "d_sel_full_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": 1.411241, "p10": 0.139805, "p90": 5.558828},
+    "stoch_rs_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": -12.222675, "p10": -13.400803, "p90": -9.750462},
+    "diffuse_s_db": {"label": "SIM", "n": 20, "n_nonfinite": 0, "median": -13.664435, "p10": -17.244575, "p90": -9.446941}
+   }
+  },
+  "gen-001600": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -1e-06, "p10": -6e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.018733, "p10": 0.002262, "p90": 0.171287},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.999882, "p10": 0.929296, "p90": 1.0},
+    "cfr_corr_selective": {"label": "SIM", "n": 16, "n_nonfinite": 74, "median": 0.999995, "p10": 0.998525, "p90": 1.0},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.037394, "p10": 0.001916, "p90": 0.160627},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.013336, "p10": -0.390005, "p90": 0.940767},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.119494, "p10": 2.120845, "p90": 3.84889},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.129884, "p10": 2.117137, "p90": 3.845988},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.007996, "p10": -0.005237, "p90": 0.049392},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.44829, "p10": 0.113681, "p90": 1.786612},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.45285, "p10": 0.132766, "p90": 1.727658},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.004047, "p10": -0.035343, "p90": 0.117659},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.055153, "p10": 0.014048, "p90": 0.116897},
+    "rs_only_frac_db": {"label": "SIM", "n": 4, "n_nonfinite": 86, "median": -28.859766, "p10": -30.9676, "p90": -25.279689},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -1e-06, "p10": -6e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.012347, "p10": -0.562945, "p90": 0.171254},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.997072, "p10": 0.813335, "p90": 0.999861},
+    "cfr_corr_selective": {"label": "SIM", "n": 12, "n_nonfinite": 78, "median": 0.999559, "p10": 0.991282, "p90": 0.999965},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.12162, "p10": 0.009438, "p90": 0.993295},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.0271, "p10": -1.695372, "p90": 1.473409},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.054331, "p10": 2.121863, "p90": 3.807774},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.093362, "p10": 2.117482, "p90": 3.790004},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.010485, "p10": -0.245063, "p90": 0.16485},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.446165, "p10": 0.101692, "p90": 1.572027},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.355473, "p10": 0.124372, "p90": 1.474147},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.002781, "p10": -0.296797, "p90": 0.246156},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.058494, "p10": 0.01332, "p90": 0.151281},
+    "rs_only_frac_db": {"label": "SIM", "n": 82, "n_nonfinite": 8, "median": -43.560886, "p10": -82.815438, "p90": -25.521404},
+    "s_only_frac_db": {"label": "SIM", "n": 60, "n_nonfinite": 30, "median": -26.318747, "p10": -42.655238, "p90": -8.844117}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 13.566136, "p10": 12.858413, "p90": 14.704732},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 13.632506, "p10": 13.178613, "p90": 13.960904},
+    "ds_s_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 3.68916, "p10": 2.601384, "p90": 4.403263},
+    "d_ds_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 9.847827, "p10": 8.778633, "p90": 11.591689},
+    "sel_rs_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 1.294338, "p10": 0.452581, "p90": 3.598848},
+    "sel_s_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.197224, "p10": 0.071988, "p90": 0.992006},
+    "d_sel_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.884807, "p10": 0.113485, "p90": 3.34444},
+    "stoch_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -11.941751, "p10": -13.355174, "p90": -10.131042},
+    "diffuse_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -13.747727, "p10": -19.118943, "p90": -11.929765}
+   }
+  },
+  "gen-001691": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -0.0, "p10": -2e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.021321, "p10": 0.003661, "p90": 0.059784},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.999784, "p10": 0.969063, "p90": 0.999999},
+    "cfr_corr_selective": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.013069, "p10": 0.002634, "p90": 0.070706},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.020722, "p10": -0.237004, "p90": 0.192878},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.659619, "p10": 1.398815, "p90": 3.342869},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.622975, "p10": 1.396428, "p90": 3.330827},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.011631, "p10": 0.001263, "p90": 0.029544},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.343135, "p10": 0.112992, "p90": 0.726531},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.341223, "p10": 0.084225, "p90": 0.719391},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.002562, "p10": -0.021119, "p90": 0.03066},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.023392, "p10": 0.008643, "p90": 0.031059},
+    "rs_only_frac_db": {"label": "SIM", "n": 3, "n_nonfinite": 87, "median": -48.218753, "p10": -48.218753, "p90": -30.738049},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 86, "n_nonfinite": 4, "median": -1e-06, "p10": -2e-06, "p90": 1e-06},
+    "d_spec_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.007254, "p10": -0.09011, "p90": 0.053063},
+    "cfr_corr": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.998636, "p10": 0.680435, "p90": 0.999957},
+    "cfr_corr_selective": {"label": "SIM", "n": 0, "n_nonfinite": 90, "median": null, "p10": null, "p90": null},
+    "cfr_rms_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.038205, "p10": 0.006922, "p90": 0.357812},
+    "cfr_offset_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.052786, "p10": -0.471763, "p90": 0.91394},
+    "ds_rs_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.625976, "p10": 1.367066, "p90": 3.433122},
+    "ds_s_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.610816, "p10": 1.381588, "p90": 3.412206},
+    "d_ds_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.007154, "p10": -0.13434, "p90": 0.04419},
+    "sel_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.302076, "p10": 0.119729, "p90": 0.710247},
+    "sel_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.308264, "p10": 0.138091, "p90": 0.784417},
+    "d_sel_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.000814, "p10": -0.215585, "p90": 0.072805},
+    "higher_order_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.026394, "p10": 0.009107, "p90": 0.053396},
+    "rs_only_frac_db": {"label": "SIM", "n": 86, "n_nonfinite": 4, "median": -49.9259, "p10": -80.216929, "p90": -32.644611},
+    "s_only_frac_db": {"label": "SIM", "n": 47, "n_nonfinite": 43, "median": -21.305144, "p10": -39.389864, "p90": -11.25032}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 11.632341, "p10": 10.835472, "p90": 12.383285},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 11.541839, "p10": 10.888828, "p90": 11.815075},
+    "ds_s_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 2.897854, "p10": 2.012802, "p90": 3.590828},
+    "d_ds_full_ns": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 8.682167, "p10": 7.33774, "p90": 10.176523},
+    "sel_rs_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 1.094512, "p10": 0.423547, "p90": 4.340384},
+    "sel_s_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.411837, "p10": 0.125937, "p90": 1.396318},
+    "d_sel_full_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": 0.696421, "p10": -0.31357, "p90": 3.000868},
+    "stoch_rs_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -10.781549, "p10": -13.366862, "p90": -8.957925},
+    "diffuse_s_db": {"label": "SIM", "n": 90, "n_nonfinite": 0, "median": -14.549789, "p10": -19.398096, "p90": -12.423152}
+   }
+  },
+  "gen-001722": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": -1e-06, "p10": -4e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.033108, "p10": 0.009707, "p90": 0.069511},
+    "cfr_corr": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.999776, "p10": 0.993213, "p90": 0.999998},
+    "cfr_corr_selective": {"label": "SIM", "n": 8, "n_nonfinite": 34, "median": 0.999868, "p10": 0.995162, "p90": 1.0},
+    "cfr_rms_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.033307, "p10": 0.004219, "p90": 0.14607},
+    "cfr_offset_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.004458, "p10": -0.406738, "p90": 0.357073},
+    "ds_rs_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 2.60586, "p10": 2.216704, "p90": 3.149953},
+    "ds_s_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 2.582027, "p10": 2.211605, "p90": 3.138842},
+    "d_ds_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.009089, "p10": 0.00506, "p90": 0.023914},
+    "sel_rs_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.431131, "p10": 0.157409, "p90": 1.488844},
+    "sel_s_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.406508, "p10": 0.151303, "p90": 1.428916},
+    "d_sel_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.020912, "p10": -0.024956, "p90": 0.143118},
+    "higher_order_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.019126, "p10": 0.007279, "p90": 0.022855},
+    "rs_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 42, "median": null, "p10": null, "p90": null},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 42, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": -1e-06, "p10": -4e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.028633, "p10": -0.128912, "p90": 0.069511},
+    "cfr_corr": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.998712, "p10": 0.959891, "p90": 0.999979},
+    "cfr_corr_selective": {"label": "SIM", "n": 6, "n_nonfinite": 36, "median": 0.999853, "p10": 0.998902, "p90": 0.999978},
+    "cfr_rms_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.059256, "p10": 0.006391, "p90": 0.251543},
+    "cfr_offset_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": -0.153192, "p10": -0.605363, "p90": 0.508659},
+    "ds_rs_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 2.543004, "p10": 2.188928, "p90": 3.148289},
+    "ds_s_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 2.582027, "p10": 2.194025, "p90": 3.150171},
+    "d_ds_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.00595, "p10": -0.239293, "p90": 0.044399},
+    "sel_rs_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.425728, "p10": 0.131047, "p90": 1.480275},
+    "sel_s_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.368381, "p10": 0.184407, "p90": 1.088727},
+    "d_sel_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.024623, "p10": -0.055774, "p90": 0.23124},
+    "higher_order_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.023076, "p10": 0.007633, "p90": 0.048257},
+    "rs_only_frac_db": {"label": "SIM", "n": 32, "n_nonfinite": 10, "median": -65.242599, "p10": -81.225345, "p90": -36.649504},
+    "s_only_frac_db": {"label": "SIM", "n": 16, "n_nonfinite": 26, "median": -17.249192, "p10": -26.426425, "p90": -12.593201}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 9.047906, "p10": 7.760057, "p90": 10.02374},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 8.981337, "p10": 8.696446, "p90": 9.199663},
+    "ds_s_full_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 2.860837, "p10": 2.502014, "p90": 3.465682},
+    "d_ds_full_ns": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 6.011301, "p10": 4.945683, "p90": 7.313155},
+    "sel_rs_full_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 1.143297, "p10": 0.672253, "p90": 3.354228},
+    "sel_s_full_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.205827, "p10": 0.055635, "p90": 0.992664},
+    "d_sel_full_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": 0.936122, "p10": 0.213679, "p90": 3.330417},
+    "stoch_rs_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": -10.765346, "p10": -13.194075, "p90": -9.502461},
+    "diffuse_s_db": {"label": "SIM", "n": 42, "n_nonfinite": 0, "median": -14.449399, "p10": -20.336451, "p90": -12.309339}
+   }
+  },
+  "gen-001865": {
+   "shell": {
+    "d_los_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -1e-06, "p10": -3e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.013143, "p10": 0.004505, "p90": 0.07924},
+    "cfr_corr": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.999902, "p10": 0.997538, "p90": 1.0},
+    "cfr_corr_selective": {"label": "SIM", "n": 26, "n_nonfinite": 106, "median": 0.999897, "p10": 0.977008, "p90": 0.999999},
+    "cfr_rms_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.020097, "p10": 0.002232, "p90": 0.196947},
+    "cfr_offset_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.046931, "p10": -0.176071, "p90": 0.57014},
+    "ds_rs_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.374591, "p10": 2.305287, "p90": 3.872476},
+    "ds_s_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.37209, "p10": 2.301299, "p90": 3.855682},
+    "d_ds_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.005627, "p10": 0.000477, "p90": 0.031856},
+    "sel_rs_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.556664, "p10": 0.13662, "p90": 1.46823},
+    "sel_s_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.556465, "p10": 0.10526, "p90": 1.55819},
+    "d_sel_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.000883, "p10": -0.073678, "p90": 0.062773},
+    "higher_order_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.060742, "p10": 0.012491, "p90": 0.122841},
+    "rs_only_frac_db": {"label": "SIM", "n": 6, "n_nonfinite": 126, "median": -31.367796, "p10": -56.465242, "p90": -30.236191},
+    "s_only_frac_db": {"label": "SIM", "n": 0, "n_nonfinite": 132, "median": null, "p10": null, "p90": null}
+   },
+   "furnished": {
+    "d_los_db": {"label": "SIM", "n": 116, "n_nonfinite": 16, "median": -1e-06, "p10": -2e-06, "p90": 2e-06},
+    "d_spec_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.008658, "p10": -0.385756, "p90": 0.108021},
+    "cfr_corr": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.98296, "p10": 0.569415, "p90": 0.999927},
+    "cfr_corr_selective": {"label": "SIM", "n": 20, "n_nonfinite": 112, "median": 0.990373, "p10": -0.157046, "p90": 0.999989},
+    "cfr_rms_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.242638, "p10": 0.013253, "p90": 2.048373},
+    "cfr_offset_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.01763, "p10": -2.693459, "p90": 2.079488},
+    "ds_rs_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 2.87124, "p10": 1.971986, "p90": 3.852107},
+    "ds_s_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 2.993244, "p10": 2.069022, "p90": 4.166919},
+    "d_ds_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -0.011181, "p10": -0.912551, "p90": 0.112751},
+    "sel_rs_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.573477, "p10": 0.121742, "p90": 2.241788},
+    "sel_s_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.480736, "p10": 0.168945, "p90": 2.962676},
+    "d_sel_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.000477, "p10": -1.220115, "p90": 0.376053},
+    "higher_order_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.085483, "p10": 0.011418, "p90": 0.759358},
+    "rs_only_frac_db": {"label": "SIM", "n": 126, "n_nonfinite": 6, "median": -38.223668, "p10": -53.98684, "p90": -13.566701},
+    "s_only_frac_db": {"label": "SIM", "n": 80, "n_nonfinite": 52, "median": -19.231187, "p10": -28.694895, "p90": -8.942235}
+   },
+   "full_S0.3": {
+    "ds_rs_full_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 10.406962, "p10": 9.63307, "p90": 11.37831},
+    "ds_rs_full_expected_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 10.505472, "p10": 9.869384, "p90": 11.068759},
+    "ds_s_full_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 3.806562, "p10": 2.601092, "p90": 5.7622},
+    "d_ds_full_ns": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 6.512349, "p10": 4.936594, "p90": 7.914999},
+    "sel_rs_full_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 1.166433, "p10": 0.429864, "p90": 3.206402},
+    "sel_s_full_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.324794, "p10": 0.079026, "p90": 1.56972},
+    "d_sel_full_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": 0.786488, "p10": -0.126736, "p90": 2.82502},
+    "stoch_rs_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -12.039153, "p10": -13.953599, "p90": -9.447079},
+    "diffuse_s_db": {"label": "SIM", "n": 132, "n_nonfinite": 0, "median": -12.659824, "p10": -19.893392, "p90": -10.161142}
+   }
+  }
+ },
+ "reproducibility": {
+  "label": "SIM",
+  "scene": "gen-001515",
+  "variant": "furnished",
+  "seeds": [42, 43],
+  "same_path_counts": false,
+  "links": 20,
+  "links_with_other_path_counts": 3,
+  "max_abs_change": {"d_los_db": 0.0, "d_spec_db": 4e-06, "cfr_corr": 0.002055, "cfr_corr_selective": 0.002055, "cfr_rms_db": 0.013223, "cfr_offset_db": 0.001028, "ds_rs_ns": 0.0, "ds_s_ns": 5.8e-05, "d_ds_ns": 5.8e-05, "sel_rs_db": 0.0, "sel_s_db": 0.022886, "d_sel_db": 0.022886, "higher_order_db": 0.015883, "rs_only_frac_db": 0.0, "s_only_frac_db": 0.0}
+ },
+ "slab_check": {
+  "label": "SIM",
+  "formula": {
+   "label": "SIM",
+   "angles_deg": [0.0, 15.0, 30.0, 45.0, 60.0, 75.0, 85.0],
+   "thicknesses_m": [0.1, 0.2],
+   "worst": {"R_abs_err": 1.9e-05, "R_db_err": 0.000933, "T_db_err": 0.000319, "T_phase_minus_q0_err": 1.3e-05},
+   "objects_halfspace": [
+    {"material": "metal", "halfspace_thickness_m": 0.01, "max_abs_err_G_vs_sionna_R": 0.0},
+    {"material": "wood", "halfspace_thickness_m": 8.475677, "max_abs_err_G_vs_sionna_R": 0.0},
+    {"material": "glass", "halfspace_thickness_m": 15.521536, "max_abs_err_G_vs_sionna_R": 1e-06}
+   ],
+   "rows": [
+    {
+     "material": "concrete",
+     "itu": "concrete",
+     "thickness_m": 0.1,
+     "R_abs_err": 0.0,
+     "R_db_err": 6e-06,
+     "T_db_err": 2.3e-05,
+     "T_phase_minus_q0_err": 0.0,
+     "R_db_roomsim_range": [-17.669829, -0.577828],
+     "T_db_roomsim_range": [-24.435698, -7.253601]
+    },
+    {
+     "material": "concrete",
+     "itu": "concrete",
+     "thickness_m": 0.2,
+     "R_abs_err": 0.0,
+     "R_db_err": 3e-06,
+     "T_db_err": 4.8e-05,
+     "T_phase_minus_q0_err": 1e-06,
+     "R_db_roomsim_range": [-19.409068, -0.715702],
+     "T_db_roomsim_range": [-30.921573, -14.369395]
+    },
+    {
+     "material": "brick",
+     "itu": "brick",
+     "thickness_m": 0.1,
+     "R_abs_err": 2e-06,
+     "R_db_err": 1.8e-05,
+     "T_db_err": 3.8e-05,
+     "T_phase_minus_q0_err": 2e-06,
+     "R_db_roomsim_range": [-29.76649, -0.600823],
+     "T_db_roomsim_range": [-17.442881, -2.532606]
+    },
+    {
+     "material": "brick",
+     "itu": "brick",
+     "thickness_m": 0.2,
+     "R_abs_err": 2e-06,
+     "R_db_err": 2.7e-05,
+     "T_db_err": 7.1e-05,
+     "T_phase_minus_q0_err": 2e-06,
+     "R_db_roomsim_range": [-26.386913, -0.517139],
+     "T_db_roomsim_range": [-21.729913, -5.064755]
+    },
+    {
+     "material": "drywall",
+     "itu": "plasterboard",
+     "thickness_m": 0.1,
+     "R_abs_err": 2e-06,
+     "R_db_err": 3e-05,
+     "T_db_err": 3.8e-05,
+     "T_phase_minus_q0_err": 1e-06,
+     "R_db_roomsim_range": [-33.115691, -1.393062],
+     "T_db_roomsim_range": [-13.320849, -2.281034]
+    },
+    {
+     "material": "drywall",
+     "itu": "plasterboard",
+     "thickness_m": 0.2,
+     "R_abs_err": 2e-06,
+     "R_db_err": 1.9e-05,
+     "T_db_err": 8.2e-05,
+     "T_phase_minus_q0_err": 1e-06,
+     "R_db_roomsim_range": [-32.859191, -0.879537],
+     "T_db_roomsim_range": [-18.308194, -4.345814]
+    },
+    {
+     "material": "glass",
+     "itu": "glass",
+     "thickness_m": 0.1,
+     "R_abs_err": 1.3e-05,
+     "R_db_err": 0.000933,
+     "T_db_err": 0.000181,
+     "T_phase_minus_q0_err": 1.3e-05,
+     "R_db_roomsim_range": [-22.887162, -0.166637],
+     "T_db_roomsim_range": [-19.677989, -0.926972]
+    },
+    {
+     "material": "glass",
+     "itu": "glass",
+     "thickness_m": 0.2,
+     "R_abs_err": 1.9e-05,
+     "R_db_err": 0.000827,
+     "T_db_err": 0.000319,
+     "T_phase_minus_q0_err": 1.2e-05,
+     "R_db_roomsim_range": [-17.814397, -0.149495],
+     "T_db_roomsim_range": [-22.730492, -1.888423]
+    },
+    {
+     "material": "wood",
+     "itu": "wood",
+     "thickness_m": 0.1,
+     "R_abs_err": 1e-06,
+     "R_db_err": 4.3e-05,
+     "T_db_err": 1.9e-05,
+     "T_phase_minus_q0_err": 1e-06,
+     "R_db_roomsim_range": [-32.712645, -0.511185],
+     "T_db_roomsim_range": [-15.198862, -1.61496]
+    },
+    {
+     "material": "wood",
+     "itu": "wood",
+     "thickness_m": 0.2,
+     "R_abs_err": 1e-06,
+     "R_db_err": 3.3e-05,
+     "T_db_err": 3.7e-05,
+     "T_phase_minus_q0_err": 1e-06,
+     "R_db_roomsim_range": [-28.192926, -1.236497],
+     "T_db_roomsim_range": [-14.985134, -3.189604]
+    }
+   ]
+  },
+  "raytraced": {
+   "label": "SIM",
+   "material": "concrete",
+   "thickness_m": 0.2,
+   "r1_m": 2.0,
+   "r2_m": 3.0,
+   "worst_exact_case_db": 0.000339,
+   "rows": [
+    {"surface": "wall", "path": "reflection", "angle_deg": 0.0, "pol_roomsim": "TE", "roomsim_db": -7.740278, "sionna_db": -7.740274, "diff_db": 4e-06, "diff_phase_rad": -0.0},
+    {"surface": "wall", "path": "transmission", "angle_deg": 0.0, "pol_roomsim": "TE", "roomsim_db": -14.747235, "sionna_db": -14.747217, "diff_db": 1.9e-05, "diff_phase_rad": -1e-06},
+    {"surface": "wall", "path": "reflection", "angle_deg": 30.0, "pol_roomsim": "TE", "roomsim_db": -6.988066, "sionna_db": -6.988065, "diff_db": 1e-06, "diff_phase_rad": 1e-06},
+    {"surface": "wall", "path": "transmission", "angle_deg": 30.0, "pol_roomsim": "TE", "roomsim_db": -15.46689, "sionna_db": -15.466844, "diff_db": 4.6e-05, "diff_phase_rad": -0.0},
+    {"surface": "floor", "path": "reflection", "angle_deg": 30.0, "pol_roomsim": "TM", "roomsim_db": -9.221481, "sionna_db": -9.221474, "diff_db": 7e-06, "diff_phase_rad": 0.0},
+    {"surface": "wall", "path": "reflection", "angle_deg": 60.0, "pol_roomsim": "TE", "roomsim_db": -4.304705, "sionna_db": -4.304749, "diff_db": -4.4e-05, "diff_phase_rad": -0.0},
+    {"surface": "wall", "path": "transmission", "angle_deg": 60.0, "pol_roomsim": "TE", "roomsim_db": -18.374107, "sionna_db": -18.374019, "diff_db": 8.8e-05, "diff_phase_rad": -1.1e-05},
+    {"surface": "floor", "path": "reflection", "angle_deg": 60.0, "pol_roomsim": "TM", "roomsim_db": -19.409068, "sionna_db": -19.408729, "diff_db": 0.000339, "diff_phase_rad": 1e-05},
+    {"surface": "wall", "path": "reflection", "angle_deg": 80.0, "pol_roomsim": "TE", "roomsim_db": -1.436131, "sionna_db": -1.436177, "diff_db": -4.6e-05, "diff_phase_rad": -1e-06},
+    {"surface": "wall", "path": "transmission", "angle_deg": 80.0, "pol_roomsim": "TE", "roomsim_db": -25.561802, "sionna_db": -25.56157, "diff_db": 0.000232, "diff_phase_rad": -6e-06},
+    {"surface": "floor", "path": "reflection", "angle_deg": 80.0, "pol_roomsim": "TM", "roomsim_db": -8.197784, "sionna_db": -8.198091, "diff_db": -0.000306, "diff_phase_rad": 2e-06},
+    {"surface": "wall", "path": "reflection_tilted", "angle_deg": 43.33172, "pol_roomsim": "TE", "roomsim_db": -6.165079, "sionna_db": -6.874019, "diff_db": -0.708939, "diff_phase_rad": -0.00409, "roomsim_tm_db": -11.472233}
+   ]
+  }
+ },
+ "runtime": {"label": "SIM", "wall_s": 1206.749426, "peak_rss_gb": 16.30726, "gpu_memory_mb_this_process": 162.0, "gpu_note": "the audit ran on Mitsuba's LLVM (CPU) variant: on this machine the CUDA variant aborts in OptiX's compiler (driver 545), so no GPU memory is used"},
+ "per_scene_note": "per-scene summaries of shell, furnished and the first diffuse S only; the sensitivity runs are summarized overall (variants, full)"
+}

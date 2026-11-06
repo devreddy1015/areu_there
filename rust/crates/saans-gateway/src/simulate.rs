@@ -8,7 +8,8 @@
 //!
 //! **Everything here is SYNTHETIC.** No measurement of a real room, a
 //! real body or a real ESP32 enters this module, and `shared.mode` is
-//! `"simulated"` so every reader of the API is told so.
+//! [`Mode::Sim`] (`"sim"` on the wire; `"simulated"` before the closed
+//! mode enum of ADR-013 d15) so every reader of the API is told so.
 //!
 //! ## What the mode is for
 //!
@@ -45,7 +46,7 @@
 use crate::config::GatewayConfig;
 use crate::engine::TICK_S;
 use crate::hub::{local_epoch_s, Hub, Wall};
-use crate::shared::Shared;
+use crate::shared::{Mode, Shared};
 use crate::timefmt::now_unix_ms;
 use saans_dsp::features::{FeatureExtractor, FeatureExtractorConfig};
 use saans_health::{LinkId, SpaceConfig};
@@ -465,7 +466,7 @@ impl SimGateway {
             .map_err(|e| io::Error::new(e.kind(), format!("cannot bind HTTP {http_bind}: {e}")))?;
         let http_addr = listener.local_addr()?;
 
-        let shared = Shared::with_history("simulated", cfg.history);
+        let shared = Shared::with_history(Mode::Sim, cfg.history);
         let sim = SimState::new(scenario, SPACE_ID);
         let (stop, stop_rx) = watch::channel(false);
         // No audit file and no event log: simulate mode leaves `data_dir`

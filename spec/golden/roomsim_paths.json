@@ -1,0 +1,134 @@
+{
+ "name": "roomsim_paths",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "seed": 0,
+  "duration_s": 0.0,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 0.0,
+  "n_links": 2,
+  "links": "0-1,0-3",
+  "link0_tx": 0,
+  "link0_rx": 1,
+  "link1_tx": 0,
+  "link1_rx": 3,
+  "n_clutter": 24,
+  "n_surfaces": 6,
+  "n_walls": 4,
+  "implied_walls": 0
+ },
+ "arrays": {
+  "path_link": [
+   "roomsim_paths__path_link.f64",
+   185
+  ],
+  "kind": [
+   "roomsim_paths__kind.f64",
+   185
+  ],
+  "surf_i": [
+   "roomsim_paths__surf_i.f64",
+   185
+  ],
+  "surf_j": [
+   "roomsim_paths__surf_j.f64",
+   185
+  ],
+  "obj": [
+   "roomsim_paths__obj.f64",
+   185
+  ],
+  "face": [
+   "roomsim_paths__face.f64",
+   185
+  ],
+  "clutter": [
+   "roomsim_paths__clutter.f64",
+   185
+  ],
+  "tail": [
+   "roomsim_paths__tail.f64",
+   185
+  ],
+  "npts": [
+   "roomsim_paths__npts.f64",
+   185
+  ],
+  "L": [
+   "roomsim_paths__L.f64",
+   185
+  ],
+  "coef_re": [
+   "roomsim_paths__coef_re.f64",
+   185
+  ],
+  "coef_im": [
+   "roomsim_paths__coef_im.f64",
+   185
+  ],
+  "coef0_re": [
+   "roomsim_paths__coef0_re.f64",
+   185
+  ],
+  "coef0_im": [
+   "roomsim_paths__coef0_im.f64",
+   185
+  ],
+  "sigma": [
+   "roomsim_paths__sigma.f64",
+   185
+  ],
+  "pts_x": [
+   "roomsim_paths__pts_x.f64",
+   343
+  ],
+  "pts_y": [
+   "roomsim_paths__pts_y.f64",
+   343
+  ],
+  "pts_z": [
+   "roomsim_paths__pts_z.f64",
+   343
+  ],
+  "link_npaths": [
+   "roomsim_paths__link_npaths.f64",
+   2
+  ],
+  "H0_re": [
+   "roomsim_paths__H0_re.f64",
+   128
+  ],
+  "H0_im": [
+   "roomsim_paths__H0_im.f64",
+   128
+  ],
+  "tail_x": [
+   "roomsim_paths__tail_x.f64",
+   80
+  ],
+  "tail_phi": [
+   "roomsim_paths__tail_phi.f64",
+   80
+  ],
+  "clutter_x": [
+   "roomsim_paths__clutter_x.f64",
+   24
+  ],
+  "clutter_y": [
+   "roomsim_paths__clutter_y.f64",
+   24
+  ],
+  "clutter_z": [
+   "roomsim_paths__clutter_z.f64",
+   24
+  ],
+  "clutter_sigma": [
+   "roomsim_paths__clutter_sigma.f64",
+   24
+  ]
+ }
+}

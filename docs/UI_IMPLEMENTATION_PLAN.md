@@ -169,6 +169,14 @@ driving it. See `COMPLETION_REPORT.md` for exactly what was run.
   localisation is a published negative result
   ([`CAPABILITY_LIMITS.md`](CAPABILITY_LIMITS.md) §1).
 
+  *Narrowed by ADR-013 (2026-10-21):* coordinates now have a schema
+  (`spec/scene.schema.json`, the `saans-scene` crate), so a room drawn
+  from a scene file is declared rather than invented and may be drawn on
+  its own page. A person is still drawn only as an estimate with a 95%
+  credible radius, never as a point, and LIVE stays gated until a real
+  room is surveyed into a scene and the view can show what is not
+  covered. See ADR-013 for what may and may not be drawn.
+
   The Explorer view (simulate mode only) does draw a room plan with a
   person in it, and that is not an exception to this rule — it is the
   rule stated the other way round. Every coordinate on that plan is an

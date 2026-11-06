@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "name": "roomsim-specular-fixture",
+  "provenance": "hand_written",
+  "room": {
+    "w_m": 8.0,
+    "d_m": 6.0,
+    "h_m": 3.0
+  },
+  "objects": [
+    { "type": "almirah", "id": "metal-cabinet", "pos": [4.0, 5.3, 1.0], "size": [2.4, 0.6, 2.0], "yaw_deg": 0.0, "material": "metal" },
+    { "type": "almirah", "id": "metal-locker", "pos": [7.2, 2.0, 1.1], "size": [2.0, 0.5, 2.2], "yaw_deg": 80.0, "material": "metal" },
+    { "type": "table", "id": "glass-table", "pos": [4.0, 2.5, 0.4], "size": [2.0, 1.6, 0.8], "yaw_deg": 10.0, "material": "glass" },
+    { "type": "almirah", "id": "wardrobe", "pos": [0.6, 3.0, 1.0], "size": [0.5, 2.5, 2.0], "yaw_deg": -5.0, "material": "wood" }
+  ],
+  "nodes": [
+    { "id": 0, "pos": [2.0, 1.0, 1.2] },
+    { "id": 1, "pos": [6.0, 1.0, 1.5] },
+    { "id": 2, "pos": [2.5, 4.0, 2.2] },
+    { "id": 3, "pos": [5.5, 4.2, 1.0] }
+  ],
+  "people": []
+}

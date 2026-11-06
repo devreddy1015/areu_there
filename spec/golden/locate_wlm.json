@@ -1,0 +1,191 @@
+{
+ "name": "locate_wlm",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "n_cases": 32,
+  "n_links": 12,
+  "lambda_m": 0.3,
+  "n_variants": 2,
+  "variants": "g0,g1",
+  "g0_room_w": 4.0,
+  "g0_room_h": 4.0,
+  "g1_room_w": 4.2,
+  "g1_room_h": 3.6,
+  "cmp.cov_xx": "rule:each",
+  "cmp.cov_xy": "rule:each",
+  "cmp.cov_yy": "rule:each",
+  "cmp.floor": "input",
+  "cmp.floor_default": "input",
+  "cmp.g0_a_l": "rule",
+  "cmp.g0_c_l": "rule",
+  "cmp.g0_len": "rule",
+  "cmp.g0_mid_x": "rule",
+  "cmp.g0_mid_y": "rule",
+  "cmp.g0_node_x": "input",
+  "cmp.g0_node_y": "input",
+  "cmp.g0_ux": "rule",
+  "cmp.g0_uy": "rule",
+  "cmp.g1_a_l": "rule",
+  "cmp.g1_c_l": "rule",
+  "cmp.g1_len": "rule",
+  "cmp.g1_mid_x": "rule",
+  "cmp.g1_mid_y": "rule",
+  "cmp.g1_node_x": "input",
+  "cmp.g1_node_y": "input",
+  "cmp.g1_ux": "rule",
+  "cmp.g1_uy": "rule",
+  "cmp.gate_z": "input",
+  "cmp.geom": "input",
+  "cmp.min_radius": "input",
+  "cmp.null_sigma": "input",
+  "cmp.radius": "rule:each",
+  "cmp.radius_scale": "input",
+  "cmp.reason": "exact",
+  "cmp.signal": "input",
+  "cmp.x": "rule",
+  "cmp.y": "input",
+  "cmp.y_hat": "rule"
+ },
+ "arrays": {
+  "g0_node_x": [
+   "locate_wlm__g0_node_x.f64",
+   4
+  ],
+  "g0_node_y": [
+   "locate_wlm__g0_node_y.f64",
+   4
+  ],
+  "g0_a_l": [
+   "locate_wlm__g0_a_l.f64",
+   12
+  ],
+  "g0_c_l": [
+   "locate_wlm__g0_c_l.f64",
+   12
+  ],
+  "g0_ux": [
+   "locate_wlm__g0_ux.f64",
+   12
+  ],
+  "g0_uy": [
+   "locate_wlm__g0_uy.f64",
+   12
+  ],
+  "g0_mid_x": [
+   "locate_wlm__g0_mid_x.f64",
+   12
+  ],
+  "g0_mid_y": [
+   "locate_wlm__g0_mid_y.f64",
+   12
+  ],
+  "g0_len": [
+   "locate_wlm__g0_len.f64",
+   12
+  ],
+  "g1_node_x": [
+   "locate_wlm__g1_node_x.f64",
+   4
+  ],
+  "g1_node_y": [
+   "locate_wlm__g1_node_y.f64",
+   4
+  ],
+  "g1_a_l": [
+   "locate_wlm__g1_a_l.f64",
+   12
+  ],
+  "g1_c_l": [
+   "locate_wlm__g1_c_l.f64",
+   12
+  ],
+  "g1_ux": [
+   "locate_wlm__g1_ux.f64",
+   12
+  ],
+  "g1_uy": [
+   "locate_wlm__g1_uy.f64",
+   12
+  ],
+  "g1_mid_x": [
+   "locate_wlm__g1_mid_x.f64",
+   12
+  ],
+  "g1_mid_y": [
+   "locate_wlm__g1_mid_y.f64",
+   12
+  ],
+  "g1_len": [
+   "locate_wlm__g1_len.f64",
+   12
+  ],
+  "geom": [
+   "locate_wlm__geom.f64",
+   32
+  ],
+  "signal": [
+   "locate_wlm__signal.f64",
+   32
+  ],
+  "gate_z": [
+   "locate_wlm__gate_z.f64",
+   32
+  ],
+  "floor_default": [
+   "locate_wlm__floor_default.f64",
+   32
+  ],
+  "floor": [
+   "locate_wlm__floor.f64",
+   32
+  ],
+  "radius_scale": [
+   "locate_wlm__radius_scale.f64",
+   32
+  ],
+  "min_radius": [
+   "locate_wlm__min_radius.f64",
+   32
+  ],
+  "y": [
+   "locate_wlm__y.f64",
+   384
+  ],
+  "null_sigma": [
+   "locate_wlm__null_sigma.f64",
+   384
+  ],
+  "reason": [
+   "locate_wlm__reason.f64",
+   32
+  ],
+  "x": [
+   "locate_wlm__x.f64",
+   32
+  ],
+  "y_hat": [
+   "locate_wlm__y_hat.f64",
+   32
+  ],
+  "radius": [
+   "locate_wlm__radius.f64",
+   32
+  ],
+  "cov_xx": [
+   "locate_wlm__cov_xx.f64",
+   32
+  ],
+  "cov_xy": [
+   "locate_wlm__cov_xy.f64",
+   32
+  ],
+  "cov_yy": [
+   "locate_wlm__cov_yy.f64",
+   32
+  ]
+ }
+}

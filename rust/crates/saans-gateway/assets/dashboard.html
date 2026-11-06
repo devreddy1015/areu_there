@@ -411,12 +411,13 @@ function svg(tag, attrs) {
 }
 function add(parent, ...kids) { for (const k of kids) if (k != null) parent.append(k); return parent; }
 
-// `needs` is a key of /api/me's `can`; `mode` is the gateway mode the tab
-// belongs to. Both are filtered in one place, visibleTabs(), so a tab a
-// principal cannot use is never rendered rather than rendered and refused.
+// `needs` is a key of /api/me's `can`; `sim` marks a tab that exists only
+// while the gateway is in Sim mode (`--simulate`). Both are filtered in one
+// place, visibleTabs(), so a tab a principal cannot use is never rendered
+// rather than rendered and refused.
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'explorer', label: 'Explorer (simulated)', mode: 'simulated' },
+  { id: 'explorer', label: 'Explorer (simulated)', sim: true },
   { id: 'signals', label: 'Signals' },
   { id: 'topology', label: 'Topology' },
   { id: 'events', label: 'Events' },
@@ -508,6 +509,44 @@ function pill(text, kind, dot, title) {
   return p;
 }
 
+/**
+ * The gateway's mode as [badge text, tooltip], or null for a value this
+ * page does not know (ADR-013 d15, spec/livedemo.md §1). An exhaustive
+ * mapping over the three wire values with no default branch: a fourth
+ * mode, or none at all, is shown as an error, never as a mode, so the
+ * page cannot call anything live by inference.
+ */
+function modeBadge(mode) {
+  switch (mode) {
+    case 'sim': return ['SIM', 'Simulated people and sensors (SIM) — not live sensors'];
+    case 'replay': return ['REPLAY', 'Replaying a capture file — not live sensors; a .sim.pcap is simulated (SIM)'];
+    case 'live': return ['LIVE', 'Live sensor input'];
+  }
+  return null;
+}
+
+/**
+ * The mode's badge, or the "unknown mode" error in its place. Every view
+ * that shows the mode shows this, so none can fall back to the raw value.
+ */
+function modePill(mode) {
+  const badge = modeBadge(mode);
+  if (badge) return pill(badge[0], badge[0] === 'LIVE' ? 'mode' : 'warn', false, badge[1]);
+  return pill('unknown mode', 'bad', false, mode === undefined
+    ? 'The gateway has not reported its mode, so none is shown'
+    : 'The gateway reported a mode this page does not know, so none is shown');
+}
+
+/**
+ * True only while the gateway reports Sim (`--simulate`: the built-in
+ * simulator, no radio hardware), read through the same mapping as the
+ * badge so nothing else interprets the raw value.
+ */
+function inSimMode(me) {
+  const badge = modeBadge(me.mode);
+  return badge !== null && badge[0] === 'SIM';
+}
+
 function renderShell() {
   const me = S.me || {};
   const pills = $('#pills');
@@ -516,18 +555,16 @@ function renderShell() {
   // Mode and connection are different facts. A connected socket does not
   // mean sensors are reporting, and a replay is not live however healthy
   // the socket is.
-  const mode = (me.mode || '').toUpperCase() || 'UNKNOWN';
-  pills.append(pill(mode, mode === 'SIMULATED' || mode === 'REPLAY' ? 'warn' : 'mode', false,
-    mode === 'REPLAY' ? 'Replaying a recording — these are not live sensors'
-      : mode === 'SIMULATED' ? 'Synthetic data from the built-in simulator — no radio hardware is involved'
-      : 'Live sensor input'));
+  const badge = modeBadge(me.mode);
+  pills.append(modePill(me.mode));
 
   // A pill is too quiet to carry this on its own: it is 12 px, it looks
   // the same as the LIVE pill, and it falls off a cropped screenshot.
   // The strip is the fact; the pill is a restatement of it.
-  $('#synthetic-banner').hidden = mode !== 'SIMULATED';
-  const wantTitle = mode === 'SIMULATED' ? 'Saans — SIMULATED (synthetic data)'
-    : mode === 'REPLAY' ? 'Saans — REPLAY (recording)' : 'Saans';
+  const simulated = inSimMode(me);
+  $('#synthetic-banner').hidden = !simulated;
+  const wantTitle = simulated ? 'Saans — SIMULATED (synthetic data)'
+    : badge && badge[0] === 'REPLAY' ? 'Saans — REPLAY (recording)' : 'Saans';
   if (document.title !== wantTitle) document.title = wantTitle;
 
   const connKind = S.conn === 'live' ? 'live' : (S.conn === 'offline' || S.conn === 'signed out') ? 'bad' : 'warn';
@@ -555,7 +592,7 @@ function renderShell() {
       'local access'));
   }
   renderTabs();
-  announce('Mode ' + mode + ', connection ' + S.conn + (stale ? ', data stale' : ''));
+  announce((badge ? 'Mode ' + badge[0] : 'Unknown mode') + ', connection ' + S.conn + (stale ? ', data stale' : ''));
 }
 
 /**
@@ -597,7 +634,7 @@ function renderTabs() {
 function visibleTabs() {
   const me = S.me || {};
   const can = me.can || {};
-  return TABS.filter((t) => (!t.needs || can[t.needs]) && (!t.mode || me.mode === t.mode));
+  return TABS.filter((t) => (!t.needs || can[t.needs]) && (!t.sim || inSimMode(me)));
 }
 
 $('#tabs').addEventListener('keydown', (e) => {
@@ -1429,7 +1466,7 @@ function renderSystem(h, links) {
   add(body, el('h2', { class: 'sec' }, 'Details'));
   const dl = el('dl');
   const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
-  row('Mode', h.mode || '');
+  add(dl, el('dt', null, 'Mode'), add(el('dd'), modePill(h.mode)));
   row('Gateway time', clock(h.time));
   row('Uptime', dur(h.uptime_s));
   row('Datagrams', String(h.datagrams_total ?? 0));
@@ -1548,7 +1585,7 @@ function stepM() { return SIM.cov && SIM.cov.res_m > 0 ? SIM.cov.res_m : 0.25; }
 
 // ---- transport -------------------------------------------------------
 async function refreshSim() {
-  if (!(S.me && S.me.mode === 'simulated')) return;
+  if (!(S.me && inSimMode(S.me))) return;
   try {
     const cfg = await getJSON('/api/sim');
     SIM.cfg = cfg;
@@ -1626,7 +1663,7 @@ async function togglePresent() {
 
 let simTimer = null;
 function startSimTimer() {
-  if (simTimer || !(S.me && S.me.mode === 'simulated')) return;
+  if (simTimer || !(S.me && inSimMode(S.me))) return;
   simTimer = setInterval(() => { if (S.tab === 'explorer') refreshSim(); else stopSimTimer(); }, 1000);
 }
 function stopSimTimer() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }

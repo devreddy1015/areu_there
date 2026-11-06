@@ -15,6 +15,13 @@
 //! - [`history`]: a bounded in-memory time series for the trend charts.
 //! - [`roles`], [`auth`], [`audit`]: who may see what, and the record of it.
 //! - [`outputs`]: the fan-out MQTT ([`mqtt`]) and alerting ([`alerts`]) consume.
+//! - `roomsim` (private, `roomsim` feature only): the static room demo at
+//!   `/roomsim`, drawing a declared scene with vendored three.js (ADR-013).
+//!   Serves no sensor data.
+//! - `roomstream` (`roomsim` feature only): the room stream at
+//!   `/api/roomsim`, a simulated (SIM) or recorded (REPLAY) Room Sim run
+//!   through Locate, one session thread per connection
+//!   (spec/livedemo.md). Never fed by, and never feeding, the sensor path.
 
 pub mod alerts;
 pub mod audit;
@@ -33,6 +40,10 @@ pub mod privacy;
 pub mod raw;
 pub mod replay;
 pub mod roles;
+#[cfg(feature = "roomsim")]
+mod roomsim;
+#[cfg(feature = "roomsim")]
+pub mod roomstream;
 pub mod shared;
 pub mod simulate;
 pub mod site;

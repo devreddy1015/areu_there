@@ -28,3 +28,6 @@ history.json
 .env
 *.env
 edge/dsp/bench/build/
+
+# Python env for the GPU/ML tooling (RUN.md); never committed
+.venv/

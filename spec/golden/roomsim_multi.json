@@ -1,0 +1,243 @@
+{
+ "name": "roomsim_multi",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/fixtures/roomsim_multi.json",
+  "scene_sha256": "d26af5c32d8bac4e64959801b53000cb5db42aeb055d1fb24f8712354cb651ec",
+  "seed": 0,
+  "duration_s": 2.0,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "cfg.duration_s": 2.0,
+  "cfg.tx_period.1": 2,
+  "cfg.impair": 0,
+  "n_links": 3,
+  "links": "0-1,1-2,2-0",
+  "link0_tx": 0,
+  "link0_rx": 1,
+  "link1_tx": 1,
+  "link1_rx": 2,
+  "link2_tx": 2,
+  "link2_rx": 0,
+  "n_packets": 134,
+  "n_transmissions": 134,
+  "n_people": 3,
+  "implied_walls": 1,
+  "n_walls": 5,
+  "person0_start_x": 1.5,
+  "person0_start_y": 1.5,
+  "person0_walking": 1,
+  "person0_height": 1.7022870812878115,
+  "person0_f_b": 0.1442728947159291,
+  "person0_p2p": 0.008426304671717007,
+  "person0_phi_b": 4.737529375076669,
+  "person0_phi_g": 3.1188954134807716,
+  "person1_start_x": 4.0,
+  "person1_start_y": 3.5,
+  "person1_walking": 1,
+  "person1_height": 1.8059537759255881,
+  "person1_f_b": 0.1517487069851299,
+  "person1_p2p": 0.01155030811104489,
+  "person1_phi_b": 5.564918768137759,
+  "person1_phi_g": 6.117871942688881,
+  "person2_start_x": 3.0,
+  "person2_start_y": 0.4,
+  "person2_walking": 1,
+  "person2_height": 1.7336807881819227,
+  "person2_f_b": 0.23207069735553718,
+  "person2_p2p": 0.010830333668988334,
+  "person2_phi_b": 4.0954661231208,
+  "person2_phi_g": 6.234457404997762
+ },
+ "arrays": {
+  "t": [
+   "roomsim_multi__t.f64",
+   134
+  ],
+  "m": [
+   "roomsim_multi__m.f64",
+   134
+  ],
+  "slot": [
+   "roomsim_multi__slot.f64",
+   134
+  ],
+  "tx": [
+   "roomsim_multi__tx.f64",
+   134
+  ],
+  "rx": [
+   "roomsim_multi__rx.f64",
+   134
+  ],
+  "link_index": [
+   "roomsim_multi__link_index.f64",
+   134
+  ],
+  "H_re": [
+   "roomsim_multi__H_re.f64",
+   8576
+  ],
+  "H_im": [
+   "roomsim_multi__H_im.f64",
+   8576
+  ],
+  "tr_t": [
+   "roomsim_multi__tr_t.f64",
+   134
+  ],
+  "tr_m": [
+   "roomsim_multi__tr_m.f64",
+   134
+  ],
+  "tr_slot": [
+   "roomsim_multi__tr_slot.f64",
+   134
+  ],
+  "tr_tx": [
+   "roomsim_multi__tr_tx.f64",
+   134
+  ],
+  "p_x": [
+   "roomsim_multi__p_x.f64",
+   402
+  ],
+  "p_y": [
+   "roomsim_multi__p_y.f64",
+   402
+  ],
+  "p_heading": [
+   "roomsim_multi__p_heading.f64",
+   402
+  ],
+  "p_walking": [
+   "roomsim_multi__p_walking.f64",
+   402
+  ],
+  "p_posture": [
+   "roomsim_multi__p_posture.f64",
+   402
+  ],
+  "phone_x": [
+   "roomsim_multi__phone_x.f64",
+   134
+  ],
+  "phone_y": [
+   "roomsim_multi__phone_y.f64",
+   134
+  ],
+  "phone_z": [
+   "roomsim_multi__phone_z.f64",
+   134
+  ],
+  "paths_path_link": [
+   "roomsim_multi__paths_path_link.f64",
+   281
+  ],
+  "paths_kind": [
+   "roomsim_multi__paths_kind.f64",
+   281
+  ],
+  "paths_surf_i": [
+   "roomsim_multi__paths_surf_i.f64",
+   281
+  ],
+  "paths_surf_j": [
+   "roomsim_multi__paths_surf_j.f64",
+   281
+  ],
+  "paths_obj": [
+   "roomsim_multi__paths_obj.f64",
+   281
+  ],
+  "paths_face": [
+   "roomsim_multi__paths_face.f64",
+   281
+  ],
+  "paths_clutter": [
+   "roomsim_multi__paths_clutter.f64",
+   281
+  ],
+  "paths_tail": [
+   "roomsim_multi__paths_tail.f64",
+   281
+  ],
+  "paths_npts": [
+   "roomsim_multi__paths_npts.f64",
+   281
+  ],
+  "paths_L": [
+   "roomsim_multi__paths_L.f64",
+   281
+  ],
+  "paths_coef_re": [
+   "roomsim_multi__paths_coef_re.f64",
+   281
+  ],
+  "paths_coef_im": [
+   "roomsim_multi__paths_coef_im.f64",
+   281
+  ],
+  "paths_coef0_re": [
+   "roomsim_multi__paths_coef0_re.f64",
+   281
+  ],
+  "paths_coef0_im": [
+   "roomsim_multi__paths_coef0_im.f64",
+   281
+  ],
+  "paths_sigma": [
+   "roomsim_multi__paths_sigma.f64",
+   281
+  ],
+  "paths_pts_x": [
+   "roomsim_multi__paths_pts_x.f64",
+   540
+  ],
+  "paths_pts_y": [
+   "roomsim_multi__paths_pts_y.f64",
+   540
+  ],
+  "paths_pts_z": [
+   "roomsim_multi__paths_pts_z.f64",
+   540
+  ],
+  "paths_link_npaths": [
+   "roomsim_multi__paths_link_npaths.f64",
+   3
+  ],
+  "paths_H0_re": [
+   "roomsim_multi__paths_H0_re.f64",
+   192
+  ],
+  "paths_H0_im": [
+   "roomsim_multi__paths_H0_im.f64",
+   192
+  ],
+  "paths_tail_x": [
+   "roomsim_multi__paths_tail_x.f64",
+   120
+  ],
+  "paths_tail_phi": [
+   "roomsim_multi__paths_tail_phi.f64",
+   120
+  ],
+  "paths_clutter_x": [
+   "roomsim_multi__paths_clutter_x.f64",
+   24
+  ],
+  "paths_clutter_y": [
+   "roomsim_multi__paths_clutter_y.f64",
+   24
+  ],
+  "paths_clutter_z": [
+   "roomsim_multi__paths_clutter_z.f64",
+   24
+  ],
+  "paths_clutter_sigma": [
+   "roomsim_multi__paths_clutter_sigma.f64",
+   24
+  ]
+ }
+}

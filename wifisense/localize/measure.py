@@ -22,7 +22,9 @@ the reason this module exists in the form it does:
     the mean is dominated by reflections. This is why VRTI is the
     through-wall variant.
 
-**Two link signals, because the evaluation has to compare them.** The
+**Three link signals** (`RssiSignal`, added for Room Sim input in Phase 4,
+is the datagram's RSSI; spec/locate.md §3). **The first two, because the
+evaluation has to compare them.** The
 `LinkSignal` strategy picks what scalar gets fed to the variance:
 
   (a) `TotalPowerSignal` — total received power in dB, summed across
@@ -105,6 +107,7 @@ __all__ = [
     "LinkSignalState",
     "TotalPowerSignal",
     "StaticSuppressedSignal",
+    "RssiSignal",
     "LinkMeasurement",
 ]
 
@@ -404,6 +407,45 @@ class StaticSuppressedSignal(LinkSignal):
 
     def new_state(self, sample_rate_hz: float) -> LinkSignalState:
         return _StaticSuppressedState(sample_rate_hz, self.corner_hz)
+
+
+class _RssiState(LinkSignalState):
+    """Stateless: the frame's reported RSSI, in dBm (spec/locate.md §3)."""
+
+    __slots__ = ()
+
+    def push(self, frame: CsiFrame) -> float | None:
+        # The shared validity gate first, so that "which frames count" is
+        # the same for every strategy: an empty or non-finite frame is
+        # dropped here exactly as `TotalPowerSignal` drops it.
+        if _frame_power(frame) is None:
+            return None
+        return float(frame.rssi_dbm)
+
+
+class RssiSignal(LinkSignal):
+    """(c) The datagram's RSSI in dBm -- the AGC-free link signal.
+
+    Room Sim normalises each packet's CSI to a fixed level with a
+    random-step AGC (spec/roomsim.md §12.3), as the ESP32 does, so a
+    per-packet total-power signal mostly sees the AGC's steps, not the
+    bodies. The RSSI the receiver reports is computed before that gain and
+    is untouched by it, which makes it the default signal for Room Sim
+    input (spec/locate.md decision 2).
+
+    Stateless. The per-frame value is `float(frame.rssi_dbm)` for every
+    frame `_frame_power` accepts: integer dBm, so its variance over a
+    window is a narrow signal (spec/locate.md §5, §13).
+    """
+
+    __slots__ = ()
+
+    @property
+    def name(self) -> str:
+        return "rssi_dbm"
+
+    def new_state(self, sample_rate_hz: float) -> LinkSignalState:
+        return _RssiState()
 
 
 class LinkMeasurement:

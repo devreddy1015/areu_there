@@ -1,0 +1,78 @@
+{
+ "name": "localize_peak",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "n_cases": 20,
+  "n_pixels": 192,
+  "n_x": 16,
+  "n_y": 12,
+  "n_err": 3,
+  "err.0": "extract_peak(geometry, 191 zeros)",
+  "err.1": "extract_peak(geometry, case 0, radius_m=0.0)",
+  "err.2": "extract_peak(geometry, case 0, radius_m=nan)",
+  "cmp.background": "rule:each",
+  "cmp.err_code": "exact",
+  "cmp.image": "input",
+  "cmp.n_nonfinite": "exact",
+  "cmp.peak": "rule:each",
+  "cmp.peak_index": "exact",
+  "cmp.radius_m": "input",
+  "cmp.spread": "rule:each",
+  "cmp.tie_fraction": "exact",
+  "cmp.x": "rule",
+  "cmp.y": "rule",
+  "cmp.z": "rule:each"
+ },
+ "arrays": {
+  "image": [
+   "localize_peak__image.f64",
+   3840
+  ],
+  "radius_m": [
+   "localize_peak__radius_m.f64",
+   20
+  ],
+  "x": [
+   "localize_peak__x.f64",
+   20
+  ],
+  "y": [
+   "localize_peak__y.f64",
+   20
+  ],
+  "peak": [
+   "localize_peak__peak.f64",
+   20
+  ],
+  "background": [
+   "localize_peak__background.f64",
+   20
+  ],
+  "spread": [
+   "localize_peak__spread.f64",
+   20
+  ],
+  "z": [
+   "localize_peak__z.f64",
+   20
+  ],
+  "peak_index": [
+   "localize_peak__peak_index.f64",
+   20
+  ],
+  "n_nonfinite": [
+   "localize_peak__n_nonfinite.f64",
+   20
+  ],
+  "tie_fraction": [
+   "localize_peak__tie_fraction.f64",
+   20
+  ],
+  "err_code": [
+   "localize_peak__err_code.f64",
+   3
+  ]
+ }
+}
