@@ -256,10 +256,14 @@ These facts were read for ADR-016 and decide most of this ADR.
 3. **There is no web app for alerts.**
 4. **The seal is HPKE (RFC 9180), in each platform's own library.** This
    narrows ADR-016, which allowed "a sealed box or HPKE".
-   - The suite is X25519 key agreement, HKDF-SHA256, and an AEAD offered
-     by both Tink and CryptoKit. The AEAD is fixed when the envelope is
-     specified in `spec/` [unverified: CryptoKit's list of suites was not
-     read].
+   - The suite is DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and
+     ChaCha20-Poly1305.
+     - CryptoKit ships it as `Curve25519_SHA256_ChachaPoly`
+       ([Apple](https://developer.apple.com/tutorials/data/documentation/cryptokit/hpke/ciphersuite.json)).
+     - Tink ships it as
+       `DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305`.
+     - The envelope around it is specified in `spec/relay.md`, which has
+       its own PR.
    - The gateway, the Android app and the iOS app are three
      implementations of one small envelope. They are held to each other
      by golden vectors in `spec/golden/`, the ADR-002 pattern.
