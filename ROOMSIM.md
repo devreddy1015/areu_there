@@ -8,7 +8,9 @@ Read it with [RUN.md](RUN.md) (how to run everything on the GPU box) and
 drawn). Every number below comes from a run on this machine; simulator and
 scene numbers are labelled as such.
 
-**Branch:** `saans/scene-format` · **Last updated:** 2026-10-24
+**Branch:** `saans/scene-format`, merged into `main` on 2026-11-06 ·
+**Last updated:** 2026-11-06 (the phase table; the rest as of 2026-10-24
+unless marked)
 
 ## Where it stands
 
@@ -22,10 +24,16 @@ scene numbers are labelled as such.
 | 5 | Live demo | **Done.** `spec/livedemo.md`: the `/roomsim` page's SIM view over a 10 Hz room stream (`/api/roomsim`, admin and safety only), Room Sim and Locate run per viewer in the gateway, REPLAY of recorded runs, `saans roomsim-eval`; `Mode { Sim, Replay, Live }`. No LIVE room view exists. Decisions for the owner: *Open items* 13. |
 | 6 | Dataset | **Done.** `spec/dataset.md`: `saans gen-dataset` draws random rooms (`provenance: generated`, an owner-approved change to `saans-scene`) and writes per room one `.npz` shard (the ESP32's int8 I/Q per link on the TDMA grid, labels every 0.5 s, Locate's baseline and the empty-room calibration), the scene and its run configs, and a manifest with stratified by-scene splits; `ml/` reads it. 2,000 rooms x 2 min generated in `/home/Aman/are_u_theone/datasets/roomsim-v1` (outside git). Decisions for the owner: *Open items* 14. |
 | 7 | Preprocessing | **Done — waiting for the owner's review.** `spec/preprocess.md`: one function (`ml/preprocess.py`, numpy) for every CSI source — the SIM dataset, Room Sim's `.sim.pcap` exports, later the public ESP32 datasets and the owner's recordings — through one record (received packets only, integer-ns times, the 52 LLTF subcarriers with a carried mask): per-packet gain normalisation over the 44 shared subcarriers, optional unwrap-free phase sanitisation, optional binning, and a per-link, per-subcarrier z-score over the window that keeps the removed mean and spread. A stdlib reference (`ml/preprocess_ref.py`) pins the arithmetic. A dataset room read as a shard and as a pcap gives identical windows. Decisions for the owner: *Open items* 15. |
-| 8–12 | Model, real data, Sionna/calibration, recordings, export | Not started. **Blocked on an ADR** for learned models (see *Open items*). |
+| 8 | Model v1 on SIM | **Built; no result yet.** `spec/model.md`; `ml/train/` (window cache, data, model, trainer, sweep, evaluation, baselines) and the run-integrity rules in `ml/train/integrity.py`, which refuse frozen, stale and partial runs. The 27-run sweep and the three-seed final run on the GPU box (RUN.md §4h); no model figure is committed. Stored baselines on the test split (201 scenes, SIM): WLM presence balanced accuracy 0.760 [0.740, 0.782], RTI 0.543. |
+| 9 | Public ESP32 data | **Tooling built; no result committed.** `spec/phase9.md` (written before any model figure), OpenCSI LCN 2026 read as REAL windows, REAL caches, baselines and the fine-tuning runner (`ml/phase9/`, RUN.md §4i). Known gap: the trainer cannot yet train P9-SIM (`ml/train/train.py`'s `model_config()` never sets `n_ref`, so it stays 44 and a `shared40` cache raises in `model._link_inputs`), so `run models` has no P9-SIM checkpoint to start from. |
+| 10 | Sionna audit and calibration | **Run.** The Sionna RT audit (`spec/sionna_audit.md`, `ml/results/phase10/sionna_audit.json`) and calibration run 10b (`spec/calibration.md`, `ml/results/phase10/calibration.json` and per-fold overrides). The calibration did **not** give a realistic SIM: the fitted body RCS (about 28–50 m² against the 0.5 default) and clutter scale sit at their range bounds, which spec/calibration.md §6 reads as a mechanism Room Sim lacks. No figure from a calibrated dataset is a realistic one. |
+| 11 | Your own recordings | **Protocol and reader only.** `spec/recording.md`, `ml/phase11/recordings.py`; no recording exists. |
+| 12 | ONNX export | **Script and note only.** `ml/export/onnx_export.py`, `docs/onnx-ort.md`; nothing loads a model (ADR-014 decision 4). |
 
-The working rule is to stop after each phase for review. That is why
-nothing past Phase 7 has been started, not lack of time.
+The working rule is to stop after each phase for review. Phases 8–12
+were started after ADR-014 (2026-10-25) wrote down the offline
+carve-out that open item 3 asked for; the table above is where each
+stands.
 
 ## What exists
 
@@ -309,7 +317,9 @@ benchmark in RUN.md §1.
    POST, with e2e cases for both. Phase 5's `/api/roomsim` already
    checks `Origin` and, on an auth-off gateway, a loopback `Host`, so
    rebinding is closed for that endpoint only (spec/livedemo.md §2.2).
-3. **An ADR for learned models, before Phase 8.** ADR-007 keeps neural
+3. **An ADR for learned models, before Phase 8.** *Written 2026-10-25 as
+   ADR-014 (accepted as 009 on this branch), and still flagged for the
+   owner's review.* ADR-007 keeps neural
    networks and trained classifiers out of the S0–S5 path until the DSP
    is measured on real rooms. Offline training and evaluation can sit
    outside that path, but the carve-out should be written down as an ADR
