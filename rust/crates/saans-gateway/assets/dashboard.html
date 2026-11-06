@@ -318,6 +318,15 @@ footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-a
     <div class="tiles" id="ov-tiles"></div>
     <h2 class="sec">Spaces</h2>
     <div class="grid" id="ov-grid"></div>
+    <div id="ov-routine" hidden>
+      <h2 class="sec">Daily routine</h2>
+      <p id="rt-note"></p>
+      <table id="rt-table" aria-label="Daily routine, newest day first">
+        <thead><tr><th scope="col">Day</th><th scope="col">Got up</th><th scope="col">Active hours</th>
+          <th scope="col">Night bathroom visits</th><th scope="col">Hours seen</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
   <section id="view-explorer" role="tabpanel" aria-labelledby="tab-explorer" tabindex="0" hidden>
@@ -1269,6 +1278,46 @@ async function refreshAlerts() {
     if (e instanceof HttpError && e.status === 404) { S.alerts = null; S.alertsOff = true; }
   }
   renderAlerts();
+}
+// The home's daily routine (issue #39), on the overview. /api/routine
+// answers 404 when no space has a room and 403 to a role that does not see
+// health alerts in every room it reads; either way there is no panel.
+S.routine = null;
+let routineAt = 0;
+async function refreshRoutine() {
+  routineAt = Date.now();
+  try {
+    S.routine = await getJSON('/api/routine');
+  } catch (e) {
+    if (handleAuthLoss(e)) return;
+    if (e instanceof HttpError && (e.status === 404 || e.status === 403)) S.routine = null;
+  }
+  renderRoutine();
+}
+function hhmm(min) {
+  if (min == null) return 'not seen';
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+function renderRoutine() {
+  const box = document.getElementById('ov-routine');
+  const r = S.routine;
+  box.hidden = !r;
+  if (!r) return;
+  document.getElementById('rt-note').textContent = r.note || '';
+  const tb = document.querySelector('#rt-table tbody');
+  tb.replaceChildren();
+  for (const d of [r.today, ...(r.days || [])].filter(Boolean)) {
+    const unusual = (m) => (d.comparisons || []).some((c) => c.metric === m && c.unusual);
+    const cell = (text, m) => el('td', m && unusual(m) ? { 'data-k': 'warn' } : null,
+      m && unusual(m) ? text + ' (unusual)' : text);
+    add(tb, add(el('tr'),
+      el('th', { scope: 'row' }, d.date + (d === r.today ? ' (so far)' : '')),
+      cell(hhmm(d.got_up_min), 'got_up_min'),
+      cell(String(d.active_hours), 'active_hours'),
+      cell(String(d.night_bathroom_visits), 'night_bathroom_visits'),
+      cell(String(d.observed_hours))));
+  }
 }
 let alertsSoon = null;
 function refreshAlertsSoon() {
@@ -2227,6 +2276,7 @@ async function start() {
 
   getJSON('/api/events?limit=500').then(mergeEvents).catch((e) => handleAuthLoss(e));
   refreshAlerts();
+  refreshRoutine();
   refreshSystem();
   connect();
 
@@ -2237,6 +2287,7 @@ async function start() {
       renderShell();
       if (S.tab === 'system' || S.tab === 'topology') refreshSystem();
       if (S.tab === 'events' && !S.alertsOff) refreshAlerts();
+      if (S.tab === 'overview' && Date.now() - routineAt > 60000) refreshRoutine();
     }, 2000);
   }
 }

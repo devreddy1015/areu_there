@@ -293,6 +293,69 @@ pub fn save_history(
     fs::rename(&tmp, history_path(dir))
 }
 
+/// The home's closed routine days (issue #39), beside `history.json` and on
+/// the same retention clock (`history_retention_days`).
+pub fn routine_path(dir: &Path) -> PathBuf {
+    dir.join("routine.json")
+}
+
+/// Read `routine.json`. A file that does not parse is moved aside (never
+/// overwritten), as `history.json` is, and the routine starts empty.
+pub fn load_routine(dir: &Path) -> (Vec<saans_health::DailyRoutine>, Option<String>) {
+    let path = routine_path(dir);
+    let text = match fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return (Vec::new(), None),
+        Err(e) => return (Vec::new(), Some(format!("{}: {e}", path.display()))),
+    };
+    let parsed = serde_json::from_str::<Value>(&text)
+        .ok()
+        .and_then(|v| serde_json::from_value(v.get("days")?.clone()).ok());
+    match parsed {
+        Some(days) => (days, None),
+        None => {
+            let aside = dir.join(format!(
+                "routine.json.unreadable-{}",
+                crate::timefmt::now_unix_ms()
+            ));
+            let what = if fs::rename(&path, &aside).is_ok() {
+                format!("moved to {}", aside.display())
+            } else {
+                "left in place".into()
+            };
+            (
+                Vec::new(),
+                Some(format!(
+                    "{} did not parse ({what}); the routine starts empty",
+                    path.display()
+                )),
+            )
+        }
+    }
+}
+
+/// Write `routine.json` atomically (temp file + rename).
+pub fn save_routine(
+    dir: &Path,
+    days: &[saans_health::DailyRoutine],
+    saved_time: &str,
+) -> io::Result<()> {
+    fs::create_dir_all(dir)?;
+    let doc = serde_json::json!({ "version": 1, "saved": saved_time, "days": days });
+    let tmp = dir.join("routine.json.tmp");
+    {
+        let mut f = File::create(&tmp)?;
+        f.write_all(
+            serde_json::to_string_pretty(&doc)
+                .map_err(io::Error::other)?
+                .as_bytes(),
+        )?;
+        f.write_all(b"\n")?;
+        f.sync_all()?;
+    }
+    fs::rename(&tmp, routine_path(dir))
+}
+
 /// The replay floors of signed frames (ADR-012), so a gateway restart does
 /// not reopen frames it has already accepted.
 pub const FRAME_COUNTERS_FILE: &str = "frame_counters.json";

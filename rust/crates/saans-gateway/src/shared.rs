@@ -33,6 +33,9 @@ pub struct Published {
     pub metrics: String,
     /// The last `{"type":"state"}` message, sent to new WebSocket clients.
     pub state_msg: Option<Arc<str>>,
+    /// The home's daily routine for `/api/routine`; `Null` when no space
+    /// has a room (issue #39).
+    pub routine: Value,
 }
 
 /// Where the data a view shows comes from (ADR-013 d15, spec/livedemo.md
