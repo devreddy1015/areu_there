@@ -631,6 +631,12 @@ impl SpaceMonitor {
         &self.config
     }
 
+    /// The last sample fed to `update`, as measured: what the home-level
+    /// routine (`routine.rs`) reads alongside the events.
+    pub fn last_sample(&self) -> Option<SpaceSample> {
+        self.last
+    }
+
     /// Feed one fused 2 Hz sample; returns events that started, ended or
     /// escalated now. `t_s` must not go backwards; a sample that does is
     /// ignored.

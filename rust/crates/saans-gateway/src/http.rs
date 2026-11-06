@@ -167,6 +167,7 @@ pub fn router(deps: HttpDeps) -> Router {
         .route("/api/spaces/{id}", get(space))
         .route("/api/events", get(events))
         .route("/api/history", get(history))
+        .route("/api/routine", get(routine))
         .route("/api/links", get(links))
         .route("/api/health", get(health))
         .route("/api/alerts", get(alerts_list))
@@ -632,6 +633,45 @@ async fn history(
             }
         }
     }
+    no_store(Json(v).into_response())
+}
+
+/// The home's daily routine (issue #39). Every space's motion feeds its
+/// active hours, and the bedroom and bathroom feed the rest, so it goes only
+/// to a principal who sees health alerts in *every* space: admin, or safety
+/// with all of them in scope. A safety user scoped to some rooms would
+/// otherwise learn about motion in the others. 404 when no space has a
+/// room: there is no routine.
+async fn routine(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let p = match principal(&app, &h, "/api/routine") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let rooms: Vec<&str> = app
+        .cfg
+        .spaces
+        .iter()
+        .filter(|s| s.room != saans_health::Room::Other)
+        .map(|s| s.id.as_str())
+        .collect();
+    if rooms.is_empty() {
+        return error(
+            StatusCode::NOT_FOUND,
+            "no daily routine: no space has a room (bedroom or bathroom)",
+        );
+    }
+    if !app
+        .cfg
+        .spaces
+        .iter()
+        .all(|s| p.can_see_health_alerts(&s.id))
+    {
+        return error(
+            StatusCode::FORBIDDEN,
+            "the daily routine needs a role that sees health alerts in every space it reads",
+        );
+    }
+    let v = app.shared.read().routine.clone();
     no_store(Json(v).into_response())
 }
 

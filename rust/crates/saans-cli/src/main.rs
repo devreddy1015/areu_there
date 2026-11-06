@@ -3,6 +3,7 @@
 //!     saans eval [--quick] [--seeds N] [--threads N] [--room-height M]
 //!     saans lying [--spots N] [--threads N]
 //!     saans export SCENARIO --out FILE.pcap [--seed N] [--vitals]
+//!     saans export-home --out FILE.pcap [--days N] [--seed N]
 //!     saans import-roomplan FILE.json --out SCENE.json [--name NAME]
 //!     saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]
 //!     saans roomsim-eval --scene SCENE.json [--seconds S] [--seed N] [--variant declared|with_walker|empty] [--records-out FILE] [--json]
@@ -34,6 +35,7 @@
 
 mod eval;
 mod gen_dataset;
+mod home;
 mod links;
 mod lying;
 mod octave;
@@ -48,7 +50,7 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}\n  {}",
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans export-home --out FILE.pcap [--days N] [--seed N]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}\n  {}",
         roomsim_eval::USAGE,
         gen_dataset::USAGE
     );
@@ -123,6 +125,14 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("export") => export(&args),
+        Some("export-home") => match arg::<String>(&args, "--out") {
+            Some(out) => home::export_home(
+                &out,
+                arg(&args, "--days").unwrap_or(2),
+                arg(&args, "--seed").unwrap_or(1),
+            ),
+            None => usage(),
+        },
         Some("trace") => trace(&args),
         Some("import-roomplan") => import_roomplan(&args),
         Some("roomsim-export") => roomsim_export(&args),

@@ -18,8 +18,8 @@ use crate::engine::{Engine, Ingested, TICK_S};
 use crate::privacy;
 use crate::shared::Shared;
 use crate::store::{self, EventLog};
-use crate::timefmt::{iso8601, local_day, now_unix_ms};
-use saans_health::{LinkId, Severity};
+use crate::timefmt::{date_string, iso8601, local_day, now_unix_ms};
+use saans_health::{DailyRoutine, HealthEvent, HomeRoutine, LinkId, Room, Severity};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::Write as _;
@@ -111,7 +111,18 @@ pub struct Hub {
     rate_window: VecDeque<(f64, u64)>,
     /// Startup warnings, shown in /api/health.
     pub notes: Vec<String>,
+    /// The home's daily routine (issue #39), when some space has a room.
+    routine: Option<HomeRoutine>,
+    /// When `/api/routine`'s body was last rebuilt, and whether a day has
+    /// closed since: it is rebuilt then, or once a minute, not at 2 Hz.
+    routine_published_t: f64,
+    routine_dirty: bool,
 }
+
+/// Closed days `/api/routine` shows, newest first.
+const ROUTINE_SHOWN_DAYS: usize = 14;
+/// How often the day in progress is republished for `/api/routine`.
+const ROUTINE_PUBLISH_S: f64 = 60.0;
 
 impl Hub {
     /// `persist`: write event logs and history under `data_dir` and load
@@ -146,6 +157,13 @@ impl Hub {
             retention_t: None,
             rate_window: VecDeque::new(),
             notes: Vec::new(),
+            routine: cfg
+                .spaces
+                .iter()
+                .any(|s| s.room != Room::Other)
+                .then(|| HomeRoutine::new(cfg.home)),
+            routine_published_t: f64::NEG_INFINITY,
+            routine_dirty: false,
             cfg,
         };
         if persist {
@@ -204,6 +222,16 @@ impl Hub {
                 )),
             }
         }
+        // The routine's days, on the same retention clock as the summaries.
+        if let Some(r) = &mut self.routine {
+            let (mut days, err) = store::load_routine(&dir);
+            if let Some(e) = err {
+                self.notes.push(e);
+            }
+            let keep_from = today - i64::from(self.cfg.history_retention_days);
+            days.retain(|d| d.day >= keep_from);
+            r.import_history(days);
+        }
         if let Some(shared) = &self.shared {
             for mut v in store::load_recent_events(&dir, crate::shared::EVENT_RING) {
                 let space = v
@@ -238,6 +266,7 @@ impl Hub {
     pub fn tick(&mut self, t_s: f64) {
         self.now_t = self.now_t.max(t_s);
         let events = self.engine.tick(t_s);
+        self.routine_step(&events);
         let offset = self.cfg.utc_offset_minutes;
         for (i, ev) in events {
             let vitals = self.engine.spaces[i].config.vitals;
@@ -293,6 +322,94 @@ impl Hub {
         if self.shared.is_some() {
             self.publish(t_s);
         }
+    }
+
+    /// Feed the home's routine every space's sample and this tick's events,
+    /// and keep each day that closes (issue #39).
+    fn routine_step(&mut self, events: &[(usize, HealthEvent)]) {
+        let Some(r) = &mut self.routine else {
+            return;
+        };
+        let before = r.today().map(|d| d.day);
+        let mut closed = Vec::new();
+        for (i, sp) in self.engine.spaces.iter().enumerate() {
+            let Some(s) = sp.monitor.last_sample() else {
+                continue;
+            };
+            let evs: Vec<HealthEvent> = events
+                .iter()
+                .filter(|(j, _)| *j == i)
+                .map(|(_, e)| e.clone())
+                .collect();
+            closed.extend(r.observe(sp.config.room, &s, &evs));
+        }
+        // A first day, or a new one: republish now rather than within the
+        // minute.
+        if r.today().map(|d| d.day) != before {
+            self.routine_dirty = true;
+        }
+        for day in closed {
+            // The date only: a routine is wellbeing data, and the log is
+            // not filtered by role the way the API is.
+            crate::log(&format!("routine: {} closed", date_string(day.day)));
+            if self.persist {
+                self.save_routine();
+            }
+        }
+    }
+
+    fn save_routine(&mut self) {
+        let Some(r) = &self.routine else { return };
+        let mut days = r.history();
+        if let Some(last) = days.last().map(|d| d.day) {
+            let keep_from = last + 1 - i64::from(self.cfg.history_retention_days);
+            days.retain(|d| d.day >= keep_from);
+        }
+        let saved = iso8601(now_unix_ms(), self.cfg.utc_offset_minutes);
+        if let Err(e) = store::save_routine(&self.cfg.data_dir, &days, &saved) {
+            self.history_errors += 1;
+            self.history_last_error = Some(format!("routine.json: {e}"));
+            crate::log(&format!("routine: could not write routine.json: {e}"));
+        }
+    }
+
+    /// `/api/routine`'s body: the day so far and the closed days, each
+    /// with its date and counts, and what is not computed.
+    fn routine_json(&self) -> Value {
+        let Some(r) = &self.routine else {
+            return Value::Null;
+        };
+        let day_json = |d: &DailyRoutine| {
+            let mut v = serde_json::to_value(d).unwrap_or(Value::Null);
+            if let Value::Object(m) = &mut v {
+                m.insert("date".into(), date_string(d.day).into());
+                m.insert("active_hours".into(), d.active_hours().into());
+                m.insert("observed_hours".into(), d.observed_hours().into());
+            }
+            v
+        };
+        let days: Vec<Value> = r
+            .history()
+            .iter()
+            .rev()
+            .take(ROUTINE_SHOWN_DAYS)
+            .map(day_json)
+            .collect();
+        let rooms: Vec<Value> = self
+            .engine
+            .spaces
+            .iter()
+            .filter(|s| s.config.room != Room::Other)
+            .map(|s| json!({ "space_id": s.config.id, "room": s.config.room }))
+            .collect();
+        json!({
+            "rooms": rooms,
+            "night_window_h": [self.cfg.home.night_start_h, self.cfg.home.night_end_h],
+            "today": r.today().map(day_json),
+            "days": days,
+            "note": "Advisory: it describes a day and diagnoses nothing. Each day is compared with this \
+                     home's own previous complete days (at least 7). Unusual quiet is not computed yet.",
+        })
     }
 
     fn housekeeping(&mut self, t_s: f64) {
@@ -419,6 +536,13 @@ impl Hub {
                 health: Arc::new(health.clone()),
             });
         }
+        let routine = (self.routine.is_some()
+            && (self.routine_dirty || t_s - self.routine_published_t >= ROUTINE_PUBLISH_S))
+            .then(|| {
+                self.routine_dirty = false;
+                self.routine_published_t = t_s;
+                self.routine_json()
+            });
         {
             let mut p = shared.write();
             p.t_s = t_s;
@@ -427,6 +551,9 @@ impl Hub {
             p.health = health;
             p.metrics = metrics;
             p.state_msg = Some(state_msg.clone());
+            if let Some(v) = routine {
+                p.routine = v;
+            }
         }
         shared.broadcast(state_msg);
     }
