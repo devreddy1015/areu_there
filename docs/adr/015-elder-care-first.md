@@ -1,10 +1,4 @@
-<!-- TODO(#37): give this ADR its number once saans/consolidate (#32) merges.
-     That PR renumbers the research line's two ADRs (declared geometry,
-     offline learned models) to the next free numbers after 012; this one
-     takes the number after those (015 if they become 013 and 014). Rename
-     the file, fix the title line, and add the row to docs/adr/README.md. -->
-
-# ADR-0XX: Lead with elder care
+# ADR-015: Lead with elder care
 
 **Status:** accepted, 2026-11-06. **Decided, not built.** The signals,
 the relay and the phone app this decision calls for are issues #38-#42;
@@ -157,8 +151,8 @@ alternatives scan is issue #48 and has not been done.
   example (spec §6). The spec
   lists the wording that stays on the wellness side, and a written
   regulatory opinion is needed before the first paid pilot.
-- **Docs written for campus need rewording:** README, `SAANS_PLAN.md`
-  and the ADR index. That is listed in the PR that adds this ADR and is
+- **Docs written for campus need rewording:** README and
+  `SAANS_PLAN.md`. That is listed in the PR that adds this ADR and is
   done after the consolidation (#32) merges.
 
 ### What would reverse this

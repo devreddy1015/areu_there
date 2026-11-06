@@ -1,9 +1,8 @@
 # Elder care: the product spec
 
 **Status:** draft for issue #37, 2026-11-06. The decision to lead with
-elder care is [ADR-0XX](adr/0XX-elder-care-first.md) (numbered after
-the consolidation, #32, merges). Issues #38-#42 and #47 build on this
-file.
+elder care is [ADR-015](adr/015-elder-care-first.md). Issues #38-#42
+and #47 build on this file.
 
 Saans for elder care is a few small sensors in the home of an older
 person who lives alone, and a gateway on the same home network. When
@@ -70,7 +69,7 @@ What they want:
 A care home has many rooms, staff on site and an institutional buyer.
 The existing campus design (spaces, roles, alert routes, escalation)
 fits it more closely than it fits a family. It is the second customer,
-not the first (ADR-0XX), and nothing in this spec is designed for it.
+not the first (ADR-015), and nothing in this spec is designed for it.
 
 ### 1.4 Who is not a user
 
@@ -500,7 +499,7 @@ alive and nothing about the rooms.
 
 Whether the relay can read what it carries is the main privacy decision
 in #40. End-to-end encryption from the home gateway to the family's
-phones would leave the relay holding only routing data (ADR-0XX).
+phones would leave the relay holding only routing data (ADR-015).
 
 ### 5.3 No identities, and what that does not mean
 
