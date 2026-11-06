@@ -235,6 +235,7 @@ fn job(c: &Config, room_name: &'static str, room: &Room, s: u64) -> Job {
             timeline,
             seed,
         ),
+        fall_hold_min: 0.0,
     }
 }
 

@@ -931,6 +931,21 @@ ALERTS (per scenario type; 'runs firing' = runs with at least one)
 REST PERIODS (night timelines: one long lying period with pauses and fidgets; >= 20 min of stillness starts one)
   runs with >= 1 rest period: 31/36; total rest periods reported: 31
 
+PRESENCE HOLD (ships OFF). A second pass over the same reader, night and collapse runs with it on:
+after a fall-shaped motion the links read empty with nothing moving, and presence is held, inferred,
+for up to 35 min or until motion. Minutes held with the person truly there and with the room truly
+empty; alerts raised while it held an empty room are false alarms it caused (inactivity ships on;
+possible collapse ships off); falls flagged as a possible collapse, against the first pass.
+  scenario       runs  runs held  held, there  held, empty  inactivity, empty  collapse, empty  departures held  collapse fired
+  reader           36          5          0.0          7.8                  0                1             5/36      33/36 (33)
+  night            36         13          2.7         20.3                  0                5            13/36      35/36 (35)
+  collapse         36          0          0.0          0.0                  0                0              0/0      36/36 (36)
+  raised while holding an empty room: inactivity 0, possible collapse 6
+  departures that engaged the hold: 18 of 72. The two timelines with a departure
+  (reader, night) end 120 s after it, which cuts such a hold short. In a room that stays empty it runs to
+  its 35 min cap and raises an inactivity alert at 30 min: read 'departures held' as false inactivity alerts.
+  'collapse fired': with the hold, and (in brackets) without it.
+
 BY ROOM (all layouts)
   clear-LoS  still false-empty   0.8%  breathing coverage  98.9% (within 1 BPM  96.2%)  pause sensitivity  90.6% precision  99.1%
   rich-NLoS  still false-empty   1.8%  breathing coverage  96.8% (within 1 BPM 100.0%)  pause sensitivity  82.8% precision  98.1%
@@ -991,6 +1006,21 @@ ALERTS (per scenario type; 'runs firing' = runs with at least one)
 REST PERIODS (night timelines: one long lying period with pauses and fidgets; >= 20 min of stillness starts one)
   runs with >= 1 rest period: 36/36; total rest periods reported: 36
 
+PRESENCE HOLD (ships OFF). A second pass over the same reader, night and collapse runs with it on:
+after a fall-shaped motion the links read empty with nothing moving, and presence is held, inferred,
+for up to 35 min or until motion. Minutes held with the person truly there and with the room truly
+empty; alerts raised while it held an empty room are false alarms it caused (inactivity ships on;
+possible collapse ships off); falls flagged as a possible collapse, against the first pass.
+  scenario       runs  runs held  held, there  held, empty  inactivity, empty  collapse, empty  departures held  collapse fired
+  reader           36         12         21.6         17.6                  0                6            11/36      34/36 (32)
+  night            36         11          0.5         16.0                  0                4            10/36      30/36 (30)
+  collapse         36          1          4.5          0.0                  0                0              0/0      34/36 (33)
+  raised while holding an empty room: inactivity 0, possible collapse 10
+  departures that engaged the hold: 21 of 72. The two timelines with a departure
+  (reader, night) end 120 s after it, which cuts such a hold short. In a room that stays empty it runs to
+  its 35 min cap and raises an inactivity alert at 30 min: read 'departures held' as false inactivity alerts.
+  'collapse fired': with the hold, and (in brackets) without it.
+
 BY ROOM (all layouts)
   clear-LoS  still false-empty   0.7%  breathing coverage 100.0% (within 1 BPM  92.3%)  pause sensitivity  86.0% precision  99.4%
   rich-NLoS  still false-empty   1.4%  breathing coverage  98.7% (within 1 BPM  99.9%)  pause sensitivity  93.0% precision  98.0%
@@ -1024,6 +1054,13 @@ READ AS AN EMPTY ROOM (share of the still period; spots read empty more than hal
   rich-NLoS  3 links       0.6%      0.0%          1/200        0/200         2.8       4.4
   all                      1.0%      0.9%        10/1200      12/1200         4.1       6.8
   (occupancy unknown: 0.0% of all scored samples)
+
+AFTER THE PRESENCE HOLD (read empty and not held: what the detectors take as nobody there)
+                          lying   upright    mostly, lie   mostly, up
+  1 link                   0.8%      0.2%          2/400        1/400
+  2 links                  0.1%      0.0%          0/400        0/400
+  3 links                  0.0%      0.0%          0/400        0/400
+  all                      0.3%      0.1%         2/1200       1/1200
 
 1 LINK, BY HORIZONTAL DISTANCE FROM THE LINK LINE (both rooms)
   distance      spots     lying   upright   SNR lie    SNR up

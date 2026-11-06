@@ -158,6 +158,7 @@ fn cases(seeds: u64, per_class: usize) -> Vec<Case> {
                     layout: "2 links",
                     seed,
                     scenario: sc,
+                    fall_hold_min: 0.0,
                 },
             });
         }

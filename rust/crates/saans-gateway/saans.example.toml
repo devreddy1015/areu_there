@@ -83,6 +83,14 @@ vitals = false
 inactivity_alert_min = 30.0
 # Off by default: WiFi cannot tell "fell" from "sat down heavily".
 collapse_detection = false
+# After a fall-shaped motion (a burst that stops abruptly) the links can
+# lose a weak breather on the floor. With this set, presence is then held
+# this long so the inactivity alert still counts; it is inferred, not
+# measured, and every alert says so. Motion ends it. Off by default, like
+# collapse detection: it cannot tell a fall out of sight from walking out,
+# and in simulation about one departure in four engages it (NOTES.md §14).
+# To turn it on, set it longer than inactivity_alert_min, e.g. 35.
+fall_hold_min = 0
 
 [[space]]
 id = "rest-room-1"
