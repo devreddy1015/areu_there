@@ -142,6 +142,16 @@ link with probability 0.1 (at least one kept). **Unknown geometry:** with
 probability 0.1. Seeds fix the initialisation, sampling, subsets and
 dropout.
 
+**A run that stops learning fails** (nonzero exit, no `done.json`): more
+than half of a 50-step window skipped for non-finite gradients (a few skips
+at the start are the gradient scaler probing its scale), a non-finite
+validation loss, or, at the end, no `best.pt` holding the best epoch.
+`done.json` is written only beside that `best.pt`. A finished run is
+reused only under the same configuration (every setting except where and
+how fast it runs: device, workers, compilation, evaluation batch, output
+root); otherwise it is refused until overwritten. A resumed run that had
+already stopped early trains no further.
+
 ## 3. Baselines (same split, same evaluation windows)
 
 1. **WLM** (spec/locate.md §5), two forms, each labelled: *stored*
@@ -215,7 +225,11 @@ scenes). The sweep table on val carries the same interval.
 1. **Sweep** (one seed each): lr {3e-4, 1e-3, 3e-3} x width `D` {64, 128,
    256} x window `ℓ` {1, 2, 4} s = 27 runs, several at once on the GPU.
    Selection by the validation loss; the whole table is reported (val
-   only; test is touched once).
+   only; test is touched once). The selection needs all 27 runs done with
+   a finite loss; choosing from a partial grid is an explicit override
+   (`--choose`). A final evaluation is reused only while its checkpoints
+   are unchanged (sha256); several runs scored together must be distinct
+   seeds on the same windows.
 2. **Main result:** the chosen configuration, 3 seeds, on test, against
    every baseline.
 3. **Ablation, impairments ON vs OFF (required):** the same configuration
@@ -262,6 +276,11 @@ scenes). The sweep table on val carries the same interval.
   the recomputed WLM equals the stored one when `window_s` = 1 s and every
   link is kept.
 - A smoke run: a few scenes, one epoch, end to end.
+- Run integrity (`ml/tests/test_integrity.py`): a frozen or diverged run
+  ends without `done.json`; a finished run of another configuration is
+  refused; the final choice needs the whole grid; a stale evaluation is
+  redone; repeated seeds or other windows are refused; Phase 9 takes only
+  P9-SIM checkpoints.
 
 ## 8. Limits
 

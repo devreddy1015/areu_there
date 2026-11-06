@@ -45,6 +45,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from ml.train import integrity as integ  # noqa: E402
 from ml.train import model as mdl  # noqa: E402
 from ml.train import train as tr  # noqa: E402
 
@@ -170,6 +171,10 @@ def evaluate_runs(runs: list, split: str = "test", subset: str = "all", *, datas
                   recomputed: str | None = None, variance: str | None = None) -> dict:
     """Evaluate one or more runs (seeds of one configuration) on the same
     windows; write `<name>.json` (and one `.npz` per run) to `out_dir`.
+    Several runs must be distinct seeds whose predictions cover the same
+    windows in the same order (ml.train.integrity.check_seed_runs): the
+    truth is taken once. Each run's entry records its checkpoint's sha256,
+    so a reused evaluation can be checked against retrained weights.
     With `baselines`, the evaluated dataset's baselines are scored on the
     same windows and resampled scenes, with the model as the reference of
     every paired difference. Returns the JSON dict."""
@@ -203,10 +208,13 @@ def evaluate_runs(runs: list, split: str = "test", subset: str = "all", *, datas
         if truth is None:
             truth = _truth(src, res, split, subset, synthetic)
         preds.append(_contract(arrays))
-        entries.append({"run_id": rc["run_id"], "checkpoint": os.path.abspath(path), "epoch": ck.get("epoch"),
+        entries.append({"run_id": rc["run_id"], "checkpoint": os.path.abspath(path),
+                        "checkpoint_sha256": integ.file_sha256(path), "epoch": ck.get("epoch"),
                         "step": ck.get("step"), "val_loss": ck.get("val_loss"), "seed": rc["seed"],
                         "eval_loss": {k: v for k, v in res.items() if k in ("loss",) + tr.TERMS},
                         "arrays": arrays, "dataset_trained": rc["dataset"]})
+    integ.check_seed_runs([{"run_id": e["run_id"], "seed": e["seed"], "scene": e["arrays"]["scene"],
+                            "k": e["arrays"]["k"]} for e in entries])
     from ml.train import metrics as met
 
     methods = {"model": preds if len(preds) > 1 else preds[0]}

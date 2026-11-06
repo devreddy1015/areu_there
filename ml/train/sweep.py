@@ -11,15 +11,19 @@ to `--concurrency` (default 9) at once on the one GPU, the costliest
 first (GPU_MS). Measured: 9 runs keep the GPU about 97% busy; the sweep
 needs about 7,200 GPU-seconds at 30 epochs a run (6,500 for training, 12%
 more for the per-epoch validation), so about 2-2.5 h of wall time, less
-when early stopping ends runs sooner. Resume-safe: a run
-with `done.json` is skipped, a run with only `last.pt` resumes at its last
-finished epoch (ml.train.train). `--collect` writes `sweep_table.json` and
-`sweep_table.md` (validation only; selection by the validation loss) under
-the sweep directory; `--intervals` adds each run's val figures with the
-scene-bootstrap interval (ml.train.evaluate on val).
+when early stopping ends runs sooner. Resume-safe: a done run is skipped,
+a run with only `last.pt` resumes at its last finished epoch
+(ml.train.train). Done means `done.json` with a finite best validation
+loss, `best.pt`, and a `config.json` equal to the planned config
+(ml.train.integrity.done_problem); any other run is trained again, and the
+trainer refuses one that finished under another configuration. `--collect`
+writes `sweep_table.json` and `sweep_table.md` (validation only; selection
+by the validation loss; the runs not done are listed with the reason)
+under the sweep directory; `--intervals` adds each run's val figures with
+the scene-bootstrap interval (ml.train.evaluate on val).
 
-**Final** (§5.2-§5.6), for the chosen configuration (the lowest val loss,
-or `--choose`) x seeds {0, 1, 2}:
+**Final** (§5.2-§5.6), for the chosen configuration (the lowest val loss
+once all 27 sweep runs are done, or `--choose`) x seeds {0, 1, 2}:
 - `main`: roomsim-v1; evaluated on its test split, on the link subsets
   `tx0`, `single01`, `single01_nogeo` (§5.6), and on roomsim-v1-hwoff's
   test split (the cross case);
@@ -30,7 +34,9 @@ or `--choose`) x seeds {0, 1, 2}:
 - `gain`: `gain_db` minus its window mean as one more channel (§5.5; every
   cache stores `gain_db`).
 Each evaluation aggregates the three seeds (mean, std and the bootstrap
-interval of the seed-averaged figure; ml.train.metrics). A missing cache is
+interval of the seed-averaged figure; ml.train.metrics); an evaluation
+already written is reused only while its checkpoints are unchanged (their
+sha256, ml.train.integrity.stale_eval). A missing cache is
 reported with the command that builds it; nothing is trained on data that
 does not exist. The baselines' comparison (WLM, RTI, forest, MLP, prior on
 the same windows) is the data side's (ml.train.baselines).
@@ -50,6 +56,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from ml.train import integrity as integ  # noqa: E402
 from ml.train import train as tr  # noqa: E402
 
 LABEL = "SIM"
@@ -99,7 +106,8 @@ def run_dir(cfg: dict) -> str:
 
 
 def is_done(cfg: dict) -> bool:
-    return os.path.isfile(os.path.join(run_dir(cfg), "done.json"))
+    """Finished with a usable best.pt, under this config (ml.train.integrity.done_problem)."""
+    return integ.done_problem(run_dir(cfg), cfg) is None
 
 
 def pending(runs: list) -> list:
@@ -203,11 +211,14 @@ def _best_epoch_record(cfg: dict) -> dict | None:
 def collect(runs: list, out_dir: str | None = None, intervals: dict | None = None) -> dict:
     """The validation table of finished runs, sorted by val loss (best
     first): config, best epoch, val loss and its terms, the val summary at
-    the best epoch, steps, time, throughput and GPU memory. SIM, val only."""
-    rows = []
+    the best epoch, steps, time, throughput and GPU memory; and `not_done`,
+    each other run with the reason. SIM, val only."""
+    rows, not_done = [], {}
     runs = [tr.resolve_config(r) for r in runs]
     for cfg in runs:
-        if not is_done(cfg):
+        problem = integ.done_problem(run_dir(cfg), cfg)
+        if problem:
+            not_done[cfg["run_id"]] = problem
             continue
         with open(os.path.join(run_dir(cfg), "done.json")) as f:
             done = json.load(f)
@@ -222,11 +233,12 @@ def collect(runs: list, out_dir: str | None = None, intervals: dict | None = Non
         if intervals and cfg["run_id"] in intervals:
             row["val_intervals"] = intervals[cfg["run_id"]]
         rows.append(row)
-    rows.sort(key=lambda r: (r["best_val_loss"] if r["best_val_loss"] is not None else float("inf")))
+    rows, dropped = integ.rank_rows(rows)
+    not_done.update({rid: "no finite best validation loss" for rid in dropped})
     table = {"label": LABEL, "spec": "spec/model.md §5.1", "split": "val",
              "selection": "lowest validation loss (spec/model.md §5.1); test untouched",
              "n_runs": len(runs), "n_finished": len(rows), "rows": rows,
-             "best": rows[0]["run_id"] if rows else None}
+             "best": rows[0]["run_id"] if rows else None, "not_done": not_done}
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
         tr._write_json(table, os.path.join(out_dir, "sweep_table.json"))
@@ -258,6 +270,10 @@ def markdown_table(table: dict) -> str:
                      f"{r['best_epoch']} | {cell('presence_acc')} | {cell('count_acc')} | {cell('zone_f1')} | "
                      f"{cell('xy_median_m', 2)} | {cell('xy_recall')} | {cell('radius_coverage')} | "
                      f"{fmt(r['samples_per_s'], 0)} |")
+    not_done = table.get("not_done") or {}
+    if not_done:
+        lines += ["", f"Not done ({len(not_done)} of {table['n_runs']}; `--final` refuses without `--choose`):"]
+        lines += [f"- {rid}: {why}" for rid, why in sorted(not_done.items())]
     return "\n".join(lines) + "\n"
 
 
@@ -284,9 +300,9 @@ def val_intervals(runs: list, n_boot: int = 2000, workers: int = 4, device: str 
 
 
 def chosen_config(table: dict, runs: list, choose: str | None = None) -> dict:
-    rid = choose or table.get("best")
-    if not rid:
-        raise SystemExit("no finished sweep run to choose from (run the sweep first, or pass --choose)")
+    """The sweep config the final runs use: `choose`, or the lowest val loss of a complete sweep (refused while
+    any of its runs is not done: a partial grid's best is not the sweep's choice)."""
+    rid = integ.pick_final(table, choose)
     for cfg in runs:
         if cfg["run_id"] == rid:
             return cfg
@@ -363,13 +379,18 @@ def run_final(plan: dict, concurrency: int, n_boot: int = 2000, workers: int = 4
             report["evals"][e["name"]] = {"skipped": f"missing cache {e['cache_dir']}"}
             continue
         out_json = os.path.join(eval_dir, f"{e['name']}.json")
+        stale = None
         if os.path.isfile(out_json):
-            report["evals"][e["name"]] = {"json": out_json, "cached": True}
-            continue
+            stale = integ.stale_eval(out_json, [ev.checkpoint_path(run_dir(c)) for c in runs])
+            if stale is None:
+                report["evals"][e["name"]] = {"json": out_json, "cached": True}
+                continue
+            if verbose:
+                print(f"[final SIM] re-evaluating {e['name']}: {stale}", flush=True)
         doc = ev.evaluate_runs([run_dir(c) for c in runs], e["split"], e["subset"], dataset=e["dataset"],
                                cache_dir=e["cache_dir"], out_dir=eval_dir, workers=workers, n_boot=n_boot,
                                name=e["name"], baselines=True)
-        report["evals"][e["name"]] = {"json": doc["json"], "baselines": doc["baselines"]}
+        report["evals"][e["name"]] = {"json": doc["json"], "baselines": doc["baselines"], "replaced_stale": stale}
     tr._write_json(report, os.path.join(plan["out_root"], "final_report.json"))
     return report
 
