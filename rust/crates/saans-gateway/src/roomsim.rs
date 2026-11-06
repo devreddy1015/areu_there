@@ -59,7 +59,7 @@ pub(crate) const ROOMSIM_SIM_JS: &str = include_str!("../assets/roomsim-sim.js")
 /// files, so any change to it must change its path, or browsers keep the
 /// old file for a year. A test pins this to the bytes, and another pins
 /// roomsim.js's import to this, so neither can be forgotten.
-pub(crate) const SIM_REV: &str = "32c8ff29371a";
+pub(crate) const SIM_REV: &str = "99f8ba68330d";
 
 /// The vendored bytes' identity in the served path: the upstream three.js
 /// version plus a local revision. The files are cached as immutable, so

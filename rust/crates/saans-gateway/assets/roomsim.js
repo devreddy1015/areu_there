@@ -29,7 +29,7 @@ import * as THREE from './vendor/0.186.1-saans1/three.module.js';
 import { OrbitControls } from './vendor/0.186.1-saans1/OrbitControls.js';
 // Named by the digest of its bytes, because it is cached as immutable;
 // src/roomsim.rs pins the two together.
-import { createSim } from './sim/32c8ff29371a/roomsim-sim.js';
+import { createSim } from './sim/99f8ba68330d/roomsim-sim.js';
 
 // ---------------------------------------------------------------- helpers
 
