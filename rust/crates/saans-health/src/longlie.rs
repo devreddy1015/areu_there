@@ -7,7 +7,10 @@
 //!    `SpaceConfig::long_lie_min`, with presence measured, or held if the
 //!    space has the presence hold on (`fall_hold_min`);
 //! 3. and nobody is seen moving in one of the spaces named in
-//!    `long_lie_elsewhere` meanwhile (the gateway reports that).
+//!    `long_lie_elsewhere` meanwhile (the gateway reports that). Only
+//!    motion that starts there after the count began counts: motion
+//!    already going on when it began is the person's own trail (they
+//!    walked in from there) or the movement itself seen through a wall.
 //!
 //! It reads only presence and motion: no vitals, and it does not need
 //! `collapse_detection`. Gross motion after the alert is reported once
@@ -71,6 +74,9 @@ struct Count {
     samples: u64,
     held_samples: u64,
     held_now: bool,
+    /// The `long_lie_elsewhere` spaces have been seen without motion
+    /// since the count began: motion there from now on is new.
+    elsewhere_quiet: bool,
 }
 
 /// The long-lie detector for one space.
@@ -159,6 +165,7 @@ impl LongLie {
                         samples: 0,
                         held_samples: 0,
                         held_now: false,
+                        elsewhere_quiet: false,
                     });
                     self.count(space, x, &mut ev);
                 }
@@ -172,10 +179,11 @@ impl LongLie {
         let Phase::Counting(mut c) = self.phase else {
             return;
         };
-        if x.moving || x.elsewhere {
+        if x.moving || (x.elsewhere && c.elsewhere_quiet) {
             self.phase = Phase::Idle;
             return;
         }
+        c.elsewhere_quiet |= !x.elsewhere;
         if !x.visible {
             let since = *c.blind_since.get_or_insert(x.t);
             if x.t - since > BLIND_END_S {
@@ -489,6 +497,25 @@ mod tests {
         m.note_motion_elsewhere();
         ev.extend(run(&mut m, 120.0, 600.0, still));
         assert!(lies(&ev).is_empty());
+    }
+
+    #[test]
+    fn motion_elsewhere_that_was_already_going_on_when_the_count_began_does_not_stop_it() {
+        // They walked out of the living room and fell in the bathroom: the
+        // living room still reads them moving for a few seconds after.
+        let mut m = SpaceMonitor::new(cfg(3.0));
+        let mut ev = run(&mut m, 0.0, 60.0, |t| sample(t, Some(true), 4.0));
+        for i in 0..10 {
+            let t = 60.0 + i as f64 * DT;
+            m.note_motion_elsewhere();
+            ev.extend(m.update(&sample(t, Some(true), if t < 61.0 { 9.5 } else { 0.5 })));
+        }
+        ev.extend(run(&mut m, 65.0, 400.0, still));
+        assert_eq!(
+            lies(&ev).len(),
+            1,
+            "trailing motion elsewhere is not a new sighting"
+        );
     }
 
     #[test]
