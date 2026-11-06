@@ -26,6 +26,7 @@ how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 | [012](012-authenticated-frames.md) | FeatureFrame v2: frames signed with a per-node key, and a counter the gateway will not accept twice | 2026-10-24 | yes, 2026-10-24, in all three implementations; the firmware builds but has not run on a board |
 | [013](013-declared-geometry-and-drawing.md) | Room geometry is declared in a scene file, never inferred from WiFi; what the room demo may draw, and for whom (accepted as 008 on the research branch) | 2026-10-21 | yes, SIM and REPLAY only, behind the `roomsim` feature; no LIVE room view |
 | [014](014-offline-learned-models.md) | Learned models are trained and evaluated offline, for research only; none runs in the product (accepted as 009 on the research branch) | 2026-10-25 | n/a — a boundary; nothing loads a model |
+| [015](015-elder-care-first.md) | Lead with elder care: an older person living alone, alerts to family; a long lie, not fall detection | 2026-11-06 | **no** — the signals, relay and app are issues #38-#42 |
 
 Writing a new one: copy the shape of the existing files — title line,
 `**Status:**` with a date, then Context, Decision, Consequences — and
