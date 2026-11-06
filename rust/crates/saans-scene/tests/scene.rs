@@ -5,7 +5,10 @@
 //! not against another call into `geom`.
 
 use saans_scene::geom;
-use saans_scene::scene::{Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Provenance, Room, Scene, Wall, WallMaterial};
+use saans_scene::scene::{
+    Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Provenance, Room, Scene, Wall,
+    WallMaterial,
+};
 use saans_scene::validate::SceneError;
 use saans_scene::SCHEMA_VERSION;
 
@@ -25,10 +28,24 @@ fn minimal() -> Scene {
         schema_version: SCHEMA_VERSION,
         name: "test".into(),
         provenance: Provenance::HandWritten,
-        room: Room { w_m: 4.0, d_m: 3.0, h_m: 2.5, polygon: None },
+        room: Room {
+            w_m: 4.0,
+            d_m: 3.0,
+            h_m: 2.5,
+            polygon: None,
+        },
         walls: Vec::new(),
         objects: Vec::new(),
-        nodes: vec![Node { id: 0, pos: (0.5, 0.5, 1.0) }, Node { id: 1, pos: (3.5, 2.5, 1.0) }],
+        nodes: vec![
+            Node {
+                id: 0,
+                pos: (0.5, 0.5, 1.0),
+            },
+            Node {
+                id: 1,
+                pos: (3.5, 2.5, 1.0),
+            },
+        ],
         people: Vec::new(),
         phone: None,
     }
@@ -40,7 +57,11 @@ fn the_three_example_scenes_load_and_validate() {
         let s = load(name);
         assert!(!s.name.is_empty());
         assert_eq!(s.schema_version, SCHEMA_VERSION);
-        assert!(s.validate().is_empty(), "{name} reported {:?}", s.validate());
+        assert!(
+            s.validate().is_empty(),
+            "{name} reported {:?}",
+            s.validate()
+        );
     }
 }
 
@@ -62,7 +83,11 @@ fn l_shaped_hall_has_the_area_worked_out_by_hand() {
     assert_eq!(poly.len(), 6);
     // The L is a 9 x 3 strip plus a 4 x 4 block above its left end.
     let expected = 9.0 * 3.0 + 4.0 * 4.0;
-    assert!((geom::area(&poly) - expected).abs() < 1e-9, "area was {}", geom::area(&poly));
+    assert!(
+        (geom::area(&poly) - expected).abs() < 1e-9,
+        "area was {}",
+        geom::area(&poly)
+    );
 }
 
 #[test]
@@ -82,8 +107,16 @@ fn every_node_of_every_example_is_inside_its_room() {
         let s = load(name);
         let poly = s.footprint();
         for n in &s.nodes {
-            assert!(geom::point_in_polygon(&poly, (n.pos.0, n.pos.1)), "{name}: node {} is outside", n.id);
-            assert!(n.pos.2 >= 0.0 && n.pos.2 <= s.room.h_m, "{name}: node {} is outside the room height", n.id);
+            assert!(
+                geom::point_in_polygon(&poly, (n.pos.0, n.pos.1)),
+                "{name}: node {} is outside",
+                n.id
+            );
+            assert!(
+                n.pos.2 >= 0.0 && n.pos.2 <= s.room.h_m,
+                "{name}: node {} is outside the room height",
+                n.id
+            );
         }
     }
 }
@@ -104,7 +137,8 @@ fn node_ids_are_unique_in_every_example() {
 fn a_scene_round_trips_through_json() {
     for name in ["bedroom.json", "office.json", "hall-l-shaped.json"] {
         let s = load(name);
-        let back = Scene::from_json_str(name, &s.to_json_pretty()).expect("re-reading our own output");
+        let back =
+            Scene::from_json_str(name, &s.to_json_pretty()).expect("re-reading our own output");
         assert_eq!(s, back, "{name} changed on a JSON round trip");
     }
 }
@@ -130,9 +164,13 @@ fn the_example_files_are_what_this_crate_would_write() {
     for name in ["bedroom.json", "office.json", "hall-l-shaped.json"] {
         let s = load(name);
         let on_disk: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(scenes_dir().join(name)).unwrap()).unwrap();
+            serde_json::from_str(&std::fs::read_to_string(scenes_dir().join(name)).unwrap())
+                .unwrap();
         let ours: serde_json::Value = serde_json::from_str(&s.to_json_pretty()).unwrap();
-        assert_eq!(on_disk, ours, "{name} is not what saans-scene would write for the same scene");
+        assert_eq!(
+            on_disk, ours,
+            "{name} is not what saans-scene would write for the same scene"
+        );
     }
 }
 
@@ -145,9 +183,10 @@ fn a_good_scene_has_no_errors() {
 fn an_unknown_schema_version_is_rejected() {
     let mut s = minimal();
     s.schema_version = 99;
-    assert!(s
-        .validate()
-        .contains(&SceneError::UnknownSchemaVersion { found: 99, supported: SCHEMA_VERSION }));
+    assert!(s.validate().contains(&SceneError::UnknownSchemaVersion {
+        found: 99,
+        supported: SCHEMA_VERSION
+    }));
 }
 
 #[test]
@@ -161,7 +200,8 @@ fn a_room_with_no_size_is_rejected() {
         set(&mut s);
         let errs = s.validate();
         assert!(
-            errs.iter().any(|e| matches!(e, SceneError::BadRoomDimension { field: f, .. } if *f == field)),
+            errs.iter()
+                .any(|e| matches!(e, SceneError::BadRoomDimension { field: f, .. } if *f == field)),
             "{field} was accepted: {errs:?}"
         );
     }
@@ -171,7 +211,10 @@ fn a_room_with_no_size_is_rejected() {
 fn a_node_outside_the_room_is_rejected() {
     let mut s = minimal();
     s.nodes[1].pos = (4.5, 1.0, 1.0);
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::NodeOutsideRoom { id: 1, .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::NodeOutsideRoom { id: 1, .. })));
 }
 
 #[test]
@@ -179,14 +222,19 @@ fn a_node_flat_against_a_wall_is_rejected_because_the_simulator_rejects_it() {
     // saans-sim requires 0 < x < w strictly, so x = 0 cannot be simulated.
     let mut s = minimal();
     s.nodes[0].pos = (0.0, 1.5, 1.0);
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::NodeOutsideRoom { id: 0, .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::NodeOutsideRoom { id: 0, .. })));
 }
 
 #[test]
 fn duplicate_node_ids_are_rejected() {
     let mut s = minimal();
     s.nodes[1].id = 0;
-    assert!(s.validate().contains(&SceneError::DuplicateNodeId { id: 0 }));
+    assert!(s
+        .validate()
+        .contains(&SceneError::DuplicateNodeId { id: 0 }));
 }
 
 #[test]
@@ -207,7 +255,10 @@ fn an_object_that_leaves_the_room_is_rejected() {
         yaw_deg: 0.0,
         material: ObjectMaterial::Wood,
     });
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::ObjectOutsideRoom { index: 0, .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::ObjectOutsideRoom { index: 0, .. })));
 }
 
 #[test]
@@ -222,7 +273,9 @@ fn an_object_taller_than_the_room_is_rejected() {
         material: ObjectMaterial::Wood,
     });
     let errs = s.validate();
-    assert!(errs.iter().any(|e| matches!(e, SceneError::ObjectAboveCeiling { .. })));
+    assert!(errs
+        .iter()
+        .any(|e| matches!(e, SceneError::ObjectAboveCeiling { .. })));
 }
 
 #[test]
@@ -241,8 +294,14 @@ fn rotating_an_object_can_push_it_out_of_the_room() {
         });
         s
     };
-    assert!(make(0.0).validate().is_empty(), "the unrotated table should fit");
-    assert!(make(90.0).validate().iter().any(|e| matches!(e, SceneError::ObjectOutsideRoom { .. })));
+    assert!(
+        make(0.0).validate().is_empty(),
+        "the unrotated table should fit"
+    );
+    assert!(make(90.0)
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::ObjectOutsideRoom { .. })));
 }
 
 #[test]
@@ -255,7 +314,10 @@ fn a_wall_thicker_than_a_metre_is_rejected_as_a_unit_mistake() {
         thickness_m: 23.0,
         height_m: None,
     });
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::WallBadThickness { index: 0, .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::WallBadThickness { index: 0, .. })));
 }
 
 #[test]
@@ -268,7 +330,10 @@ fn a_wall_taller_than_the_room_is_rejected() {
         thickness_m: 0.23,
         height_m: Some(9.0),
     });
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::WallBadHeight { index: 0, .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::WallBadHeight { index: 0, .. })));
 }
 
 #[test]
@@ -276,7 +341,10 @@ fn a_self_intersecting_floor_outline_is_rejected() {
     let mut s = minimal();
     // A bow tie across the 4 x 3 box.
     s.room.polygon = Some(vec![(0.0, 0.0), (4.0, 3.0), (4.0, 0.0), (0.0, 3.0)]);
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::PolygonSelfIntersects { .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::PolygonSelfIntersects { .. })));
 }
 
 #[test]
@@ -284,17 +352,30 @@ fn a_floor_outline_that_does_not_fill_its_declared_box_is_rejected() {
     let mut s = minimal();
     // Only 3 m of the declared 4 m width.
     s.room.polygon = Some(vec![(0.0, 0.0), (3.0, 0.0), (3.0, 3.0), (0.0, 3.0)]);
-    assert!(s.validate().iter().any(|e| matches!(e, SceneError::PolygonBboxMismatch { .. })));
+    assert!(s
+        .validate()
+        .iter()
+        .any(|e| matches!(e, SceneError::PolygonBboxMismatch { .. })));
 }
 
 #[test]
 fn a_person_or_phone_starting_outside_the_room_is_rejected() {
     let mut s = minimal();
-    s.people.push(Person { id: None, start: Some((9.0, 9.0)) });
-    s.phone = Some(Phone { id: None, start: (-1.0, 1.0) });
+    s.people.push(Person {
+        id: None,
+        start: Some((9.0, 9.0)),
+    });
+    s.phone = Some(Phone {
+        id: None,
+        start: (-1.0, 1.0),
+    });
     let errs = s.validate();
-    assert!(errs.iter().any(|e| matches!(e, SceneError::PersonOutsideRoom { .. })));
-    assert!(errs.iter().any(|e| matches!(e, SceneError::PhoneOutsideRoom { .. })));
+    assert!(errs
+        .iter()
+        .any(|e| matches!(e, SceneError::PersonOutsideRoom { .. })));
+    assert!(errs
+        .iter()
+        .any(|e| matches!(e, SceneError::PhoneOutsideRoom { .. })));
 }
 
 #[test]
@@ -303,7 +384,11 @@ fn validation_reports_every_problem_not_just_the_first() {
     s.name = String::new();
     s.nodes[1].id = 0;
     s.nodes[1].pos = (99.0, 99.0, 1.0);
-    assert!(s.validate().len() >= 3, "expected several errors, got {:?}", s.validate());
+    assert!(
+        s.validate().len() >= 3,
+        "expected several errors, got {:?}",
+        s.validate()
+    );
 }
 
 #[test]
@@ -318,7 +403,10 @@ fn a_rejected_scene_names_every_problem_in_its_message() {
     s.nodes.clear();
     let text = serde_json::to_string(&s).unwrap();
     let err = Scene::from_json_str("<test>", &text).unwrap_err();
-    assert!(err.to_string().contains("nodes is empty"), "message was: {err}");
+    assert!(
+        err.to_string().contains("nodes is empty"),
+        "message was: {err}"
+    );
 }
 
 #[test]
@@ -338,9 +426,15 @@ fn distance_to_a_segment_is_measured_from_its_ends_not_its_line() {
 fn a_scene_without_a_phone_writes_no_null() {
     let text = minimal().to_json_pretty();
     assert!(!text.contains("null"), "a null reached the file:\n{text}");
-    assert!(!text.contains("\"phone\""), "an absent phone was written:\n{text}");
+    assert!(
+        !text.contains("\"phone\""),
+        "an absent phone was written:\n{text}"
+    );
     // ... and it still reads back as absent.
-    assert!(Scene::from_json_str("<test>", &text).unwrap().phone.is_none());
+    assert!(Scene::from_json_str("<test>", &text)
+        .unwrap()
+        .phone
+        .is_none());
 }
 
 /// The examples are illustrative rooms, not surveys of real ones, and the

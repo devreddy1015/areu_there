@@ -32,35 +32,97 @@ pub const NODE_WALL_CLEARANCE_M: f64 = 0.01;
 #[derive(Debug, Clone, PartialEq)]
 pub enum SceneError {
     /// The file declares a format version this build does not know.
-    UnknownSchemaVersion { found: u32, supported: u32 },
+    UnknownSchemaVersion {
+        found: u32,
+        supported: u32,
+    },
     EmptyName,
     /// A room dimension is zero, negative, or not a number.
-    BadRoomDimension { field: &'static str, value: f64 },
-    PolygonTooShort { vertices: usize },
-    PolygonNotFinite { index: usize },
+    BadRoomDimension {
+        field: &'static str,
+        value: f64,
+    },
+    PolygonTooShort {
+        vertices: usize,
+    },
+    PolygonNotFinite {
+        index: usize,
+    },
     /// Two edges of the floor outline cross or touch.
-    PolygonSelfIntersects { edge_a: usize, edge_b: usize },
+    PolygonSelfIntersects {
+        edge_a: usize,
+        edge_b: usize,
+    },
     PolygonZeroArea,
     /// The outline's bounding box is not the declared `w_m` x `d_m`.
-    PolygonBboxMismatch { got: (Point, Point), want: (Point, Point) },
-    WallNotFinite { index: usize },
-    WallZeroLength { index: usize },
-    WallBadThickness { index: usize, value: f64 },
-    WallBadHeight { index: usize, value: f64, room_h_m: f64 },
-    WallOutsideRoom { index: usize, point: Point },
-    ObjectNotFinite { index: usize },
-    ObjectBadSize { index: usize, size: (f64, f64, f64) },
-    ObjectOutsideRoom { index: usize, bbox: (Point, Point) },
-    ObjectAboveCeiling { index: usize, z_top: f64, room_h_m: f64 },
-    ObjectBelowFloor { index: usize, z_bottom: f64 },
+    PolygonBboxMismatch {
+        got: (Point, Point),
+        want: (Point, Point),
+    },
+    WallNotFinite {
+        index: usize,
+    },
+    WallZeroLength {
+        index: usize,
+    },
+    WallBadThickness {
+        index: usize,
+        value: f64,
+    },
+    WallBadHeight {
+        index: usize,
+        value: f64,
+        room_h_m: f64,
+    },
+    WallOutsideRoom {
+        index: usize,
+        point: Point,
+    },
+    ObjectNotFinite {
+        index: usize,
+    },
+    ObjectBadSize {
+        index: usize,
+        size: (f64, f64, f64),
+    },
+    ObjectOutsideRoom {
+        index: usize,
+        bbox: (Point, Point),
+    },
+    ObjectAboveCeiling {
+        index: usize,
+        z_top: f64,
+        room_h_m: f64,
+    },
+    ObjectBelowFloor {
+        index: usize,
+        z_bottom: f64,
+    },
     NoNodes,
-    DuplicateNodeId { id: u8 },
-    NodeNotFinite { index: usize, id: u8 },
+    DuplicateNodeId {
+        id: u8,
+    },
+    NodeNotFinite {
+        index: usize,
+        id: u8,
+    },
     /// Outside the footprint, or closer to a wall than a node can be.
-    NodeOutsideRoom { id: u8, pos: (f64, f64, f64) },
-    NodeBadHeight { id: u8, z_m: f64, room_h_m: f64 },
-    PersonOutsideRoom { index: usize, start: Point },
-    PhoneOutsideRoom { start: Point },
+    NodeOutsideRoom {
+        id: u8,
+        pos: (f64, f64, f64),
+    },
+    NodeBadHeight {
+        id: u8,
+        z_m: f64,
+        room_h_m: f64,
+    },
+    PersonOutsideRoom {
+        index: usize,
+        start: Point,
+    },
+    PhoneOutsideRoom {
+        start: Point,
+    },
 }
 
 impl fmt::Display for SceneError {
@@ -181,8 +243,14 @@ fn object_inside(poly: &[Point], o: &Object) -> bool {
     ];
     // The bbox corners are only required for an axis-aligned box; a
     // rotated box's bbox legitimately sticks out past its own corners.
-    let n = if o.yaw_deg.abs() < EPS_M { corners.len() } else { 4 };
-    corners[..n].iter().all(|&p| geom::point_in_polygon(poly, p))
+    let n = if o.yaw_deg.abs() < EPS_M {
+        corners.len()
+    } else {
+        4
+    };
+    corners[..n]
+        .iter()
+        .all(|&p| geom::point_in_polygon(poly, p))
 }
 
 impl Scene {
@@ -207,13 +275,19 @@ impl Scene {
             }
         }
         // Without a usable shell there is nothing to place anything in.
-        if !errs.is_empty() && errs.iter().any(|e| matches!(e, SceneError::BadRoomDimension { .. })) {
+        if !errs.is_empty()
+            && errs
+                .iter()
+                .any(|e| matches!(e, SceneError::BadRoomDimension { .. }))
+        {
             return errs;
         }
 
         if let Some(poly) = &r.polygon {
             if poly.len() < 3 {
-                errs.push(SceneError::PolygonTooShort { vertices: poly.len() });
+                errs.push(SceneError::PolygonTooShort {
+                    vertices: poly.len(),
+                });
                 return errs;
             }
             if let Some(i) = poly.iter().position(|&p| !finite2(p)) {
@@ -221,7 +295,10 @@ impl Scene {
                 return errs;
             }
             if let Some((a, b)) = geom::self_intersection(poly) {
-                errs.push(SceneError::PolygonSelfIntersects { edge_a: a, edge_b: b });
+                errs.push(SceneError::PolygonSelfIntersects {
+                    edge_a: a,
+                    edge_b: b,
+                });
                 return errs;
             }
             if geom::area(poly) <= EPS_M {
@@ -231,7 +308,11 @@ impl Scene {
             let got = geom::bbox(poly);
             let want = ((0.0, 0.0), (r.w_m, r.d_m));
             let tol = 1e-6;
-            let off = (got.0 .0 - want.0 .0).abs().max((got.0 .1 - want.0 .1).abs()).max((got.1 .0 - want.1 .0).abs()).max((got.1 .1 - want.1 .1).abs());
+            let off = (got.0 .0 - want.0 .0)
+                .abs()
+                .max((got.0 .1 - want.0 .1).abs())
+                .max((got.1 .0 - want.1 .0).abs())
+                .max((got.1 .1 - want.1 .1).abs());
             if off > tol {
                 errs.push(SceneError::PolygonBboxMismatch { got, want });
             }
@@ -247,12 +328,22 @@ impl Scene {
             if w.length_m() <= EPS_M {
                 errs.push(SceneError::WallZeroLength { index: i });
             }
-            if !w.thickness_m.is_finite() || w.thickness_m <= 0.0 || w.thickness_m > MAX_WALL_THICKNESS_M {
-                errs.push(SceneError::WallBadThickness { index: i, value: w.thickness_m });
+            if !w.thickness_m.is_finite()
+                || w.thickness_m <= 0.0
+                || w.thickness_m > MAX_WALL_THICKNESS_M
+            {
+                errs.push(SceneError::WallBadThickness {
+                    index: i,
+                    value: w.thickness_m,
+                });
             }
             if let Some(h) = w.height_m {
                 if !h.is_finite() || h <= 0.0 || h > r.h_m + EPS_M {
-                    errs.push(SceneError::WallBadHeight { index: i, value: h, room_h_m: r.h_m });
+                    errs.push(SceneError::WallBadHeight {
+                        index: i,
+                        value: h,
+                        room_h_m: r.h_m,
+                    });
                 }
             }
             for p in [w.from, w.to] {
@@ -268,18 +359,31 @@ impl Scene {
                 continue;
             }
             if o.size.0 <= 0.0 || o.size.1 <= 0.0 || o.size.2 <= 0.0 {
-                errs.push(SceneError::ObjectBadSize { index: i, size: o.size });
+                errs.push(SceneError::ObjectBadSize {
+                    index: i,
+                    size: o.size,
+                });
                 continue;
             }
             if !object_inside(&poly, o) {
-                errs.push(SceneError::ObjectOutsideRoom { index: i, bbox: o.footprint_bbox() });
+                errs.push(SceneError::ObjectOutsideRoom {
+                    index: i,
+                    bbox: o.footprint_bbox(),
+                });
             }
             let (z0, z1) = o.z_extent();
             if z0 < -EPS_M {
-                errs.push(SceneError::ObjectBelowFloor { index: i, z_bottom: z0 });
+                errs.push(SceneError::ObjectBelowFloor {
+                    index: i,
+                    z_bottom: z0,
+                });
             }
             if z1 > r.h_m + EPS_M {
-                errs.push(SceneError::ObjectAboveCeiling { index: i, z_top: z1, room_h_m: r.h_m });
+                errs.push(SceneError::ObjectAboveCeiling {
+                    index: i,
+                    z_top: z1,
+                    room_h_m: r.h_m,
+                });
             }
         }
 
@@ -298,10 +402,17 @@ impl Scene {
                 continue;
             }
             if !geom::point_inside_with_margin(&poly, (n.pos.0, n.pos.1), NODE_WALL_CLEARANCE_M) {
-                errs.push(SceneError::NodeOutsideRoom { id: n.id, pos: n.pos });
+                errs.push(SceneError::NodeOutsideRoom {
+                    id: n.id,
+                    pos: n.pos,
+                });
             }
             if n.pos.2 < 0.0 || n.pos.2 > r.h_m + EPS_M {
-                errs.push(SceneError::NodeBadHeight { id: n.id, z_m: n.pos.2, room_h_m: r.h_m });
+                errs.push(SceneError::NodeBadHeight {
+                    id: n.id,
+                    z_m: n.pos.2,
+                    room_h_m: r.h_m,
+                });
             }
         }
 

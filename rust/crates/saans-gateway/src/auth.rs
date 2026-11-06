@@ -285,7 +285,10 @@ mod tests {
     /// both rest on this function.
     #[test]
     fn sha256_hex_matches_the_fips_vector() {
-        assert_eq!(sha256_hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            sha256_hex("abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 
     fn cfg(toml: &str) -> GatewayConfig {

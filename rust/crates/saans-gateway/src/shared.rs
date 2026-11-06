@@ -199,9 +199,17 @@ mod tests {
     /// Every variant's wire name, from serde itself: deserialising an
     /// unknown name fails with "expected one of `sim`, ..." naming each.
     fn serde_variants() -> Vec<String> {
-        let e = serde_json::from_value::<Mode>("?".into()).unwrap_err().to_string();
-        let (_, list) = e.split_once(", expected ").unwrap_or_else(|| panic!("no variant list in {e:?}"));
-        list.split('`').skip(1).step_by(2).map(String::from).collect()
+        let e = serde_json::from_value::<Mode>("?".into())
+            .unwrap_err()
+            .to_string();
+        let (_, list) = e
+            .split_once(", expected ")
+            .unwrap_or_else(|| panic!("no variant list in {e:?}"));
+        list.split('`')
+            .skip(1)
+            .step_by(2)
+            .map(String::from)
+            .collect()
     }
 
     fn index(m: Mode) -> usize {
@@ -217,19 +225,36 @@ mod tests {
         for (i, m) in ALL.into_iter().enumerate() {
             assert_eq!(index(m), i, "{m:?}");
         }
-        assert_eq!(serde_variants(), ALL.map(Mode::as_str), "ALL lists every variant");
+        assert_eq!(
+            serde_variants(),
+            ALL.map(Mode::as_str),
+            "ALL lists every variant"
+        );
     }
 
     #[test]
     fn mode_serialises_and_parses_in_lower_case() {
-        let wire: Vec<String> = ALL.iter().map(|m| serde_json::to_string(m).unwrap()).collect();
+        let wire: Vec<String> = ALL
+            .iter()
+            .map(|m| serde_json::to_string(m).unwrap())
+            .collect();
         assert_eq!(wire, [r#""sim""#, r#""replay""#, r#""live""#]);
         for m in ALL {
-            assert_eq!(serde_json::to_value(m).unwrap(), m.as_str(), "serde and as_str agree");
-            assert_eq!(serde_json::from_value::<Mode>(m.as_str().into()).unwrap(), m);
+            assert_eq!(
+                serde_json::to_value(m).unwrap(),
+                m.as_str(),
+                "serde and as_str agree"
+            );
+            assert_eq!(
+                serde_json::from_value::<Mode>(m.as_str().into()).unwrap(),
+                m
+            );
         }
         for bad in ["SIM", "Live", "REPLAY", "unknown", ""] {
-            assert!(serde_json::from_value::<Mode>(bad.into()).is_err(), "{bad:?} is not a mode");
+            assert!(
+                serde_json::from_value::<Mode>(bad.into()).is_err(),
+                "{bad:?} is not a mode"
+            );
         }
     }
 

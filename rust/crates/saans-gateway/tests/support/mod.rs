@@ -52,8 +52,12 @@ pub fn config(name: &str, spaces_toml: &str) -> GatewayConfig {
 }
 
 /// One bearer token per role, as `(role, token)`.
-pub const ROLE_TOKENS: [(&str, &str); 4] =
-    [("admin", "test-admin-token"), ("ops", "test-ops-token"), ("safety", "test-safety-token"), ("occupancy", "test-occupancy-token")];
+pub const ROLE_TOKENS: [(&str, &str); 4] = [
+    ("admin", "test-admin-token"),
+    ("ops", "test-ops-token"),
+    ("safety", "test-safety-token"),
+    ("occupancy", "test-occupancy-token"),
+];
 
 /// `[auth] required = true` and one `[[token]]` per [`ROLE_TOKENS`] entry,
 /// named after its role and stored as its SHA-256 (no Argon2, so no
@@ -71,7 +75,10 @@ pub fn auth_toml() -> String {
 
 /// The `Authorization` value for `role`'s token in [`ROLE_TOKENS`].
 pub fn bearer(role: &str) -> String {
-    let (_, token) = ROLE_TOKENS.iter().find(|(r, _)| *r == role).unwrap_or_else(|| panic!("no test token for role {role}"));
+    let (_, token) = ROLE_TOKENS
+        .iter()
+        .find(|(r, _)| *r == role)
+        .unwrap_or_else(|| panic!("no test token for role {role}"));
     format!("Bearer {token}")
 }
 
@@ -306,10 +313,16 @@ fn dechunk(mut b: &[u8]) -> Vec<u8> {
 /// its own, then `fixed` (whole header lines), then `extra` as given.
 fn request_head(addr: SocketAddr, path: &str, fixed: &str, extra: &[(&str, &str)]) -> String {
     let is_host = |k: &str| k.eq_ignore_ascii_case("host");
-    let host = extra.iter().find(|(k, _)| is_host(k)).map_or_else(|| addr.to_string(), |(_, v)| v.to_string());
+    let host = extra
+        .iter()
+        .find(|(k, _)| is_host(k))
+        .map_or_else(|| addr.to_string(), |(_, v)| v.to_string());
     let mut req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\n{fixed}");
     for (k, v) in extra.iter().filter(|(k, _)| !is_host(k)) {
-        assert!(!k.contains(['\r', '\n', ':']) && !v.contains(['\r', '\n']), "header {k:?}: {v:?} would split the request");
+        assert!(
+            !k.contains(['\r', '\n', ':']) && !v.contains(['\r', '\n']),
+            "header {k:?}: {v:?} would split the request"
+        );
         req += &format!("{k}: {v}\r\n");
     }
     req + "\r\n"
@@ -388,7 +401,10 @@ pub enum WsMsg {
     Text(String),
     /// The server's close frame: its status code (`None` when the frame
     /// carries none) and its reason.
-    Close { code: Option<u16>, reason: String },
+    Close {
+        code: Option<u16>,
+        reason: String,
+    },
 }
 
 /// RFC 6455 section 1.3's example key and its accept value.
@@ -406,14 +422,21 @@ impl Ws {
     pub async fn connect_with(addr: SocketAddr, path: &str, headers: &[(&str, &str)]) -> Ws {
         match Self::try_connect(addr, path, headers).await {
             Ok(ws) => ws,
-            Err(r) => panic!("WebSocket handshake refused: {} {:?} {}", r.status, r.headers, r.body),
+            Err(r) => panic!(
+                "WebSocket handshake refused: {} {:?} {}",
+                r.status, r.headers, r.body
+            ),
         }
     }
 
     /// The handshake, returning the server's answer instead of panicking
     /// when it does not upgrade: `Err` holds the refusal's status,
     /// headers and body.
-    pub async fn try_connect(addr: SocketAddr, path: &str, headers: &[(&str, &str)]) -> Result<Ws, Resp> {
+    pub async fn try_connect(
+        addr: SocketAddr,
+        path: &str,
+        headers: &[(&str, &str)],
+    ) -> Result<Ws, Resp> {
         let fut = async {
             let mut s = TcpStream::connect(addr).await.expect("connect");
             let fixed = format!(
@@ -435,7 +458,11 @@ impl Ws {
             buf.drain(..end + 4);
             if status != 101 {
                 let body = refusal_body(&mut s, buf, &headers).await;
-                return Err(Resp { status, headers, body: String::from_utf8(body).expect("UTF-8 body") });
+                return Err(Resp {
+                    status,
+                    headers,
+                    body: String::from_utf8(body).expect("UTF-8 body"),
+                });
             }
             let h = |n: &str| headers.iter().find(|(k, _)| k == n).map(|(_, v)| v.clone());
             assert_eq!(
@@ -491,7 +518,9 @@ impl Ws {
     pub async fn next_text(&mut self) -> String {
         match self.next_message().await {
             WsMsg::Text(t) => t,
-            WsMsg::Close { code, reason } => panic!("server closed the WebSocket: code {code:?}, reason {reason:?}"),
+            WsMsg::Close { code, reason } => {
+                panic!("server closed the WebSocket: code {code:?}, reason {reason:?}")
+            }
         }
     }
 
@@ -502,13 +531,20 @@ impl Ws {
         let fut = async {
             loop {
                 match self.frame().await {
-                    (0x1, p) => return WsMsg::Text(String::from_utf8(p).expect("UTF-8 text frame")),
+                    (0x1, p) => {
+                        return WsMsg::Text(String::from_utf8(p).expect("UTF-8 text frame"))
+                    }
                     (0x8, p) => {
                         // RFC 6455 section 5.5.1: no body, or a 2-byte
                         // code followed by a UTF-8 reason.
-                        assert_ne!(p.len(), 1, "a close frame body is empty or at least 2 bytes");
+                        assert_ne!(
+                            p.len(),
+                            1,
+                            "a close frame body is empty or at least 2 bytes"
+                        );
                         let code = (p.len() >= 2).then(|| u16::from_be_bytes([p[0], p[1]]));
-                        let reason = String::from_utf8(p.get(2..).unwrap_or_default().to_vec()).expect("UTF-8 close reason");
+                        let reason = String::from_utf8(p.get(2..).unwrap_or_default().to_vec())
+                            .expect("UTF-8 close reason");
                         return WsMsg::Close { code, reason };
                     }
                     (0x9, p) => self.pong(&p).await,
@@ -526,12 +562,17 @@ impl Ws {
     /// answering nothing: to the server, a client that reads this way
     /// has stopped reading. Panics after 10 s without one.
     pub async fn next_raw(&mut self) -> (u8, Vec<u8>) {
-        timeout(IO_TIMEOUT, self.frame()).await.expect("no WebSocket frame within 10 s")
+        timeout(IO_TIMEOUT, self.frame())
+            .await
+            .expect("no WebSocket frame within 10 s")
     }
 
     /// Answer a ping. Best effort: a server that has closed gets nothing.
     async fn pong(&mut self, payload: &[u8]) {
-        assert!(payload.len() <= 125, "a control frame's payload is at most 125 bytes");
+        assert!(
+            payload.len() <= 125,
+            "a control frame's payload is at most 125 bytes"
+        );
         let mask = [0x12u8, 0x34, 0x56, 0x78];
         let mut f = vec![0x80 | 0xA, 0x80 | payload.len() as u8];
         f.extend_from_slice(&mask);
@@ -566,7 +607,10 @@ impl Ws {
         }
         f.extend_from_slice(&mask);
         f.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
-        timeout(IO_TIMEOUT, self.s.write_all(&f)).await.expect("WebSocket send timed out").unwrap();
+        timeout(IO_TIMEOUT, self.s.write_all(&f))
+            .await
+            .expect("WebSocket send timed out")
+            .unwrap();
     }
 
     pub async fn next_json(&mut self) -> Value {
@@ -600,18 +644,33 @@ impl Ws {
 /// The body of a refused handshake. The connection stays open (it was
 /// not asked to close), so the body is read by its `Content-Length`, or
 /// to the end of its chunks; only a response with neither is read to EOF.
-async fn refusal_body(s: &mut TcpStream, mut buf: Vec<u8>, headers: &[(String, String)]) -> Vec<u8> {
-    let h = |n: &str| headers.iter().find(|(k, _)| k == n).map(|(_, v)| v.as_str());
+async fn refusal_body(
+    s: &mut TcpStream,
+    mut buf: Vec<u8>,
+    headers: &[(String, String)],
+) -> Vec<u8> {
+    let h = |n: &str| {
+        headers
+            .iter()
+            .find(|(k, _)| k == n)
+            .map(|(_, v)| v.as_str())
+    };
     if let Some(n) = h("content-length") {
         let n: usize = n.parse().expect("Content-Length");
         while buf.len() < n {
-            assert!(read_more(s, &mut buf).await > 0, "connection closed inside the response body");
+            assert!(
+                read_more(s, &mut buf).await > 0,
+                "connection closed inside the response body"
+            );
         }
         buf.truncate(n);
         buf
     } else if h("transfer-encoding").is_some_and(|v| v.contains("chunked")) {
         while !(buf.starts_with(b"0\r\n\r\n") || buf.ends_with(b"\r\n0\r\n\r\n")) {
-            assert!(read_more(s, &mut buf).await > 0, "connection closed inside the response body");
+            assert!(
+                read_more(s, &mut buf).await > 0,
+                "connection closed inside the response body"
+            );
         }
         dechunk(&buf)
     } else {
@@ -913,20 +972,35 @@ pub fn link_targets(body: &str) -> Vec<String> {
 /// and are allowed by name.
 pub fn assert_nothing_foreign(name: &str, body: &str) {
     let mut stripped = body.to_string();
-    for ns in ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"] {
+    for ns in [
+        "http://www.w3.org/2000/svg",
+        "http://www.w3.org/1999/xhtml",
+        "http://www.w3.org/1999/xlink",
+    ] {
         stripped = stripped.replace(ns, "");
     }
     for bad in ["http://", "https://", "@import", "url(http"] {
-        assert!(!stripped.contains(bad), "{name}: external reference {bad:?}");
+        assert!(
+            !stripped.contains(bad),
+            "{name}: external reference {bad:?}"
+        );
     }
     let b = body.as_bytes();
     for (i, _) in body.match_indices("//") {
         let opens = i > 0 && matches!(b[i - 1], b'\'' | b'"' | b'(' | b'`');
         let host = b.get(i + 2).is_some_and(|c| c.is_ascii_alphanumeric());
-        assert!(!(opens && host), "{name}: protocol-relative URL at byte {i}");
+        assert!(
+            !(opens && host),
+            "{name}: protocol-relative URL at byte {i}"
+        );
     }
     for (i, _) in body.match_indices("import(") {
-        let arg = body[i + 7..].trim_start().trim_start_matches(['\'', '"', '`']);
-        assert!(arg.starts_with("./") || arg.starts_with('/'), "{name}: import( at byte {i} is not same-origin");
+        let arg = body[i + 7..]
+            .trim_start()
+            .trim_start_matches(['\'', '"', '`']);
+        assert!(
+            arg.starts_with("./") || arg.starts_with('/'),
+            "{name}: import( at byte {i} is not same-origin"
+        );
     }
 }

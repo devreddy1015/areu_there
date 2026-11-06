@@ -351,7 +351,8 @@ async fn me(State(app): State<AppState>, h: HeaderMap) -> Response {
         }
         Err(_) => {
             v["authenticated"] = false.into();
-            v["can"] = json!({ "system": false, "audit": false, "alerts": false, "position": false });
+            v["can"] =
+                json!({ "system": false, "audit": false, "alerts": false, "position": false });
         }
     }
     no_store(Json(v).into_response())
@@ -1014,14 +1015,22 @@ mod tests {
     /// `roomsim::tests` and fenced by the demo's CSP — because a
     /// third-party file's comments legitimately contain URLs.
     fn assert_no_external_urls(name: &str, body: &str) {
-        const XML_NS: [&str; 3] =
-            ["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink"];
+        const XML_NS: [&str; 3] = [
+            "http://www.w3.org/2000/svg",
+            "http://www.w3.org/1999/xhtml",
+            "http://www.w3.org/1999/xlink",
+        ];
         let mut stripped = body.to_string();
         for ns in XML_NS {
             stripped = stripped.replace(ns, "");
         }
-        for bad in ["http://", "https://", "//cdn", "src=\"//", "@import", "url(http"] {
-            assert!(!stripped.contains(bad), "{name} must stay offline-capable: found {bad:?}");
+        for bad in [
+            "http://", "https://", "//cdn", "src=\"//", "@import", "url(http",
+        ] {
+            assert!(
+                !stripped.contains(bad),
+                "{name} must stay offline-capable: found {bad:?}"
+            );
         }
         // Protocol-relative URLs: `//` opening a string or a url(), followed
         // by a host. Catches `'//unpkg…'`, `url(//fonts…)` and
@@ -1031,12 +1040,21 @@ mod tests {
         for (i, _) in body.match_indices("//") {
             let opens = i > 0 && matches!(b[i - 1], b'\'' | b'"' | b'(' | b'`');
             let host = b.get(i + 2).is_some_and(|c| c.is_ascii_alphanumeric());
-            assert!(!(opens && host), "{name}: protocol-relative URL at byte {i}: {}", &body[i..body.len().min(i + 40)]);
+            assert!(
+                !(opens && host),
+                "{name}: protocol-relative URL at byte {i}: {}",
+                &body[i..body.len().min(i + 40)]
+            );
         }
         // A dynamic import may only name a same-origin path.
         for (i, _) in body.match_indices("import(") {
-            let arg = body[i + 7..].trim_start().trim_start_matches(['\'', '"', '`']);
-            assert!(arg.starts_with("./") || arg.starts_with('/'), "{name}: import( at byte {i} is not same-origin");
+            let arg = body[i + 7..]
+                .trim_start()
+                .trim_start_matches(['\'', '"', '`']);
+            assert!(
+                arg.starts_with("./") || arg.starts_with('/'),
+                "{name}: import( at byte {i} is not same-origin"
+            );
         }
         // The namespaces that *are* present may only appear as a
         // namespace argument, never as something to fetch. (A bare
@@ -1047,7 +1065,8 @@ mod tests {
                 let rest = &body[i..];
                 let before = &body[i.saturating_sub(40)..i];
                 assert!(
-                    XML_NS.iter().any(|ns| rest.starts_with(ns)) && (before.contains("xmlns") || before.contains("createElementNS")),
+                    XML_NS.iter().any(|ns| rest.starts_with(ns))
+                        && (before.contains("xmlns") || before.contains("createElementNS")),
                     "{name}: unexpected URL at byte {i}: ...{before}{}",
                     &rest[..rest.len().min(40)]
                 );

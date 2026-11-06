@@ -107,7 +107,10 @@ impl fmt::Display for RoomPlanError {
         match self {
             Self::Json(e) => write!(f, "not JSON: {e}"),
             Self::NotACapturedRoom => {
-                write!(f, "no \"walls\" array: this does not look like a RoomPlan CapturedRoom export")
+                write!(
+                    f,
+                    "no \"walls\" array: this does not look like a RoomPlan CapturedRoom export"
+                )
             }
             Self::NoWalls => write!(f, "the export has no walls, so there is no room to import"),
         }
@@ -176,7 +179,11 @@ fn parse_vec3(v: &Value) -> Option<(f64, f64, f64)> {
         }
         return None;
     }
-    Some((v.get("x")?.as_f64()?, v.get("y")?.as_f64()?, v.get("z")?.as_f64()?))
+    Some((
+        v.get("x")?.as_f64()?,
+        v.get("y")?.as_f64()?,
+        v.get("z")?.as_f64()?,
+    ))
 }
 
 /// Read a RoomPlan category, written either as `"table"` or as the
@@ -219,7 +226,9 @@ fn round_point(p: Point) -> Point {
 fn default_material(kind: ObjectKind) -> ObjectMaterial {
     match kind {
         ObjectKind::Bed | ObjectKind::Sofa => ObjectMaterial::Fabric,
-        ObjectKind::Table | ObjectKind::Chair | ObjectKind::Almirah | ObjectKind::Door => ObjectMaterial::Wood,
+        ObjectKind::Table | ObjectKind::Chair | ObjectKind::Almirah | ObjectKind::Door => {
+            ObjectMaterial::Wood
+        }
         ObjectKind::Window => ObjectMaterial::Glass,
     }
 }
@@ -255,7 +264,10 @@ fn read_element(v: &Value) -> Option<Element> {
     let lx = t.local_x();
     // Local +x projected onto the scene floor plane.
     let yaw_deg = round_m((-lx.2).atan2(lx.0).to_degrees());
-    if ![pos.0, pos.1, pos.2, size.0, size.1, size.2, yaw_deg].iter().all(|x| x.is_finite()) {
+    if ![pos.0, pos.1, pos.2, size.0, size.1, size.2, yaw_deg]
+        .iter()
+        .all(|x| x.is_finite())
+    {
         return None;
     }
     Some(Element { pos, size, yaw_deg })
@@ -267,7 +279,10 @@ fn read_element(v: &Value) -> Option<Element> {
 /// them before loading it.
 pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, RoomPlanError> {
     let root: Value = serde_json::from_str(text).map_err(RoomPlanError::Json)?;
-    let walls_json = root.get("walls").and_then(Value::as_array).ok_or(RoomPlanError::NotACapturedRoom)?;
+    let walls_json = root
+        .get("walls")
+        .and_then(Value::as_array)
+        .ok_or(RoomPlanError::NotACapturedRoom)?;
     let mut warnings = Vec::new();
 
     // --- walls -------------------------------------------------------
@@ -280,7 +295,10 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
     let mut raw_walls = Vec::new();
     for (i, w) in walls_json.iter().enumerate() {
         let Some(e) = read_element(w) else {
-            warnings.push(RoomPlanWarning::Unreadable { what: "walls".into(), index: i });
+            warnings.push(RoomPlanWarning::Unreadable {
+                what: "walls".into(),
+                index: i,
+            });
             continue;
         };
         // A wall's local x runs along its length.
@@ -288,7 +306,12 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
         let (c, s) = (e.yaw_deg.to_radians().cos(), e.yaw_deg.to_radians().sin());
         let a = (e.pos.0 - half * c, e.pos.1 - half * s);
         let b = (e.pos.0 + half * c, e.pos.1 + half * s);
-        raw_walls.push(RawWall { a, b, top: e.pos.2 + e.size.2 / 2.0, bottom: e.pos.2 - e.size.2 / 2.0 });
+        raw_walls.push(RawWall {
+            a,
+            b,
+            top: e.pos.2 + e.size.2 / 2.0,
+            bottom: e.pos.2 - e.size.2 / 2.0,
+        });
     }
     if raw_walls.is_empty() {
         return Err(RoomPlanError::NoWalls);
@@ -297,24 +320,52 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
     // --- floor level and origin --------------------------------------
     // Prefer an explicit floor; otherwise the lowest wall edge is it.
     let floor_z = match root.get("floors").and_then(Value::as_array).and_then(|fs| {
-        fs.iter().filter_map(read_element).map(|e| e.pos.2).fold(None::<f64>, |acc, z| Some(acc.map_or(z, |a: f64| a.min(z))))
+        fs.iter()
+            .filter_map(read_element)
+            .map(|e| e.pos.2)
+            .fold(None::<f64>, |acc, z| Some(acc.map_or(z, |a: f64| a.min(z))))
     }) {
         Some(z) => z,
         None => {
-            let z = raw_walls.iter().map(|w| w.bottom).fold(f64::INFINITY, f64::min);
+            let z = raw_walls
+                .iter()
+                .map(|w| w.bottom)
+                .fold(f64::INFINITY, f64::min);
             warnings.push(RoomPlanWarning::FloorInferred { z_arkit: z });
             z
         }
     };
-    let min_x = raw_walls.iter().flat_map(|w| [w.a.0, w.b.0]).fold(f64::INFINITY, f64::min);
-    let min_y = raw_walls.iter().flat_map(|w| [w.a.1, w.b.1]).fold(f64::INFINITY, f64::min);
-    let max_x = raw_walls.iter().flat_map(|w| [w.a.0, w.b.0]).fold(f64::NEG_INFINITY, f64::max);
-    let max_y = raw_walls.iter().flat_map(|w| [w.a.1, w.b.1]).fold(f64::NEG_INFINITY, f64::max);
+    let min_x = raw_walls
+        .iter()
+        .flat_map(|w| [w.a.0, w.b.0])
+        .fold(f64::INFINITY, f64::min);
+    let min_y = raw_walls
+        .iter()
+        .flat_map(|w| [w.a.1, w.b.1])
+        .fold(f64::INFINITY, f64::min);
+    let max_x = raw_walls
+        .iter()
+        .flat_map(|w| [w.a.0, w.b.0])
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_y = raw_walls
+        .iter()
+        .flat_map(|w| [w.a.1, w.b.1])
+        .fold(f64::NEG_INFINITY, f64::max);
     let shift = |p: (f64, f64)| -> Point { (p.0 - min_x, p.1 - min_y) };
     let shift3 = |p: (f64, f64, f64)| (p.0 - min_x, p.1 - min_y, p.2 - floor_z);
 
-    let room_h = round_m(raw_walls.iter().map(|w| w.top - floor_z).fold(0.0, f64::max));
-    let room = Room { w_m: round_m(max_x - min_x), d_m: round_m(max_y - min_y), h_m: room_h, polygon: None };
+    let room_h = round_m(
+        raw_walls
+            .iter()
+            .map(|w| w.top - floor_z)
+            .fold(0.0, f64::max),
+    );
+    let room = Room {
+        w_m: round_m(max_x - min_x),
+        d_m: round_m(max_y - min_y),
+        h_m: room_h,
+        polygon: None,
+    };
 
     let walls: Vec<Wall> = raw_walls
         .iter()
@@ -326,23 +377,35 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
             height_m: Some(round_m((w.top - floor_z).min(room_h))),
         })
         .collect();
-    warnings.push(RoomPlanWarning::ThicknessAssumed { walls: walls.len(), thickness_m: DEFAULT_WALL_THICKNESS_M });
+    warnings.push(RoomPlanWarning::ThicknessAssumed {
+        walls: walls.len(),
+        thickness_m: DEFAULT_WALL_THICKNESS_M,
+    });
 
     // --- doors, windows, objects -------------------------------------
     let mut objects: Vec<Object> = Vec::new();
     let mut unsupported: Vec<(String, usize)> = Vec::new();
 
     for (key, kind) in [("doors", ObjectKind::Door), ("windows", ObjectKind::Window)] {
-        let Some(arr) = root.get(key).and_then(Value::as_array) else { continue };
+        let Some(arr) = root.get(key).and_then(Value::as_array) else {
+            continue;
+        };
         for (i, v) in arr.iter().enumerate() {
             let Some(e) = read_element(v) else {
-                warnings.push(RoomPlanWarning::Unreadable { what: key.into(), index: i });
+                warnings.push(RoomPlanWarning::Unreadable {
+                    what: key.into(),
+                    index: i,
+                });
                 continue;
             };
             let p = shift3(e.pos);
             // A door or window is planar in the export; give it enough
             // depth to be a box, matching the wall it sits in.
-            let depth = if e.size.1 > 1e-3 { e.size.1 } else { DEFAULT_WALL_THICKNESS_M };
+            let depth = if e.size.1 > 1e-3 {
+                e.size.1
+            } else {
+                DEFAULT_WALL_THICKNESS_M
+            };
             objects.push(Object {
                 kind,
                 id: None,
@@ -371,7 +434,10 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
                 continue;
             };
             let Some(e) = read_element(v) else {
-                warnings.push(RoomPlanWarning::Unreadable { what: "objects".into(), index: i });
+                warnings.push(RoomPlanWarning::Unreadable {
+                    what: "objects".into(),
+                    index: i,
+                });
                 continue;
             };
             let p = shift3(e.pos);
@@ -389,7 +455,10 @@ pub fn import_roomplan_str(name: &str, text: &str) -> Result<RoomPlanImport, Roo
         warnings.push(RoomPlanWarning::UnsupportedCategory { category, count });
     }
 
-    warnings.push(RoomPlanWarning::MaterialsAssumed { walls: walls.len(), objects: objects.len() });
+    warnings.push(RoomPlanWarning::MaterialsAssumed {
+        walls: walls.len(),
+        objects: objects.len(),
+    });
     warnings.push(RoomPlanWarning::NoNodes);
 
     let scene = Scene {

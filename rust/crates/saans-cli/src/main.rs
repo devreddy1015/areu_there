@@ -443,11 +443,15 @@ fn scene_name(input: &str, explicit: Option<String>) -> String {
 /// outcome here, so it is not an error — but it is said out loud, because
 /// a scene that quietly looked finished would be the worse failure.
 fn import_roomplan(args: &[String]) -> ExitCode {
-    let Some(input) = args.get(1) else { return usage() };
+    let Some(input) = args.get(1) else {
+        return usage();
+    };
     if input.starts_with("--") {
         return usage();
     }
-    let Some(out) = arg::<String>(args, "--out") else { return usage() };
+    let Some(out) = arg::<String>(args, "--out") else {
+        return usage();
+    };
     let name = scene_name(input, arg::<String>(args, "--name"));
 
     let text = match std::fs::read_to_string(input) {
@@ -487,7 +491,10 @@ fn import_roomplan(args: &[String]) -> ExitCode {
     }
     let errors = scene.validate();
     if !errors.is_empty() {
-        eprintln!("  this scene does not load yet ({} problem(s) to fix by hand):", errors.len());
+        eprintln!(
+            "  this scene does not load yet ({} problem(s) to fix by hand):",
+            errors.len()
+        );
         for e in &errors {
             eprintln!("    - {e}");
         }
@@ -501,7 +508,10 @@ mod tests {
 
     #[test]
     fn an_explicit_name_wins() {
-        assert_eq!(scene_name("/tmp/scan.json", Some("living room".into())), "living room");
+        assert_eq!(
+            scene_name("/tmp/scan.json", Some("living room".into())),
+            "living room"
+        );
     }
 
     #[test]

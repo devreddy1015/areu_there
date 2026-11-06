@@ -145,12 +145,24 @@ mod tests {
 
     #[test]
     fn position_is_admin_and_safety_only_and_never_a_space_yet() {
-        let table = [(Role::Admin, true), (Role::Safety, true), (Role::Ops, false), (Role::Occupancy, false)];
+        let table = [
+            (Role::Admin, true),
+            (Role::Safety, true),
+            (Role::Ops, false),
+            (Role::Occupancy, false),
+        ];
         for (role, unbound) in table {
             for scope in [None, Some(&["lab3"][..])] {
                 let who = p(role, scope);
-                assert_eq!(who.can_see_position(None), unbound, "{role:?}, scope {scope:?}, no space");
-                assert!(!who.can_see_position(Some("lab3")), "{role:?}: no per-space opt-in exists in Phase 5");
+                assert_eq!(
+                    who.can_see_position(None),
+                    unbound,
+                    "{role:?}, scope {scope:?}, no space"
+                );
+                assert!(
+                    !who.can_see_position(Some("lab3")),
+                    "{role:?}: no per-space opt-in exists in Phase 5"
+                );
                 assert!(!who.can_see_position(Some("elsewhere")), "{role:?}");
             }
         }

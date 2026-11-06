@@ -226,7 +226,12 @@ impl Default for Room {
     /// 6.0 x 5.0 m) at a typical Indian ceiling height, so a scene and a
     /// bare simulator scenario describe the same box.
     fn default() -> Self {
-        Self { w_m: 6.0, d_m: 5.0, h_m: 2.7, polygon: None }
+        Self {
+            w_m: 6.0,
+            d_m: 5.0,
+            h_m: 2.7,
+            polygon: None,
+        }
     }
 }
 
@@ -254,12 +259,18 @@ impl Object {
         let (c, s) = (t.cos().abs(), t.sin().abs());
         let hx = (self.size.0 * c + self.size.1 * s) / 2.0;
         let hy = (self.size.0 * s + self.size.1 * c) / 2.0;
-        ((self.pos.0 - hx, self.pos.1 - hy), (self.pos.0 + hx, self.pos.1 + hy))
+        (
+            (self.pos.0 - hx, self.pos.1 - hy),
+            (self.pos.0 + hx, self.pos.1 + hy),
+        )
     }
 
     /// Vertical extent of the box, metres above the floor.
     pub fn z_extent(&self) -> (f64, f64) {
-        (self.pos.2 - self.size.2 / 2.0, self.pos.2 + self.size.2 / 2.0)
+        (
+            self.pos.2 - self.size.2 / 2.0,
+            self.pos.2 + self.size.2 / 2.0,
+        )
     }
 }
 
@@ -269,7 +280,12 @@ impl Scene {
     pub fn footprint(&self) -> Vec<Point> {
         match &self.room.polygon {
             Some(p) => p.clone(),
-            None => vec![(0.0, 0.0), (self.room.w_m, 0.0), (self.room.w_m, self.room.d_m), (0.0, self.room.d_m)],
+            None => vec![
+                (0.0, 0.0),
+                (self.room.w_m, 0.0),
+                (self.room.w_m, self.room.d_m),
+                (0.0, self.room.d_m),
+            ],
         }
     }
 

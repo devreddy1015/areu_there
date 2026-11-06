@@ -15,7 +15,18 @@ use saans_scene::scene::{Node, ObjectKind, Provenance, WallMaterial};
 fn xform(col0: [f64; 3], col1: [f64; 3], col2: [f64; 3], t: [f64; 3]) -> String {
     format!(
         "[{},{},{},0, {},{},{},0, {},{},{},0, {},{},{},1]",
-        col0[0], col0[1], col0[2], col1[0], col1[1], col1[2], col2[0], col2[1], col2[2], t[0], t[1], t[2]
+        col0[0],
+        col0[1],
+        col0[2],
+        col1[0],
+        col1[1],
+        col1[2],
+        col2[0],
+        col2[1],
+        col2[2],
+        t[0],
+        t[1],
+        t[2]
     )
 }
 
@@ -72,7 +83,11 @@ fn walls_come_back_as_the_segments_they_were_drawn_as() {
     let out = import_roomplan_str("fixture", &fixture()).unwrap();
     // Every wall endpoint must be a corner of the 4 x 3 room.
     let corners = [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0)];
-    let is_corner = |p: (f64, f64)| corners.iter().any(|c| (c.0 - p.0).abs() < 1e-9 && (c.1 - p.1).abs() < 1e-9);
+    let is_corner = |p: (f64, f64)| {
+        corners
+            .iter()
+            .any(|c| (c.0 - p.0).abs() < 1e-9 && (c.1 - p.1).abs() < 1e-9)
+    };
     for (i, w) in out.scene.walls.iter().enumerate() {
         assert!(is_corner(w.from), "wall {i} starts at {:?}", w.from);
         assert!(is_corner(w.to), "wall {i} ends at {:?}", w.to);
@@ -80,7 +95,10 @@ fn walls_come_back_as_the_segments_they_were_drawn_as() {
     // Their lengths are the room's sides: two of 4 m and two of 3 m.
     let mut lengths: Vec<f64> = out.scene.walls.iter().map(|w| w.length_m()).collect();
     lengths.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    assert!((lengths[0] - 3.0).abs() < 1e-9 && (lengths[3] - 4.0).abs() < 1e-9, "{lengths:?}");
+    assert!(
+        (lengths[0] - 3.0).abs() < 1e-9 && (lengths[3] - 4.0).abs() < 1e-9,
+        "{lengths:?}"
+    );
 }
 
 #[test]
@@ -88,14 +106,27 @@ fn the_arkit_frame_is_mapped_not_copied() {
     let out = import_roomplan_str("fixture", &fixture()).unwrap();
     // The table sits at ARKit (1.5, 0.375, -1.0), which is scene
     // (1.5, 1.0, 0.375): z becomes -y, and up becomes z.
-    let table = out.scene.objects.iter().find(|o| o.kind == ObjectKind::Table).expect("a table");
+    let table = out
+        .scene
+        .objects
+        .iter()
+        .find(|o| o.kind == ObjectKind::Table)
+        .expect("a table");
     assert!((table.pos.0 - 1.5).abs() < 1e-9, "x was {}", table.pos.0);
     assert!((table.pos.1 - 1.0).abs() < 1e-9, "y was {}", table.pos.1);
     assert!((table.pos.2 - 0.375).abs() < 1e-9, "z was {}", table.pos.2);
     // ARKit dimensions are (x, up, z); the scene wants (x, y, up).
     assert!((table.size.0 - 1.2).abs() < 1e-9);
-    assert!((table.size.1 - 0.8).abs() < 1e-9, "depth was {}", table.size.1);
-    assert!((table.size.2 - 0.75).abs() < 1e-9, "height was {}", table.size.2);
+    assert!(
+        (table.size.1 - 0.8).abs() < 1e-9,
+        "depth was {}",
+        table.size.1
+    );
+    assert!(
+        (table.size.2 - 0.75).abs() < 1e-9,
+        "height was {}",
+        table.size.2
+    );
 }
 
 #[test]
@@ -117,18 +148,34 @@ fn recognised_categories_map_and_the_rest_are_dropped_loudly() {
 #[test]
 fn an_opening_is_dropped_and_said_so() {
     let out = import_roomplan_str("fixture", &fixture()).unwrap();
-    assert!(out.warnings.contains(&RoomPlanWarning::OpeningDropped { count: 1 }));
+    assert!(out
+        .warnings
+        .contains(&RoomPlanWarning::OpeningDropped { count: 1 }));
 }
 
 #[test]
 fn everything_roomplan_does_not_measure_is_warned_about() {
     let out = import_roomplan_str("fixture", &fixture()).unwrap();
-    assert!(out.warnings.iter().any(|w| matches!(w, RoomPlanWarning::MaterialsAssumed { .. })));
-    assert!(out.warnings.iter().any(|w| matches!(w, RoomPlanWarning::ThicknessAssumed { .. })));
+    assert!(out
+        .warnings
+        .iter()
+        .any(|w| matches!(w, RoomPlanWarning::MaterialsAssumed { .. })));
+    assert!(out
+        .warnings
+        .iter()
+        .any(|w| matches!(w, RoomPlanWarning::ThicknessAssumed { .. })));
     assert!(out.warnings.contains(&RoomPlanWarning::NoNodes));
     // ... and the guesses are the documented ones.
-    assert!(out.scene.walls.iter().all(|w| w.material == WallMaterial::Drywall));
-    assert!(out.scene.walls.iter().all(|w| (w.thickness_m - 0.1).abs() < 1e-12));
+    assert!(out
+        .scene
+        .walls
+        .iter()
+        .all(|w| w.material == WallMaterial::Drywall));
+    assert!(out
+        .scene
+        .walls
+        .iter()
+        .all(|w| (w.thickness_m - 0.1).abs() < 1e-12));
 }
 
 #[test]
@@ -136,8 +183,22 @@ fn an_imported_scene_is_valid_once_nodes_are_added() {
     let mut out = import_roomplan_str("fixture", &fixture()).unwrap();
     // A scan has no radios, so the scene is deliberately incomplete.
     assert!(!out.scene.validate().is_empty());
-    out.scene.nodes = vec![Node { id: 0, pos: (0.5, 0.5, 1.2) }, Node { id: 1, pos: (3.5, 2.5, 1.2) }];
-    assert_eq!(out.scene.validate(), Vec::new(), "{:?}", out.scene.validate());
+    out.scene.nodes = vec![
+        Node {
+            id: 0,
+            pos: (0.5, 0.5, 1.2),
+        },
+        Node {
+            id: 1,
+            pos: (3.5, 2.5, 1.2),
+        },
+    ];
+    assert_eq!(
+        out.scene.validate(),
+        Vec::new(),
+        "{:?}",
+        out.scene.validate()
+    );
 }
 
 /// Apple's `simd_float4x4` is written either as 16 flat numbers or as
@@ -190,7 +251,10 @@ fn an_unreadable_element_is_skipped_rather_than_failing_the_import() {
     }"#;
     let out = import_roomplan_str("partial", text).unwrap();
     assert_eq!(out.scene.walls.len(), 1);
-    assert!(out.warnings.iter().any(|w| matches!(w, RoomPlanWarning::Unreadable { index: 1, .. })));
+    assert!(out
+        .warnings
+        .iter()
+        .any(|w| matches!(w, RoomPlanWarning::Unreadable { index: 1, .. })));
 }
 
 /// Regression: positions come out of a 4x4 transform and an `atan2`, so
@@ -205,8 +269,15 @@ fn imported_geometry_carries_no_floating_point_noise() {
     assert_eq!(out.scene.room.h_m, 2.5);
 
     let tidy = |v: f64, what: &str| {
-        assert_eq!(v, (v * 1e6).round() / 1e6, "{what} = {v} is not rounded to a micrometre");
-        assert!(!(v == 0.0 && v.is_sign_negative()), "{what} is negative zero");
+        assert_eq!(
+            v,
+            (v * 1e6).round() / 1e6,
+            "{what} = {v} is not rounded to a micrometre"
+        );
+        assert!(
+            !(v == 0.0 && v.is_sign_negative()),
+            "{what} is negative zero"
+        );
     };
     for (i, w) in out.scene.walls.iter().enumerate() {
         for p in [w.from, w.to] {

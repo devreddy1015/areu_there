@@ -45,8 +45,8 @@ pub mod validate;
 #[cfg(feature = "write")]
 pub use roomplan::{import_roomplan_str, RoomPlanImport, RoomPlanWarning};
 pub use scene::{
-    Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Point, Point3, Provenance, Room, Scene, Wall, WallMaterial,
-    DEFAULT_WALL_THICKNESS_M, SCHEMA_VERSION,
+    Node, Object, ObjectKind, ObjectMaterial, Person, Phone, Point, Point3, Provenance, Room,
+    Scene, Wall, WallMaterial, DEFAULT_WALL_THICKNESS_M, SCHEMA_VERSION,
 };
 pub use validate::SceneError;
 
@@ -56,11 +56,20 @@ use std::path::Path;
 /// Why a scene could not be loaded.
 #[derive(Debug)]
 pub enum LoadError {
-    Io { path: String, source: std::io::Error },
+    Io {
+        path: String,
+        source: std::io::Error,
+    },
     /// The bytes are not the JSON this crate expects.
-    Json { path: String, source: serde_json::Error },
+    Json {
+        path: String,
+        source: serde_json::Error,
+    },
     /// The JSON parsed but the room it describes is not a room.
-    Invalid { path: String, errors: Vec<SceneError> },
+    Invalid {
+        path: String,
+        errors: Vec<SceneError>,
+    },
 }
 
 impl fmt::Display for LoadError {
@@ -95,13 +104,18 @@ impl Scene {
     /// `label` names the source in error messages (a path, or something
     /// like `"<stdin>"`).
     pub fn from_json_str(label: &str, text: &str) -> Result<Self, LoadError> {
-        let scene: Scene =
-            serde_json::from_str(text).map_err(|e| LoadError::Json { path: label.to_string(), source: e })?;
+        let scene: Scene = serde_json::from_str(text).map_err(|e| LoadError::Json {
+            path: label.to_string(),
+            source: e,
+        })?;
         let errors = scene.validate();
         if errors.is_empty() {
             Ok(scene)
         } else {
-            Err(LoadError::Invalid { path: label.to_string(), errors })
+            Err(LoadError::Invalid {
+                path: label.to_string(),
+                errors,
+            })
         }
     }
 
@@ -109,7 +123,10 @@ impl Scene {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadError> {
         let path = path.as_ref();
         let label = path.display().to_string();
-        let text = std::fs::read_to_string(path).map_err(|e| LoadError::Io { path: label.clone(), source: e })?;
+        let text = std::fs::read_to_string(path).map_err(|e| LoadError::Io {
+            path: label.clone(),
+            source: e,
+        })?;
         Self::from_json_str(&label, &text)
     }
 

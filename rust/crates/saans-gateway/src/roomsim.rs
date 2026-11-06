@@ -76,16 +76,33 @@ const ORBIT_CONTROLS: &str = include_str!("../assets/vendor/three-0.186.1/OrbitC
 /// A test keeps this list equal to the files in `spec/scenes/`, every one
 /// of which saans-scene validates.
 pub(crate) const SCENES: &[(&str, &str)] = &[
-    ("bedroom", include_str!("../../../../spec/scenes/bedroom.json")),
-    ("office", include_str!("../../../../spec/scenes/office.json")),
-    ("hall-l-shaped", include_str!("../../../../spec/scenes/hall-l-shaped.json")),
+    (
+        "bedroom",
+        include_str!("../../../../spec/scenes/bedroom.json"),
+    ),
+    (
+        "office",
+        include_str!("../../../../spec/scenes/office.json"),
+    ),
+    (
+        "hall-l-shaped",
+        include_str!("../../../../spec/scenes/hall-l-shaped.json"),
+    ),
 ];
 
 /// The only top-level keys a served scene carries. An allowlist rather
 /// than a list of keys to strip: `people` and `phone` exist for the
 /// simulator and must not be published, and a key added to the format
 /// later stays private until someone adds it here on purpose.
-pub(crate) const SERVED_KEYS: [&str; 7] = ["schema_version", "name", "provenance", "room", "walls", "objects", "nodes"];
+pub(crate) const SERVED_KEYS: [&str; 7] = [
+    "schema_version",
+    "name",
+    "provenance",
+    "room",
+    "walls",
+    "objects",
+    "nodes",
+];
 
 /// The demo's policy. Compared with the dashboard's (`http.rs::CSP`) it
 /// drops `'unsafe-inline'` from both `script-src` and `style-src` (every
@@ -103,8 +120,14 @@ pub(crate) fn routes<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/roomsim", get(page))
         .route("/roomsim/", get(page))
-        .route("/roomsim/roomsim.js", get(|| async { asset(ROOMSIM_JS, "text/javascript; charset=utf-8", false) }))
-        .route("/roomsim/roomsim.css", get(|| async { asset(ROOMSIM_CSS, "text/css; charset=utf-8", false) }))
+        .route(
+            "/roomsim/roomsim.js",
+            get(|| async { asset(ROOMSIM_JS, "text/javascript; charset=utf-8", false) }),
+        )
+        .route(
+            "/roomsim/roomsim.css",
+            get(|| async { asset(ROOMSIM_CSS, "text/css; charset=utf-8", false) }),
+        )
         .route("/roomsim/vendor/{rev}/{file}", get(vendor))
         .route("/roomsim/sim/{rev}/roomsim-sim.js", get(sim_module))
         .route("/roomsim/scenes", get(scene_list))
@@ -113,16 +136,28 @@ pub(crate) fn routes<S: Clone + Send + Sync + 'static>() -> Router<S> {
 
 fn common_headers(r: &mut Response) {
     let h = r.headers_mut();
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
 }
 
 async fn page() -> Response {
     let mut r = ROOMSIM_HTML.into_response();
     common_headers(&mut r);
     let h = r.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(ROOMSIM_CSP));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(ROOMSIM_CSP),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
@@ -135,7 +170,11 @@ fn asset(body: &'static str, content_type: &'static str, immutable: bool) -> Res
     common_headers(&mut r);
     let h = r.headers_mut();
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
-    let cache = if immutable { "public, max-age=31536000, immutable" } else { "no-store" };
+    let cache = if immutable {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-store"
+    };
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
     r
 }
@@ -174,8 +213,10 @@ async fn sim_module(Path(rev): Path<String>) -> Response {
 pub(crate) fn served_scene(text: &str) -> Option<Value> {
     let v: Value = serde_json::from_str(text).ok()?;
     let obj = v.as_object()?;
-    let kept: Map<String, Value> =
-        SERVED_KEYS.iter().filter_map(|k| obj.get(*k).map(|v| ((*k).to_string(), v.clone()))).collect();
+    let kept: Map<String, Value> = SERVED_KEYS
+        .iter()
+        .filter_map(|k| obj.get(*k).map(|v| ((*k).to_string(), v.clone())))
+        .collect();
     Some(Value::Object(kept))
 }
 
@@ -203,8 +244,12 @@ async fn scene_list() -> Response {
 }
 
 async fn scene(Path(id): Path<String>) -> Response {
-    let Some((_, text)) = SCENES.iter().find(|(sid, _)| *sid == id) else { return not_found() };
-    let Some(v) = served_scene(text) else { return not_found() };
+    let Some((_, text)) = SCENES.iter().find(|(sid, _)| *sid == id) else {
+        return not_found();
+    };
+    let Some(v) = served_scene(text) else {
+        return not_found();
+    };
     let mut r = Json(v).into_response();
     common_headers(&mut r);
     crate::http::no_store(r)
@@ -229,7 +274,14 @@ pub(crate) fn module_specifiers(js: &str) -> Vec<String> {
         if t.starts_with('*') || t.starts_with("//") {
             continue;
         }
-        for pat in [" from '", " from \"", "import('", "import(\"", "import '", "import \""] {
+        for pat in [
+            " from '",
+            " from \"",
+            "import('",
+            "import(\"",
+            "import '",
+            "import \"",
+        ] {
             let mut rest = t;
             while let Some(i) = rest.find(pat) {
                 let after = &rest[i + pat.len()..];
@@ -254,35 +306,73 @@ mod tests {
     #[test]
     fn vendored_three_js_is_exactly_what_vendor_md_records() {
         let pinned = [
-            ("three.core.js", THREE_CORE, "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6"),
-            ("three.module.js", THREE_MODULE, "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"),
-            ("OrbitControls.js", ORBIT_CONTROLS, "30386f7141d5ce5d5e0a3ab643e4eb16265f4564466108105ce449857f62fdda"),
+            (
+                "three.core.js",
+                THREE_CORE,
+                "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+            ),
+            (
+                "three.module.js",
+                THREE_MODULE,
+                "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+            ),
+            (
+                "OrbitControls.js",
+                ORBIT_CONTROLS,
+                "30386f7141d5ce5d5e0a3ab643e4eb16265f4564466108105ce449857f62fdda",
+            ),
         ];
         for (name, body, want) in pinned {
-            assert_eq!(sha256_hex(body), want, "{name} differs from the version recorded in VENDOR.md");
+            assert_eq!(
+                sha256_hex(body),
+                want,
+                "{name} differs from the version recorded in VENDOR.md"
+            );
         }
         let vendor_md = include_str!("../assets/vendor/three-0.186.1/VENDOR.md");
         for (_, _, want) in pinned {
             assert!(vendor_md.contains(want), "VENDOR.md does not record {want}");
         }
-        assert!(vendor_md.contains(VENDOR_REV), "VENDOR.md does not name the served revision {VENDOR_REV}");
+        assert!(
+            vendor_md.contains(VENDOR_REV),
+            "VENDOR.md does not name the served revision {VENDOR_REV}"
+        );
     }
 
     #[test]
     fn the_vendored_files_need_no_eval_and_reach_nothing_but_each_other() {
-        for (name, body) in [("three.core.js", THREE_CORE), ("three.module.js", THREE_MODULE), ("OrbitControls.js", ORBIT_CONTROLS)] {
+        for (name, body) in [
+            ("three.core.js", THREE_CORE),
+            ("three.module.js", THREE_MODULE),
+            ("OrbitControls.js", ORBIT_CONTROLS),
+        ] {
             // `import(` too: none of these files loads code dynamically, and
             // a dynamic import with a computed argument could not be checked.
-            for banned in ["eval(", "new Function", "new Worker", "importScripts", "import("] {
-                assert!(!body.contains(banned), "{name} contains {banned:?}, which the CSP would have to allow");
+            for banned in [
+                "eval(",
+                "new Function",
+                "new Worker",
+                "importScripts",
+                "import(",
+            ] {
+                assert!(
+                    !body.contains(banned),
+                    "{name} contains {banned:?}, which the CSP would have to allow"
+                );
             }
             for spec in module_specifiers(body) {
-                assert!(spec.starts_with("./"), "{name} imports {spec:?}, which is not same-origin relative");
+                assert!(
+                    spec.starts_with("./"),
+                    "{name} imports {spec:?}, which is not same-origin relative"
+                );
             }
         }
         // Not vacuous: the files do link to each other, including through
         // the `export { … } from` line an import-only scan would miss.
-        assert_eq!(module_specifiers(THREE_MODULE), ["./three.core.js", "./three.core.js"]);
+        assert_eq!(
+            module_specifiers(THREE_MODULE),
+            ["./three.core.js", "./three.core.js"]
+        );
         assert_eq!(module_specifiers(ORBIT_CONTROLS), ["./three.module.js"]);
         assert!(module_specifiers(THREE_CORE).is_empty());
     }
@@ -329,7 +419,10 @@ mod tests {
     /// they name the rules.
     #[test]
     fn the_page_scripts_use_no_html_sink_no_inline_style_and_no_eval() {
-        for (name, js) in [("roomsim.js", ROOMSIM_JS), ("roomsim-sim.js", ROOMSIM_SIM_JS)] {
+        for (name, js) in [
+            ("roomsim.js", ROOMSIM_JS),
+            ("roomsim-sim.js", ROOMSIM_SIM_JS),
+        ] {
             let code: String = js
                 .lines()
                 .filter(|l| {
@@ -356,7 +449,12 @@ mod tests {
                 assert!(!code.contains(banned), "{name} uses {banned:?}");
             }
             // String timers are code too.
-            for timer in ["setTimeout('", "setTimeout(\"", "setInterval('", "setInterval(\""] {
+            for timer in [
+                "setTimeout('",
+                "setTimeout(\"",
+                "setInterval('",
+                "setInterval(\"",
+            ] {
                 assert!(!code.contains(timer), "{name} passes a string to a timer");
             }
         }
@@ -365,7 +463,10 @@ mod tests {
     #[test]
     fn the_specifier_scan_finds_every_form_and_ignores_comments() {
         let js = "import { a } from './a.js';\nexport { b } from \"./b.js\";\nconst c = await import('./c.js');\nimport './d.js';\n * import { e } from 'three';\n// import x from 'y';\n/* note */ import { f } from './f.js';\n/* unclosed\n";
-        assert_eq!(module_specifiers(js), ["./a.js", "./b.js", "./c.js", "./d.js", "./f.js"]);
+        assert_eq!(
+            module_specifiers(js),
+            ["./a.js", "./b.js", "./c.js", "./d.js", "./f.js"]
+        );
     }
 
     /// The page's policy must be at least as strict as the dashboard's, and
@@ -375,7 +476,15 @@ mod tests {
     fn the_demo_csp_allows_nothing_inline_and_nothing_foreign() {
         let csp = ROOMSIM_CSP;
         assert!(csp.contains("default-src 'none'"));
-        for loose in ["'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "*", "http:", "https:", "blob:"] {
+        for loose in [
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "'unsafe-hashes'",
+            "*",
+            "http:",
+            "https:",
+            "blob:",
+        ] {
             assert!(!csp.contains(loose), "demo CSP contains {loose}");
         }
         for directive in csp.split(';') {
@@ -389,7 +498,12 @@ mod tests {
                 assert!(ok, "unexpected CSP source {source:?} in {directive:?}");
             }
         }
-        for required in ["frame-ancestors 'none'", "base-uri 'none'", "require-trusted-types-for 'script'", "trusted-types 'none'"] {
+        for required in [
+            "frame-ancestors 'none'",
+            "base-uri 'none'",
+            "require-trusted-types-for 'script'",
+            "trusted-types 'none'",
+        ] {
             assert!(csp.contains(required), "demo CSP lacks {required}");
         }
     }
@@ -399,14 +513,24 @@ mod tests {
         for (id, text) in SCENES {
             let raw: Value = serde_json::from_str(text).unwrap_or_else(|e| panic!("{id}: {e}"));
             // The fixtures do carry people and a phone, so this is not vacuous.
-            assert!(raw.get("people").is_some() && raw.get("phone").is_some(), "{id} fixture lost its people/phone");
+            assert!(
+                raw.get("people").is_some() && raw.get("phone").is_some(),
+                "{id} fixture lost its people/phone"
+            );
             let served = served_scene(text).expect("parses");
             for k in served.as_object().unwrap().keys() {
-                assert!(SERVED_KEYS.contains(&k.as_str()), "{id}: {k} reached the served scene");
+                assert!(
+                    SERVED_KEYS.contains(&k.as_str()),
+                    "{id}: {k} reached the served scene"
+                );
             }
             // And nothing on the allowlist was lost: the geometry is intact.
             for k in SERVED_KEYS {
-                assert_eq!(served.get(k), raw.get(k), "{id}: {k} changed on the way out");
+                assert_eq!(
+                    served.get(k),
+                    raw.get(k),
+                    "{id}: {k} changed on the way out"
+                );
             }
         }
     }
@@ -415,7 +539,10 @@ mod tests {
     fn every_embedded_scene_says_it_is_hand_written() {
         for (id, text) in SCENES {
             let v: Value = serde_json::from_str(text).unwrap();
-            assert_eq!(v["provenance"], "hand_written", "{id}: the demo would print a false provenance");
+            assert_eq!(
+                v["provenance"], "hand_written",
+                "{id}: the demo would print a false provenance"
+            );
         }
     }
 
@@ -428,7 +555,8 @@ mod tests {
             .unwrap()
             .filter_map(|e| {
                 let p = e.ok()?.path();
-                (p.extension()? == "json").then(|| p.file_stem().unwrap().to_string_lossy().into_owned())
+                (p.extension()? == "json")
+                    .then(|| p.file_stem().unwrap().to_string_lossy().into_owned())
             })
             .collect();
         on_disk.sort();

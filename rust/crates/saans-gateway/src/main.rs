@@ -98,7 +98,9 @@ fn install_room(shared: &saans_gateway::shared::Shared, room: RoomReplays) {
     }
     let scenes = room.scene_ids().join(", ");
     if shared.room.install_replays(room).is_ok() {
-        log(&format!("room stream: recorded runs (REPLAY of SIM) for {scenes}"));
+        log(&format!(
+            "room stream: recorded runs (REPLAY of SIM) for {scenes}"
+        ));
     }
 }
 
@@ -109,7 +111,11 @@ fn install_room(_: &saans_gateway::shared::Shared, _: RoomReplays) {}
 #[cfg(feature = "roomsim")]
 fn check_room(room: &RoomReplays) {
     if !room.is_empty() {
-        println!("--room-replay: OK ({} recorded runs, SIM: {})", room.len(), room.scene_ids().join(", "));
+        println!(
+            "--room-replay: OK ({} recorded runs, SIM: {})",
+            room.len(),
+            room.scene_ids().join(", ")
+        );
     }
 }
 
@@ -344,7 +350,10 @@ async fn run_replay(
         return Ok(());
     }
     // Serve while replaying: the HTTP side reads what the replay publishes.
-    let shared = saans_gateway::shared::Shared::with_history(saans_gateway::shared::Mode::Replay, cfg.history);
+    let shared = saans_gateway::shared::Shared::with_history(
+        saans_gateway::shared::Mode::Replay,
+        cfg.history,
+    );
     install_room(&shared, room);
     let http_addr = cfg.http_socket_addr()?;
     let listener = tokio::net::TcpListener::bind(http_addr)

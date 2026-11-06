@@ -68,7 +68,9 @@ pub fn segments_intersect(a: Point, b: Point, c: Point, d: Point) -> bool {
     let (d1, d2) = (cross(c, d, a), cross(c, d, b));
     let (d3, d4) = (cross(a, b, c), cross(a, b, d));
     // Proper crossing: each segment straddles the other's line.
-    if ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0)) && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0)) {
+    if ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
+        && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+    {
         return true;
     }
     // Collinear or touching.

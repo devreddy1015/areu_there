@@ -62,7 +62,9 @@ fn enables_write(manifest: &str) -> bool {
             continue;
         }
         let inline = line.starts_with("saans-scene ") || line.starts_with("saans-scene=");
-        if (inline || (in_scene_table && line.starts_with("features"))) && line.contains("\"write\"") {
+        if (inline || (in_scene_table && line.starts_with("features")))
+            && line.contains("\"write\"")
+        {
             return true;
         }
     }
@@ -76,7 +78,9 @@ fn only_writers_enable_write_and_only_known_readers_depend_on_the_scene_crate() 
     for entry in std::fs::read_dir(crates).unwrap() {
         let dir = entry.unwrap().path();
         let name = dir.file_name().unwrap().to_string_lossy().into_owned();
-        let Ok(manifest) = std::fs::read_to_string(dir.join("Cargo.toml")) else { continue };
+        let Ok(manifest) = std::fs::read_to_string(dir.join("Cargo.toml")) else {
+            continue;
+        };
         checked += 1;
         if name == "saans-scene" || !depends_on_scene(&manifest) {
             continue;
@@ -98,7 +102,10 @@ fn only_writers_enable_write_and_only_known_readers_depend_on_the_scene_crate() 
         }
     }
     // Guard against the test passing because it looked in the wrong place.
-    assert!(checked >= 6, "found only {checked} crates; is the workspace layout different?");
+    assert!(
+        checked >= 6,
+        "found only {checked} crates; is the workspace layout different?"
+    );
 }
 
 #[test]
