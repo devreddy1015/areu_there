@@ -12,6 +12,7 @@
 //! | Rate high / low | `breathing.bpm`, `confidence` | `vitals` |
 //! | Lone-worker inactivity | stillness (+ breathing when `vitals`) | `inactivity_alert_min > 0` |
 //! | Possible collapse | `motion_index` burst, then stillness | `collapse_detection` |
+//! | Long lie (`longlie.rs`) | burst, then stillness for N min | `long_lie_min > 0` |
 //! | Rest period | stillness (+ breathing when `vitals`) | — |
 //! | Trend deviation | daily resting breathing rate | `vitals` |
 //!
@@ -41,6 +42,7 @@
 //!   sleeping and praying are still too; that is why inactivity and
 //!   collapse are advisory and collapse detection is off by default.
 
+use crate::longlie::{self, LongLie};
 use crate::types::{
     Breathing, EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceSample, SpaceState,
 };
@@ -621,6 +623,12 @@ pub struct SpaceMonitor {
     /// the session it kept open ends at the last measured presence.
     hold_expired: Option<f64>,
     rest: Option<Rest>,
+    long_lie: LongLie,
+    /// Gross motion seen in a `long_lie_elsewhere` space since the last
+    /// sample (`note_motion_elsewhere`).
+    motion_elsewhere: bool,
+    /// The last sample was measured present and moving.
+    moving_now: bool,
     // trend
     day: Option<DayAccum>,
     history: BTreeMap<i64, DailySummary>,
@@ -629,6 +637,7 @@ pub struct SpaceMonitor {
 impl SpaceMonitor {
     pub fn new(config: SpaceConfig) -> Self {
         Self {
+            long_lie: LongLie::new(config.long_lie_min),
             config,
             last: None,
             session_start: None,
@@ -650,6 +659,8 @@ impl SpaceMonitor {
             fall_hold: None,
             hold_expired: None,
             rest: None,
+            motion_elsewhere: false,
+            moving_now: false,
             day: None,
             history: BTreeMap::new(),
         }
@@ -665,6 +676,19 @@ impl SpaceMonitor {
     pub fn presence_held(&self) -> bool {
         self.last.is_some_and(|s| s.occupied == Some(false))
             && self.fall_hold.is_some_and(|h| h.held_since.is_some())
+    }
+
+    /// Gross motion was measured in one of `long_lie_elsewhere`'s spaces:
+    /// the person is not lying here, so a long lie that is counting stops
+    /// at the next sample. The gateway calls this; it sees every space.
+    pub fn note_motion_elsewhere(&mut self) {
+        self.motion_elsewhere = true;
+    }
+
+    /// Whether the last sample was measured present (not held) with gross
+    /// motion: what another space's `long_lie_elsewhere` listens for.
+    pub fn moving_now(&self) -> bool {
+        self.moving_now
     }
 
     /// Feed one fused 2 Hz sample; returns events that started, ended or
@@ -741,7 +765,20 @@ impl SpaceMonitor {
             self.collapse_step(s, &c, &mut ev);
         }
         self.rest_step(&c, &mut ev);
+        ev.extend(self.long_lie.step(
+            &self.config.id,
+            &longlie::Input {
+                t,
+                visible,
+                motion_index: s.motion_index,
+                moving,
+                present,
+                held,
+                elsewhere: std::mem::take(&mut self.motion_elsewhere),
+            },
+        ));
         self.day_step(&c);
+        self.moving_now = moving && measured.occupied == Some(true);
         self.last = Some(measured);
         ev
     }
@@ -847,6 +884,9 @@ impl SpaceMonitor {
         if self.burst.as_ref().is_some_and(|b| b.fired) {
             active_alerts.push("possible_collapse".to_string());
         }
+        if self.long_lie.alerted() {
+            active_alerts.push("long_lie".to_string());
+        }
         match self.rate.active {
             Some(RateDir::High) => active_alerts.push("rate_high".to_string()),
             Some(RateDir::Low) => active_alerts.push("rate_low".to_string()),
@@ -874,6 +914,7 @@ impl SpaceMonitor {
             vitals,
             active_alerts,
             presence_held: self.presence_held(),
+            long_lie: self.long_lie.status(t),
         }
     }
 
@@ -911,6 +952,7 @@ impl SpaceMonitor {
         }
         self.still = None;
         self.burst = None;
+        self.long_lie.discontinuity();
         self.rate.window.clear();
         self.rate.in_range_since = None;
         if gap >= BLIND_END_S {
