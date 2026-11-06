@@ -12,6 +12,7 @@
 //! | Rate high / low | `breathing.bpm`, `confidence` | `vitals` |
 //! | Lone-worker inactivity | stillness (+ breathing when `vitals`) | `inactivity_alert_min > 0` |
 //! | Possible collapse | `motion_index` burst, then stillness | `collapse_detection` |
+//! | Long lie (`long_lie.rs`) | a burst, then N minutes still while present | `long_lie_min > 0` |
 //! | Rest period | stillness (+ breathing when `vitals`) | — |
 //! | Trend deviation | daily resting breathing rate | `vitals` |
 //!
@@ -41,6 +42,7 @@
 //!   sleeping and praying are still too; that is why inactivity and
 //!   collapse are advisory and collapse detection is off by default.
 
+use crate::long_lie::{LongLie, Outcome as LongLieOutcome, Step as LongLieStep};
 use crate::types::{
     Breathing, EventKind, HealthEvent, LinkId, Severity, SpaceConfig, SpaceSample, SpaceState,
 };
@@ -620,6 +622,7 @@ pub struct SpaceMonitor {
     /// Start of a presence hold that just ran out with nothing moving:
     /// the session it kept open ends at the last measured presence.
     hold_expired: Option<f64>,
+    long_lie: LongLie,
     rest: Option<Rest>,
     // trend
     day: Option<DayAccum>,
@@ -649,6 +652,7 @@ impl SpaceMonitor {
             burst: None,
             fall_hold: None,
             hold_expired: None,
+            long_lie: LongLie::default(),
             rest: None,
             day: None,
             history: BTreeMap::new(),
@@ -737,6 +741,7 @@ impl SpaceMonitor {
             self.rate_step(&c, &mut ev);
         }
         self.inactivity_step(&c, &mut ev);
+        self.long_lie_step(s, &c, &mut ev);
         if self.config.collapse_detection {
             self.collapse_step(s, &c, &mut ev);
         }
@@ -847,6 +852,9 @@ impl SpaceMonitor {
         if self.burst.as_ref().is_some_and(|b| b.fired) {
             active_alerts.push("possible_collapse".to_string());
         }
+        if self.long_lie.alerting() {
+            active_alerts.push("long_lie".to_string());
+        }
         match self.rate.active {
             Some(RateDir::High) => active_alerts.push("rate_high".to_string()),
             Some(RateDir::Low) => active_alerts.push("rate_low".to_string()),
@@ -911,6 +919,7 @@ impl SpaceMonitor {
         }
         self.still = None;
         self.burst = None;
+        self.long_lie.interrupt();
         self.rate.window.clear();
         self.rate.in_range_since = None;
         if gap >= BLIND_END_S {
@@ -1661,6 +1670,94 @@ impl SpaceMonitor {
                 burst_index: peak,
                 still_s,
             },
+        ));
+    }
+
+    /// The long lie (`long_lie.rs`): the tracker decides, this words it.
+    /// Reads the effective sample, so held presence counts as present and
+    /// the evidence says it was inferred.
+    fn long_lie_step(&mut self, s: &SpaceSample, c: &Ctx, ev: &mut Vec<HealthEvent>) {
+        let step = LongLieStep {
+            t: c.t,
+            visible: s.occupied.is_some(),
+            motion_index: s.motion_index,
+            moving: c.moving,
+            present: c.present,
+            measured: c.present && !c.held,
+            still_alive: self.still.is_some(),
+            limit_s: self.config.long_lie_min * 60.0,
+        };
+        let Some(out) = self.long_lie.step(&step) else {
+            return;
+        };
+        let (severity, confidence, t_start, evidence, kind) = match out {
+            LongLieOutcome::Alert {
+                burst_t,
+                peak,
+                settle_s,
+                still_s,
+                seen_fraction,
+            } => {
+                let phrase = breathing_phrase(self.config.vitals, self.last_breath.as_ref(), c.t);
+                let presence = if c.held {
+                    "while presence is held after the movement (the links read empty, so this is inferred, \
+                     not measured)"
+                } else {
+                    "while present"
+                };
+                (
+                    Severity::Check,
+                    // Share of the lie in which the links measured someone:
+                    // held presence keeps it running but is not seen.
+                    seen_fraction,
+                    burst_t,
+                    format!(
+                        "a sudden movement (motion index {peak:.1}) stopped within {settle_s:.1} s, and there \
+                         has been no gross motion for {:.1} min since, {presence}; {phrase}. Lying down quickly \
+                         to rest looks the same to WiFi, so this is advisory: check on the space",
+                        still_s / 60.0
+                    ),
+                    EventKind::LongLie {
+                        still_min: still_s / 60.0,
+                        burst_index: peak,
+                        movement_seen: false,
+                    },
+                )
+            }
+            LongLieOutcome::Moved {
+                burst_t,
+                peak,
+                still_s,
+                after_alert_s,
+            } => (
+                // Recorded and shown, never pushed: moving is not the same
+                // as being fine, so nothing is resolved by it.
+                Severity::Info,
+                // Gross motion on a usable link was measured; the fixed
+                // confidence other Info events carry.
+                0.8,
+                burst_t,
+                format!(
+                    "gross motion seen {:.1} min after the long-lie alert ({:.1} min after the sudden \
+                     movement); the alert stays open until someone resolves it",
+                    after_alert_s / 60.0,
+                    still_s / 60.0
+                ),
+                EventKind::LongLie {
+                    still_min: still_s / 60.0,
+                    burst_index: peak,
+                    movement_seen: true,
+                },
+            ),
+        };
+        ev.push(event(
+            &self.config.id,
+            c.t,
+            Some(t_start),
+            severity,
+            confidence,
+            evidence,
+            kind,
         ));
     }
 

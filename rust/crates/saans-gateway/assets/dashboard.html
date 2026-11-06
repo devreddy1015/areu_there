@@ -435,6 +435,7 @@ const EVENT_LABEL = {
   occupancy_started: 'Someone arrived', occupancy_ended: 'Space became empty',
   breathing_pause: 'Breathing pause', rate_high: 'Fast breathing', rate_low: 'Slow breathing',
   inactivity: 'No movement', possible_collapse: 'Possible collapse',
+  long_lie: 'Long lie',
   rest_started: 'Rest started', rest_ended: 'Rest ended', trend_deviation: 'Change from usual',
   link_down: 'Link down', link_up: 'Link back up', link_degraded: 'Link degraded',
   calibration_stale: 'Calibration stale', raw_mode_active: 'Raw CSI debug mode on',
@@ -443,6 +444,7 @@ const EVENT_LABEL = {
 const ALERT_LABEL = {
   blind: 'Cannot see this space', breathing_pause: 'Breathing pause', inactivity: 'No movement',
   inactivity_no_breathing: 'No movement and no breathing detected', possible_collapse: 'Possible collapse',
+  long_lie: 'No movement after a sudden movement',
   rate_high: 'Fast breathing', rate_low: 'Slow breathing',
 };
 const SEV_RANK = { info: 0, advisory: 1, check: 2 };

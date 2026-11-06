@@ -55,6 +55,17 @@ pub struct SpaceConfig {
     /// later. To turn it on, set it longer than `inactivity_alert_min`
     /// (35 for the default 30).
     pub fall_hold_min: f64,
+    /// Long lie (issue #38, `docs/ELDER_CARE.md` §3.3): a `Check` alert
+    /// when a sudden movement (a burst that stops within
+    /// `COLLAPSE_SETTLE_S`) is followed by this many minutes of no gross
+    /// motion while the space is occupied, measured or held. It does not
+    /// need vitals.
+    ///
+    /// Off (0) by default. It cannot tell a person who went down and cannot
+    /// get up from one who lay down quickly to rest, sat down heavily to read
+    /// or knelt to pray: the time condition is the only thing separating
+    /// them, and `saans longlie` measures how well (`docs/RESULTS.md`).
+    pub long_lie_min: f64,
     pub breathing_pause_min_s: f64,
     pub rate_high_bpm: f64,
     pub rate_low_bpm: f64,
@@ -71,6 +82,7 @@ impl Default for SpaceConfig {
             inactivity_alert_min: 30.0,
             collapse_detection: false,
             fall_hold_min: 0.0,
+            long_lie_min: 0.0,
             breathing_pause_min_s: 10.0,
             rate_high_bpm: 24.0,
             rate_low_bpm: 8.0,
@@ -157,6 +169,14 @@ pub enum EventKind {
     PossibleCollapse {
         burst_index: f64,
         still_s: f64,
+    },
+    /// `movement_seen = false`: the alert (`Check`). `true`: gross motion
+    /// after it, recorded as `Info` so it pages nobody; the alert stays
+    /// open until a person resolves it.
+    LongLie {
+        still_min: f64,
+        burst_index: f64,
+        movement_seen: bool,
     },
     RestStarted,
     RestEnded {

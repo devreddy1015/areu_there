@@ -91,6 +91,16 @@ collapse_detection = false
 # and in simulation about one departure in four engages it (NOTES.md §14).
 # To turn it on, set it longer than inactivity_alert_min, e.g. 35.
 fall_hold_min = 0
+# Long lie (docs/ELDER_CARE.md §3.3): a Check alert, with or without
+# vitals, when a sudden movement is followed by this many minutes of no
+# gross motion while someone is present (measured, or held by
+# fall_hold_min). Off by default: lying down quickly to rest, sitting down
+# heavily to read or kneeling to pray look the same, and only the time
+# separates them. Measured in docs/RESULTS.md ("Long lie"). Starting values
+# from the spec: 15 for a bathroom, 30 for a living room. With the presence
+# hold on, set fall_hold_min longer than this, or the hold ends first and a
+# person the links have lost is never alerted on.
+long_lie_min = 0
 
 [[space]]
 id = "rest-room-1"
