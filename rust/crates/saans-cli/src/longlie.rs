@@ -12,8 +12,10 @@
 //! minutes. A positive counts as alerted when the alert comes within N + 2
 //! minutes of the lie starting (§4.6). Negatives are everything else: a
 //! heavy sit-down and then still, a sit-down and up again, a sit-down and
-//! fidgeting, lying down into bed quickly, an empty room, and the person
-//! walking out. Every alert in a negative is false.
+//! fidgeting, lying down into bed quickly, an empty room, the person
+//! walking out, and `saans eval`'s walk-in reader and fidgeting night (the
+//! scenarios PR #59 measured). Every alert in a negative is false, and so
+//! is an alert on a lie run before the lie started.
 //!
 //! The rooms and layouts are `saans eval`'s, as a 2.7 m box: on the floor
 //! the chest is at 0.2 m and breathes vertically. A bed's height is not
@@ -62,9 +64,11 @@ enum Case {
     IntoBed,
     Empty,
     Departure,
+    Reader,
+    Night,
 }
 
-const CASES: [Case; 9] = [
+const CASES: [Case; 11] = [
     Case::Fall,
     Case::Slide,
     Case::FallMoving,
@@ -74,6 +78,8 @@ const CASES: [Case; 9] = [
     Case::IntoBed,
     Case::Empty,
     Case::Departure,
+    Case::Reader,
+    Case::Night,
 ];
 
 impl Case {
@@ -88,6 +94,8 @@ impl Case {
             Case::IntoBed => "into bed quickly, 90m",
             Case::Empty => "empty room, 60m",
             Case::Departure => "walks out, empty 40m",
+            Case::Reader => "walks in, reads 40m",
+            Case::Night => "fidgeting night, 2h",
         }
     }
 
@@ -104,6 +112,14 @@ fn seg(duration_s: f64, activity: Activity) -> Segment {
 }
 
 fn timeline(case: Case, rng: &mut Lcg) -> Vec<Segment> {
+    // `saans eval`'s own timelines, the scenarios PR #59 measured: walk
+    // in and sit still reading (no heavy sit-down), and a 2-hour night
+    // with breathing pauses and an occasional fidget.
+    match case {
+        Case::Reader => return eval::timeline(Kind::Reader, false, rng),
+        Case::Night => return eval::timeline(Kind::Night, false, rng),
+        _ => {}
+    }
     let mut t = vec![seg(LEAD_IN_S, Activity::Absent)];
     let seat = rng.seat();
     let bpm = rng.range(11.0, 17.0);
@@ -193,6 +209,7 @@ fn timeline(case: Case, rng: &mut Lcg) -> Vec<Segment> {
             walk_out(&mut t);
         }
         Case::Empty => t.push(seg(EMPTY_S, Activity::Absent)),
+        Case::Reader | Case::Night => unreachable!("eval's timelines, above"),
         Case::Departure => {
             t.push(seg(15.0, walk(seat)));
             t.push(seg(
@@ -409,13 +426,31 @@ pub fn run(seeds: u64, threads: usize) {
     );
 }
 
+/// Where a positive run's alerts fall around its lie: the first within
+/// N + 2 min of it starting (`in_time`, seconds after it started), alerts
+/// before it started (false: nobody was lying yet), and alerts later than
+/// the window (too late to count as caught). The before-the-lie count is
+/// ported from PR #59.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Timing {
+    in_time: Option<f64>,
+    before: usize,
+    late: usize,
+}
+
+fn timing(lie_start: f64, alerts: &[(f64, bool)], n_min: f64) -> Timing {
+    let window = n_min * 60.0 + IN_TIME_S;
+    let dts = || alerts.iter().map(|&(t, _)| t - lie_start);
+    Timing {
+        in_time: dts().find(|dt| (0.0..=window).contains(dt)),
+        before: dts().filter(|&dt| dt < 0.0).count(),
+        late: dts().filter(|&dt| dt > window).count(),
+    }
+}
+
 /// Alerted within N + 2 min of the lie starting.
 fn in_time(d: &Done, o: &Outcome, n_min: f64) -> Option<f64> {
-    let lie = d.lie_start?;
-    o.alerts
-        .iter()
-        .map(|&(t, _)| t - lie)
-        .find(|&dt| dt >= 0.0 && dt <= n_min * 60.0 + IN_TIME_S)
+    timing(d.lie_start?, &o.alerts, n_min).in_time
 }
 
 fn report(all: &[Done], seeds: u64, n_rooms: usize, layouts: &[&str]) {
@@ -432,6 +467,8 @@ fn report(all: &[Done], seeds: u64, n_rooms: usize, layouts: &[&str]) {
     println!("'false / occ. h' and 'false / empty h' pool the false alerts of every scenario that is not a lie over");
     println!("its occupied or empty hours: they depend on this mix of scenarios and are not a rate for a home.");
 
+    println!("'before lie' and 'late' count alerts on the lie runs before the lie started (false: nobody was lying)");
+    println!("and after the N + 2 min window (too late to count as caught); none is dropped.");
     println!("\nSUDDEN MOVEMENT: runs where the motion index reached {BURST_INDEX:.0} at the fall, slide or sit-down");
     for c in [
         Case::Fall,
@@ -478,14 +515,16 @@ fn report(all: &[Done], seeds: u64, n_rooms: usize, layouts: &[&str]) {
         }
         println!("\nMISS RATE AND FALSE ALARMS TOGETHER, presence hold {word}");
         println!(
-            "  {:>4} {:>13} {:>13} {:>15} {:>15} {:>16} {:>16}",
+            "  {:>4} {:>13} {:>13} {:>15} {:>15} {:>16} {:>16} {:>11} {:>6}",
             "N",
             "falls missed",
             "slides missed",
             "median past N",
             "false alerts",
             "false / occ. h",
-            "false / empty h"
+            "false / empty h",
+            "before lie",
+            "late"
         );
         for (ni, nm) in NS_MIN.iter().enumerate() {
             let idx = hold_i * NS_MIN.len() + ni;
@@ -506,15 +545,21 @@ fn report(all: &[Done], seeds: u64, n_rooms: usize, layouts: &[&str]) {
             let occ_h: f64 = neg.iter().map(|d| d.occupied_h).sum();
             let empty_h: f64 = neg.iter().map(|d| d.empty_h).sum();
             let (f_occ, f_empty) = (alerts(true), alerts(false));
+            let (before, late) = all
+                .iter()
+                .filter_map(|d| Some(timing(d.lie_start?, &d.plain[idx].alerts, *nm)))
+                .fold((0, 0), |(b, l), t| (b + t.before, l + t.late));
             println!(
-                "  {:>4} {:>13} {:>13} {:>15} {:>15} {:>16} {:>16}",
+                "  {:>4} {:>13} {:>13} {:>15} {:>15} {:>16} {:>16} {:>11} {:>6}",
                 format!("{nm:.0}"),
                 pct(ratio(missed(Case::Fall) as u64, per_case as u64)),
                 pct(ratio(missed(Case::Slide) as u64, per_case as u64)),
                 format!("{} s", num(median(&lat) - nm * 60.0, 0)),
                 f_occ + f_empty,
                 num(f_occ as f64 / occ_h, 3),
-                num(f_empty as f64 / empty_h, 3)
+                num(f_empty as f64 / empty_h, 3),
+                before,
+                late
             );
         }
     }
@@ -571,4 +616,38 @@ fn report(all: &[Done], seeds: u64, n_rooms: usize, layouts: &[&str]) {
         );
     }
     println!("\nSYNTHETIC. Simulated physics, bodies and noise; no real lie, fall, nap or home is in these numbers.");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alerts_before_the_lie_and_too_late_are_counted_not_dropped() {
+        let lie = 1000.0;
+        let n = 15.0;
+        let t = timing(lie, &[(400.0, true), (lie + 901.0, true)], n);
+        assert_eq!(t.in_time, Some(901.0));
+        assert_eq!((t.before, t.late), (1, 0));
+        let t = timing(lie, &[(lie + n * 60.0 + IN_TIME_S + 1.0, true)], n);
+        assert_eq!(t.in_time, None);
+        assert_eq!((t.before, t.late), (0, 1));
+        let t = timing(lie, &[(lie + 60.0, true), (lie + 2000.0, true)], 3.0);
+        assert_eq!(
+            t,
+            Timing {
+                in_time: Some(60.0),
+                before: 0,
+                late: 1
+            }
+        );
+        assert_eq!(
+            timing(lie, &[], n),
+            Timing {
+                in_time: None,
+                before: 0,
+                late: 0
+            }
+        );
+    }
 }
