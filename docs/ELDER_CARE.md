@@ -302,6 +302,9 @@ presence hold off:
   N = 30, so the inference above holds, and no N fixes it;
 - lying down into bed quickly and turning over now and then: alerted in
   94 of 120 at N = 15;
+- walking in and reading for 40 minutes: alerted in 101 of 120 at every
+  N, because walking in reaches `BURST_INDEX` too; a two-hour fidgeting
+  night: 78 of 120 at N = 15;
 - an empty room: never; a walk-out with the presence hold on: 33 of 120
   alert on the empty room, and none when the person is seen moving in
   another room (`long_lie_elsewhere`).

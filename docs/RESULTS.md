@@ -1096,6 +1096,8 @@ Vitals off, possible collapse off, as shipped. (+) = a lie, alerted if within N 
 every alert in any other scenario is false. The presence hold, when on, is 35 min.
 'false / occ. h' and 'false / empty h' pool the false alerts of every scenario that is not a lie over
 its occupied or empty hours: they depend on this mix of scenarios and are not a rate for a home.
+'before lie' and 'late' count alerts on the lie runs before the lie started (false: nobody was lying)
+and after the N + 2 min window (too late to count as caught); none is dropped.
 
 SUDDEN MOVEMENT: runs where the motion index reached 8 at the fall, slide or sit-down
   fall, then still (+)        113/120
@@ -1117,15 +1119,17 @@ RUNS ALERTED, presence hold OFF (as shipped)
   into bed quickly, 90m       117/120  112/120  101/120   94/120   81/120   51/120
   empty room, 60m               0/120    0/120    0/120    0/120    0/120    0/120
   walks out, empty 40m        116/120  116/120    0/120    0/120    0/120    0/120
+  walks in, reads 40m         101/120  101/120  101/120  101/120  101/120  101/120
+  fidgeting night, 2h          97/120   93/120   80/120   78/120   71/120   51/120
 
 MISS RATE AND FALSE ALARMS TOGETHER, presence hold OFF (as shipped)
-     N  falls missed slides missed   median past N    false alerts   false / occ. h  false / empty h
-     3          6.7%         45.8%             2 s             784            2.005            0.000
-     5          6.7%         45.8%             2 s             590            1.509            0.000
-    10          6.7%         45.8%             2 s             318            0.813            0.000
-    15          6.7%         46.7%             2 s             263            0.673            0.000
-    20          6.7%         47.5%             2 s             229            0.586            0.000
-    30          6.7%         47.5%             2 s             174            0.445            0.000
+     N  falls missed slides missed   median past N    false alerts   false / occ. h  false / empty h  before lie   late
+     3          6.7%         45.8%             2 s            1088            1.522            0.000           0      9
+     5          6.7%         45.8%             2 s             870            1.217            0.000           0      3
+    10          6.7%         45.8%             2 s             555            0.776            0.000           0      2
+    15          6.7%         46.7%             2 s             479            0.670            0.000           0      0
+    20          6.7%         47.5%             2 s             426            0.596            0.000           0      0
+    30          6.7%         47.5%             2 s             340            0.476            0.000           0      0
 
 RUNS ALERTED, presence hold ON (35 min)
   scenario                        N=3      N=5     N=10     N=15     N=20     N=30
@@ -1138,15 +1142,17 @@ RUNS ALERTED, presence hold ON (35 min)
   into bed quickly, 90m       117/120  113/120  102/120   95/120   82/120   52/120
   empty room, 60m               0/120    0/120    0/120    0/120    0/120    0/120
   walks out, empty 40m        119/120  119/120   33/120   33/120   33/120   33/120
+  walks in, reads 40m         103/120  103/120  103/120  103/120  103/120  103/120
+  fidgeting night, 2h          97/120   93/120   81/120   79/120   72/120   52/120
 
 MISS RATE AND FALSE ALARMS TOGETHER, presence hold ON (35 min)
-     N  falls missed slides missed   median past N    false alerts   false / occ. h  false / empty h
-     3          5.8%         45.8%             2 s             827            2.031            0.153
-     5          5.8%         45.8%             2 s             632            1.532            0.153
-    10          5.8%         45.8%             2 s             356            0.826            0.153
-    15          5.8%         46.7%             2 s             300            0.683            0.153
-    20          5.8%         47.5%             2 s             266            0.596            0.153
-    30          5.8%         47.5%             2 s             211            0.455            0.153
+     N  falls missed slides missed   median past N    false alerts   false / occ. h  false / empty h  before lie   late
+     3          5.8%         45.8%             2 s            1133            1.539            0.147           0      9
+     5          5.8%         45.8%             2 s             914            1.232            0.147           0      3
+    10          5.8%         45.8%             2 s             596            0.787            0.147           0      2
+    15          5.8%         46.7%             2 s             519            0.680            0.147           0      0
+    20          5.8%         47.5%             2 s             466            0.606            0.147           0      0
+    30          5.8%         47.5%             2 s             380            0.485            0.147           0      0
 
 WALKS OUT, presence hold ON: runs with a false alert on the room once it is truly empty, left the home
 against seen moving in another room 10 s later (`long_lie_elsewhere`; the harness says so, there

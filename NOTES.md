@@ -1333,7 +1333,9 @@ Everything here is **SYNTHETIC**. `saans longlie --seeds 20`, in
 without gross motion for N minutes (`long_lie_min`). Presence may be
 held by the presence hold (§14) if that is on. Gross motion in a space
 listed in `long_lie_elsewhere` stops the count. It needs no vitals and
-not `collapse_detection`, and it ships off.
+not `collapse_detection`, and it ships off. Its confidence is the share
+of the counted lie in which the space was measured present: held
+presence counts as not seen (taken from #59).
 
 **How it was measured.** Every timeline was simulated once, through the
 production path, in `saans eval`'s rooms and layouts as a 2.7 m box: 120
@@ -1341,20 +1343,25 @@ runs per scenario. The fused samples were then replayed through the
 detector for N = 3, 5, 10, 15, 20 and 30 minutes, with the hold off and
 on, so each column of the table sees identical data. A lie counts as
 caught when the alert comes within N + 2 minutes of it starting
-(ELDER_CARE.md §4.6). Every alert in any other scenario is false.
+(ELDER_CARE.md §4.6). Every alert in any other scenario is false. An
+alert on a lie run before the lie started is false too, and one after
+the N + 2 window is late: both are counted, not dropped (from #59).
 
 ### Presence hold off, as shipped
 
 | N | falls missed | slow slides missed | sat down hard, then still 45 min | into bed quickly, 90 min | sat down, fidgeting 45 min | false alerts per occupied hour |
 |---|---|---|---|---|---|---|
-| 3 min | 6.7% | 45.8% | 119/120 | 117/120 | 73/120 | 2.005 |
-| 15 min | 6.7% | 46.7% | 118/120 | 94/120 | 5/120 | 0.673 |
-| 30 min | 6.7% | 47.5% | 118/120 | 51/120 | 2/120 | 0.445 |
+| 3 min | 6.7% | 45.8% | 119/120 | 117/120 | 73/120 | 1.522 |
+| 15 min | 6.7% | 46.7% | 118/120 | 94/120 | 5/120 | 0.670 |
+| 30 min | 6.7% | 47.5% | 118/120 | 51/120 | 2/120 | 0.476 |
 
 The alert, when it comes, comes 2 s after N (median), and an empty room
 raised none in 120 hours at any N. The last column pools the false
 alerts of every scenario that is not a lie over its occupied hours: it
-depends on this mix of scenarios and is not a rate for a home.
+depends on this mix of scenarios and is not a rate for a home. No lie
+run alerted before its lie began, at any N, hold off or on. Alerts after
+the window were 9 at N = 3, 3 at N = 5, 2 at N = 10 and none from
+N = 15.
 
 ### What it says
 
@@ -1384,7 +1391,9 @@ depends on this mix of scenarios and is not a rate for a home.
    every 1-5 minutes is alerted 5 times in 120 at N = 15.
 7. **Lying down into bed quickly is the bedroom case, and it is bad.**
    Turning over every 10-30 minutes on average, it is alerted in 94 of
-   120 runs at N = 15 and 51 at N = 30.
+   120 runs at N = 15 and 51 at N = 30. A two-hour night with fidgeting
+   (`saans eval`'s night) is alerted in 78 of 120 at N = 15 and 51 at
+   N = 30.
 
 ### The presence hold, and motion in another room
 
@@ -1412,9 +1421,11 @@ inside the home, not for leaving it, which needs a door sensor
 - **N does not need to be long for falls.** The miss rate is the same
   at 3 minutes as at 30, so N is set by the false alarms, and per room.
 - **Walking in reaches the burst threshold too.** A person who walks in
-  and sits down gently for 5 minutes was alerted at N = 3 and 5 in
-  nearly every run of the walk-out scenario. The burst condition does
-  little to separate events in this simulator.
+  and reads for 40 minutes (`saans eval`'s reader) is alerted in 101 of
+  120 runs at N = 3 and 101 at N = 30, and one who walks in and sits
+  down gently for 5 minutes was alerted at N = 3 and 5 in nearly every
+  run of the walk-out scenario. The burst condition does little to
+  separate events in this simulator.
 - **Not modelled:** a bed's height (into bed is a heavy sit-down at the
   bed, chest upright), lying on the side, a second room (motion
   elsewhere is the harness's word), real falls, real naps. Staged

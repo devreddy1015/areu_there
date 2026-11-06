@@ -239,6 +239,10 @@ def _ll_miss(hold: str, n: str) -> str:
             + r"[^\n]*\n[^\n]*\n(?:[^\n]*\n)*?\s+" + n + r"\s+")
 
 
+# The `longlie` miss-rate row from the miss rates up to the "before lie" cell.
+_LL_TAIL = r"[\d.]+%\s+[\d.]+%\s+-?\d+ s\s+\d+\s+[\d.]+\s+[\d.]+\s+"
+
+
 def _ll_runs(hold: str, row: str, col: int) -> str:
     """One cell (runs alerted) of a `longlie` RUNS ALERTED table."""
     return (r"RUNS ALERTED, presence hold " + hold + r"[\s\S]*?^  " + row
@@ -456,6 +460,23 @@ QUOTES = [
           r"falls missed drop from ([\d.]+)% to ([\d.]+)%\. The\ncost is the walk-out: in (\d+) of 120 runs",
           [_ll_miss("OFF", "15") + r"([\d.]+)%", _ll_miss("ON", "15") + r"([\d.]+)%",
            r"^  left the home\s+(\d+)/120"]),
+    Quote("NOTES.md", "longlie",
+          r"No lie\nrun alerted before its lie began, at any N, hold off or on\. Alerts after\n"
+          r"the window were (\d+) at N = 3, (\d+) at N = 5, (\d+) at N = 10 and none from\nN = 15\.",
+          [_ll_miss("OFF", n) + _LL_TAIL + r"\d+\s+(\d+)$" for n in ("3", "5", "10")]
+          + [_ll_miss(hold, n) + _LL_TAIL + r"0\s+\d+$"
+             for hold in ("OFF", "ON") for n in ("3", "5", "10", "15", "20", "30")]
+          + [_ll_miss("OFF", n) + _LL_TAIL + r"\d+\s+0$" for n in ("15", "20", "30")]),
+    Quote("NOTES.md", "longlie",
+          r"night\) is alerted in (\d+) of 120 at N = 15 and (\d+) at\n   N = 30",
+          [_ll_runs("OFF", "fidgeting night, 2h", 3), _ll_runs("OFF", "fidgeting night, 2h", 5)]),
+    Quote("NOTES.md", "longlie",
+          r"reader\) is alerted in (\d+) of\n  120 runs at N = 3 and (\d+) at N = 30",
+          [_ll_runs("OFF", "walks in, reads 40m", 0), _ll_runs("OFF", "walks in, reads 40m", 5)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"reading for 40 minutes: alerted in (\d+) of 120 at every\n  N,[\s\S]*?night: (\d+) of 120 at N = 15",
+          [r"RUNS ALERTED, presence hold OFF[\s\S]*?^  walks in, reads 40m\s+(\d+)/120(?:\s+\1/120){5}$",
+           _ll_runs("OFF", "fidgeting night, 2h", 3)]),
     Quote("docs/ELDER_CARE.md", "longlie",
           r"falls that end still: ([\d.]+)% missed at every N from 3 to 30 minutes,\n  and (\d+)/40 on two links at N = 15",
           [_ll_miss("OFF", "15") + r"([\d.]+)%", r"^  2 links\s+falls missed\s+(\d+)/40"]),
