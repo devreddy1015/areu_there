@@ -156,8 +156,6 @@ pub struct Trajectory {
     segments: std::collections::VecDeque<Segment>,
     last_walk_heading: f64,
     last_t: f64,
-    /// Segments appended so far (kept count, for inspection).
-    appended: u64,
 }
 
 impl Trajectory {
@@ -169,7 +167,6 @@ impl Trajectory {
             segments: Default::default(),
             last_walk_heading: 0.0,
             last_t: f64::NEG_INFINITY,
-            appended: 0,
         }
     }
 
@@ -177,14 +174,8 @@ impl Trajectory {
         self.start
     }
 
-    /// Number of segments appended so far.
-    pub fn segments_appended(&self) -> u64 {
-        self.appended
-    }
-
     fn push(&mut self, s: Segment) {
         self.segments.push_back(s);
-        self.appended += 1;
     }
 
     fn extend(&mut self, w: &Walkability<'_>, cfg: &Config) {

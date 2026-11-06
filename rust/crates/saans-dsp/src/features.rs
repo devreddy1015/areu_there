@@ -639,8 +639,4 @@ impl FeatureExtractor {
         self.noise_n = 0;
         frame
     }
-
-    pub fn processed_frames(&self) -> u64 {
-        self.processed
-    }
 }
