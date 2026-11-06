@@ -12,10 +12,12 @@
 
 pub mod detectors;
 pub mod fusion;
+pub mod routine;
 pub mod system;
 pub mod types;
 
 pub use detectors::SpaceMonitor;
 pub use fusion::SpaceFusion;
+pub use routine::{DailyRoutine, HomeRoutine, RoutineConfig};
 pub use system::SystemMonitor;
 pub use types::*;
