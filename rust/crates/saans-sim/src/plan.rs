@@ -483,6 +483,23 @@ impl Plan {
                     b.hold(te, t1);
                     (sane_bpm(*bpm), sane_bpm(*bpm))
                 }
+                Activity::Slide {
+                    to,
+                    bpm,
+                    duration_s,
+                } => {
+                    if !present {
+                        b.pos = door;
+                    }
+                    let te = b.drop_to(t0, t1, duration_s.max(0.0), bx.clamp(*to), true);
+                    b.events.push(TruthEvent {
+                        kind: TruthKind::Slide,
+                        t_start_s: t0,
+                        t_end_s: te,
+                    });
+                    b.hold(te, t1);
+                    (sane_bpm(*bpm), sane_bpm(*bpm))
+                }
                 Activity::SitDown { at, bpm } => {
                     if !present {
                         b.pos = door;

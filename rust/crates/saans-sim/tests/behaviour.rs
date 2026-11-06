@@ -439,6 +439,59 @@ fn sensitivity_and_rssi_are_sane() {
 }
 
 #[test]
+fn a_slide_lowers_the_body_slowly_and_labels_itself() {
+    let to = (3.5, 2.5);
+    let timeline = vec![
+        seg(100.0, Activity::Absent),
+        seg(
+            20.0,
+            Activity::WalkTo {
+                to: (2.5, 2.5),
+                speed_mps: 1.0,
+            },
+        ),
+        seg(
+            6.0 + 60.0,
+            Activity::Slide {
+                to,
+                bpm: 14.0,
+                duration_s: 6.0,
+            },
+        ),
+    ];
+    let sc = quiet(scenarios::scenario(
+        "slide",
+        scenarios::room_clear_los(),
+        scenarios::two_links(),
+        timeline,
+        5,
+    ));
+    let mut sim = Simulator::new(&sc);
+    let slides: Vec<TruthEvent> = sim
+        .truth_events()
+        .into_iter()
+        .filter(|e| e.kind == TruthKind::Slide)
+        .collect();
+    assert_eq!(slides.len(), 1);
+    assert_close(slides[0].t_start_s, 120.0, "slide start");
+    assert_close(slides[0].t_end_s, 126.0, "slide end");
+    let mut during = Vec::new();
+    let mut after = Vec::new();
+    while let Some(tick) = sim.step() {
+        let t = tick.truth.t_s;
+        if (120.5..125.5).contains(&t) {
+            during.push(tick.truth);
+        } else if t > 127.0 {
+            after.push(tick.truth);
+        }
+    }
+    assert!(during.iter().all(|x| x.present && !x.still && !x.in_burst));
+    assert!(after.iter().all(|x| x.present && x.still && x.breathing));
+    let end = after.last().unwrap().position;
+    assert!((end.0 - to.0).abs() < 1e-9 && (end.1 - to.1).abs() < 1e-9);
+}
+
+#[test]
 fn ready_made_scenarios_build_and_label() {
     let layouts = [
         scenarios::one_link(),
