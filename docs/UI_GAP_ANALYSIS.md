@@ -47,7 +47,7 @@ did not look, and the matrix says so.
 | Mode separated from connection state | **Implemented** (was Missing) | `dashboard.html::renderShell` — two independent pills | Previously one "live" indicator conflated socket health with data validity | P0 |
 | Data freshness visible | **Implemented** (was Partial) | `renderShell` freshness pill; `S.lastState` | The old page detected staleness but only by overwriting the connection label | P0 |
 | Version shown | **Implemented** | `/api/me`, `hello` | — | — |
-| SYNTHETIC label | **N/A** | No synthetic *live* path exists: `saans-sim` output is exported to a pcap and consumed as `replay` (`saans-cli/src/main.rs::export`) | Nothing to label; REPLAY is the truthful word | — |
+| SYNTHETIC label | **Changed by ADR-008** | Was N/A: `saans-sim` output was exported to a pcap and consumed as `replay`, so REPLAY was the truthful word | ADR-008 adds a third mode. `Shared::mode` becomes the closed enum `Mode { Sim, Replay, Live }`, because drawing ground truth needs a state REPLAY cannot express. True positions are published only in `Sim` | — |
 
 **Acceptance:** start a replay with `--serve`, confirm the REPLAY pill;
 kill the gateway, confirm the connection pill goes red while the mode
@@ -79,11 +79,11 @@ pill does not change. Done.
 
 | Capability | Status | Evidence | Gap | Priority |
 |---|---|---|---|---|
-| Floor plan with room geometry | **Blocked** | `SpaceConfig` is `{id, name, links, vitals, presence_quorum, …}` (`saans-health/src/types.rs`) — **no coordinates anywhere in the gateway config** | Would require a new config schema, a survey of each room, and a way to show what is *not* covered. Until then any drawing is invented | P3 |
-| Person position in a room | **Blocked** | `NOTES-localize.md`: on synthetic scenarios, radio-tomographic imaging did **not** beat a weighted-link-midpoint baseline at 4–12 nodes. No validated real-world position tracking exists | Not a UI gap. Do not render a position | — |
+| Floor plan with room geometry | **Unblocked, not built** (ADR-008) | Coordinates now have a schema: `spec/scene.schema.json` + the `saans-scene` crate. `SpaceConfig` still has none, and the gateway does not yet read scene files | The first of the three objections is retired — geometry from a scene file is declared, not invented. Still needed: binding a scene to a space, a survey of each room, and a way to show what is *not* covered | P3 |
+| Person position in a room | **Blocked for LIVE** (ADR-008) | `NOTES-localize.md`: on synthetic scenarios, radio-tomographic imaging did **not** beat a weighted-link-midpoint baseline at 4–12 nodes. No validated real-world position tracking exists | Still not a UI gap. In SIM and REPLAY a person may be drawn only as an estimate with a 95% credible radius, never as a point, never interpolated between measurements, and only to principals holding `can_see_position`. No LIVE position | — |
 | Sensor/link topology | **Implemented** (was Missing) | `dashboard.html::renderTopology` from `/api/links` | Explicitly labelled not-to-scale and not a floor plan | P1 |
 | Link quality on the diagram | **Implemented** | Edge colour and dash from `up`, `loss`, `calib_age_h`; `<title>` carries the numbers | — | — |
-| 3D observatory | **Blocked** | Same reason as the floor plan: no coordinates, no validated localisation | A 3D room drawn from invented geometry would imply spatial capability this system does not have | P3 |
+| 3D observatory | **Unblocked for SIM/REPLAY** (ADR-008) | Coordinates come from a scene file; localisation is still unvalidated | A 3D room drawn from *invented* geometry would imply spatial capability this system does not have — a room drawn from a declared scene does not. Ships on its own page, behind a default-off feature, with the scene's name, hash and provenance shown | P3 |
 
 ### 1.5 Events
 

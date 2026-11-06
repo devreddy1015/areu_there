@@ -1,0 +1,101 @@
+{
+ "name": "roomsim_materials",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "channel": 6,
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "n_materials": 6,
+  "n_angles": 4,
+  "n_thickness": 2,
+  "material_0": "concrete",
+  "material_1": "brick",
+  "material_2": "drywall",
+  "material_3": "glass",
+  "material_4": "wood",
+  "material_5": "metal",
+  "angle_deg_0": 0.0,
+  "angle_deg_1": 30.0,
+  "angle_deg_2": 60.0,
+  "angle_deg_3": 85.0
+ },
+ "arrays": {
+  "cos_t": [
+   "roomsim_materials__cos_t.f64",
+   4
+  ],
+  "thickness": [
+   "roomsim_materials__thickness.f64",
+   2
+  ],
+  "eta_re": [
+   "roomsim_materials__eta_re.f64",
+   6
+  ],
+  "eta_im": [
+   "roomsim_materials__eta_im.f64",
+   6
+  ],
+  "row_material": [
+   "roomsim_materials__row_material.f64",
+   96
+  ],
+  "row_thickness": [
+   "roomsim_materials__row_thickness.f64",
+   96
+  ],
+  "row_cos_t": [
+   "roomsim_materials__row_cos_t.f64",
+   96
+  ],
+  "row_pol": [
+   "roomsim_materials__row_pol.f64",
+   96
+  ],
+  "G_re": [
+   "roomsim_materials__G_re.f64",
+   96
+  ],
+  "G_im": [
+   "roomsim_materials__G_im.f64",
+   96
+  ],
+  "R_re": [
+   "roomsim_materials__R_re.f64",
+   96
+  ],
+  "R_im": [
+   "roomsim_materials__R_im.f64",
+   96
+  ],
+  "T_re": [
+   "roomsim_materials__T_re.f64",
+   96
+  ],
+  "T_im": [
+   "roomsim_materials__T_im.f64",
+   96
+  ],
+  "obj_material": [
+   "roomsim_materials__obj_material.f64",
+   24
+  ],
+  "obj_cos_t": [
+   "roomsim_materials__obj_cos_t.f64",
+   24
+  ],
+  "obj_pol": [
+   "roomsim_materials__obj_pol.f64",
+   24
+  ],
+  "obj_G_re": [
+   "roomsim_materials__obj_G_re.f64",
+   24
+  ],
+  "obj_G_im": [
+   "roomsim_materials__obj_G_im.f64",
+   24
+  ]
+ }
+}

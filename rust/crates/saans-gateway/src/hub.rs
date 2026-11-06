@@ -579,7 +579,7 @@ impl Hub {
             .collect();
         let mut h = json!({
             "version": env!("CARGO_PKG_VERSION"),
-            "mode": shared.mode,
+            "mode": shared.mode.as_str(),
             "uptime_s": shared.started.elapsed().as_secs_f64(),
             "t_s": t_s,
             "time": iso8601(self.wall.unix_ms(t_s, t_s), self.cfg.utc_offset_minutes),

@@ -1,0 +1,90 @@
+{
+ "name": "localize_inverter_default",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "room_w": 8.0,
+  "room_h": 6.0,
+  "pitch_m": 0.5,
+  "lambda_m": 0.3,
+  "n_x": 16,
+  "n_y": 12,
+  "alpha": 1.0,
+  "sigma": 1.0,
+  "delta_c": 0.5,
+  "residual_tol": 1e-06,
+  "n_links": 56,
+  "n_pixels": 192,
+  "n_independent_links": 28,
+  "n_blind": 2,
+  "asymmetry": 2.6382741088131823e-16,
+  "mean_diag_a": 39.85025302193726,
+  "min_diag_a": 14.624010016843268,
+  "inverse_residual": 2.1699542035062474e-15,
+  "projection_slots": 43008,
+  "projection_bytes": 172032,
+  "n_cases": 9,
+  "cases": "blob(0.3W,0.35H);blob(0.55W,0.6H);blob(0.85W,0.2H);two blobs;zero;noisy blob;noise;antisymmetric;mixed signs",
+  "min_boundary_margin": 0.0004639147812019462,
+  "cmp.a_plus_alpha": "rule:28",
+  "cmp.asymmetry": "le:1e-07",
+  "cmp.blind_pixels": "exact",
+  "cmp.group_idx": "exact",
+  "cmp.group_len": "exact",
+  "cmp.group_scale": "rule",
+  "cmp.inverse_residual": "le:1e-06",
+  "cmp.node_id": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.projection": "rule:28",
+  "cmp.x": "rule:192",
+  "cmp.y": "input"
+ },
+ "arrays": {
+  "node_id": [
+   "localize_inverter_default__node_id.f64",
+   8
+  ],
+  "node_x": [
+   "localize_inverter_default__node_x.f64",
+   8
+  ],
+  "node_y": [
+   "localize_inverter_default__node_y.f64",
+   8
+  ],
+  "blind_pixels": [
+   "localize_inverter_default__blind_pixels.f64",
+   2
+  ],
+  "group_len": [
+   "localize_inverter_default__group_len.f64",
+   28
+  ],
+  "group_idx": [
+   "localize_inverter_default__group_idx.f64",
+   56
+  ],
+  "group_scale": [
+   "localize_inverter_default__group_scale.f64",
+   28
+  ],
+  "a_plus_alpha": [
+   "localize_inverter_default__a_plus_alpha.f64",
+   784
+  ],
+  "projection": [
+   "localize_inverter_default__projection.f64",
+   5376
+  ],
+  "y": [
+   "localize_inverter_default__y.f64",
+   504
+  ],
+  "x": [
+   "localize_inverter_default__x.f64",
+   1728
+  ]
+ }
+}

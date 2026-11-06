@@ -1,0 +1,56 @@
+label SIM
+spec locate_v1
+reasons no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated
+aniso_n_x 11
+aniso_n_y 9
+aniso_pitch_x 0.7272727272727273
+aniso_pitch_y 0.6666666666666666
+aniso_sigma 1.7
+aniso_delta_c 0.65
+aniso_sigma2 2.8899999999999997
+default_n_x 16
+default_n_y 12
+default_pitch_x 0.5
+default_pitch_y 0.5
+default_sigma 1.0
+default_delta_c 0.5
+default_sigma2 1.0
+n_err 10
+err.0 SpatialPrior(16x12 grid, sigma=0.0)
+err.1 SpatialPrior(16x12 grid, sigma=nan)
+err.2 SpatialPrior(16x12 grid, sigma=inf)
+err.3 SpatialPrior(16x12 grid, sigma=1e200)
+err.4 SpatialPrior(16x12 grid, delta_c=0.0)
+err.5 SpatialPrior(16x12 grid, delta_c=-1.0)
+err.6 SpatialPrior(16x12 grid, delta_c=inf)
+err.7 SpatialPrior(16x12 grid).entry(192, 0)
+err.8 SpatialPrior(16x12 grid).entry(0, -1)
+err.9 SpatialPrior(16x12 grid).row(192)
+n_variants 2
+variants aniso,default
+cmp.aniso_entry rule
+cmp.aniso_entry_p input
+cmp.aniso_entry_q input
+cmp.aniso_kern rule
+cmp.aniso_row_p input
+cmp.aniso_rows rule:99
+cmp.default_entry rule
+cmp.default_entry_p input
+cmp.default_entry_q input
+cmp.default_kern rule
+cmp.default_row_p input
+cmp.default_rows rule:192
+cmp.err_code exact
+array.aniso_kern 99
+array.aniso_row_p 3
+array.aniso_rows 297
+array.aniso_entry_p 7
+array.aniso_entry_q 7
+array.aniso_entry 7
+array.default_kern 192
+array.default_row_p 3
+array.default_rows 576
+array.default_entry_p 7
+array.default_entry_q 7
+array.default_entry 7
+array.err_code 10

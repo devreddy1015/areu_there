@@ -1,0 +1,23 @@
+[package]
+name = "saans-roomsim"
+description = "Saans Room Sim v1 (spec/roomsim.md): physically motivated CSI for a declared scene, with people and ESP32 impairments. Everything it produces is SIM, never a measurement."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Only the RNG (saans_sim::rng::Rng, spec/roomsim.md §2) is used.
+saans-sim = { path = "../saans-sim" }
+# READ only: without the `write` feature (ADR-008 decision 1). This crate
+# carries CSI, so it may never write a scene; saans-scene/tests/boundary.rs
+# lists it as a reader.
+saans-scene = { path = "../saans-scene" }
+serde = { version = "1", features = ["derive"] }
+# float_roundtrip: config numbers are parsed with correct rounding, as
+# Python's float() does (spec/roomsim.md §1).
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[dev-dependencies]
+# tests/golden.rs: each set's scene_sha256 against the scene file's bytes
+# (spec/roomsim.md §14). Already in the lockfile (saans-gateway, saans-cli).
+sha2 = "0.10"

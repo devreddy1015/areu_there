@@ -3,6 +3,8 @@
 //! or `saans-gateway --config saans.toml --simulate` (the sensing
 //! explorer: a SYNTHETIC room through the real pipeline).
 //! `saans-gateway --export-site DIR` writes the public site as static files.
+//! A `roomsim` build also takes `--room-replay run.jsonl` (repeatable): a
+//! recorded Locate run offered on the room stream (spec/livedemo.md §6).
 
 use clap::{ArgGroup, Parser};
 use saans_gateway::{
@@ -72,7 +74,47 @@ struct Args {
     /// Which `[[frame_key]]` `--node-key` uses. Default: the only one.
     #[arg(long, value_name = "ID", requires = "node_key")]
     key_id: Option<u8>,
+    /// A recorded Locate run to offer on the room stream as REPLAY (SIM),
+    /// written by `saans roomsim-eval --records-out`. Repeatable, one file
+    /// per scene.
+    #[cfg(feature = "roomsim")]
+    #[arg(long, value_name = "FILE.jsonl")]
+    room_replay: Vec<PathBuf>,
 }
+
+/// The recorded room runs to install (spec/livedemo.md §6.2).
+#[cfg(feature = "roomsim")]
+type RoomReplays = saans_gateway::roomstream::RoomReplays;
+/// Without the `roomsim` feature there is no room stream, and nothing
+/// to install on it.
+#[cfg(not(feature = "roomsim"))]
+struct RoomReplays;
+
+/// Offer the recorded runs on this gateway's room stream.
+#[cfg(feature = "roomsim")]
+fn install_room(shared: &saans_gateway::shared::Shared, room: RoomReplays) {
+    if room.is_empty() {
+        return;
+    }
+    let scenes = room.scene_ids().join(", ");
+    if shared.room.install_replays(room).is_ok() {
+        log(&format!("room stream: recorded runs (REPLAY of SIM) for {scenes}"));
+    }
+}
+
+#[cfg(not(feature = "roomsim"))]
+fn install_room(_: &saans_gateway::shared::Shared, _: RoomReplays) {}
+
+/// `--check`'s line for the recorded room runs, when there are any.
+#[cfg(feature = "roomsim")]
+fn check_room(room: &RoomReplays) {
+    if !room.is_empty() {
+        println!("--room-replay: OK ({} recorded runs, SIM: {})", room.len(), room.scene_ids().join(", "));
+    }
+}
+
+#[cfg(not(feature = "roomsim"))]
+fn check_room(_: &RoomReplays) {}
 
 fn main() -> ExitCode {
     let args = Args::parse();
@@ -115,12 +157,25 @@ fn main() -> ExitCode {
     if let Some(node) = args.node_key {
         return print_node_key(&cfg, node, args.key_id);
     }
+    // Read and checked before --check returns, so the check run before a
+    // deployment finds a bad file (spec/livedemo.md §6.2).
+    #[cfg(feature = "roomsim")]
+    let room = match RoomReplays::load(&args.room_replay) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("saans-gateway: --room-replay {e}");
+            return ExitCode::from(2);
+        }
+    };
+    #[cfg(not(feature = "roomsim"))]
+    let room = RoomReplays;
     if args.check {
         println!(
             "{}: OK ({} spaces)",
             args.config.display(),
             cfg.spaces.len()
         );
+        check_room(&room);
         return ExitCode::SUCCESS;
     }
     // Replay defaults to "as fast as possible" because its output is a
@@ -143,9 +198,9 @@ fn main() -> ExitCode {
         }
     };
     let result = match (args.simulate, args.replay.clone()) {
-        (true, _) => rt.block_on(run_simulate(cfg, speed)),
-        (false, Some(pcap)) => rt.block_on(run_replay(cfg, args, speed, pcap)),
-        (false, None) => rt.block_on(run_live(cfg)),
+        (true, _) => rt.block_on(run_simulate(cfg, speed, room)),
+        (false, Some(pcap)) => rt.block_on(run_replay(cfg, args, speed, pcap, room)),
+        (false, None) => rt.block_on(run_live(cfg, room)),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -223,10 +278,11 @@ fn hash_password() -> ExitCode {
     }
 }
 
-async fn run_live(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_live(cfg: GatewayConfig, room: RoomReplays) -> Result<(), Box<dyn std::error::Error>> {
     let spaces = cfg.spaces.len();
     let data_dir = cfg.data_dir.clone();
     let gw = Gateway::start(cfg, ClockMode::Live).await?;
+    install_room(&gw.shared, room);
     log(&format!(
         "listening for sensors on udp {}, dashboard on http://{}/ ({spaces} spaces, data in {})",
         gw.udp_addr,
@@ -242,8 +298,13 @@ async fn run_live(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error>> 
 
 /// The sensing explorer. Serving is not optional here the way it is for
 /// a replay: a simulate run with nobody watching has no output at all.
-async fn run_simulate(cfg: GatewayConfig, speed: f64) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_simulate(
+    cfg: GatewayConfig,
+    speed: f64,
+    room: RoomReplays,
+) -> Result<(), Box<dyn std::error::Error>> {
     let gw = SimGateway::start(cfg, SimulateOptions { speed }).await?;
+    install_room(&gw.shared, room);
     let sc = gw.sim.scenario();
     log(&format!(
         "SIMULATED {:?} scenario: a {:.0} m x {:.0} m room, {} nodes, {} link(s), {:.0} Hz CSI. Explorer on http://{}/",
@@ -269,6 +330,7 @@ async fn run_replay(
     args: Args,
     speed: f64,
     pcap: PathBuf,
+    room: RoomReplays,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let opts = ReplayOptions {
         pcap,
@@ -282,7 +344,8 @@ async fn run_replay(
         return Ok(());
     }
     // Serve while replaying: the HTTP side reads what the replay publishes.
-    let shared = saans_gateway::shared::Shared::with_history("replay", cfg.history);
+    let shared = saans_gateway::shared::Shared::with_history(saans_gateway::shared::Mode::Replay, cfg.history);
+    install_room(&shared, room);
     let http_addr = cfg.http_socket_addr()?;
     let listener = tokio::net::TcpListener::bind(http_addr)
         .await

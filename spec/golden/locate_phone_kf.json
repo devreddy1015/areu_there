@@ -1,0 +1,120 @@
+{
+ "name": "locate_phone_kf",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "n_steps": 24,
+  "phone_accel_psd": 1.0,
+  "phone_init_speed_std": 1.0,
+  "phone_max_coast_s": 3.0,
+  "CHI2_2_99": 9.210340371976182,
+  "cmp.P": "rule:16",
+  "cmp.discarded": "exact",
+  "cmp.exists": "exact",
+  "cmp.f_ok": "input",
+  "cmp.f_r00": "input",
+  "cmp.f_r01": "input",
+  "cmp.f_r11": "input",
+  "cmp.f_reason": "input",
+  "cmp.f_x": "input",
+  "cmp.f_y": "input",
+  "cmp.p00": "rule:each",
+  "cmp.p01": "rule:each",
+  "cmp.p11": "rule:each",
+  "cmp.reason": "exact",
+  "cmp.s": "rule:4",
+  "cmp.started": "exact",
+  "cmp.t": "input",
+  "cmp.t_acc": "exact",
+  "cmp.t_f": "exact",
+  "cmp.x": "rule",
+  "cmp.y": "rule"
+ },
+ "arrays": {
+  "t": [
+   "locate_phone_kf__t.f64",
+   24
+  ],
+  "f_ok": [
+   "locate_phone_kf__f_ok.f64",
+   24
+  ],
+  "f_reason": [
+   "locate_phone_kf__f_reason.f64",
+   24
+  ],
+  "f_x": [
+   "locate_phone_kf__f_x.f64",
+   24
+  ],
+  "f_y": [
+   "locate_phone_kf__f_y.f64",
+   24
+  ],
+  "f_r00": [
+   "locate_phone_kf__f_r00.f64",
+   24
+  ],
+  "f_r01": [
+   "locate_phone_kf__f_r01.f64",
+   24
+  ],
+  "f_r11": [
+   "locate_phone_kf__f_r11.f64",
+   24
+  ],
+  "reason": [
+   "locate_phone_kf__reason.f64",
+   24
+  ],
+  "x": [
+   "locate_phone_kf__x.f64",
+   24
+  ],
+  "y": [
+   "locate_phone_kf__y.f64",
+   24
+  ],
+  "p00": [
+   "locate_phone_kf__p00.f64",
+   24
+  ],
+  "p01": [
+   "locate_phone_kf__p01.f64",
+   24
+  ],
+  "p11": [
+   "locate_phone_kf__p11.f64",
+   24
+  ],
+  "started": [
+   "locate_phone_kf__started.f64",
+   24
+  ],
+  "discarded": [
+   "locate_phone_kf__discarded.f64",
+   24
+  ],
+  "exists": [
+   "locate_phone_kf__exists.f64",
+   24
+  ],
+  "s": [
+   "locate_phone_kf__s.f64",
+   96
+  ],
+  "P": [
+   "locate_phone_kf__P.f64",
+   384
+  ],
+  "t_f": [
+   "locate_phone_kf__t_f.f64",
+   24
+  ],
+  "t_acc": [
+   "locate_phone_kf__t_acc.f64",
+   24
+  ]
+ }
+}

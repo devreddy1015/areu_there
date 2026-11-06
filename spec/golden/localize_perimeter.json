@@ -1,0 +1,229 @@
+{
+ "name": "localize_perimeter",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "n_perimeter_cases": 7,
+  "n_grid_cases": 12,
+  "n_ni": 30,
+  "n_ew": 8,
+  "n_err": 19,
+  "err.0": "Room(0.0, 6.0)",
+  "err.1": "Room(8.0, nan)",
+  "err.2": "perimeter_nodes(Room(8,6), 1)",
+  "err.3": "perimeter_nodes(Room(8,6), 4, inset_m=-0.1)",
+  "err.4": "perimeter_nodes(Room(8,6), 4, inset_m=3.0)",
+  "err.5": "PixelGrid(Room(8,6), nan)",
+  "err.6": "PixelGrid(Room(8,6), 0.0)",
+  "err.7": "PixelGrid(Room(8,6), -0.5)",
+  "err.8": "PixelGrid(Room(8,6), 0.5).pixel_index(16, 0)",
+  "err.9": "PixelGrid(Room(8,6), 0.5).pixel_index(-1, 0)",
+  "err.10": "PixelGrid(Room(8,6), 0.5).nearest_index(nan, 1.0)",
+  "err.11": "Geometry(Room(8,6), [Node(0, 1, 1)])",
+  "err.12": "Geometry(Room(8,6), nodes 0 at (1,1) and 0 at (2,2))",
+  "err.13": "Geometry(Room(8,6), nodes 0 and 1 both at (1,1))",
+  "err.14": "Geometry(Room(8,6), nodes 0 (1,1), 1 (2,2), lambda_m=0.0)",
+  "err.15": "Geometry(Room(8,6), nodes 0 (1,1), 1 (2,2), lambda_m=nan)",
+  "err.16": "Geometry.perimeter(8).link_index(0, 0)",
+  "err.17": "Geometry.perimeter(8).node(99)",
+  "err.18": "ellipse_weight(link (0,0)-(4,0), 1.0, 1.0, 0.0)",
+  "cmp.err_code": "exact",
+  "cmp.ew_ax": "input",
+  "cmp.ew_ay": "input",
+  "cmp.ew_bx": "input",
+  "cmp.ew_by": "input",
+  "cmp.ew_excess": "rule:each",
+  "cmp.ew_lambda": "input",
+  "cmp.ew_px": "input",
+  "cmp.ew_py": "input",
+  "cmp.ew_weight": "rule:each",
+  "cmp.g_n_pixels": "exact",
+  "cmp.g_n_x": "exact",
+  "cmp.g_n_y": "exact",
+  "cmp.g_pitch": "input",
+  "cmp.g_pitch_x": "rule:each",
+  "cmp.g_pitch_y": "rule:each",
+  "cmp.g_pixel_area": "rule:each",
+  "cmp.g_room_h": "input",
+  "cmp.g_room_w": "input",
+  "cmp.link_len": "rule",
+  "cmp.link_mid_x": "rule",
+  "cmp.link_mid_y": "rule",
+  "cmp.link_rx": "exact",
+  "cmp.link_tx": "exact",
+  "cmp.ni_grid": "input",
+  "cmp.ni_index": "exact",
+  "cmp.ni_x": "input",
+  "cmp.ni_y": "input",
+  "cmp.node_id": "exact",
+  "cmp.node_x": "rule",
+  "cmp.node_y": "rule",
+  "cmp.pc_inset": "input",
+  "cmp.pc_n": "input",
+  "cmp.pc_nlinks": "exact",
+  "cmp.pc_offset": "input",
+  "cmp.pc_room_h": "input",
+  "cmp.pc_room_w": "input",
+  "cmp.pixel_x": "rule:ptr:g_n_pixels",
+  "cmp.pixel_y": "rule:ptr:g_n_pixels"
+ },
+ "arrays": {
+  "pc_room_w": [
+   "localize_perimeter__pc_room_w.f64",
+   7
+  ],
+  "pc_room_h": [
+   "localize_perimeter__pc_room_h.f64",
+   7
+  ],
+  "pc_n": [
+   "localize_perimeter__pc_n.f64",
+   7
+  ],
+  "pc_inset": [
+   "localize_perimeter__pc_inset.f64",
+   7
+  ],
+  "pc_offset": [
+   "localize_perimeter__pc_offset.f64",
+   7
+  ],
+  "node_id": [
+   "localize_perimeter__node_id.f64",
+   45
+  ],
+  "node_x": [
+   "localize_perimeter__node_x.f64",
+   45
+  ],
+  "node_y": [
+   "localize_perimeter__node_y.f64",
+   45
+  ],
+  "pc_nlinks": [
+   "localize_perimeter__pc_nlinks.f64",
+   7
+  ],
+  "link_tx": [
+   "localize_perimeter__link_tx.f64",
+   298
+  ],
+  "link_rx": [
+   "localize_perimeter__link_rx.f64",
+   298
+  ],
+  "link_len": [
+   "localize_perimeter__link_len.f64",
+   298
+  ],
+  "link_mid_x": [
+   "localize_perimeter__link_mid_x.f64",
+   298
+  ],
+  "link_mid_y": [
+   "localize_perimeter__link_mid_y.f64",
+   298
+  ],
+  "g_room_w": [
+   "localize_perimeter__g_room_w.f64",
+   12
+  ],
+  "g_room_h": [
+   "localize_perimeter__g_room_h.f64",
+   12
+  ],
+  "g_pitch": [
+   "localize_perimeter__g_pitch.f64",
+   12
+  ],
+  "g_n_x": [
+   "localize_perimeter__g_n_x.f64",
+   12
+  ],
+  "g_n_y": [
+   "localize_perimeter__g_n_y.f64",
+   12
+  ],
+  "g_n_pixels": [
+   "localize_perimeter__g_n_pixels.f64",
+   12
+  ],
+  "g_pitch_x": [
+   "localize_perimeter__g_pitch_x.f64",
+   12
+  ],
+  "g_pitch_y": [
+   "localize_perimeter__g_pitch_y.f64",
+   12
+  ],
+  "g_pixel_area": [
+   "localize_perimeter__g_pixel_area.f64",
+   12
+  ],
+  "pixel_x": [
+   "localize_perimeter__pixel_x.f64",
+   1529
+  ],
+  "pixel_y": [
+   "localize_perimeter__pixel_y.f64",
+   1529
+  ],
+  "ni_grid": [
+   "localize_perimeter__ni_grid.f64",
+   30
+  ],
+  "ni_x": [
+   "localize_perimeter__ni_x.f64",
+   30
+  ],
+  "ni_y": [
+   "localize_perimeter__ni_y.f64",
+   30
+  ],
+  "ni_index": [
+   "localize_perimeter__ni_index.f64",
+   30
+  ],
+  "ew_ax": [
+   "localize_perimeter__ew_ax.f64",
+   8
+  ],
+  "ew_ay": [
+   "localize_perimeter__ew_ay.f64",
+   8
+  ],
+  "ew_bx": [
+   "localize_perimeter__ew_bx.f64",
+   8
+  ],
+  "ew_by": [
+   "localize_perimeter__ew_by.f64",
+   8
+  ],
+  "ew_px": [
+   "localize_perimeter__ew_px.f64",
+   8
+  ],
+  "ew_py": [
+   "localize_perimeter__ew_py.f64",
+   8
+  ],
+  "ew_lambda": [
+   "localize_perimeter__ew_lambda.f64",
+   8
+  ],
+  "ew_weight": [
+   "localize_perimeter__ew_weight.f64",
+   8
+  ],
+  "ew_excess": [
+   "localize_perimeter__ew_excess.f64",
+   8
+  ],
+  "err_code": [
+   "localize_perimeter__err_code.f64",
+   19
+  ]
+ }
+}

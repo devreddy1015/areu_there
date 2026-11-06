@@ -1,0 +1,40 @@
+{
+ "name": "locate_los",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "n_rows": 501,
+  "n_walls": 6,
+  "n_boxes": 3,
+  "cmp.blocked": "exact",
+  "cmp.kind": "input",
+  "cmp.p": "input",
+  "cmp.prim": "input",
+  "cmp.q": "input"
+ },
+ "arrays": {
+  "kind": [
+   "locate_los__kind.f64",
+   501
+  ],
+  "prim": [
+   "locate_los__prim.f64",
+   4008
+  ],
+  "p": [
+   "locate_los__p.f64",
+   1503
+  ],
+  "q": [
+   "locate_los__q.f64",
+   1503
+  ],
+  "blocked": [
+   "locate_los__blocked.f64",
+   501
+  ]
+ }
+}
