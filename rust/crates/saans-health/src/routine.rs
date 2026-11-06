@@ -4,10 +4,15 @@
 //!
 //! Per local day (`floor(t / DAY_S)`, the same index `DailySummary` uses):
 //!
-//! - **got up:** the end of a bedroom rest period in the morning window,
-//!   confirmed by a motion bout somewhere in the home between 10 and 30
-//!   minutes later. Getting up for the bathroom and going back to bed is not
-//!   getting up.
+//! - **got up:** the end of a bedroom rest period of at least two hours in
+//!   the morning window, confirmed by a motion bout somewhere in the home
+//!   between 10 and 30 minutes later; the latest such rise wins. Getting up
+//!   in the night and going back to bed is not getting up, and a nap is not.
+//!
+//! **Restarts.** Only closed days are kept. A gateway restart loses the day
+//! in progress (and a night visit already carried to tomorrow); that day
+//! then closes with fewer observed hours, and below
+//! `ROUTINE_MIN_OBSERVED_H` it is neither compared nor a baseline.
 //! - **active hours:** hours of the day with a motion bout in any room
 //!   (`BOUT_INDEX`, as the per-space bout counter).
 //! - **night bathroom visits:** bathroom occupancy sessions that start in
@@ -40,6 +45,10 @@ pub const MORNING_END_H: f64 = 12.0;
 pub const GOT_UP_ACTIVE_S: f64 = 600.0;
 /// ...and no later than this.
 pub const GOT_UP_WINDOW_S: f64 = 1800.0;
+/// Only a rest at least this long can end in getting up: a nap does not.
+/// The latest such confirmed rise in the morning wins, so getting up in
+/// the night and going back to bed does not stand in for the morning.
+pub const GOT_UP_MIN_REST_S: f64 = 7200.0;
 /// Previous complete days needed before a day is compared with them.
 pub const ROUTINE_MIN_DAYS: usize = 7;
 /// At most this many previous days form the baseline.
@@ -51,6 +60,11 @@ pub const ROUTINE_MIN_OBSERVED_H: u32 = 20;
 pub const FLOOR_GOT_UP_MIN: f64 = 45.0;
 pub const FLOOR_ACTIVE_HOURS: f64 = 2.0;
 pub const FLOOR_NIGHT_BATHROOM: f64 = 1.0;
+/// A bathroom session that starts within this long of the last bathroom
+/// session starting or ending is the same visit. A still person on one link
+/// can read empty for a few seconds; in `saans export-home`'s replay one
+/// 4-minute visit was three sessions.
+pub const VISIT_MERGE_S: f64 = 300.0;
 
 /// The home's settings for the routine.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -134,6 +148,8 @@ pub struct HomeRoutine {
     carry_bathroom: u32,
     /// A bedroom rest period that ended in the morning, awaiting a bout.
     got_up_candidate: Option<f64>,
+    /// The last bathroom session start or end, to merge a flickering visit.
+    bathroom_last_t: Option<f64>,
     history: BTreeMap<i64, DailyRoutine>,
 }
 
@@ -144,6 +160,29 @@ fn hour_of(t: f64) -> f64 {
 
 fn bit(t: f64) -> u32 {
     1 << (hour_of(t).floor() as u32).min(23)
+}
+
+/// The day whose night a bathroom visit at `t` belongs to, or `None` if it
+/// is not in the night window. A window that wraps past midnight (22-06)
+/// gives its evening part to the next morning; one that does not (01-06)
+/// is all on its own day.
+fn night_of(cfg: &RoutineConfig, t: f64) -> Option<i64> {
+    let (start, end) = (cfg.night_start_h, cfg.night_end_h);
+    let h = hour_of(t);
+    let day = (t / DAY_S).floor() as i64;
+    if start > end {
+        if h >= start {
+            Some(day + 1)
+        } else if h < end {
+            Some(day)
+        } else {
+            None
+        }
+    } else if h >= start && h < end {
+        Some(day)
+    } else {
+        None
+    }
 }
 
 fn median(v: &mut [f64]) -> f64 {
@@ -163,6 +202,7 @@ impl HomeRoutine {
             today: None,
             carry_bathroom: 0,
             got_up_candidate: None,
+            bathroom_last_t: None,
             history: BTreeMap::new(),
         }
     }
@@ -198,6 +238,10 @@ impl HomeRoutine {
             return None;
         }
         let d = (t / DAY_S).floor() as i64;
+        if self.today.as_ref().is_some_and(|r| d < r.day) {
+            // A late sample from a day already closed.
+            return None;
+        }
         let closed = if self.today.as_ref().is_some_and(|r| r.day >= d) {
             None
         } else {
@@ -216,7 +260,7 @@ impl HomeRoutine {
         if s.occupied.is_some() && s.motion_index > BOUT_INDEX {
             today.active_hours_mask |= bit(t);
             if let Some(end) = self.got_up_candidate {
-                if t - end >= GOT_UP_ACTIVE_S && today.got_up_min.is_none() {
+                if t - end >= GOT_UP_ACTIVE_S {
                     today.got_up_min = Some(hour_of(end) * 60.0);
                     self.got_up_candidate = None;
                 }
@@ -228,18 +272,27 @@ impl HomeRoutine {
                     let end = ev.t_start_s.unwrap_or(ev.t_s) + duration_min * 60.0;
                     if (MORNING_START_H..MORNING_END_H).contains(&hour_of(end))
                         && (end / DAY_S).floor() as i64 == today.day
-                        && today.got_up_min.is_none()
+                        && duration_min * 60.0 >= GOT_UP_MIN_REST_S
                     {
                         self.got_up_candidate = Some(end);
                     }
                 }
                 EventKind::OccupancyStarted if room == Room::Bathroom => {
-                    let h = hour_of(ev.t_s);
-                    if h >= self.cfg.night_start_h {
-                        self.carry_bathroom += 1;
-                    } else if h < self.cfg.night_end_h {
-                        today.night_bathroom_visits += 1;
+                    let new_visit = self
+                        .bathroom_last_t
+                        .is_none_or(|last| ev.t_s - last > VISIT_MERGE_S);
+                    self.bathroom_last_t = Some(ev.t_s);
+                    if !new_visit {
+                        continue;
                     }
+                    match night_of(&self.cfg, ev.t_s) {
+                        Some(n) if n == today.day => today.night_bathroom_visits += 1,
+                        Some(n) if n == today.day + 1 => self.carry_bathroom += 1,
+                        _ => {}
+                    }
+                }
+                EventKind::OccupancyEnded { .. } if room == Room::Bathroom => {
+                    self.bathroom_last_t = Some(ev.t_s);
                 }
                 _ => {}
             }
@@ -476,6 +529,91 @@ mod tests {
         assert_eq!(r.today().unwrap().day, 1);
         assert_eq!(r.today().unwrap().night_bathroom_visits, 2);
         assert_eq!(r.history()[0].night_bathroom_visits, 0);
+    }
+
+    #[test]
+    fn got_up_is_the_last_morning_rise_after_a_long_rest() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        still(&mut r, 0.0);
+        // Up at 03:30 after 5.5 h, about for 20 minutes, back to bed.
+        bedroom_rest_ends(&mut r, 3.5 * H, 330.0);
+        bout(&mut r, 3.5 * H + 15.0 * 60.0);
+        // Up for the day at 07:00 after 3 h.
+        bedroom_rest_ends(&mut r, 7.0 * H, 180.0);
+        bout(&mut r, 7.0 * H + 15.0 * 60.0);
+        // A 1-hour nap ending at 10:30 is not getting up.
+        bedroom_rest_ends(&mut r, 10.5 * H, 60.0);
+        bout(&mut r, 10.5 * H + 15.0 * 60.0);
+        assert_eq!(r.today().unwrap().got_up_min, Some(420.0));
+    }
+
+    #[test]
+    fn a_night_window_that_does_not_cross_midnight_counts_on_its_own_day() {
+        let mut r = HomeRoutine::new(RoutineConfig {
+            night_start_h: 1.0,
+            night_end_h: 6.0,
+        });
+        still(&mut r, 0.0);
+        for h in [2.0, 14.0, 23.0] {
+            let t = h * H;
+            r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
+        }
+        assert_eq!(r.today().unwrap().night_bathroom_visits, 1, "only 02:00");
+        let next = DAY_S + 0.5 * H;
+        still(&mut r, next);
+        assert_eq!(
+            r.today().unwrap().night_bathroom_visits,
+            0,
+            "nothing carried"
+        );
+    }
+
+    #[test]
+    fn a_visit_just_before_midnight_seen_after_it_is_tonights() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        still(&mut r, 0.0);
+        // Day 1 has begun when the 23:59:50 arrival is processed.
+        let t = DAY_S - 10.0;
+        r.observe(Room::Bathroom, &sample(DAY_S + 5.0, 0.5), &[arrived(t)]);
+        assert_eq!(r.today().unwrap().day, 1);
+        assert_eq!(r.today().unwrap().night_bathroom_visits, 1);
+    }
+
+    #[test]
+    fn a_sample_from_a_day_already_closed_changes_nothing() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        still(&mut r, DAY_S + 1.0 * H);
+        bout(&mut r, 5.0 * H); // day 0, arriving late
+        assert_eq!(r.today().unwrap().day, 1);
+        assert_eq!(r.today().unwrap().active_hours_mask, 0);
+    }
+
+    fn left(t: f64) -> HealthEvent {
+        HealthEvent {
+            kind: EventKind::OccupancyEnded { dwell_s: 60.0 },
+            ..arrived(t)
+        }
+    }
+
+    #[test]
+    fn a_visit_that_flickers_into_several_sessions_is_one_visit() {
+        // A still person on one link can read empty for a few seconds: in
+        // `saans export-home`'s replay one 4-minute visit was 3 sessions.
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        still(&mut r, 0.0);
+        let bath = |r: &mut HomeRoutine, ev: HealthEvent| {
+            let t = ev.t_s;
+            r.observe(Room::Bathroom, &sample(t, 0.5), &[ev]);
+        };
+        let v = 2.5 * H;
+        for (a, b) in [(0.0, 80.0), (85.0, 180.0), (186.0, 270.0)] {
+            bath(&mut r, arrived(v + a));
+            bath(&mut r, left(v + b));
+        }
+        // Twenty minutes later is another visit.
+        bath(&mut r, arrived(v + 1500.0));
+        bath(&mut r, left(v + 1700.0));
+        assert_eq!(r.today().unwrap().night_bathroom_visits, 2);
     }
 
     #[test]
