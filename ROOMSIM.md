@@ -60,7 +60,7 @@ nothing past Phase 7 has been started, not lack of time.
 | `rust/crates/saans-gateway/roomsim-demo.toml` | Loopback config to run the demo. |
 | `rust/crates/saans-gateway/tests/browser/roomsim_check.py` | **The repo's first browser end-to-end test.** Drives Chrome: render, CSP, clicks, toggles, phone width. |
 | `docs/adr/013-declared-geometry-and-drawing.md` | Accepted. What the room view may draw and who may see it. |
-| `.github/workflows/tests.yml` | First CI job that runs tests at all. **Never run** — no push access from here. |
+| `.github/workflows/ci.yml` (rust job) | The roomsim-feature tests and lints and the standalone `saans-roomsim` / `saans-locate` builds. They were `tests.yml` on this branch; folded into `main`'s CI when the branch was merged (2026-11-06). |
 | `RUN.md` | Environment facts, how to run, monitor and resume, known failures with causes. |
 
 ## Decisions taken
@@ -315,12 +315,12 @@ benchmark in RUN.md §1.
    outside that path, but the carve-out should be written down as an ADR
    before Phase 8 starts, the way every other decision here is recorded,
    rather than left implicit.
-4. **CI has never run.** `.github/workflows/tests.yml` exists because
-   ADR-013 decision 14 requires it, and it now triggers on a push to any
-   branch, so pushing `saans/scene-format` will be its first run. Every
-   command in it was run locally first except `sudo sysctl`, which was
-   not run on this shared machine; that it makes the UDP test pass is
-   expected, not observed.
+4. **CI.** *Resolved 2026-11-06.* This branch's `tests.yml` did run once
+   it was pushed, and failed on every push: a SHA-256 of float output
+   (`test_synthetic`) and a bit-for-bit C++ check (`test_vitals`) broke on
+   Ubuntu 26.04's libm and FMA. `main` had already fixed both (`7dbabc1`).
+   When the branch was merged into `main`, its steps moved into `main`'s
+   `ci.yml` (ADR-013 decision 14), and `tests.yml` was removed.
 5. **ADR-013 items that arrive with Phase 5:** the `Mode { Sim, Replay,
    Live }` enum (approved); refusing at config load to serve the room
    view LIVE without the feature (decision 13's second half); binding a

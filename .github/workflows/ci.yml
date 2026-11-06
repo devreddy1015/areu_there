@@ -36,7 +36,9 @@ jobs:
   rust:
     name: rust (fmt, clippy, test)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 30 until the research line was merged; its crates and the roomsim
+    # feature's tests took about 10 minutes on a runner without a cache.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +66,33 @@ jobs:
       - name: cargo test
         working-directory: rust
         run: cargo test --workspace --locked
+
+      # The room demo is compiled only with this feature (ADR-013 decision
+      # 13), so its lints and tests run only here. The feature is named
+      # rather than using --all-features, so a feature added later to some
+      # other crate is not switched on here by accident.
+      - name: cargo clippy -D warnings, gateway with roomsim
+        working-directory: rust
+        run: cargo clippy -p saans-gateway --features roomsim --all-targets -- -D warnings
+
+      - name: cargo test, gateway with roomsim
+        working-directory: rust
+        run: cargo test -p saans-gateway --features roomsim --locked
+
+      # saans-roomsim (spec/roomsim.md §14) and saans-locate (spec/locate.md,
+      # Rules) by themselves. In the workspace build above, cargo unifies
+      # features, and saans-cli switches on saans-scene's `write`; only a
+      # standalone build proves each compiles and passes without it
+      # (ADR-013 decision 1). Locate's Room Sim pipeline is compiled only
+      # with its `roomsim` feature.
+      - name: saans-roomsim and saans-locate, standalone
+        working-directory: rust
+        run: |
+          cargo check -p saans-roomsim --locked
+          cargo test -p saans-roomsim --locked
+          cargo check -p saans-locate --locked
+          cargo test -p saans-locate --locked
+          cargo test -p saans-locate --features roomsim --locked
 
   python:
     name: python (reference implementation)
@@ -127,9 +156,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 3.14, not the 3.12 the other Python jobs use: the Room Sim and
+      # Locate vector sets are CPython 3.14's (spec/locate.md §12; its
+      # math.hypot and float sum() are part of what they pin), and
+      # generate.py refuses any other version. The committed DSP vectors
+      # were generated on 3.14 as well (check_drift.py's docstring).
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       # ADR-002: Python is the spec. If regenerating the golden vectors
       # changes them, then either the Python DSP moved without the vectors

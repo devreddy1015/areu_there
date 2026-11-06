@@ -57,7 +57,8 @@ only under its `roomsim` cargo feature, off by default, and in its tests —
 on `saans-roomsim` and on `saans-scene` **without** `write`; it is added to
 READERS in `saans-scene/tests/boundary.rs`. `wifisense/localize` imports
 only the standard library and `wifisense`. `.github/workflows/tests.yml`
-gains `cargo check -p saans-locate --locked`, `cargo test -p saans-locate
+(since the merge into `main`, the rust job of `ci.yml`) gains
+`cargo check -p saans-locate --locked`, `cargo test -p saans-locate
 --locked` and `cargo test -p saans-locate --features roomsim --locked`
 (standalone: they also prove the crate builds without `saans-scene/write`).
 Existing files this phase edits: `saans-scene/tests/boundary.rs`,
