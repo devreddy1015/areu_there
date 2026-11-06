@@ -754,6 +754,8 @@ mod tests {
             "breathing_pause",
             "inactivity",
             "fall_suspected",
+            "long_lie",
+            "long_lie_movement",
             "link_down",
         ] {
             assert!(

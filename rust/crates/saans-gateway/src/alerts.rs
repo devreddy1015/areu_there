@@ -105,6 +105,11 @@ pub struct Alert {
     pub resolution_note: Option<String>,
     /// 0 = first channels; n = escalated n times.
     pub escalation_level: u32,
+    /// When gross motion was last seen in the space after a long-lie
+    /// alert (`long_lie_movement`). It updates the alert and leaves it
+    /// open: moving does not mean being fine.
+    #[serde(default)]
+    pub movement_seen_unix_ms: Option<i64>,
     /// "telegram:wardens" etc., with delivery outcome.
     pub deliveries: Vec<Delivery>,
 }
@@ -413,6 +418,9 @@ impl AlertService {
         ) else {
             return Vec::new();
         };
+        if let Some(&(_, updates)) = UPDATES.iter().find(|(k, _)| *k == kind) {
+            return self.on_update(space, updates, unix_ms);
+        }
         let Ok(sev) = serde_json::from_value::<Severity>(
             event.get("severity").cloned().unwrap_or(Value::Null),
         ) else {
@@ -453,6 +461,7 @@ impl AlertService {
             resolved_unix_ms: None,
             resolution_note: None,
             escalation_level: 0,
+            movement_seen_unix_ms: None,
             deliveries: Vec::new(),
         };
         let out = route
@@ -464,6 +473,32 @@ impl AlertService {
         g.live.insert(key, id);
         Self::persist(&mut g, id);
         out
+    }
+
+    /// An update to the live alert of `kind` in `space`, if there is one
+    /// (`UPDATES`): recorded, and told to the route's first channels. It
+    /// never opens an alert and never changes its state.
+    fn on_update(&self, space: &str, kind: &str, unix_ms: i64) -> Vec<Outbound> {
+        let mut g = self.lock();
+        let Some(&id) = g.live.get(&(space.to_string(), kind.to_string())) else {
+            return Vec::new();
+        };
+        let Some(a) = g.alerts.get_mut(&id) else {
+            return Vec::new();
+        };
+        a.movement_seen_unix_ms = Some(unix_ms);
+        let a = a.clone();
+        Self::persist(&mut g, id);
+        let Some(route) = self.route_named(&a.route) else {
+            return Vec::new();
+        };
+        let why =
+            "movement seen in the space since; the alert stays open until someone resolves it";
+        route
+            .channels
+            .iter()
+            .map(|c| self.outbound(&a, route, c, why))
+            .collect()
     }
 
     /// The gateway clock moved to `now_ms`: escalate what has waited too
@@ -519,7 +554,7 @@ impl AlertService {
             .get(&a.space_id)
             .cloned()
             .unwrap_or_else(|| a.space_id.clone());
-        let words = a.kind.replace('_', " ");
+        let words = kind_words(&a.kind);
         let mut text = format!(
             "Saans alert #{}: {words} in {space_name} ({}), {why}. \
              Advisory only -- check the space and follow your usual procedure.",
@@ -952,6 +987,19 @@ impl AlertService {
     }
 }
 
+/// Event types that update a live alert of another type instead of
+/// opening one: (event type, alert kind it updates).
+const UPDATES: &[(&str, &str)] = &[("long_lie_movement", "long_lie")];
+
+/// An alert kind in the words a message uses. The long lie says what was
+/// observed, not what it might mean (docs/ELDER_CARE.md §6.3).
+fn kind_words(kind: &str) -> String {
+    match kind {
+        "long_lie" => "no movement for a long time after a sudden movement".into(),
+        other => other.replace('_', " "),
+    }
+}
+
 fn hmac_hex(key: &[u8], body: &[u8]) -> String {
     let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key).expect("HMAC takes any key length");
     mac.update(body);
@@ -1081,6 +1129,48 @@ mod tests {
             1
         );
         assert_eq!(s.list(false, 10).len(), 3);
+    }
+
+    #[test]
+    fn movement_after_a_long_lie_updates_it_and_never_opens_one() {
+        let s = AlertService::new(&cfg(vec![route("r")]), None).unwrap();
+        let moved = json!({"space_id": "lab", "type": "long_lie_movement", "severity": "info",
+            "evidence": "gross motion seen", "after_alert_s": 120.0});
+        // Nothing open: nothing happens, and nothing is opened.
+        assert!(s.on_event(&moved, T0).is_empty());
+        assert!(s.list(false, 10).is_empty());
+        assert_eq!(s.on_event(&event("long_lie", "check"), T0 + 10).len(), 1);
+        let id = s.list(true, 10)[0].id;
+        s.ack(id, "ravi", T0 + 20).unwrap();
+        let out = s.on_event(&moved, T0 + 30);
+        assert_eq!(out.len(), 1, "the family is told");
+        assert!(out[0].text.contains("movement seen"), "{}", out[0].text);
+        let a = s.get(id).unwrap();
+        assert_eq!(
+            a.state,
+            AlertState::Acknowledged,
+            "moving is not being fine"
+        );
+        assert_eq!(a.movement_seen_unix_ms, Some(T0 + 30));
+        assert_eq!(a.kind, "long_lie");
+        // Resolved: later movement is nobody's business.
+        s.resolve(id, "ravi", "all fine", T0 + 40).unwrap();
+        assert!(s.on_event(&moved, T0 + 50).is_empty());
+        assert_eq!(s.list(false, 10).len(), 1);
+    }
+
+    #[test]
+    fn a_long_lie_message_says_what_happened_in_plain_words() {
+        let s = AlertService::new(&cfg(vec![route("r")]), None).unwrap();
+        let out = s.on_event(&event("long_lie", "check"), T0);
+        let text = out[0].text.to_lowercase();
+        assert!(
+            text.contains("no movement for a long time after a sudden movement"),
+            "{text}"
+        );
+        for banned in ["fall", "collapse", "13 bpm"] {
+            assert!(!text.contains(banned), "{banned}: {text}");
+        }
     }
 
     #[test]

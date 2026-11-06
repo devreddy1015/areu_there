@@ -151,6 +151,8 @@ pub fn space_for(v: &Value, principal: &Principal) -> Option<Value> {
             // inference, like `possible_collapse`. Without it the space
             // reads what the links measured.
             m.remove("presence_held");
+            // The long-lie countdown says the same, and more.
+            m.remove("long_lie");
             if let Some(Value::Array(a)) = m.get_mut("alerts") {
                 a.retain(|x| !is_health_alert(x.get("name").and_then(Value::as_str).unwrap_or("")));
             }
@@ -301,6 +303,39 @@ mod tests {
             let v = space_for(&held, &p(role, None)).expect("in scope");
             assert!(v.get("presence_held").is_none());
             assert_eq!(v["occupied"], json!(false), "the measurement stays");
+        }
+    }
+
+    #[test]
+    fn a_long_lie_needs_no_consent_to_vitals_and_only_health_roles_see_it() {
+        // Consent: the long lie reads presence and motion only, so a space
+        // with vitals off keeps it (it must not depend on vitals).
+        for ty in ["long_lie", "long_lie_movement"] {
+            assert!(event_allowed(&json!({"type": ty}), false), "{ty}");
+        }
+        assert!(alert_allowed("long_lie", false));
+        // Role: the countdown and the alert are a health inference.
+        let mut lying = consented_space();
+        lying["vitals"] = json!(false);
+        lying["long_lie"] =
+            json!({"still_s": 160.0, "limit_s": 180.0, "held": false, "alerted": false});
+        lying["active_alerts"] = json!(["long_lie"]);
+        lying["alerts"] = json!([{"name": "long_lie"}]);
+        for role in [Role::Admin, Role::Safety] {
+            let v = space_for(&lying, &p(role, None)).expect("in scope");
+            assert_eq!(v["long_lie"]["limit_s"], json!(180.0));
+            assert_eq!(v["active_alerts"], json!(["long_lie"]));
+        }
+        for role in [Role::Ops, Role::Occupancy] {
+            let v = space_for(&lying, &p(role, None)).expect("in scope");
+            assert!(v.get("long_lie").is_none(), "{role:?}: {v}");
+            assert_eq!(v["active_alerts"], json!([]));
+        }
+        let ev =
+            json!({"space_id": "lab", "type": "long_lie", "severity": "check", "still_min": 15.0});
+        assert!(event_for(&ev, &p(Role::Safety, None)).is_some());
+        for role in [Role::Ops, Role::Occupancy] {
+            assert!(event_for(&ev, &p(role, None)).is_none(), "{role:?}");
         }
     }
 
