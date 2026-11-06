@@ -1278,3 +1278,234 @@ fn a_from_that_is_not_a_finished_dataset_is_refused() {
     );
     assert!(!out.exists());
 }
+
+// ---------------------------------------------------------------------
+// §8 --overrides
+// ---------------------------------------------------------------------
+
+/// `--from SRC --overrides FILE`: every scene's config is SRC's with the
+/// file's values, written into its `.roomsim.json`; the scene files, the
+/// splits and every label stay SRC's, and Locate's configs too but the
+/// transmit power they take from Room Sim's; the manifest records the
+/// object, the file's sha256 and the command.
+#[test]
+fn overrides_set_every_scene_config_and_the_manifest_records_them() {
+    let src = temp_dir("overrides-src");
+    let out = temp_dir("overrides-out");
+    let file_dir = temp_dir("overrides-file");
+    generate(&src, &["--scenes", "3", "--seconds", "2", "--seed", "8"]);
+    let m = read_json(&src.join("manifest.json"));
+    assert_eq!(
+        (&m["overrides"], &m["overrides_sha256"]),
+        (&Value::Null, &Value::Null),
+        "no --overrides"
+    );
+    std::fs::create_dir_all(&file_dir).unwrap();
+    let file = file_dir.join("calibrated.json");
+    // A lower SNR (the noise floor up 7 dB, the power 2 dB), so every
+    // scene's radio changes, with people or without.
+    let text =
+        "{\"body_rcs_m2\": 0.7, \"noise_floor_dbm\": [-90.0, -85.0], \"tx_power_dbm\": 12.0}\n";
+    std::fs::write(&file, text).unwrap();
+    let given: Value = serde_json::from_str(text).unwrap();
+    let o = generate(
+        &out,
+        &[
+            "--from",
+            src.to_str().unwrap(),
+            "--overrides",
+            file.to_str().unwrap(),
+        ],
+    );
+    assert!(!stderr(&o).contains("warning"), "{}", stderr(&o));
+
+    let (before, after) = (files(&src, "scenes"), files(&out, "scenes"));
+    assert_eq!(
+        before.keys().collect::<Vec<_>>(),
+        after.keys().collect::<Vec<_>>()
+    );
+    let mut configs = 0;
+    for (name, bytes) in &before {
+        if name.ends_with(".locate.json") {
+            // Locate takes the transmit power from Room Sim's config
+            // (its resolved config), and nothing else that may be
+            // overridden.
+            let mut a: Value = serde_json::from_slice(bytes).unwrap();
+            let mut b: Value = serde_json::from_slice(&after[name]).unwrap();
+            assert_eq!(b["tx_power_dbm"], given["tx_power_dbm"], "{name}");
+            a.as_object_mut().unwrap().remove("tx_power_dbm");
+            b.as_object_mut().unwrap().remove("tx_power_dbm");
+            assert_eq!(a, b, "{name}");
+            continue;
+        }
+        if !name.ends_with(".roomsim.json") {
+            assert_eq!(bytes, &after[name], "{name}");
+            continue;
+        }
+        configs += 1;
+        let mut a: Value = serde_json::from_slice(bytes).unwrap();
+        let mut b: Value = serde_json::from_slice(&after[name]).unwrap();
+        for (k, v) in given.as_object().unwrap() {
+            assert_ne!(&a[k], v, "{name}: {k} was not already the value");
+            assert_eq!(&b[k], v, "{name}: {k}");
+            a.as_object_mut().unwrap().remove(k);
+            b.as_object_mut().unwrap().remove(k);
+        }
+        assert_eq!(a, b, "{name}: nothing else changes");
+        // And Room Sim reads it back.
+        RoomSimConfig::from_json_str(std::str::from_utf8(&after[name]).unwrap()).unwrap();
+    }
+    assert_eq!(configs, 3, "every scene");
+    for i in 0..3 {
+        let (a, b) = (shard(&src, i), shard(&out, i));
+        for name in LABEL_MEMBERS {
+            assert_eq!(a[name], b[name], "scene {i}: {name}");
+        }
+        assert_ne!(a["csi_iq"], b["csi_iq"], "scene {i}: the radio differs");
+    }
+
+    let m = read_json(&out.join("manifest.json"));
+    assert_eq!(m["overrides"], given);
+    assert_eq!(
+        m["overrides_sha256"],
+        Value::from(sha256_hex(text.as_bytes()))
+    );
+    let canon = |p: &Path| std::fs::canonicalize(p).unwrap().display().to_string();
+    assert_eq!(
+        m["command"],
+        Value::from(format!(
+            "saans gen-dataset --scenes 3 --seconds 2 --seed 8 --from {} --overrides {}",
+            canon(&src),
+            canon(&file)
+        ))
+    );
+    let src_m = read_json(&src.join("manifest.json"));
+    assert_eq!(m["splits"], src_m["splits"]);
+    assert_eq!(
+        m["roomsim_defaults"], src_m["roomsim_defaults"],
+        "a calibrated set is never the default"
+    );
+}
+
+/// `ripple_amp` scales the ripple, which `--no-impair` turns off: the run
+/// goes ahead with a warning.
+#[test]
+fn overriding_ripple_amp_with_no_impair_warns_that_it_does_nothing() {
+    let src = temp_dir("ripple-src");
+    let out = temp_dir("ripple-out");
+    let file_dir = temp_dir("ripple-file");
+    generate(&src, &["--scenes", "1", "--seconds", "2", "--seed", "9"]);
+    std::fs::create_dir_all(&file_dir).unwrap();
+    let file = file_dir.join("ripple.json");
+    std::fs::write(&file, r#"{"ripple_amp": 0.1}"#).unwrap();
+    let o = generate(
+        &out,
+        &[
+            "--no-impair",
+            "--from",
+            src.to_str().unwrap(),
+            "--overrides",
+            file.to_str().unwrap(),
+        ],
+    );
+    let warning = stderr(&o)
+        .lines()
+        .find(|l| l.contains("warning"))
+        .map(str::to_string)
+        .unwrap_or_else(|| panic!("no warning: {}", stderr(&o)));
+    assert!(
+        warning.contains("ripple_amp") && warning.contains("--no-impair"),
+        "{warning}"
+    );
+    let cfg = read_json(&out.join("scenes/gen-000000.roomsim.json"));
+    assert_eq!(
+        (&cfg["ripple"], &cfg["ripple_amp"]),
+        (&Value::Bool(false), &Value::from(0.1))
+    );
+}
+
+/// A bad overrides file is refused before anything is read or written:
+/// exit 2, one line naming `--overrides` and the file but no scene (a
+/// value used to be refused scene by scene, a missing file as an I/O
+/// error, a key given twice not at all), and an existing dataset at
+/// `--out` survives even with `--overwrite`.
+#[test]
+fn a_bad_overrides_file_leaves_an_existing_out_untouched() {
+    let src = temp_dir("bad-overrides-src");
+    let out = temp_dir("bad-overrides-out");
+    let file_dir = temp_dir("bad-overrides-files");
+    generate(&src, &["--scenes", "2", "--seconds", "2", "--seed", "3"]);
+    generate(&out, &["--scenes", "1", "--seconds", "2", "--seed", "4"]);
+    std::fs::write(out.join("notes.txt"), b"keep me").unwrap();
+    let snapshot = |d: &Path| {
+        (
+            std::fs::read(d.join("manifest.json")).unwrap(),
+            files(d, "scenes"),
+            files(d, "shards"),
+            std::fs::read(d.join("notes.txt")).unwrap(),
+        )
+    };
+    let before = snapshot(&out);
+    std::fs::create_dir_all(&file_dir).unwrap();
+    let mut cases: Vec<(PathBuf, &str)> = Vec::new();
+    for (name, text, says) in [
+        (
+            "typo.json",
+            r#"{"body_rcs_m": 0.7}"#,
+            "may not be overridden",
+        ),
+        ("range.json", r#"{"ripple_amp": 5.0}"#, "ripple_amp"),
+        ("type.json", r#"{"body_rcs_m2": "x"}"#, "body_rcs_m2"),
+        ("null.json", r#"{"tx_power_dbm": null}"#, "tx_power_dbm"),
+        (
+            "twice.json",
+            r#"{"body_rcs_m2": 0.7, "body_rcs_m2": 0.9}"#,
+            "given twice",
+        ),
+        ("broken.json", "{\"body_rcs_m2\": ", "not JSON"),
+        ("empty.json", "{}", "overrides nothing"),
+    ] {
+        let f = file_dir.join(name);
+        std::fs::write(&f, text).unwrap();
+        cases.push((f, says));
+    }
+    cases.push((file_dir.join("missing.json"), "no such file"));
+    for (file, says) in &cases {
+        let o = saans(
+            &[
+                "gen-dataset",
+                "--out",
+                out.to_str().unwrap(),
+                "--from",
+                src.to_str().unwrap(),
+                "--overrides",
+                file.to_str().unwrap(),
+                "--overwrite",
+            ],
+            &[],
+        );
+        let err = stderr(&o);
+        assert_eq!(o.status.code(), Some(2), "{}: {err}", file.display());
+        assert_eq!(
+            err.lines().count(),
+            1,
+            "{}: one line: {err}",
+            file.display()
+        );
+        assert!(
+            err.starts_with(&format!("gen-dataset: --overrides: {}: ", file.display())),
+            "{err}"
+        );
+        assert!(err.contains(says), "{}: {err}", file.display());
+        assert!(
+            !err.contains("gen-0"),
+            "{}: no scene named: {err}",
+            file.display()
+        );
+        assert!(
+            snapshot(&out) == before,
+            "{}: --out untouched",
+            file.display()
+        );
+    }
+}
