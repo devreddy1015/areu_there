@@ -7,3 +7,6 @@
 
 # rust: format the tree with rustfmt defaults
 13acc2da78d10164c097ec868be7bdbef8fb3894
+
+# style(rust): rustfmt the files the merge brought in unformatted
+4506efaacdb16bc7c118a1119af93b6d410c5d0f

@@ -3,16 +3,43 @@
 //!     saans eval [--quick] [--seeds N] [--threads N] [--room-height M]
 //!     saans lying [--spots N] [--threads N]
 //!     saans export SCENARIO --out FILE.pcap [--seed N] [--vitals]
+//!     saans import-roomplan FILE.json --out SCENE.json [--name NAME]
+//!     saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]
+//!     saans roomsim-eval --scene SCENE.json [--seconds S] [--seed N] [--variant declared|with_walker|empty] [--records-out FILE] [--json]
+//!     saans gen-dataset --out DIR [--scenes N] [--seconds S] [--seed N] [--threads N] [--no-impair] [--from DIR] [--overwrite]
 //!
 //! `export` runs a simulated scenario through the node-side FeatureExtractor
 //! and writes the FeatureFrames as a pcap, so `saans-gateway --replay`
 //! and its dashboard can play back a synthetic night end to end.
+//!
+//! `import-roomplan` converts an Apple RoomPlan scan into a scene.json.
+//! Room geometry is DECLARED, never inferred from WiFi, and a scan is one
+//! of the two ways to declare it (the other is measuring the room by
+//! hand).
+//!
+//! `roomsim-export` runs Room Sim v1 (spec/roomsim.md) on a scene and
+//! writes `PREFIX.sim.pcap` (the raw CSI datagrams its nodes would send in
+//! raw mode), `PREFIX.truth.jsonl` and `PREFIX.manifest.json` (§13),
+//! refusing to replace an earlier export unless given `--overwrite`.
+//! Everything it writes is SIM: a model, not a measurement.
+//!
+//! `roomsim-eval` runs Room Sim and Locate on a scene and prints the live
+//! demo's statistics of the run (spec/livedemo.md §10), every line SIM, or
+//! one JSON object with `--json`; `--records-out` writes the run as a
+//! records file for the gateway's `--room-replay` (§6).
+//!
+//! `gen-dataset` draws random scenes, runs Room Sim and Locate on each and
+//! writes one `.npz` shard per scene with a manifest (spec/dataset.md),
+//! every file SIM.
 
 mod eval;
+mod gen_dataset;
 mod links;
 mod lying;
 mod octave;
 mod pcap;
+mod roomsim_eval;
+mod roomsim_export;
 mod score;
 
 use saans_dsp::features::{FeatureExtractor, FeatureExtractorConfig};
@@ -21,7 +48,9 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]"
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}\n  {}",
+        roomsim_eval::USAGE,
+        gen_dataset::USAGE
     );
     ExitCode::from(2)
 }
@@ -95,8 +124,134 @@ fn main() -> ExitCode {
         }
         Some("export") => export(&args),
         Some("trace") => trace(&args),
+        Some("import-roomplan") => import_roomplan(&args),
+        Some("roomsim-export") => roomsim_export(&args),
+        Some("roomsim-eval") => roomsim_eval::main(&args),
+        Some("gen-dataset") => gen_dataset::main(&args),
         _ => usage(),
     }
+}
+
+/// Parse `saans roomsim-export SCENE.json --out PREFIX [--seed N]
+/// [--duration S] [--config CONFIG.json] [--overwrite]`. Stricter than
+/// [`arg`]: a value that does not parse, a flag given twice or an unknown
+/// flag is an error rather than a silent default, because a simulated run
+/// is only worth keeping if it is the run that was asked for.
+fn roomsim_options(args: &[String]) -> Result<roomsim_export::Options, String> {
+    let mut scene = None;
+    let (mut out, mut seed, mut duration_s, mut config) = (None, None, None, None);
+    let mut overwrite = false;
+    let mut it = args.iter().skip(1);
+    while let Some(a) = it.next() {
+        if a == "--overwrite" {
+            if overwrite {
+                return Err(format!("{a} given twice"));
+            }
+            overwrite = true;
+            continue;
+        }
+        let mut value = |slot_set: bool| -> Result<&String, String> {
+            if slot_set {
+                return Err(format!("{a} given twice"));
+            }
+            it.next().ok_or_else(|| format!("{a} needs a value"))
+        };
+        match a.as_str() {
+            "--out" => out = Some(value(out.is_some())?.clone()),
+            "--config" => config = Some(value(config.is_some())?.clone()),
+            "--seed" => {
+                let v = value(seed.is_some())?;
+                seed = Some(
+                    v.parse::<u64>()
+                        .map_err(|_| format!("--seed {v}: not an integer in 0..2^64-1"))?,
+                );
+            }
+            "--duration" => {
+                let v = value(duration_s.is_some())?;
+                duration_s = Some(
+                    v.parse::<f64>()
+                        .map_err(|_| format!("--duration {v}: not a number of seconds"))?,
+                );
+            }
+            f if f.starts_with("--") => return Err(format!("unknown option {f}")),
+            path if scene.is_none() => scene = Some(path.to_string()),
+            extra => return Err(format!("unexpected argument {extra}")),
+        }
+    }
+    let scene = scene.ok_or("no SCENE.json given")?;
+    let out = out.ok_or("--out PREFIX is required")?;
+    Ok(roomsim_export::Options {
+        scene,
+        out,
+        seed,
+        duration_s,
+        config,
+        overwrite,
+    })
+}
+
+/// Room Sim v1 on a declared scene: datagrams, truth and a manifest, all
+/// SIM (spec/roomsim.md §13).
+fn roomsim_export(args: &[String]) -> ExitCode {
+    let opts = match roomsim_options(args) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("roomsim-export: {e}");
+            return usage();
+        }
+    };
+    let s = match roomsim_export::export(&opts) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("roomsim-export: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let num = |r: &f64| {
+        let s = format!("{r:.3}");
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    };
+    let hz = |r: &f64| format!("{} Hz", num(r));
+    let rates: Vec<String> = s.rates_hz.iter().map(hz).collect();
+    let links = if rates.is_empty() {
+        "no links".to_string()
+    } else {
+        format!("{} link(s) at {} per link", s.links, rates.join(" / "))
+    };
+    eprintln!(
+        "SIM (Room Sim v1, a model, not a measurement): {} seed {} for {} s: {} transmission(s), {} packet(s) on {links}, {} lost, {} datagram(s)",
+        s.scene_name,
+        s.seed,
+        s.duration_s,
+        s.transmissions,
+        s.packets,
+        s.lost,
+        s.datagrams
+    );
+    eprintln!(
+        "  -> {} (SIM datagrams), {} (SIM truth), {}",
+        s.pcap, s.truth, s.manifest
+    );
+    for a in &s.assumptions {
+        eprintln!("  assumed: {a}");
+    }
+    if !s.gateway_faithful {
+        eprintln!(
+            "warning: SIM export with {} transmitters: each receiver's datagrams interleave them and carry no transmitter id, so this pcap cannot be split per link; for a gateway-faithful export use roles with one tx and slot_s 0.05 (spec/roomsim.md §10)",
+            s.transmitters
+        );
+    }
+    // One transmitter: its links share one rate, which the gateway's
+    // raw.sample_rate_hz (default 20 Hz) must equal (§12.4).
+    if let (true, [rate]) = (s.gateway_faithful, s.rates_hz.as_slice()) {
+        if *rate != 20.0 {
+            let r = num(rate);
+            eprintln!(
+                "note: one transmitter at {r} Hz per link; set the gateway's raw.sample_rate_hz to {r}, or use slot_s 0.05 for its default 20 Hz (spec/roomsim.md §10)"
+            );
+        }
+    }
+    ExitCode::SUCCESS
 }
 
 /// Per-sample CSV of truth and fused state for one evaluation job, plus
@@ -262,4 +417,118 @@ fn export(args: &[String]) -> ExitCode {
         if vitals { "on" } else { "off" }
     );
     ExitCode::SUCCESS
+}
+
+/// The scene's name: `--name` if given, else the input file's stem, so
+/// `bedroom-scan.json` becomes the scene "bedroom-scan" rather than
+/// something anonymous.
+fn scene_name(input: &str, explicit: Option<String>) -> String {
+    match explicit {
+        Some(n) if !n.trim().is_empty() => n,
+        _ => std::path::Path::new(input)
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "imported-room".to_string()),
+    }
+}
+
+/// Convert an Apple RoomPlan export into a scene.json.
+///
+/// RoomPlan measures geometry, not materials, not wall thickness, and of
+/// course not where anyone put an ESP32. The scene this writes is
+/// therefore deliberately incomplete: every assumption is printed, and so
+/// is the list of what still has to be filled in before the file will
+/// load. Writing a file that does not yet validate is the expected
+/// outcome here, so it is not an error — but it is said out loud, because
+/// a scene that quietly looked finished would be the worse failure.
+fn import_roomplan(args: &[String]) -> ExitCode {
+    let Some(input) = args.get(1) else {
+        return usage();
+    };
+    if input.starts_with("--") {
+        return usage();
+    }
+    let Some(out) = arg::<String>(args, "--out") else {
+        return usage();
+    };
+    let name = scene_name(input, arg::<String>(args, "--name"));
+
+    let text = match std::fs::read_to_string(input) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("{input}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let imported = match saans_scene::import_roomplan_str(&name, &text) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("{input}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let scene = imported.scene;
+
+    if let Err(e) = scene.save(&out) {
+        eprintln!("{out}: {e}");
+        return ExitCode::FAILURE;
+    }
+
+    let r = &scene.room;
+    eprintln!(
+        "{name}: {:.2} x {:.2} x {:.2} m, {} wall(s), {} object(s), {} node(s) -> {out}",
+        r.w_m,
+        r.d_m,
+        r.h_m,
+        scene.walls.len(),
+        scene.objects.len(),
+        scene.nodes.len()
+    );
+    // SCENE, not a measurement: say what had to be assumed.
+    for w in &imported.warnings {
+        eprintln!("  assumed: {w}");
+    }
+    let errors = scene.validate();
+    if !errors.is_empty() {
+        eprintln!(
+            "  this scene does not load yet ({} problem(s) to fix by hand):",
+            errors.len()
+        );
+        for e in &errors {
+            eprintln!("    - {e}");
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scene_name;
+
+    #[test]
+    fn an_explicit_name_wins() {
+        assert_eq!(
+            scene_name("/tmp/scan.json", Some("living room".into())),
+            "living room"
+        );
+    }
+
+    #[test]
+    fn the_file_stem_is_the_default_name() {
+        assert_eq!(scene_name("/tmp/bedroom-scan.json", None), "bedroom-scan");
+        assert_eq!(scene_name("office.json", None), "office");
+    }
+
+    #[test]
+    fn a_blank_name_falls_back_to_the_stem_rather_than_an_empty_scene_name() {
+        // An empty name fails validation, so it must never be what we write.
+        assert_eq!(scene_name("/tmp/hall.json", Some("   ".into())), "hall");
+    }
+
+    #[test]
+    fn a_path_with_no_stem_still_produces_a_name() {
+        assert_eq!(scene_name("..", None), "imported-room");
+        assert_eq!(scene_name("", None), "imported-room");
+    }
 }

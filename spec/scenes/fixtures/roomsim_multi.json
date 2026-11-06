@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "roomsim-multi-fixture",
+  "provenance": "hand_written",
+  "room": {
+    "w_m": 6.0,
+    "d_m": 5.5,
+    "h_m": 2.8,
+    "polygon": [
+      [0.0, 0.0],
+      [6.0, 0.0],
+      [6.0, 4.0],
+      [3.5, 5.5],
+      [0.0, 4.0]
+    ]
+  },
+  "objects": [
+    { "type": "almirah", "id": "cabinet", "pos": [4.5, 1.5, 0.9], "size": [1.0, 0.5, 1.8], "yaw_deg": 30.0, "material": "metal" },
+    { "type": "table", "id": "table", "pos": [1.5, 3.0, 0.375], "size": [1.2, 0.7, 0.75], "yaw_deg": 0.0, "material": "wood" },
+    { "type": "door", "id": "door", "pos": [3.0, 0.0, 1.05], "size": [0.9, 0.1, 2.1], "yaw_deg": 0.0, "material": "wood" }
+  ],
+  "nodes": [
+    { "id": 0, "pos": [0.3, 0.3, 1.4] },
+    { "id": 1, "pos": [5.7, 0.3, 1.4] },
+    { "id": 2, "pos": [3.5, 5.0, 1.4] }
+  ],
+  "people": [
+    { "id": "first", "start": [1.5, 1.5] },
+    { "id": "second", "start": [4.0, 3.5] },
+    { "id": "third" }
+  ],
+  "phone": { "id": "phone", "start": [1.5, 1.5] }
+}

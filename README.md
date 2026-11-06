@@ -57,7 +57,7 @@ the copy says so on those pages.
 | Part | Where | Checked by |
 |---|---|---|
 | Reference DSP + FeatureFrame | `wifisense/` (Python) | `python3 -m unittest discover -s tests` |
-| Golden vectors | `spec/golden/` | `python3 spec/golden/generate.py` |
+| Golden vectors | `spec/golden/` | `$(.venv/bin/uv python find 3.14) -I spec/golden/generate.py` (CPython 3.14 only) |
 | Rust DSP (byte-identical frames) | `rust/crates/saans-dsp` | `cargo test -p saans-dsp` |
 | Health detectors, link fusion | `rust/crates/saans-health` | `cargo test -p saans-health` |
 | Simulator (matches Python physics to 1e-14) | `rust/crates/saans-sim` | `cargo test -p saans-sim` |
@@ -69,6 +69,74 @@ the copy says so on those pages.
 Rust lives in `rust/` (`~/.cargo/bin/cargo` if cargo is not on PATH).
 Measured results and every bug the evaluation found are in
 [NOTES.md](NOTES.md) §7–8.
+
+## Product vs research
+
+Two lines of work share this repository, and they are held to different
+claims. The **product** is what a deployment runs: the sensors, the
+gateway and what the gateway serves. The **research** line asks what
+else the same radios could do (where a person is, a learned model) and
+everything it produces is labelled SIM until real rooms say otherwise.
+Directories have not been moved to match; this table is the boundary.
+
+| | Product | Research |
+|---|---|---|
+| Python | `wifisense/` (the reference DSP and FeatureFrame), `spec/wire.md`, the DSP golden vectors | `wifisense/roomsim/`, `wifisense/localize/`, and their `roomsim_*`, `localize_*`, `locate_*` golden sets; `wifisense/scene.py` and `wifisense/roomplan_import.py` (the `scenes/` format); `evaluate_localize.py` (the P0b sweep) |
+| Sensor | `edge/` (C++ DSP and the ESP32-S3 firmware) | — |
+| Rust | `saans-dsp`, `saans-health`, `saans-sim` (the evaluation simulator), `saans-gateway` with default features, `saans-cli` | `saans-roomsim` (Room Sim), `saans-locate` (Locate), `saans-scene` (declared room geometry), `saans-sim`'s `scene` module (the `scenes/` reader; nothing outside its tests calls it) |
+| Pages | the site (seven pages), and the dashboard at `/app` | both 3-D views, compiled in only with `saans-gateway --features roomsim`: the room demo at `/roomsim`, and the site's `/room-sim` page, which draws a scene file and nothing measured |
+| Specs and notes | `spec/wire.md`, SAANS_PLAN.md | `spec/{scene.schema.json,roomsim,locate,livedemo,dataset,preprocess,model,phase9,calibration,sionna_audit,recording}.md`, ROOMSIM.md, RUN.md, NOTES-localize.md, P0B_TASK.md, `phase6-samples/` |
+| Learned models | none ([ADR-007](docs/adr/007-no-learned-models-yet.md)) | `ml/`, offline only, on the GPU box ([ADR-014](docs/adr/014-offline-learned-models.md)) |
+
+What keeps them apart, in code rather than in prose:
+
+- The gateway compiles the research crates in only under its `roomsim`
+  feature, which is off by default ([ADR-013](docs/adr/013-declared-geometry-and-drawing.md)
+  decision 13); a default build serves no room view, neither `/roomsim`
+  nor the site's `/room-sim`. `saans-cli` links them
+  for its research subcommands (`import-roomplan`, `roomsim-export`,
+  `roomsim-eval`, `gen-dataset`).
+- `rust/crates/saans-scene/tests/boundary.rs` fails if a crate that carries
+  CSI could write a scene: only `saans-cli`, a tool a person runs, may
+  enable `saans-scene`'s `write` feature; the crates that read scenes
+  (`saans-roomsim`, `saans-locate`, `saans-gateway` under `roomsim`) are an
+  allowlist, and any other crate that depends on `saans-scene` fails the
+  test until it is placed on one list. Geometry is declared, never
+  inferred from WiFi (ADR-013 decision 1).
+- No learned model runs in the gateway, on a node or in the room stream
+  (ADR-014); moving one into the product takes a new ADR and real-room
+  evidence.
+
+Two scene formats exist side by side since the merge, and unifying them
+is open work: `scenes/` (drawn by the `/room-sim` page, and checked by
+`wifisense/scene.py` and `saans-sim`'s scene reader in their tests; the
+simulator itself reads no scene) and `spec/scene.schema.json` with
+`spec/scenes/` (read by `saans-scene`, Room Sim and the room demo).
+
+### Parked: off by default, kept in the tree
+
+The first customer is an older person living alone ([docs/ELDER_CARE.md](docs/ELDER_CARE.md)).
+What a default build runs for them: occupancy, a still person, breathing
+rate in spaces that opt in (`vitals = true`, off by default), and the
+inactivity alert (`inactivity_alert_min`, on, 30 min by default). The rest
+is kept but switched off, because it is not reliable enough to put in
+front of a family:
+
+| Feature | Why it is off | Where it is switched | Default |
+|---|---|---|---|
+| Heart rate | Unreliable from WiFi CSI in a way breathing is not (NOTES.md §4.6) | The node's `SAANS_HEART_ENABLED` (`edge/firmware/main/Kconfig.projbuild`), which needs vitals on too. The gateway never shows or stores heart rate: no API field, MQTT topic, history series or dashboard view carries it | off |
+| Fall / collapse detector | It also fires on a heavy sit-down: WiFi cannot tell them apart | `collapse_detection` per space (`saans.example.toml`); the test `defaults_are_conservative` pins the default | off |
+| Positioning (RTI) | Did not beat a weighted link-midpoint baseline: 0.72 m median at 13–18% coverage against 0.709 m at 100% (NOTES-localize.md) | Not in the gateway's default build; `--features roomsim` only. `saans-cli` keeps its research subcommands | off |
+| Headcount | Research only: no implementation exists, only a use case on `/hardware` marked "research" | — | none |
+| 3-D room views | Draw declared geometry, not anything measured | `saans-gateway --features roomsim` (`/roomsim` and `/room-sim`) | off |
+
+The long-lie path for elder care is the inactivity alert. Holding presence
+after a fall-shaped motion, so that a person lying still is not read as an
+empty room, is opt-in work in progress (PR #31).
+
+Checking the research line: `cargo test -p saans-gateway --features roomsim`,
+`cargo test -p saans-locate --features roomsim`, and on the GPU box
+`.venv/bin/python -m unittest discover -s ml/tests` (RUN.md §3).
 
 ## What works, measured
 
@@ -447,10 +515,13 @@ tuning problem when it is not:
 
 ## Hardware
 
-You have none yet, so: the cheapest real CSI path is an **ESP32-S3 or
-ESP32-C6 devkit, about $6–10**. The ESP-IDF API (`esp_wifi_set_csi_config`,
+You have none yet, so: the cheapest real CSI path is an **ESP32-S3
+devkit, about $6–10**. The ESP-IDF API (`esp_wifi_set_csi_config`,
 `esp_wifi_set_csi_rx_cb`) exposes per-subcarrier CSI directly, and the
-Saans node firmware in `edge/firmware` is ready to flash. One link gives presence and breathing for one space; more links per space
+Saans node firmware in `edge/firmware` is ready to flash. It is built for
+the S3 only (`CONFIG_IDF_TARGET="esp32s3"`); another chip, the C6
+included, is not a drop-in substitute ([docs/HARDWARE.md](docs/HARDWARE.md)
+§2). One link gives presence and breathing for one space; more links per space
 buy blind-spot coverage, not new capabilities.
 
 Multi-person separation and through-wall sensing are **not** on this
@@ -482,9 +553,9 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `wifisense/roomplan_import.py` | Apple RoomPlan scan to scene file. A stub: the mapping table is real, the format assumptions are untested |
 | `rust/crates/saans-sim/src/scene.rs` | The same format in Rust, with its own reader |
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
-| `tests/` | 550 tests, 242 of them outside `test_localize_*` (which belong to the P0b localization work) |
+| `tests/` | 829 tests in 30 files (counted 2026-11-06, after the research merge): 308 in `test_localize_*` (the P0b localization work), 136 in `test_locate_*` and 100 in `test_roomsim_*` (research), 285 elsewhere. How they were counted: [docs/EVIDENCE.md](docs/EVIDENCE.md) §2.3 |
 | `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |
-| `rust/crates/saans-gateway/assets/site/` | The eight public pages, the stylesheet, the scripts and the fonts |
+| `rust/crates/saans-gateway/assets/site/` | The public pages (seven; `room-sim.html` is served only with `--features roomsim`), the stylesheet, the scripts and the fonts |
 | `rust/crates/saans-gateway/src/site.rs` | The route table for those pages, and the offline and link tests |
 | `docs/HARDWARE.md` | What to buy for the first bench run, and how to bring it up |
 | `docs/PROTOCOL_S5.md` | The recording protocol, to be followed before any human-subject data exists |

@@ -1,0 +1,525 @@
+{
+ "name": "roomsim_physics_switches",
+ "scalars": {
+  "label": "SIM",
+  "spec": "roomsim_v1",
+  "scene": "spec/scenes/hall-l-shaped.json",
+  "scene_sha256": "cdb393f429ba3cd06e07e88ccdbb407129c530ebad7089d5e22eb1fa6d0a109b",
+  "carrier_hz": 2437000000.0,
+  "lambda": 0.1230170118998769,
+  "n_variants": 2,
+  "variants": "a,b",
+  "a_seed": 1,
+  "a_duration_s": 0.5,
+  "a_cfg.seed": 1,
+  "a_cfg.duration_s": 0.5,
+  "a_cfg.reflection_order": 1,
+  "a_cfg.floor_ceiling": 0,
+  "a_cfg.object_specular": 0,
+  "a_cfg.object_scatter_scale": 0.5,
+  "a_cfg.clutter_count": 5,
+  "a_cfg.tail": 0,
+  "a_cfg.n_people": 3,
+  "a_cfg.people_mode.2": "stationary",
+  "a_cfg.people_posture.1": "stand",
+  "a_cfg.start_heading_rad.2": 2.0,
+  "a_cfg.impair": 0,
+  "a_n_links": 3,
+  "a_links": "4-6,0-1,0-5",
+  "a_link0_tx": 4,
+  "a_link0_rx": 6,
+  "a_link1_tx": 0,
+  "a_link1_rx": 1,
+  "a_link2_tx": 0,
+  "a_link2_rx": 5,
+  "a_n_clutter": 5,
+  "a_n_surfaces": 6,
+  "a_n_walls": 6,
+  "a_n_packets": 15,
+  "a_n_transmissions": 40,
+  "a_n_people": 3,
+  "a_body_points": 10,
+  "a_person0_start_x": 2.0,
+  "a_person0_start_y": 5.8,
+  "a_person0_walking": 1,
+  "a_person0_posture": "stand",
+  "a_person0_on_object": -1,
+  "a_person0_heading0": 0.0,
+  "a_person0_height": 1.8414487241743465,
+  "a_person0_f_b": 0.2620516067120854,
+  "a_person0_p2p": 0.005298909166617072,
+  "a_person0_phi_b": 6.204306658538298,
+  "a_person0_phi_g": 1.2494295553253039,
+  "a_person1_start_x": 7.0,
+  "a_person1_start_y": 0.6,
+  "a_person1_walking": 0,
+  "a_person1_posture": "stand",
+  "a_person1_on_object": 0,
+  "a_person1_heading0": 0.0,
+  "a_person1_height": 1.5972603682971687,
+  "a_person1_f_b": 0.15656660870381714,
+  "a_person1_p2p": 0.010895120640496444,
+  "a_person1_phi_b": 4.807687642781396,
+  "a_person1_phi_g": 5.327630438549279,
+  "a_person2_start_x": 0.4,
+  "a_person2_start_y": 1.5,
+  "a_person2_walking": 0,
+  "a_person2_posture": "stand",
+  "a_person2_on_object": -1,
+  "a_person2_heading0": 2.0,
+  "a_person2_height": 1.8132339044318333,
+  "a_person2_f_b": 0.18980056958868874,
+  "a_person2_p2p": 0.006677871337115745,
+  "a_person2_phi_b": 2.0105400618431526,
+  "a_person2_phi_g": 2.447351540074853,
+  "b_seed": 2,
+  "b_duration_s": 0.5,
+  "b_cfg.seed": 2,
+  "b_cfg.duration_s": 0.5,
+  "b_cfg.reflection_order": 0,
+  "b_cfg.transmission": 0,
+  "b_cfg.object_scatter": 0,
+  "b_cfg.object_blockage": 0,
+  "b_cfg.shadowing": 0,
+  "b_cfg.impair": 0,
+  "b_n_links": 3,
+  "b_links": "5-7,1-6,0-1",
+  "b_link0_tx": 5,
+  "b_link0_rx": 7,
+  "b_link1_tx": 1,
+  "b_link1_rx": 6,
+  "b_link2_tx": 0,
+  "b_link2_rx": 1,
+  "b_n_clutter": 24,
+  "b_n_surfaces": 8,
+  "b_n_walls": 6,
+  "b_n_packets": 15,
+  "b_n_transmissions": 40,
+  "b_n_people": 2,
+  "b_body_points": 10,
+  "b_person0_start_x": 2.0,
+  "b_person0_start_y": 5.8,
+  "b_person0_walking": 1,
+  "b_person0_posture": "stand",
+  "b_person0_on_object": -1,
+  "b_person0_heading0": 0.0,
+  "b_person0_height": 1.8324303824880386,
+  "b_person0_f_b": 0.22721134648770785,
+  "b_person0_p2p": 0.010789908117301296,
+  "b_person0_phi_b": 4.7749325964031435,
+  "b_person0_phi_g": 5.157421495072846,
+  "b_person1_start_x": 7.0,
+  "b_person1_start_y": 0.6,
+  "b_person1_walking": 0,
+  "b_person1_posture": "sit",
+  "b_person1_on_object": 0,
+  "b_person1_heading0": 0.0,
+  "b_person1_height": 1.74573959027716,
+  "b_person1_f_b": 0.24613389564246077,
+  "b_person1_p2p": 0.00562494770295936,
+  "b_person1_phi_b": 1.6960022768631033,
+  "b_person1_phi_g": 0.3678961216147806
+ },
+ "arrays": {
+  "a_path_link": [
+   "roomsim_physics_switches__a_path_link.f64",
+   48
+  ],
+  "a_kind": [
+   "roomsim_physics_switches__a_kind.f64",
+   48
+  ],
+  "a_surf_i": [
+   "roomsim_physics_switches__a_surf_i.f64",
+   48
+  ],
+  "a_surf_j": [
+   "roomsim_physics_switches__a_surf_j.f64",
+   48
+  ],
+  "a_obj": [
+   "roomsim_physics_switches__a_obj.f64",
+   48
+  ],
+  "a_face": [
+   "roomsim_physics_switches__a_face.f64",
+   48
+  ],
+  "a_clutter": [
+   "roomsim_physics_switches__a_clutter.f64",
+   48
+  ],
+  "a_tail": [
+   "roomsim_physics_switches__a_tail.f64",
+   48
+  ],
+  "a_npts": [
+   "roomsim_physics_switches__a_npts.f64",
+   48
+  ],
+  "a_L": [
+   "roomsim_physics_switches__a_L.f64",
+   48
+  ],
+  "a_coef_re": [
+   "roomsim_physics_switches__a_coef_re.f64",
+   48
+  ],
+  "a_coef_im": [
+   "roomsim_physics_switches__a_coef_im.f64",
+   48
+  ],
+  "a_coef0_re": [
+   "roomsim_physics_switches__a_coef0_re.f64",
+   48
+  ],
+  "a_coef0_im": [
+   "roomsim_physics_switches__a_coef0_im.f64",
+   48
+  ],
+  "a_sigma": [
+   "roomsim_physics_switches__a_sigma.f64",
+   48
+  ],
+  "a_pts_x": [
+   "roomsim_physics_switches__a_pts_x.f64",
+   141
+  ],
+  "a_pts_y": [
+   "roomsim_physics_switches__a_pts_y.f64",
+   141
+  ],
+  "a_pts_z": [
+   "roomsim_physics_switches__a_pts_z.f64",
+   141
+  ],
+  "a_link_npaths": [
+   "roomsim_physics_switches__a_link_npaths.f64",
+   3
+  ],
+  "a_H0_re": [
+   "roomsim_physics_switches__a_H0_re.f64",
+   192
+  ],
+  "a_H0_im": [
+   "roomsim_physics_switches__a_H0_im.f64",
+   192
+  ],
+  "a_tail_x": [
+   "roomsim_physics_switches__a_tail_x.f64",
+   120
+  ],
+  "a_tail_phi": [
+   "roomsim_physics_switches__a_tail_phi.f64",
+   120
+  ],
+  "a_clutter_x": [
+   "roomsim_physics_switches__a_clutter_x.f64",
+   5
+  ],
+  "a_clutter_y": [
+   "roomsim_physics_switches__a_clutter_y.f64",
+   5
+  ],
+  "a_clutter_z": [
+   "roomsim_physics_switches__a_clutter_z.f64",
+   5
+  ],
+  "a_clutter_sigma": [
+   "roomsim_physics_switches__a_clutter_sigma.f64",
+   5
+  ],
+  "a_t": [
+   "roomsim_physics_switches__a_t.f64",
+   15
+  ],
+  "a_m": [
+   "roomsim_physics_switches__a_m.f64",
+   15
+  ],
+  "a_slot": [
+   "roomsim_physics_switches__a_slot.f64",
+   15
+  ],
+  "a_tx": [
+   "roomsim_physics_switches__a_tx.f64",
+   15
+  ],
+  "a_rx": [
+   "roomsim_physics_switches__a_rx.f64",
+   15
+  ],
+  "a_link_index": [
+   "roomsim_physics_switches__a_link_index.f64",
+   15
+  ],
+  "a_H_re": [
+   "roomsim_physics_switches__a_H_re.f64",
+   960
+  ],
+  "a_H_im": [
+   "roomsim_physics_switches__a_H_im.f64",
+   960
+  ],
+  "a_tr_t": [
+   "roomsim_physics_switches__a_tr_t.f64",
+   40
+  ],
+  "a_tr_m": [
+   "roomsim_physics_switches__a_tr_m.f64",
+   40
+  ],
+  "a_tr_slot": [
+   "roomsim_physics_switches__a_tr_slot.f64",
+   40
+  ],
+  "a_tr_tx": [
+   "roomsim_physics_switches__a_tr_tx.f64",
+   40
+  ],
+  "a_p_x": [
+   "roomsim_physics_switches__a_p_x.f64",
+   120
+  ],
+  "a_p_y": [
+   "roomsim_physics_switches__a_p_y.f64",
+   120
+  ],
+  "a_p_heading": [
+   "roomsim_physics_switches__a_p_heading.f64",
+   120
+  ],
+  "a_p_walking": [
+   "roomsim_physics_switches__a_p_walking.f64",
+   120
+  ],
+  "a_p_posture": [
+   "roomsim_physics_switches__a_p_posture.f64",
+   120
+  ],
+  "a_phone_x": [
+   "roomsim_physics_switches__a_phone_x.f64",
+   40
+  ],
+  "a_phone_y": [
+   "roomsim_physics_switches__a_phone_y.f64",
+   40
+  ],
+  "a_phone_z": [
+   "roomsim_physics_switches__a_phone_z.f64",
+   40
+  ],
+  "a_body_x": [
+   "roomsim_physics_switches__a_body_x.f64",
+   1200
+  ],
+  "a_body_y": [
+   "roomsim_physics_switches__a_body_y.f64",
+   1200
+  ],
+  "a_body_z": [
+   "roomsim_physics_switches__a_body_z.f64",
+   1200
+  ],
+  "b_path_link": [
+   "roomsim_physics_switches__b_path_link.f64",
+   196
+  ],
+  "b_kind": [
+   "roomsim_physics_switches__b_kind.f64",
+   196
+  ],
+  "b_surf_i": [
+   "roomsim_physics_switches__b_surf_i.f64",
+   196
+  ],
+  "b_surf_j": [
+   "roomsim_physics_switches__b_surf_j.f64",
+   196
+  ],
+  "b_obj": [
+   "roomsim_physics_switches__b_obj.f64",
+   196
+  ],
+  "b_face": [
+   "roomsim_physics_switches__b_face.f64",
+   196
+  ],
+  "b_clutter": [
+   "roomsim_physics_switches__b_clutter.f64",
+   196
+  ],
+  "b_tail": [
+   "roomsim_physics_switches__b_tail.f64",
+   196
+  ],
+  "b_npts": [
+   "roomsim_physics_switches__b_npts.f64",
+   196
+  ],
+  "b_L": [
+   "roomsim_physics_switches__b_L.f64",
+   196
+  ],
+  "b_coef_re": [
+   "roomsim_physics_switches__b_coef_re.f64",
+   196
+  ],
+  "b_coef_im": [
+   "roomsim_physics_switches__b_coef_im.f64",
+   196
+  ],
+  "b_coef0_re": [
+   "roomsim_physics_switches__b_coef0_re.f64",
+   196
+  ],
+  "b_coef0_im": [
+   "roomsim_physics_switches__b_coef0_im.f64",
+   196
+  ],
+  "b_sigma": [
+   "roomsim_physics_switches__b_sigma.f64",
+   196
+  ],
+  "b_pts_x": [
+   "roomsim_physics_switches__b_pts_x.f64",
+   225
+  ],
+  "b_pts_y": [
+   "roomsim_physics_switches__b_pts_y.f64",
+   225
+  ],
+  "b_pts_z": [
+   "roomsim_physics_switches__b_pts_z.f64",
+   225
+  ],
+  "b_link_npaths": [
+   "roomsim_physics_switches__b_link_npaths.f64",
+   3
+  ],
+  "b_H0_re": [
+   "roomsim_physics_switches__b_H0_re.f64",
+   192
+  ],
+  "b_H0_im": [
+   "roomsim_physics_switches__b_H0_im.f64",
+   192
+  ],
+  "b_tail_x": [
+   "roomsim_physics_switches__b_tail_x.f64",
+   120
+  ],
+  "b_tail_phi": [
+   "roomsim_physics_switches__b_tail_phi.f64",
+   120
+  ],
+  "b_clutter_x": [
+   "roomsim_physics_switches__b_clutter_x.f64",
+   24
+  ],
+  "b_clutter_y": [
+   "roomsim_physics_switches__b_clutter_y.f64",
+   24
+  ],
+  "b_clutter_z": [
+   "roomsim_physics_switches__b_clutter_z.f64",
+   24
+  ],
+  "b_clutter_sigma": [
+   "roomsim_physics_switches__b_clutter_sigma.f64",
+   24
+  ],
+  "b_t": [
+   "roomsim_physics_switches__b_t.f64",
+   15
+  ],
+  "b_m": [
+   "roomsim_physics_switches__b_m.f64",
+   15
+  ],
+  "b_slot": [
+   "roomsim_physics_switches__b_slot.f64",
+   15
+  ],
+  "b_tx": [
+   "roomsim_physics_switches__b_tx.f64",
+   15
+  ],
+  "b_rx": [
+   "roomsim_physics_switches__b_rx.f64",
+   15
+  ],
+  "b_link_index": [
+   "roomsim_physics_switches__b_link_index.f64",
+   15
+  ],
+  "b_H_re": [
+   "roomsim_physics_switches__b_H_re.f64",
+   960
+  ],
+  "b_H_im": [
+   "roomsim_physics_switches__b_H_im.f64",
+   960
+  ],
+  "b_tr_t": [
+   "roomsim_physics_switches__b_tr_t.f64",
+   40
+  ],
+  "b_tr_m": [
+   "roomsim_physics_switches__b_tr_m.f64",
+   40
+  ],
+  "b_tr_slot": [
+   "roomsim_physics_switches__b_tr_slot.f64",
+   40
+  ],
+  "b_tr_tx": [
+   "roomsim_physics_switches__b_tr_tx.f64",
+   40
+  ],
+  "b_p_x": [
+   "roomsim_physics_switches__b_p_x.f64",
+   80
+  ],
+  "b_p_y": [
+   "roomsim_physics_switches__b_p_y.f64",
+   80
+  ],
+  "b_p_heading": [
+   "roomsim_physics_switches__b_p_heading.f64",
+   80
+  ],
+  "b_p_walking": [
+   "roomsim_physics_switches__b_p_walking.f64",
+   80
+  ],
+  "b_p_posture": [
+   "roomsim_physics_switches__b_p_posture.f64",
+   80
+  ],
+  "b_phone_x": [
+   "roomsim_physics_switches__b_phone_x.f64",
+   40
+  ],
+  "b_phone_y": [
+   "roomsim_physics_switches__b_phone_y.f64",
+   40
+  ],
+  "b_phone_z": [
+   "roomsim_physics_switches__b_phone_z.f64",
+   40
+  ],
+  "b_body_x": [
+   "roomsim_physics_switches__b_body_x.f64",
+   800
+  ],
+  "b_body_y": [
+   "roomsim_physics_switches__b_body_y.f64",
+   800
+  ],
+  "b_body_z": [
+   "roomsim_physics_switches__b_body_z.f64",
+   800
+  ]
+ }
+}

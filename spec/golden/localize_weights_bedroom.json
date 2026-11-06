@@ -1,0 +1,79 @@
+{
+ "name": "localize_weights_bedroom",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "scene": "spec/scenes/bedroom.json",
+  "scene_sha256": "ca9b768b232f971ffa14ee76a2444b9c10661bac398f0a774b445df315e2c112",
+  "room_w": 4.2,
+  "room_h": 3.6,
+  "pitch_m": 0.5,
+  "lambda_m": 0.3,
+  "n_x": 8,
+  "n_y": 7,
+  "n_nodes": 4,
+  "n_links": 12,
+  "n_pixels": 56,
+  "nnz": 192,
+  "n_blind": 0,
+  "min_boundary_margin": 0.011425847337655448,
+  "cmp.blind_pixels": "exact",
+  "cmp.link_len": "rule",
+  "cmp.link_rx": "exact",
+  "cmp.link_tx": "exact",
+  "cmp.link_w": "rule",
+  "cmp.node_id": "input",
+  "cmp.node_x": "input",
+  "cmp.node_y": "input",
+  "cmp.pixel_link_counts": "exact",
+  "cmp.support_idx": "exact",
+  "cmp.support_len": "exact"
+ },
+ "arrays": {
+  "node_id": [
+   "localize_weights_bedroom__node_id.f64",
+   4
+  ],
+  "node_x": [
+   "localize_weights_bedroom__node_x.f64",
+   4
+  ],
+  "node_y": [
+   "localize_weights_bedroom__node_y.f64",
+   4
+  ],
+  "link_tx": [
+   "localize_weights_bedroom__link_tx.f64",
+   12
+  ],
+  "link_rx": [
+   "localize_weights_bedroom__link_rx.f64",
+   12
+  ],
+  "link_len": [
+   "localize_weights_bedroom__link_len.f64",
+   12
+  ],
+  "link_w": [
+   "localize_weights_bedroom__link_w.f64",
+   12
+  ],
+  "support_len": [
+   "localize_weights_bedroom__support_len.f64",
+   12
+  ],
+  "support_idx": [
+   "localize_weights_bedroom__support_idx.f64",
+   192
+  ],
+  "pixel_link_counts": [
+   "localize_weights_bedroom__pixel_link_counts.f64",
+   56
+  ],
+  "blind_pixels": [
+   "localize_weights_bedroom__blind_pixels.f64",
+   0
+  ]
+ }
+}

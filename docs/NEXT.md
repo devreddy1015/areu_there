@@ -1,7 +1,16 @@
 # What to change next, and why each one makes it more accurate
 
-Written 2026-10-24 against `main` @ `ed924f8`. A plan, not a record:
-nothing below is done. Every figure cites where it was read from and is
+Written 2026-10-24 against `main` @ `ed924f8` as a plan, when nothing
+below was done.
+
+**Status, 2026-11-06: all of section 1 is done; section 2 waits for the
+boards.** Each item in section 1 says **Done** in its own text and names
+its branch. The pull requests: 1.1 #6, 1.2 #7, 1.3 #8 (part a), 1.4 #9
+and #24 (done as a measurement; nothing shipped), 1.5 #14, 1.6 #12,
+1.7 #11, 1.8 #13, 1.9 #15 and #16, 1.10 #17, 1.11 #19, #20 and #21. The
+rest of this file is left as it was written.
+
+Every figure cites where it was read from and is
 SYNTHETIC unless it says otherwise, which in this repository means all of
 them.
 

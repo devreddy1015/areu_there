@@ -1,0 +1,64 @@
+{
+ "name": "localize_cholesky",
+ "scalars": {
+  "label": "SIM",
+  "spec": "locate_v1",
+  "reasons": "no_disturbance,implausible_radius,not_significant,no_reports,too_few_ranges,degenerate,not_converged,gated",
+  "n_cases": 12,
+  "symmetry_tol": 1e-09,
+  "n_err": 1,
+  "err.0": "cholesky_solve_factored(G of case 0, [1.0, 2.0])",
+  "cmp.err_code": "exact",
+  "cmp.m_a": "input",
+  "cmp.m_b": "input",
+  "cmp.m_code": "exact",
+  "cmp.m_g": "rule:ptr:m_nn",
+  "cmp.m_inv": "rule:ptr:m_nn",
+  "cmp.m_n": "input",
+  "cmp.m_nn": "input",
+  "cmp.m_pivot": "exact",
+  "cmp.m_x": "rule:ptr:m_n"
+ },
+ "arrays": {
+  "m_n": [
+   "localize_cholesky__m_n.f64",
+   12
+  ],
+  "m_nn": [
+   "localize_cholesky__m_nn.f64",
+   12
+  ],
+  "m_a": [
+   "localize_cholesky__m_a.f64",
+   188
+  ],
+  "m_b": [
+   "localize_cholesky__m_b.f64",
+   32
+  ],
+  "m_code": [
+   "localize_cholesky__m_code.f64",
+   12
+  ],
+  "m_pivot": [
+   "localize_cholesky__m_pivot.f64",
+   12
+  ],
+  "m_g": [
+   "localize_cholesky__m_g.f64",
+   188
+  ],
+  "m_x": [
+   "localize_cholesky__m_x.f64",
+   32
+  ],
+  "m_inv": [
+   "localize_cholesky__m_inv.f64",
+   188
+  ],
+  "err_code": [
+   "localize_cholesky__err_code.f64",
+   1
+  ]
+ }
+}

@@ -170,6 +170,29 @@ stale in both directions: the non-localization Python files alone define
 `COMPLETION_REPORT.md:179`. It now says 547, 239 of them outside
 `test_localize_*`.
 
+**Recounted 2026-11-06, after the research line (`saans/scene-format`)
+was merged into `main`.** Unlike the counts above, these were run as well
+as counted, on the merged tree:
+
+| What | Defined | Run |
+|---|---|---|
+| Python tests under `tests/` | **829** in 30 files: 308 `test_localize_*`, 136 `test_locate_*`, 100 `test_roomsim_*`, 285 elsewhere | 829 passed on CPython 3.14 and on 3.12 |
+| Rust test functions | **799** = 750 `#[test]` + 49 `#[tokio::test]` | `cargo test --workspace --locked`: 759 passed, 1 ignored (it needs a CPython dump, `SAANS_HYPOT_DUMP`); `cargo test -p saans-gateway --features roomsim --locked`: 211 passed |
+| Golden vector sets | **62** (`spec/golden/MANIFEST`, and as many `.json` files) | regenerated on CPython 3.14: all 1,489 files bit-identical (`spec/golden/check_drift.py`) |
+| C++ host test binaries | **10** in `edge/dsp/test/` | `make -C edge/dsp/test check`: all 10 pass under g++ and clang++, 889 checks per compiler |
+
+How: the Python count is unittest's own loader
+(`unittest.defaultTestLoader.discover("tests")`), grouped by module; no
+test in it is inherited, so defined and run are the same number. The AST
+walk used above counts only classes whose base is named `TestCase`, and
+misses a class that derives from another test class: on this tree it
+finds 752 of the 829. The Rust count is the same grep as above, over
+`rust/crates`. Defined and run are different measures here: the run
+count includes 5 doc-tests, and 49 of the gateway's tests exist only with
+its `roomsim` feature (211 run with it, 162 without), so the workspace
+run does not reach them. The C++ count sums each binary's `PASS n/n`
+and `N checks` lines.
+
 ### 2.4 Continuous integration
 
 `git ls-files .github/workflows` returns two files: `codeql.yml` and
@@ -852,6 +875,7 @@ were.
 | "141 core tests" for `tests/` | `README.md` | Fixed: 547, 239 outside `test_localize_*`. |
 | "459 passed" (Python) | `docs/COMPLETION_REPORT.md:186` | Superseded by 88 tests added in `170c963`; 459 + 88 = 547. |
 | "141 passed" (Rust) | `docs/COMPLETION_REPORT.md:179` | Superseded; 217 test functions defined at HEAD. |
+| "550 tests, 242 of them outside `test_localize_*`" | `README.md` (Layout) | Fixed 2026-11-06, after the research merge: 829 tests in 30 files, counted by unittest's loader (§2.3). |
 | "208 tests" / "351 tests" | `NOTES-localize.md:214`, `:218` | Stale; 308 localization methods and 547 total are defined now. |
 | "no CI in this repository" | `docs/COMPLETION_REPORT.md:189` | Amended in place with a dated note: `ci.yml` since `101639b`. |
 | Site evidence page: "21 vector sets" (S0 row) | `rust/.../assets/site/evidence.html` | Fixed: 23. |
