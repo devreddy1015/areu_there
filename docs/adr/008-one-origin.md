@@ -78,3 +78,9 @@ the site is eight pages now. The body is left as it was: an ADR records
 what was decided and when, and correcting its arithmetic after the fact
 would make it a worse record, not a better one. The count that is load
 bearing is the one in `site::PAGES`, which the tests walk.
+
+## Amendment, 2026-11-06
+`/room-sim` is now compiled in only with the gateway's `roomsim` feature
+(issue #34), and no other page links to it. A default build, which is
+what the public copy is exported from, is seven pages again; a `roomsim`
+build is eight.

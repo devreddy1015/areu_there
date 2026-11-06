@@ -1307,48 +1307,67 @@ async fn the_site_is_served_from_the_same_origin() {
     // The licence has to be reachable, not merely present in the tree.
     assert_eq!(g.get("/fonts/OFL.txt").await.status, 200);
 
-    // three.js is served from this origin, and `three.module.min.js`
-    // imports `./three.core.min.js`: the browser resolves that against
-    // the directory it was served from, so the sibling has to answer on
-    // the same prefix or the import 404s and the page draws nothing.
-    let module = g.get("/vendor/three.module.min.js").await;
-    assert_eq!(module.status, 200);
-    assert!(module
-        .header("content-type")
-        .unwrap()
-        .starts_with("text/javascript"));
-    assert!(
-        module.body.contains("from\"./three.core.min.js\""),
-        "the vendored module is the real one"
-    );
-    let core = g.get("/vendor/three.core.min.js").await;
-    assert_eq!(core.status, 200);
-    assert!(core
-        .header("content-type")
-        .unwrap()
-        .starts_with("text/javascript"));
-    // MIT asks that the notice travel with the code it covers.
-    let licence = g.get("/vendor/three-LICENSE.txt").await;
-    assert_eq!(licence.status, 200);
-    assert!(
-        licence.body.contains("MIT License"),
-        "the vendored licence is the real one"
-    );
+    // `/room-sim` is parked behind the `roomsim` feature (issue #34),
+    // and three.js and the scene files ship only with it. CI runs this
+    // file both ways, so both halves are checked.
+    #[cfg(feature = "roomsim")]
+    {
+        // three.js is served from this origin, and `three.module.min.js`
+        // imports `./three.core.min.js`: the browser resolves that against
+        // the directory it was served from, so the sibling has to answer on
+        // the same prefix or the import 404s and the page draws nothing.
+        let module = g.get("/vendor/three.module.min.js").await;
+        assert_eq!(module.status, 200);
+        assert!(module
+            .header("content-type")
+            .unwrap()
+            .starts_with("text/javascript"));
+        assert!(
+            module.body.contains("from\"./three.core.min.js\""),
+            "the vendored module is the real one"
+        );
+        let core = g.get("/vendor/three.core.min.js").await;
+        assert_eq!(core.status, 200);
+        assert!(core
+            .header("content-type")
+            .unwrap()
+            .starts_with("text/javascript"));
+        // MIT asks that the notice travel with the code it covers.
+        let licence = g.get("/vendor/three-LICENSE.txt").await;
+        assert_eq!(licence.status, 200);
+        assert!(
+            licence.body.contains("MIT License"),
+            "the vendored licence is the real one"
+        );
 
-    // The scenes are files the page fetches. A scene is typed in: these
-    // dimensions were written by a person, not measured by a radio.
-    let bedroom = g.get("/scenes/bedroom.json").await;
-    assert_eq!(bedroom.status, 200);
-    assert!(bedroom
-        .header("content-type")
-        .unwrap()
-        .starts_with("application/json"));
-    assert!(
-        bedroom.body.contains("\"width_m\": 4.2"),
-        "the served scene is the one in scenes/"
-    );
-    assert_eq!(g.get("/scenes/office.json").await.status, 200);
-    assert_eq!(g.get("/scenes/hall-l.json").await.status, 200);
+        // The scenes are files the page fetches. A scene is typed in: these
+        // dimensions were written by a person, not measured by a radio.
+        let bedroom = g.get("/scenes/bedroom.json").await;
+        assert_eq!(bedroom.status, 200);
+        assert!(bedroom
+            .header("content-type")
+            .unwrap()
+            .starts_with("application/json"));
+        assert!(
+            bedroom.body.contains("\"width_m\": 4.2"),
+            "the served scene is the one in scenes/"
+        );
+        assert_eq!(g.get("/scenes/office.json").await.status, 200);
+        assert_eq!(g.get("/scenes/hall-l.json").await.status, 200);
+    }
+    #[cfg(not(feature = "roomsim"))]
+    for parked in [
+        "/room-sim",
+        "/room-sim.js",
+        "/vendor/three.module.min.js",
+        "/scenes/bedroom.json",
+    ] {
+        assert_eq!(
+            g.get(parked).await.status,
+            404,
+            "GET {parked} in a default build"
+        );
+    }
 
     // A path the site does not define is still the API's 404, not a page.
     assert_eq!(g.get("/no-such-page").await.status, 404);

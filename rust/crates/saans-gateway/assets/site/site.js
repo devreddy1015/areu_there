@@ -3,10 +3,10 @@
 // header, and runs the interactive pieces (pipeline, links, detectors,
 // frame, tabs, waveform).
 //
-// One file serves all seven pages. Every block below is gated on an
+// One file serves every page. Every block below is gated on an
 // element that exists on exactly one of them, so the pages that do not
 // have it simply skip it — which is cheaper and far less brittle than
-// seven bundles that can drift apart.
+// one bundle per page, all able to drift apart.
 (() => {
   "use strict";
 

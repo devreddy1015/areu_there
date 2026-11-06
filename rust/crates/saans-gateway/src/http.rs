@@ -43,7 +43,7 @@
 //! consent allowed. Neither substitutes for the other: consent decides
 //! what may exist, the principal decides who may see it.
 //!
-//! The static surface is deliberately public: the seven site pages
+//! The static surface is deliberately public: the site pages
 //! ([`crate::site`]) and the dashboard at `/app` are files with no data
 //! in them, and the dashboard has to load before anyone can log in. Every
 //! route that carries data is behind [`principal`] without exception.
