@@ -24,6 +24,7 @@ how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 | [010](010-audit-retention.md) | The audit log is kept for a year, then deleted | 2026-10-19 | yes, 2026-10-24 |
 | [011](011-multi-site.md) | One gateway per site; a hosted control plane is ruled out | 2026-10-19 | **no** — and nothing is scheduled |
 | [012](012-authenticated-frames.md) | FeatureFrame v2: frames signed with a per-node key, and a counter the gateway will not accept twice | 2026-10-24 | yes, 2026-10-24, in all three implementations; the firmware builds but has not run on a board |
+| [015](015-elder-care-first.md) | Lead with elder care: an older person living alone, alerts to family; a long lie, not fall detection | 2026-11-06 | **no** — the signals, relay and app are issues #38-#42 |
 
 Writing a new one: copy the shape of the existing files — title line,
 `**Status:**` with a date, then Context, Decision, Consequences — and
