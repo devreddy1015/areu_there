@@ -289,8 +289,22 @@ moves inside the home, not for leaving it. It is not built or measured.
 own echo, lying on the side, nodes at other heights, real floors. Real
 recordings of someone lying on a floor (#46) settle it.
 
-**Measured for the long lie itself: nothing.** Its parts are measured
-as above.
+**Measured for the long lie itself (SIM, issue #38).**
+
+- **The measurement.** `saans longlie`, in `docs/RESULTS.md` under "Long
+  lie: falls caught against ordinary stillness".
+- **What it reports, side by side:**
+  - the falls caught within N + 2 minutes;
+  - the false alarms on dozing after sitting down heavily, reading,
+    fidgeting nights and walking out.
+
+  Both are given at N = 15 and 30, with the presence hold off and on.
+- **What is built.** The long lie is the per-space setting
+  `long_lie_min`, off by default.
+- **What is not.** Condition 3 is not applied, because the home-level
+  view does not exist yet.
+
+Before that, only its parts were measured, as above.
 
 ### 3.4 Sleep breathing rate trend (only where opted in)
 

@@ -186,6 +186,16 @@ def suites() -> list[Suite]:
             "NOTES.md §14 reads this.",
         ),
         Suite(
+            "longlie", "Long lie: falls caught against ordinary stillness",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "longlie", "--seeds", "12"],
+            rust, "slow",
+            "Issue #38 and docs/ELDER_CARE.md §3.3. Misses on falls that end lying still, "
+            "false alarms on dozing, reading, fidgeting nights and walking out, side by side "
+            "(ADR-005), at N = 15 and 30 min with the presence hold off (as shipped) and on. "
+            "The timelines run 40 min past the event in `saans eval`'s rooms and layouts as a "
+            "2.7 m box. Held-out seeds: no threshold was tuned on them.",
+        ),
+        Suite(
             "links", "What each extra link buys, one transmitter",
             [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "links",
              "--seats", "600", "--blind-seats", "5000"],
