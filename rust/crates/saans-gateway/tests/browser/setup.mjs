@@ -86,6 +86,7 @@ id = "hall"
 name = "Hall"
 vitals = false
 links = [{ rx = 1, tx = 255 }]
+long_lie_min = 5
 
 ${usersToml}`);
 

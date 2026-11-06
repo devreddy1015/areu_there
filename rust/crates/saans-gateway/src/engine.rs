@@ -456,6 +456,24 @@ impl Engine {
     /// Advance every space to `t_s`; returns (space index, event) pairs.
     pub fn tick(&mut self, t_s: f64) -> Vec<(usize, HealthEvent)> {
         let mut out = Vec::new();
+        // A long lie stops when someone is seen moving in one of the spaces
+        // it lists (as of the previous tick, half a second ago).
+        let moving: Vec<String> = self
+            .spaces
+            .iter()
+            .filter(|s| s.monitor.moving_now())
+            .map(|s| s.config.id.clone())
+            .collect();
+        for sp in &mut self.spaces {
+            if sp
+                .config
+                .long_lie_elsewhere
+                .iter()
+                .any(|id| moving.contains(id))
+            {
+                sp.monitor.note_motion_elsewhere();
+            }
+        }
         for (i, sp) in self.spaces.iter_mut().enumerate() {
             let sample = sp.fusion.sample(t_s);
             let mut events = sp.monitor.update(&sample);
@@ -492,6 +510,65 @@ mod tests {
             motion_energy: 0.2,
             ..Default::default()
         }
+    }
+
+    /// A bathroom with a 3-minute long lie and a living room: a sudden
+    /// movement in the bathroom at t = 30 s, then stillness there; the
+    /// living room sees someone walking at t = 100-110 s if `walker`.
+    fn long_lie_events(elsewhere: &str, walker: bool) -> usize {
+        let cfg = GatewayConfig::from_toml(&format!(
+            "[[space]]\nid = \"bath\"\nlinks = [{{ rx = 1, tx = 2 }}]\nlong_lie_min = 3\n{elsewhere}\
+             [[space]]\nid = \"living\"\nlinks = [{{ rx = 3, tx = 2 }}]\n"
+        ))
+        .unwrap();
+        let mut e = Engine::new(&cfg);
+        let mut n = 0;
+        for i in 0..1200 {
+            let t = i as f64 * TICK_S;
+            let bath = if t < 30.0 {
+                0.2
+            } else if t < 31.0 {
+                0.5
+            } else {
+                0.01
+            };
+            let living = if walker && (100.0..110.0).contains(&t) {
+                0.2
+            } else {
+                0.01
+            };
+            for (rx, gross) in [(1, bath), (3, living)] {
+                let f = FeatureFrame {
+                    gross_motion: gross,
+                    ..frame(rx, 2)
+                };
+                e.ingest(&f.encode(), t, None);
+            }
+            n += e
+                .tick(t)
+                .iter()
+                .filter(|(i, ev)| {
+                    *i == 0 && matches!(ev.kind, saans_health::EventKind::LongLie { .. })
+                })
+                .count();
+        }
+        n
+    }
+
+    #[test]
+    fn motion_in_a_listed_room_stops_a_long_lie_and_in_an_unlisted_one_does_not() {
+        let listed = "long_lie_elsewhere = [\"living\"]\n";
+        assert_eq!(long_lie_events(listed, false), 1, "nobody elsewhere");
+        assert_eq!(
+            long_lie_events(listed, true),
+            0,
+            "seen walking in the living room"
+        );
+        assert_eq!(
+            long_lie_events("", true),
+            1,
+            "the living room is not listed"
+        );
     }
 
     #[test]

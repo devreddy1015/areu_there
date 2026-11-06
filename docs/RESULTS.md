@@ -931,6 +931,21 @@ ALERTS (per scenario type; 'runs firing' = runs with at least one)
 REST PERIODS (night timelines: one long lying period with pauses and fidgets; >= 20 min of stillness starts one)
   runs with >= 1 rest period: 31/36; total rest periods reported: 31
 
+PRESENCE HOLD (ships OFF). A second pass over the same reader, night and collapse runs with it on:
+after a fall-shaped motion the links read empty with nothing moving, and presence is held, inferred,
+for up to 35 min or until motion. Minutes held with the person truly there and with the room truly
+empty; alerts raised while it held an empty room are false alarms it caused (inactivity ships on;
+possible collapse ships off); falls flagged as a possible collapse, against the first pass.
+  scenario       runs  runs held  held, there  held, empty  inactivity, empty  collapse, empty  departures held  collapse fired
+  reader           36          5          0.0          7.8                  0                1             5/36      33/36 (33)
+  night            36         13          2.7         20.3                  0                5            13/36      35/36 (35)
+  collapse         36          0          0.0          0.0                  0                0              0/0      36/36 (36)
+  raised while holding an empty room: inactivity 0, possible collapse 6
+  departures that engaged the hold: 18 of 72. The two timelines with a departure
+  (reader, night) end 120 s after it, which cuts such a hold short. In a room that stays empty it runs to
+  its 35 min cap and raises an inactivity alert at 30 min: read 'departures held' as false inactivity alerts.
+  'collapse fired': with the hold, and (in brackets) without it.
+
 BY ROOM (all layouts)
   clear-LoS  still false-empty   0.8%  breathing coverage  98.9% (within 1 BPM  96.2%)  pause sensitivity  90.6% precision  99.1%
   rich-NLoS  still false-empty   1.8%  breathing coverage  96.8% (within 1 BPM 100.0%)  pause sensitivity  82.8% precision  98.1%
@@ -991,6 +1006,21 @@ ALERTS (per scenario type; 'runs firing' = runs with at least one)
 REST PERIODS (night timelines: one long lying period with pauses and fidgets; >= 20 min of stillness starts one)
   runs with >= 1 rest period: 36/36; total rest periods reported: 36
 
+PRESENCE HOLD (ships OFF). A second pass over the same reader, night and collapse runs with it on:
+after a fall-shaped motion the links read empty with nothing moving, and presence is held, inferred,
+for up to 35 min or until motion. Minutes held with the person truly there and with the room truly
+empty; alerts raised while it held an empty room are false alarms it caused (inactivity ships on;
+possible collapse ships off); falls flagged as a possible collapse, against the first pass.
+  scenario       runs  runs held  held, there  held, empty  inactivity, empty  collapse, empty  departures held  collapse fired
+  reader           36         12         21.6         17.6                  0                6            11/36      34/36 (32)
+  night            36         11          0.5         16.0                  0                4            10/36      30/36 (30)
+  collapse         36          1          4.5          0.0                  0                0              0/0      34/36 (33)
+  raised while holding an empty room: inactivity 0, possible collapse 10
+  departures that engaged the hold: 21 of 72. The two timelines with a departure
+  (reader, night) end 120 s after it, which cuts such a hold short. In a room that stays empty it runs to
+  its 35 min cap and raises an inactivity alert at 30 min: read 'departures held' as false inactivity alerts.
+  'collapse fired': with the hold, and (in brackets) without it.
+
 BY ROOM (all layouts)
   clear-LoS  still false-empty   0.7%  breathing coverage 100.0% (within 1 BPM  92.3%)  pause sensitivity  86.0% precision  99.4%
   rich-NLoS  still false-empty   1.4%  breathing coverage  98.7% (within 1 BPM  99.9%)  pause sensitivity  93.0% precision  98.0%
@@ -1025,6 +1055,13 @@ READ AS AN EMPTY ROOM (share of the still period; spots read empty more than hal
   all                      1.0%      0.9%        10/1200      12/1200         4.1       6.8
   (occupancy unknown: 0.0% of all scored samples)
 
+AFTER THE PRESENCE HOLD (read empty and not held: what the detectors take as nobody there)
+                          lying   upright    mostly, lie   mostly, up
+  1 link                   0.8%      0.2%          2/400        1/400
+  2 links                  0.1%      0.0%          0/400        0/400
+  3 links                  0.0%      0.0%          0/400        0/400
+  all                      0.3%      0.1%         2/1200       1/1200
+
 1 LINK, BY HORIZONTAL DISTANCE FROM THE LINK LINE (both rooms)
   distance      spots     lying   upright   SNR lie    SNR up
   0.0-0.5 m       100      0.6%      8.1%       6.9       7.2
@@ -1043,6 +1080,95 @@ cumulative variances and can do worse. SYNTHETIC: a model of a body on a model o
 floor bounce of the body's own echo is not modelled, and real floors are not concrete half-spaces.
 ```
 <!-- results:end lying -->
+
+<!-- results:begin longlie -->
+## Long lie: miss rate and false alarms together, by N
+
+`cd rust && cargo run -q --release -p saans-cli -- longlie --seeds 20` — slow: regenerated by hand with `--slow`, not checked by CI
+
+Issue #38. Lies (a fall, a slow slide, a fall with a limb moving) and everything that is not one, simulated once each and replayed through the long lie for every N, presence hold off and on. docs/ELDER_CARE.md §3.3 and NOTES.md §15 read this.
+
+```text
+saans longlie -- SYNTHETIC. The long lie (issue #38) on simulated timelines.
+Rooms and layouts of `saans eval` as a 2.7 m box; 120 runs per scenario (2 rooms x 3 layouts x 20 seeds).
+Production path: FeatureExtractor -> SpaceFusion, replayed through SpaceMonitor for every N.
+Vitals off, possible collapse off, as shipped. (+) = a lie, alerted if within N + 2 min of it starting;
+every alert in any other scenario is false. The presence hold, when on, is 35 min.
+'false / occ. h' and 'false / empty h' pool the false alerts of every scenario that is not a lie over
+its occupied or empty hours: they depend on this mix of scenarios and are not a rate for a home.
+'before lie' and 'late' count alerts on the lie runs before the lie started (false: nobody was lying)
+and after the N + 2 min window (too late to count as caught); none is dropped.
+
+SUDDEN MOVEMENT: runs where the motion index reached 8 at the fall, slide or sit-down
+  fall, then still (+)        113/120
+  slide to the floor (+)       16/120
+  fall, a limb moves (+)      117/120
+  sit down hard, still 45m    120/120
+  sit down, up within 5m      118/120
+  sit down, fidgeting 45m     120/120
+  into bed quickly, 90m       120/120
+
+RUNS ALERTED, presence hold OFF (as shipped)
+  scenario                        N=3      N=5     N=10     N=15     N=20     N=30
+  fall, then still (+)        112/120  112/120  112/120  112/120  112/120  112/120
+  slide to the floor (+)       65/120   65/120   65/120   64/120   63/120   63/120
+  fall, a limb moves (+)       75/120   53/120   27/120   12/120    9/120    6/120
+  sit down hard, still 45m    119/120  119/120  118/120  118/120  118/120  118/120
+  sit down, up within 5m       53/120    0/120    0/120    0/120    0/120    0/120
+  sit down, fidgeting 45m      73/120   61/120   34/120    5/120    2/120    2/120
+  into bed quickly, 90m       117/120  112/120  101/120   94/120   81/120   51/120
+  empty room, 60m               0/120    0/120    0/120    0/120    0/120    0/120
+  walks out, empty 40m        116/120  116/120    0/120    0/120    0/120    0/120
+  walks in, reads 40m         101/120  101/120  101/120  101/120  101/120  101/120
+  fidgeting night, 2h          97/120   93/120   80/120   78/120   71/120   51/120
+
+MISS RATE AND FALSE ALARMS TOGETHER, presence hold OFF (as shipped)
+     N  falls missed slides missed   median past N    false alerts   false / occ. h  false / empty h  before lie   late
+     3          6.7%         45.8%             2 s            1088            1.522            0.000           0      9
+     5          6.7%         45.8%             2 s             870            1.217            0.000           0      3
+    10          6.7%         45.8%             2 s             555            0.776            0.000           0      2
+    15          6.7%         46.7%             2 s             479            0.670            0.000           0      0
+    20          6.7%         47.5%             2 s             426            0.596            0.000           0      0
+    30          6.7%         47.5%             2 s             340            0.476            0.000           0      0
+
+RUNS ALERTED, presence hold ON (35 min)
+  scenario                        N=3      N=5     N=10     N=15     N=20     N=30
+  fall, then still (+)        113/120  113/120  113/120  113/120  113/120  113/120
+  slide to the floor (+)       65/120   65/120   65/120   64/120   63/120   63/120
+  fall, a limb moves (+)       80/120   57/120   28/120   12/120    9/120    6/120
+  sit down hard, still 45m    120/120  120/120  120/120  120/120  120/120  120/120
+  sit down, up within 5m       54/120    0/120    0/120    0/120    0/120    0/120
+  sit down, fidgeting 45m      74/120   62/120   35/120    5/120    2/120    2/120
+  into bed quickly, 90m       117/120  113/120  102/120   95/120   82/120   52/120
+  empty room, 60m               0/120    0/120    0/120    0/120    0/120    0/120
+  walks out, empty 40m        119/120  119/120   33/120   33/120   33/120   33/120
+  walks in, reads 40m         103/120  103/120  103/120  103/120  103/120  103/120
+  fidgeting night, 2h          97/120   93/120   81/120   79/120   72/120   52/120
+
+MISS RATE AND FALSE ALARMS TOGETHER, presence hold ON (35 min)
+     N  falls missed slides missed   median past N    false alerts   false / occ. h  false / empty h  before lie   late
+     3          5.8%         45.8%             2 s            1133            1.539            0.147           0      9
+     5          5.8%         45.8%             2 s             914            1.232            0.147           0      3
+    10          5.8%         45.8%             2 s             596            0.787            0.147           0      2
+    15          5.8%         46.7%             2 s             519            0.680            0.147           0      0
+    20          5.8%         47.5%             2 s             466            0.606            0.147           0      0
+    30          5.8%         47.5%             2 s             380            0.485            0.147           0      0
+
+WALKS OUT, presence hold ON: runs with a false alert on the room once it is truly empty, left the home
+against seen moving in another room 10 s later (`long_lie_elsewhere`; the harness says so, there
+is no second room). Alerts while they still sat there count in the tables above, not here.
+                                  N=3      N=5     N=10     N=15     N=20     N=30
+  left the home                33/120   33/120   33/120   33/120   33/120   33/120
+  moving in another room        0/120    0/120    0/120    0/120    0/120    0/120
+
+BY LAYOUT, N = 15: falls missed, hold off / on; still sitters alerted, hold off
+  1 link   falls missed   6/40 /   5/40   still sitters alerted  38/40
+  2 links  falls missed   2/40 /   2/40   still sitters alerted  40/40
+  3 links  falls missed   0/40 /   0/40   still sitters alerted  40/40
+
+SYNTHETIC. Simulated physics, bodies and noise; no real lie, fall, nap or home is in these numbers.
+```
+<!-- results:end longlie -->
 
 <!-- results:begin links -->
 ## What each extra link buys, one transmitter

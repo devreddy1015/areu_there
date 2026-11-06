@@ -12,6 +12,7 @@
 
 pub mod detectors;
 pub mod fusion;
+pub mod longlie;
 pub mod system;
 pub mod types;
 

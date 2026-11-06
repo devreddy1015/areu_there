@@ -40,6 +40,37 @@ pub struct SpaceConfig {
     /// Possible-collapse detection. Off by default: WiFi cannot tell
     /// "fell" from "sat down heavily" (see the S3 evaluation).
     pub collapse_detection: bool,
+    /// Hold presence for up to this long after a fall-shaped motion: a
+    /// burst that stops abruptly, after which the links read empty with
+    /// nothing moving. A person on the floor can be too weak a breather
+    /// for the links to see (NOTES.md §14), and without the hold the space
+    /// reads empty and the inactivity alert never starts counting. Held
+    /// presence is inferred, not measured: `SpaceState::occupied` stays
+    /// what the links say and `presence_held` says it is being held.
+    ///
+    /// Off (0) by default, like collapse detection and for the same
+    /// reason: it cannot tell "fell out of sight" from "walked out". In
+    /// simulation about one departure in four engages it, and in a room
+    /// that then stays empty each of those is an inactivity alert 30 min
+    /// later. To turn it on, set it longer than `inactivity_alert_min`
+    /// (35 for the default 30).
+    pub fall_hold_min: f64,
+    /// Long lie (issue #38, docs/ELDER_CARE.md §3.3): an urgent (`Check`)
+    /// alert after a sudden movement (`BURST_INDEX`) that stops within
+    /// `COLLAPSE_SETTLE_S`, followed by this long present and without
+    /// gross motion. Does not need vitals or `collapse_detection`.
+    ///
+    /// Off (0) by default: a nap after lying down quickly looks the same,
+    /// and in simulation so does a reader who sat down heavily
+    /// (docs/RESULTS.md, "Long lie"). Opt in per room.
+    pub long_lie_min: f64,
+    /// Other spaces of this gateway in which gross motion, measured while
+    /// a long lie counts, means the person is not lying here: the count
+    /// stops. For a home, the other sensed rooms. Empty by default, so
+    /// nothing elsewhere can cancel a long lie (a campus gateway, a
+    /// neighbour through a shared wall). Applied by the gateway, which
+    /// sees every space ([`crate::SpaceMonitor::note_motion_elsewhere`]).
+    pub long_lie_elsewhere: Vec<String>,
     pub breathing_pause_min_s: f64,
     pub rate_high_bpm: f64,
     pub rate_low_bpm: f64,
@@ -55,6 +86,9 @@ impl Default for SpaceConfig {
             presence_quorum: 0,
             inactivity_alert_min: 30.0,
             collapse_detection: false,
+            fall_hold_min: 0.0,
+            long_lie_min: 0.0,
+            long_lie_elsewhere: Vec::new(),
             breathing_pause_min_s: 10.0,
             rate_high_bpm: 24.0,
             rate_low_bpm: 8.0,
@@ -142,6 +176,20 @@ pub enum EventKind {
         burst_index: f64,
         still_s: f64,
     },
+    /// No gross motion for `SpaceConfig::long_lie_min` after a sudden
+    /// movement. `held_fraction`: the share of that time presence was
+    /// held (inferred, not measured) after the links read empty.
+    LongLie {
+        still_min: f64,
+        burst_index: f64,
+        held_fraction: f64,
+    },
+    /// Gross motion in a space after its long-lie alert. Updates that
+    /// alert, never opens one: moving does not mean being fine, so the
+    /// alert stays open until a person resolves it (ELDER_CARE.md §3.3).
+    LongLieMovement {
+        after_alert_s: f64,
+    },
     RestStarted,
     RestEnded {
         duration_min: f64,
@@ -213,4 +261,25 @@ pub struct SpaceState {
     pub links_total: u8,
     pub vitals: bool,
     pub active_alerts: Vec<String>,
+    /// The links read empty, but presence is being held after a
+    /// fall-shaped motion (`SpaceConfig::fall_hold_min`). Inferred, not
+    /// measured: `occupied` is what the links say.
+    pub presence_held: bool,
+    /// A long lie counting or alerted (`SpaceConfig::long_lie_min`); None
+    /// when off or nothing has armed it.
+    pub long_lie: Option<LongLieStatus>,
+}
+
+/// Where a space's long lie stands, for the dashboard's countdown
+/// ("Long lie: 2:40 of 3:00").
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct LongLieStatus {
+    /// Since the sudden movement stopped.
+    pub still_s: f64,
+    /// `long_lie_min` in seconds.
+    pub limit_s: f64,
+    /// Presence is being held, not measured, right now.
+    pub held: bool,
+    /// The alert has been raised; it stays until gross motion is seen.
+    pub alerted: bool,
 }

@@ -81,7 +81,7 @@ fn alert_event_type(alert: &str) -> &str {
 
 fn alert_default_severity(alert: &str) -> &'static str {
     match alert {
-        "possible_collapse" | "inactivity_no_breathing" => "check",
+        "possible_collapse" | "inactivity_no_breathing" | "long_lie" => "check",
         _ => "advisory",
     }
 }

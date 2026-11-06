@@ -95,6 +95,25 @@ test('all five views render with data, and the leaked rate is nowhere', async ({
   expect(errors).toEqual([]);
 });
 
+test('a long lie counts down with vitals off, and only a health role sees it', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.goto(`${base()}/app#overview`);
+  const hall = card(page, 'Hall');
+  await expect(hall).toContainText(/Long lie: 2:5\d of 5:00/);
+  await expect(hall).toContainText('vitals: off');
+  const api = await (await page.request.get(base() + '/api/spaces/hall')).json();
+  expect(api.state.long_lie.limit_s).toBe(300);
+});
+
+test('occupancy role: no long-lie countdown, which is a health inference', async ({ page }) => {
+  await signIn(page, 'facilities');
+  await page.goto(`${base()}/app#overview`);
+  await expect(card(page, 'Hall')).toContainText('Occupied');
+  await expect(card(page, 'Hall')).not.toContainText('Long lie');
+  const seen = await (await page.request.get(base() + '/api/spaces/hall')).json();
+  expect('long_lie' in seen.state).toBe(false);
+});
+
 test('dark and light themes both render', async ({ browser }) => {
   const backgrounds = {};
   for (const colorScheme of ['dark', 'light']) {

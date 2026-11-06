@@ -17,7 +17,10 @@
 //! - `hall` (not consented): link 1<-255, occupied from 10 min to the end,
 //!   so a breathing estimate would exist in the final state if consent were
 //!   wrongly allowed. Its node is misconfigured and reports breathing
-//!   (17.25 BPM) throughout, which the gateway must withhold.
+//!   (17.25 BPM) throughout, which the gateway must withhold. At 27 min
+//!   it has a sudden movement (motion index 10 for 1 s) and is still
+//!   after it, so a long lie (`long_lie_min = 5` in setup.mjs) is counting
+//!   when the replay ends, with vitals off.
 
 use saans_dsp::features::{
     FeatureFrame, FLAG_BREATHING_VALID, FLAG_CALIBRATED, FLAG_OCCUPIED, FLAG_VITALS_ENABLED,
@@ -83,7 +86,10 @@ fn main() -> std::io::Result<()> {
             gw,
             &frame(5, 4, i, false, None).encode(),
         )?;
-        let leaky = frame(1, 255, i, hall, Some(17.25));
+        let mut leaky = frame(1, 255, i, hall, Some(17.25));
+        if (3240..3242).contains(&i) {
+            leaky.gross_motion = 0.5;
+        }
         w.write(t_ns + 3_000_000, node(1), gw, &leaky.encode())?;
     }
     w.into_inner().into_inner()?;

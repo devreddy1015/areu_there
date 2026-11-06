@@ -175,6 +175,16 @@ pub enum Activity {
     /// 0.4 m from `at` they first walk to the point 0.4 m away. Exists to
     /// measure how often "possible collapse" fires on an ordinary action.
     SitDown { at: Point, bpm: f64 },
+    /// A slow slide to the floor: the body moves from its current position
+    /// to `to` and down to the floor over `duration_s`, with no arm
+    /// flailing, then lies still breathing at `bpm` for the rest of the
+    /// segment. Exists to measure the long lie on a person who reaches the
+    /// floor without a sudden movement.
+    Slide {
+        to: Point,
+        bpm: f64,
+        duration_s: f64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -262,6 +272,7 @@ pub enum TruthKind {
     BreathingPause,
     Fall,
     SitDown,
+    Slide,
     Walking,
     Burst,
 }
