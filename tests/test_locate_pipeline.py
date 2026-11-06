@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import unittest
 
 from wifisense.localize.config import LocateConfig, LocateError
@@ -99,7 +100,10 @@ class TestRefusals(unittest.TestCase):
             with self.subTest(label=label):
                 err = self.assertRefused("label", small_scene(phone=False), Config(duration_s=0.5, **CHEAP),
                                          LocateConfig(calib_s=11.0), label=label)
-                self.assertNotIn(repr(label), str(err))
+                # As a token, not a substring: the message cites an ADR by
+                # number, and the label 3 must not match the 3 in "ADR-013".
+                echoed = re.compile(rf"(?<![\w-]){re.escape(repr(label))}(?![\w-])")
+                self.assertIsNone(echoed.search(str(err)), str(err))
 
     def test_set_room_sim_values_must_match(self):
         """§9: phone_seed, tx_power_dbm and carrier_hz, when set, must be
