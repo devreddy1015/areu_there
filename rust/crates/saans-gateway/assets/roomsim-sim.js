@@ -1,4 +1,4 @@
-// Saans room demo, simulation layer (spec/livedemo.md §9; ADR-008).
+// Saans room demo, simulation layer (spec/livedemo.md §9; ADR-013).
 //
 // Draws a room stream from GET /api/roomsim over the declared room that
 // roomsim.js draws. Every number on that stream is SIM: simulated people
@@ -6,7 +6,7 @@
 // run of the same (mode `replay`). Nothing here is sensed, and nothing
 // here is LIVE: the page never calls this stream live.
 //
-// What this layer may draw, and how (ADR-008 decisions 3-16):
+// What this layer may draw, and how (ADR-013 decisions 3-16):
 //   * a person or the phone only as an estimate WITH its radius, through
 //     one function, drawEstimate, which refuses a radius that is absent,
 //     non-finite, <= 0 or below min_plausible_radius_m (d5);
@@ -371,7 +371,7 @@ export function createSim(host) {
   // ---------------------------------------------------------- estimates
 
   /**
-   * The ONE function that draws an estimate (ADR-008 d5, §9.3). It takes
+   * The ONE function that draws an estimate (ADR-013 d5, §9.3). It takes
    * an Outcome's `estimate`, which carries its radius, never a bare
    * position, and refuses to draw one whose radius is absent, not
    * finite, <= 0 or below min_plausible_radius_m. What it draws: a ring

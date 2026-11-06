@@ -2,16 +2,16 @@
 
 **Status:** spec for Phase 9, 2026-10-25, written before any REAL figure
 was computed. Decided under the owner's blanket permission of 2026-10-25
-and flagged in ROOMSIM.md. Runs offline under ADR-009. Its figures are
+and flagged in ROOMSIM.md. Runs offline under ADR-014. Its figures are
 **REAL** (methods trained and tested on recordings), or **SIM->REAL** (a
 model trained on SIM, with or without REAL fine-tuning, tested on
 recordings). The SIM pre-training figures stay **SIM**. Nothing here is a
-product claim (ADR-009 d3): one subject, three rooms and a scripted
+product claim (ADR-014 d3): one subject, three rooms and a scripted
 protocol are far from a deployment.
 
 ## 1. Data
 
-**OpenCSI LCN 2026** (CC BY 4.0, so ADR-009 d6 allows it; cite *OpenCSI:
+**OpenCSI LCN 2026** (CC BY 4.0, so ADR-014 d6 allows it; cite *OpenCSI:
 Self-Calibrating WiFi CSI Meshes Across 802.11 Generations*, IEEE LCN
 2026). It has four sessions in three rooms. Each session uses eight ESP32
 nodes on the room's perimeter (56 directed links) and the same anonymous
@@ -38,7 +38,7 @@ length and width. **What it does not give:** node positions, the subject's
 position, and so zones and xy. Phase 9 therefore scores presence and count
 (at most one person) only; the zone and xy heads are not evaluable on it.
 
-**LoFi and WiCount** carry no licence. Under ADR-009 d6 they are not used
+**LoFi and WiCount** carry no licence. Under ADR-014 d6 they are not used
 until their authors agree, so no loader is written for them. This is
 flagged for the owner (ROOMSIM.md open items).
 

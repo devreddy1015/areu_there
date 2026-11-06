@@ -27,7 +27,7 @@ Locate v1 (spec/locate.md), added beside them:
     config    — every §9 parameter and its validation (`LocateConfig`)
     baseline  — the weighted-link-midpoint baseline with a gate and a
                 radius (§5)
-    phone     — a SIM-only phone (ADR-008 d16) ranging itself to the nodes
+    phone     — a SIM-only phone (ADR-013 d16) ranging itself to the nodes
                 by Wi-Fi RTT and RSSI, its fixes and Kalman filters (§6-§7).
                 A cooperative device measuring its own distances; this is
                 not the multilateration of people that RESEARCH.md §0 and
@@ -36,7 +36,7 @@ Locate v1 (spec/locate.md), added beside them:
                 records (§4.3, §10)
 
 Every estimate is a position with a radius, or an abstention with a
-reason; never a bare point (ADR-008 d5). Everything Locate produces in
+reason; never a bare point (ADR-013 d5). Everything Locate produces in
 Phase 4 is SIM.
 """
 

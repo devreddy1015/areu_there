@@ -9,7 +9,7 @@
 //! **Everything here is SYNTHETIC.** No measurement of a real room, a
 //! real body or a real ESP32 enters this module, and `shared.mode` is
 //! [`Mode::Sim`] (`"sim"` on the wire; `"simulated"` before the closed
-//! mode enum of ADR-008 d15) so every reader of the API is told so.
+//! mode enum of ADR-013 d15) so every reader of the API is told so.
 //!
 //! ## What the mode is for
 //!

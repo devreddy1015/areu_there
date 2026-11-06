@@ -305,7 +305,7 @@ fn validation_names_the_parameter() {
         ("tick_hz", |c, v| c.tick_hz = v),
         ("calib_s", |c, v| c.calib_s = v),
         ("window_s", |c, v| c.window_s = v),
-        // A zero radius would publish a bare point (ADR-008 d5).
+        // A zero radius would publish a bare point (ADR-013 d5).
         ("min_plausible_radius_m", |c, v| {
             c.min_plausible_radius_m = v
         }),

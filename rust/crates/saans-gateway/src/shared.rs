@@ -35,7 +35,7 @@ pub struct Published {
     pub state_msg: Option<Arc<str>>,
 }
 
-/// Where the data a view shows comes from (ADR-008 d15, spec/livedemo.md
+/// Where the data a view shows comes from (ADR-013 d15, spec/livedemo.md
 /// §1). Closed: every view maps it exhaustively with no default branch,
 /// so a fourth mode cannot be added without each of them being updated,
 /// and nothing infers the mode from anything else.

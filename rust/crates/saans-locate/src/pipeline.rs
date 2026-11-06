@@ -8,13 +8,13 @@
 //!   baseline (§5) and RTI (the ported `invert`/`track`), each an estimate
 //!   with a radius or an abstention with a reason;
 //! - one **epoch record** per fired phone epoch (§6, §7), from the phone
-//!   module, which is simulated only (ADR-008 decision 16).
+//!   module, which is simulated only (ADR-013 decision 16).
 //!
 //! [`run_roomsim`] is one [`RoomSimSetup`] and one stream of it advanced
 //! to the end in one step (spec/livedemo.md §8.1), so a stream advanced in
 //! any steps gives its records.
 //!
-//! The scene is read through `saans-scene` without `write` (ADR-008
+//! The scene is read through `saans-scene` without `write` (ADR-013
 //! decision 1). No `Person.id` or `Phone.id` is read from the scene here:
 //! people are `people[i]` by index, so no id can reach a record, log or
 //! error.
@@ -69,7 +69,7 @@ pub enum PipelineError {
     /// fails validation or is not Room Sim's is [`PipelineError::Phone`].
     Refused { param: &'static str, reason: String },
     /// A label other than `"SIM"` for Room Sim input (the phone is
-    /// simulated only, ADR-008 decision 16). The given label is not
+    /// simulated only, ADR-013 decision 16). The given label is not
     /// repeated.
     Label,
     /// Room Sim rejected the scene or its configuration (its error names
@@ -101,7 +101,7 @@ impl std::fmt::Display for PipelineError {
         match self {
             PipelineError::Refused { param, reason } => write!(f, "{param}: {reason}"),
             PipelineError::Label => f.write_str(
-                "label: Room Sim input is simulated (ADR-008 decision 16); the only label is \"SIM\"",
+                "label: Room Sim input is simulated (ADR-013 decision 16); the only label is \"SIM\"",
             ),
             PipelineError::RoomSim(e) => write!(f, "Room Sim: {e}"),
             PipelineError::Locate(e) => write!(f, "{e}"),

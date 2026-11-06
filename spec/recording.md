@@ -62,7 +62,7 @@ one segment.
 
 **Scene.** When the room is declared, node positions are SCENE and the
 windows carry `geometry_known` true; otherwise false, as for OpenCSI. A
-person's position is never recorded (ADR-008); zones and xy stay
+person's position is never recorded (ADR-013); zones and xy stay
 unscored unless a later protocol adds marked positions with the owner's
 agreement.
 

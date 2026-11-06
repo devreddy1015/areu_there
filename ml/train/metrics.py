@@ -2,7 +2,7 @@
 
 Every figure here is **SIM** and every result dict says so (`"label":
 "SIM"`): the windows are simulated (spec/dataset.md), and nothing here is
-a claim about real rooms (ADR-008 d9, ADR-009).
+a claim about real rooms (ADR-013 d9, ADR-014).
 
 **The predictions contract.** Every method — the model, the stored and
 recomputed WLM and RTI, the forest, the MLP and the prior — hands its
@@ -249,7 +249,7 @@ def check_predictions(pred: dict, n: int | None = None) -> dict:
             live = live.copy()
             live[:, 0] |= out["published"]
         if not np.isfinite(out["slot_xy"][live]).all() or not np.isfinite(rad[live]).all() or (rad[live] <= 0).any():
-            raise ValueError("every estimate needs a finite centre and a finite positive radius (ADR-008 d5)")
+            raise ValueError("every estimate needs a finite centre and a finite positive radius (ADR-013 d5)")
         out["_radius"] = rad
     if out.get("slot_exist") is None and out.get("slot_xy") is not None:
         out["slot_exist"] = np.zeros((n, N_SLOTS))
@@ -628,7 +628,7 @@ def _one_figures(one: dict, wt: np.ndarray, restrict: np.ndarray | None = None, 
 def _point_tables(at: dict, truth: dict) -> dict:
     """Point-only tables: the 4 x 4 count confusion (rows truth, columns
     predicted) and each cell's zone confusion counts over windows where it
-    is reachable (ADR-008 d8)."""
+    is reachable (ADR-013 d8)."""
     out = {}
     if "chat" in at:
         conf = np.zeros((4, 4), np.int64)

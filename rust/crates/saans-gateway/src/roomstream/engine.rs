@@ -1180,7 +1180,7 @@ mod tests {
         assert!(scored > 0, "some estimate was scored");
     }
 
-    /// ADR-008 decision 3: for every shipped scene and variant, no
+    /// ADR-013 decision 3: for every shipped scene and variant, no
     /// `Person.id` or `Phone.id` is a string value in any state, frame or
     /// error. A walk of the parsed JSON, not a text search: the shipped
     /// phone's id "phone" is also a frame key.

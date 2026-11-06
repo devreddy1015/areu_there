@@ -123,7 +123,7 @@ class TestRadius(unittest.TestCase):
     def test_zero_radius_is_never_published(self):
         """§8: every publication test also needs `r > 0`, so a caller that
         passes a zero (or negative) minimum still never publishes a bare
-        point (ADR-008 d5)."""
+        point (ADR-013 d5)."""
         for minr in (0.0, -0.0, -10.0, NAN):
             with self.subTest(minr=minr):
                 self.assertFalse(publishable(0.0, minr))
@@ -317,7 +317,7 @@ class TestConfig(unittest.TestCase):
 
     def test_positive(self):
         # min_plausible_radius_m and the three scales too: a zero radius
-        # would publish a bare point (ADR-008 d5); carrier_hz guards C / f.
+        # would publish a bare point (ADR-013 d5); carrier_hz guards C / f.
         for p in ("rtt_sigma_m", "rssi_shadow_sigma_db", "rssi_shadow_corr_m", "rssi_breakpoint_m",
                   "phone_rate_hz", "huber_k", "rssi_far_exponent", "rssi_est_exponent",
                   "phone_accel_psd", "phone_init_speed_std", "tick_hz", "calib_s", "window_s",

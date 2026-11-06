@@ -1,4 +1,4 @@
-// Saans room demo (ADR-008): draws a DECLARED scene with three.js.
+// Saans room demo (ADR-013): draws a DECLARED scene with three.js.
 //
 // The room comes from a scene file and is labelled SCENE: it is declared,
 // never measured by WiFi. The gateway serves a scene through an allowlist
@@ -240,7 +240,7 @@ function clearRoom() {
  * simulated estimate's label (`est`) outranks everything but the
  * selection; truth and error labels come next. None of the three is ever
  * hidden: a ring without its radius, or a cross or segment without its
- * name, would read as a point estimate (ADR-008 d5).
+ * name, would read as a point estimate (ADR-013 d5).
  */
 const PRIORITY = { est: 8, truth: 7, err: 7, dim: 3, node: 2, object: 1 };
 

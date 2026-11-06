@@ -8,7 +8,7 @@ baseline) and spec/scene.schema.json (the scene format).
 
 **Owner decisions, 2026-10-24** (asked and answered):
 1. **Provenance.** `saans-scene` gains `Provenance::Generated`, serialised
-   `"generated"` (a public-API change to `saans-scene`, approved; ADR-008
+   `"generated"` (a public-API change to `saans-scene`, approved; ADR-013
    amended). Every scene this command writes says so; no generated scene
    claims to be a room.
 2. **What is generated now.** The impairment layer ON only, 2,000 scenes
@@ -267,7 +267,7 @@ over present people; a one-estimate baseline (WLM, RTI) is scored for
 presence as `published`, for xy against the nearest present person
 (optimistic when `count >= 2`; reported per count), for zone as a hit when
 its cell is set in `zone_occupied`; coverage (the published share) is
-reported beside every accuracy (ADR-008 d7).
+reported beside every accuracy (ADR-013 d7).
 
 ## 6. The baseline (Locate v1, SIM)
 

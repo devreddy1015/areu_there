@@ -313,7 +313,7 @@ fn no_published_wlm_radius_is_below_the_floor() {
 fn a_zero_radius_is_never_published_even_with_a_zero_minimum() {
     // §8: every publication test also requires r > 0, so a raw library
     // call with min_plausible_radius_m 0 (which Config refuses) still
-    // never publishes a bare point (ADR-008 d5).
+    // never publishes a bare point (ADR-013 d5).
     let sq = links(&SQUARE);
     let mut y = vec![0.0; sq.len()];
     y[li(0, 2)] = 2.0;

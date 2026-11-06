@@ -19,12 +19,12 @@
 //!
 //! A frame goes only to the socket of the connection that asked for it.
 //! Nothing here touches `Shared::live_tx`, `Shared::outputs`,
-//! `Published`, the event log, the history or the disk (§2.5, ADR-008
+//! `Published`, the event log, the history or the disk (§2.5, ADR-013
 //! decision 11). The only trace a request leaves is the audit `Denied`
 //! record of a role refusal (§2.3), which carries no position.
 //!
 //! No scene's `Person.id` or `Phone.id` is sent, logged or kept: people
-//! are indices, and the phone is the phone (ADR-008 decision 3).
+//! are indices, and the phone is the phone (ADR-013 decision 3).
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -122,7 +122,7 @@ pub(crate) struct Embedded {
     pub(crate) index: usize,
     /// The scene's id in `/roomsim/scenes` (declared geometry, sent).
     pub(crate) id: &'static str,
-    /// The file as embedded; its sha256 names it (ADR-008 decision 4).
+    /// The file as embedded; its sha256 names it (ADR-013 decision 4).
     pub(crate) text: &'static str,
 }
 

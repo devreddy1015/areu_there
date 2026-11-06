@@ -27,7 +27,7 @@
 //!
 //! The scene is read as `roomsim-export` reads it: its people and phone
 //! ids are checked before it is parsed, so no message quotes one, and no
-//! output names a person or the phone by its scene id (ADR-008 decision
+//! output names a person or the phone by its scene id (ADR-013 decision
 //! 3). A refusal names the parameter (`--scene`, `--seconds` …) and exits
 //! with code 2.
 //!

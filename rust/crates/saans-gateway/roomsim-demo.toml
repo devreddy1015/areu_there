@@ -1,8 +1,8 @@
-# Loopback-only gateway for looking at the room demo (ADR-008).
+# Loopback-only gateway for looking at the room demo (ADR-013).
 #
 #   cd rust && cargo run -p saans-gateway --features roomsim -- --config crates/saans-gateway/roomsim-demo.toml
 #
-# The `roomsim` feature is off by default (ADR-008 decision 13); without
+# The `roomsim` feature is off by default (ADR-013 decision 13); without
 # it /roomsim is a 404.
 #   then open http://127.0.0.1:18080/roomsim
 #

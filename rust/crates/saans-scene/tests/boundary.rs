@@ -1,4 +1,4 @@
-//! ADR-008 decision 1: geometry is declared, never inferred. Nothing that
+//! ADR-013 decision 1: geometry is declared, never inferred. Nothing that
 //! carries CSI may write a scene.
 //!
 //! The mechanism is the `write` cargo feature: `Serialize` on the scene
@@ -86,13 +86,13 @@ fn only_writers_enable_write_and_only_known_readers_depend_on_the_scene_crate() 
         if enables_write(&manifest) {
             assert!(
                 writer,
-                "ADR-008 decision 1: {name} enables saans-scene's `write` feature but is not a writer. \
+                "ADR-013 decision 1: {name} enables saans-scene's `write` feature but is not a writer. \
                  A crate that carries CSI may read scenes, never write them."
             );
         } else {
             assert!(
                 writer || reader,
-                "ADR-008 decision 1: {name} now depends on saans-scene but is on neither list. \
+                "ADR-013 decision 1: {name} now depends on saans-scene but is on neither list. \
                  Decide whether it may only read scenes (READERS) or is a human tool that writes them (WRITERS)."
             );
         }

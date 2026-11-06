@@ -160,7 +160,7 @@ pub(crate) async fn handler(
         Ok(p) => p,
         Err(r) => return r,
     };
-    // 3. Simulated positions: admin and safety only (ADR-008 d10).
+    // 3. Simulated positions: admin and safety only (ADR-013 d10).
     if !who.can_see_position(None) {
         app.audit.record(
             now_unix_ms(),

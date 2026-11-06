@@ -1,6 +1,6 @@
 """The simulated phone (spec/locate.md §6-§7): RTT and RSSI to every node, fixes, filters.
 
-**SIM only** (ADR-008 decision 16). Every public entry point refuses any
+**SIM only** (ADR-013 decision 16). Every public entry point refuses any
 label but `"SIM"`. A phone ranging to nodes is a cooperative device
 measuring its own distances; it is not the multilateration of people that
 CAMPUS_SENSING_PROMPT.md §3 bans (people are located only by the links they

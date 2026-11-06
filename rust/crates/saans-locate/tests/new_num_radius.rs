@@ -137,7 +137,7 @@ fn radius95_nan_and_negative_fail_closed() {
     assert!(!plausible(0.29, 0.3));
     assert!(plausible(0.3, 0.3));
     // r > 0 whatever the minimum (§8): a raw call with minimum 0 and a
-    // zero radius abstains implausible_radius (ADR-008 d5).
+    // zero radius abstains implausible_radius (ADR-013 d5).
     assert!(!plausible(0.0, 0.0));
     assert!(!plausible(-0.0, -1.0));
     assert!(!plausible(-1.0, -10.0));

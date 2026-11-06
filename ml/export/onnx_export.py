@@ -1,6 +1,6 @@
 """ONNX export of a trained model v1 and its check (Phase 12).
 
-ADR-009 decision 4: an export is a research artefact. Loading it in the
+ADR-014 decision 4: an export is a research artefact. Loading it in the
 gateway is a later ADR; `docs/onnx-ort.md` notes how that would read it.
 
 The exported graph takes the §1 batch as ten explicit inputs (float32

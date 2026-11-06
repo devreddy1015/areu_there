@@ -1,7 +1,7 @@
 # The three test suites of record (COMPLETION_REPORT §5, RUN.md §3).
 #
 # Until this file, nothing in CI compiled or ran a test: the only workflow
-# was CodeQL with `build-mode: none`. ADR-008 decision 14 names a job like
+# was CodeQL with `build-mode: none`. ADR-013 decision 14 names a job like
 # this as a prerequisite, because every rule that ADR states is enforced
 # by `cargo test` and would otherwise be enforced by review alone.
 #
@@ -32,7 +32,7 @@ jobs:
       - run: rustup toolchain install stable --profile minimal && rustup default stable
       - run: cargo test --workspace --locked
         working-directory: rust
-      # The room demo is compiled only with this feature (ADR-008 decision
+      # The room demo is compiled only with this feature (ADR-013 decision
       # 13), so its tests run only here. The feature is named rather than
       # using --all-features, so a feature added later to some other crate
       # is not switched on here by accident.
@@ -41,7 +41,7 @@ jobs:
       # saans-roomsim by itself (spec/roomsim.md §14). In the workspace
       # build above, cargo unifies features, and saans-cli switches on
       # saans-scene's `write`; only a standalone build proves the
-      # simulator compiles and passes without it (ADR-008 decision 1).
+      # simulator compiles and passes without it (ADR-013 decision 1).
       - run: cargo check -p saans-roomsim --locked
         working-directory: rust
       - run: cargo test -p saans-roomsim --locked

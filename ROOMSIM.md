@@ -4,7 +4,7 @@ The working record for the Room Sim / ML / simulator-realism plan (twelve
 phases: scene format → web demo → simulator upgrade → localisation →
 live demo → dataset → model → real data → Sionna and calibration → export).
 Read it with [RUN.md](RUN.md) (how to run everything on the GPU box) and
-[ADR-008](docs/adr/008-declared-geometry-and-drawing.md) (what may be
+[ADR-013](docs/adr/013-declared-geometry-and-drawing.md) (what may be
 drawn). Every number below comes from a run on this machine; simulator and
 scene numbers are labelled as such.
 
@@ -59,7 +59,7 @@ nothing past Phase 7 has been started, not lack of time.
 | `rust/crates/saans-gateway/assets/vendor/three-0.186.1/` | Vendored three.js, integrity-checked, pinned by SHA-256, one documented one-line change (VENDOR.md). |
 | `rust/crates/saans-gateway/roomsim-demo.toml` | Loopback config to run the demo. |
 | `rust/crates/saans-gateway/tests/browser/roomsim_check.py` | **The repo's first browser end-to-end test.** Drives Chrome: render, CSP, clicks, toggles, phone width. |
-| `docs/adr/008-declared-geometry-and-drawing.md` | Accepted. What the room view may draw and who may see it. |
+| `docs/adr/013-declared-geometry-and-drawing.md` | Accepted. What the room view may draw and who may see it. |
 | `.github/workflows/tests.yml` | First CI job that runs tests at all. **Never run** — no push access from here. |
 | `RUN.md` | Environment facts, how to run, monitor and resume, known failures with causes. |
 
@@ -67,20 +67,20 @@ nothing past Phase 7 has been started, not lack of time.
 
 | When | Decision | By |
 |---|---|---|
-| 2026-10-21 | ADR-008 accepted: geometry is declared, never inferred; the room may be drawn, a person only as an estimate with an uncertainty radius, gated by role and consent; LIVE gated by a mechanism. | Owner |
+| 2026-10-21 | ADR-013 accepted: geometry is declared, never inferred; the room may be drawn, a person only as an estimate with an uncertainty radius, gated by role and consent; LIVE gated by a mechanism. | Owner |
 | 2026-10-21 | `Shared::mode` becomes `Mode { Sim, Replay, Live }` (a public-API change to saans-gateway). Done in Phase 5; the wire spelling stays `live`/`replay`. | Owner |
 | 2026-10-21 | The phone is simulated only; a LIVE phone needs its own ADR. | Owner |
 | 2026-10-21 | Static demo now; mode enum and scene-to-space binding left for Phase 5. | Owner |
-| 2026-10-21 | `provenance` is a required scene field; the examples say `hand_written`. | Implements ADR-008 decision 4 |
-| 2026-10-21 | three.js 0.186.1 vendored, served from the binary; demo CSP allows nothing inline. | Implements ADR-008 decision 12 |
+| 2026-10-21 | `provenance` is a required scene field; the examples say `hand_written`. | Implements ADR-013 decision 4 |
+| 2026-10-21 | three.js 0.186.1 vendored, served from the binary; demo CSP allows nothing inline. | Implements ADR-013 decision 12 |
 | 2026-10-21 | Room Sim is a **new** crate `saans-roomsim` and package `wifisense/roomsim/`, not an extension of `saans-sim` as the brief says. Extending `saans-sim` changes its public types (`Scenario`, `Room`, `SimOptions`, `LinkFrame`, `Tick`) and moves the `sim_geometric` golden vectors the S3 detector evaluation depends on. | **Proposed — owner to confirm** (open item 7) |
-| 2026-10-21 | `saans-scene` gains a `write` cargo feature: `Serialize`, `Scene::save`, `to_json_pretty` and the RoomPlan importer exist only with it. Only `saans-cli` enables it; `tests/boundary.rs` holds two allowlists (writers; readers such as `saans-roomsim`). A public-API change to `saans-scene`. | Implements ADR-008 decision 1; **owner to confirm the API change** |
+| 2026-10-21 | `saans-scene` gains a `write` cargo feature: `Serialize`, `Scene::save`, `to_json_pretty` and the RoomPlan importer exist only with it. Only `saans-cli` enables it; `tests/boundary.rs` holds two allowlists (writers; readers such as `saans-roomsim`). A public-API change to `saans-scene`. | Implements ADR-013 decision 1; **owner to confirm the API change** |
 | 2026-10-21 | `saans-cli` is both the scene writer and a SIM CSI producer (`export` already was; `roomsim-export` now too). No command writes a scene from CSI; nothing structural stops a future one. | **Proposed — owner to confirm**, or split `roomsim-export` into its own binary |
 | 2026-10-21 | Scene fixes in files this work wrote: bedroom almirah centre x 3.5 → 3.3 (node 1 was inside it); hall "sitter" (7.0, 1.8) → (7.0, 0.6), onto the sofa; office occupants y 2.5 → 2.1, onto their chairs (they were frozen standing behind them). | Fixes found by the Phase 3 reviews |
 | 2026-10-24 | Locate v1 (spec/locate.md header): Python first, then Rust (ADR-002); the person estimators read RSSI variance on Room Sim data because Room Sim's AGC normalises CSI power away; the radius is a model flagged `radius_calibrated: false` until Phase 5 measures coverage; the baseline abstains rather than guessing the room centre; the phone is SIM only and its radio model lives in `saans-locate`, not Room Sim; one person estimate per estimator; scenes with `roles` or stacked nodes refused by the person pipeline. | **Proposed — owner to confirm** (open item 12) |
-| 2026-10-24 | Phase 5 (spec/livedemo.md header): the additive APIs (`can_see_position`, a room handle on `Shared`, the streaming driver, score and records in `saans-locate`); the frame adapted to ADR-008 (per-estimator estimates with radii or abstentions, truth by index in SIM only, phone RTT and RSSI each with a radius, a timestamp per block); SIM plus REPLAY of recorded runs, no LIVE; RTI never drawn without the baseline, the baseline may be drawn alone. | Owner |
+| 2026-10-24 | Phase 5 (spec/livedemo.md header): the additive APIs (`can_see_position`, a room handle on `Shared`, the streaming driver, score and records in `saans-locate`); the frame adapted to ADR-013 (per-estimator estimates with radii or abstentions, truth by index in SIM only, phone RTT and RSSI each with a radius, a timestamp per block); SIM plus REPLAY of recorded runs, no LIVE; RTI never drawn without the baseline, the baseline may be drawn alone. | Owner |
 | 2026-10-24 | Phase 5 choices made here (spec/livedemo.md *Decisions taken here*): `/api/roomsim` checks `Origin` and, on an auth-off gateway, a loopback `Host`; one thread per session, at most 4; frames never dropped; radii shown as uncalibrated models; truth drawn from each record's own truth; an empty-room run per session so coverage always sits beside the false-alarm rate; variants named `declared`/`with_walker`/`empty`, the page defaulting to `with_walker`; `can_see_position(Some(_))` false until a per-space opt-in exists; the simulation crates at `opt-level = 2` in the dev profile; the pcap `--replay` left unlabelled. | **Proposed — owner to confirm** (open item 13) |
-| 2026-10-24 | Phase 6 (spec/dataset.md header): `Provenance::Generated` in `saans-scene` (ADR-008 amended); the impairments-ON dataset now, the OFF copy in Phase 8 from the same scenes. | Owner |
+| 2026-10-24 | Phase 6 (spec/dataset.md header): `Provenance::Generated` in `saans-scene` (ADR-013 amended); the impairments-ON dataset now, the OFF copy in Phase 8 from the same scenes. | Owner |
 | 2026-10-24 | Phase 6 choices made here (spec/dataset.md *Decisions taken here*): `.npz` from a hand-written zip writer; the ESP32's int8 I/Q stored rather than amplitude (same bytes, phase kept; the loader returns the brief's amplitude); one continuous stream per room with labels every 0.5 s, the brief's 2 s windows cut by the loader; Locate's outcomes and the empty-room calibration stored; stratified by-scene splits in the manifest; `--no-impair` = the hardware impairments off with the receiver's noise kept (Room Sim's master switch removes the noise too and makes presence trivial); people start 0.5 m apart; `ml/` for ML tooling; about 17 GB rather than the 15 GB first quoted. | **Proposed — owner to confirm** (open item 14) |
 | 2026-10-24 | Phase 7 (spec/preprocess.md header): the z-score is per link and subcarrier over the window, with the removed mean and spread kept as side features; the output grid is the 52 LLTF subcarriers with a per-source carried mask. | Owner |
 | 2026-10-25 | Phase 7 choices made here (spec/preprocess.md *Decisions taken here*): numpy in `ml/` with a stdlib reference and no Rust port; one canonical record and one reader per source; gain and the phase fit computed over the 44 subcarriers every source carries (so 44- and 52-bin sources are normalised identically), the other carried bins output with the same gain; phase off by default, output as (cos, sin), the slope never output; no resampling by default, optional integer-ns binning that averages amplitudes; unbiased sigma with a 3-packet minimum; labels derived, never overridable; a recording with several transmitters refused rather than pooled. | **Proposed — owner to confirm** (open item 15) |
@@ -138,10 +138,10 @@ the Phase 4, 5 and 6 rows are from 2026-10-24.
 
 **Review.** Phase 2 went through two rounds of multi-agent review, each
 finding checked by a second agent who tried to refute it by reproducing
-it. Round one — ADR-008 compliance, security, frontend correctness, repo
+it. Round one — ADR-013 compliance, security, frontend correctness, repo
 conventions — confirmed 44 findings and refuted none; 43 are fixed and
 the 44th is open item 2. Its two serious ones: the page was compiled into
-every gateway build, contrary to the accepted ADR-008 decision 13, and
+every gateway build, contrary to the accepted ADR-013 decision 13, and
 clicking a label selected whatever was behind it. Round two audited that
 the fixes had landed, hunted for regressions they introduced, and
 fact-checked these documents: 35 more confirmed, mostly in the docs (a
@@ -205,7 +205,7 @@ point, the radius sizes and the empty-room rates needed to read it
 honestly. All are fixed except the regeneration hints in `edge/dsp/bench/` (open item 12). A second round (fix audit, regression hunt with differential checks, docs fact-check; each finding again checked by a refuting agent) confirmed 19 and partly confirmed 9 more, all fixed: the collinear test still let through anchors collinear to rounding on an axis-aligned line (a node at `0.1+0.2` published a mirror fix 8.4 m off), now replaced by a test that does not depend on the line's direction; a library caller could still publish a zero radius; Python checked a far-away phone only at epochs; the two implementations resolved phone defaults differently outside Room Sim runs; and several §13 sentences overstated what the measurements show.
 
 **Phase 5 review.** Before any code, a four-lens review of
-`spec/livedemo.md` (rules and ADR-008, gateway, protocol, page), with a
+`spec/livedemo.md` (rules and ADR-013, gateway, protocol, page), with a
 refuting verifier per finding, confirmed or partly confirmed 46 of 48
 findings. Among them:
 - a browser cannot see why a WebSocket handshake was refused, so the
@@ -316,12 +316,12 @@ benchmark in RUN.md §1.
    before Phase 8 starts, the way every other decision here is recorded,
    rather than left implicit.
 4. **CI has never run.** `.github/workflows/tests.yml` exists because
-   ADR-008 decision 14 requires it, and it now triggers on a push to any
+   ADR-013 decision 14 requires it, and it now triggers on a push to any
    branch, so pushing `saans/scene-format` will be its first run. Every
    command in it was run locally first except `sudo sysctl`, which was
    not run on this shared machine; that it makes the UDP test pass is
    expected, not observed.
-5. **ADR-008 items that arrive with Phase 5:** the `Mode { Sim, Replay,
+5. **ADR-013 items that arrive with Phase 5:** the `Mode { Sim, Replay,
    Live }` enum (approved); refusing at config load to serve the room
    view LIVE without the feature (decision 13's second half); binding a
    surveyed scene to a configured space, behind the authenticated `/api`
@@ -392,7 +392,7 @@ benchmark in RUN.md §1.
       §3.1 calls "Unchanged API".
     - *RTI on RSSI does not localise in the bedroom or the office* and
       false-alarms on 17.6% of the hall's empty-room ticks (spec §13, SIM).
-      ADR-008 d9's "both or neither" would then hide the baseline whenever
+      ADR-013 d9's "both or neither" would then hide the baseline whenever
       RTI abstains; Phase 5 must decide how the demo treats that.
       (Decided 2026-10-24: RTI is never drawn without the baseline; the
       baseline may be drawn alone, with RTI's abstention shown.)
@@ -401,13 +401,13 @@ benchmark in RUN.md §1.
       so a Phase 5 calibration to 95% coverage would set
       `wlm_radius_scale` near 0.4–0.6 (median radius about 1.3–3.4 m).
       Its error (median 0.7–1.7 m on walking ticks) is its real limit.
-    - *Zones* (ADR-008 d2, d8) still have no type; the measurements are in
+    - *Zones* (ADR-013 d2, d8) still have no type; the measurements are in
       metres. Adding them is a public-API change to `saans-scene`.
-    - *FeatureFrame input* (ADR-008 d9's runtime) is Phase 5's: the
+    - *FeatureFrame input* (ADR-013 d9's runtime) is Phase 5's: the
       estimators take any per-link `y`.
     - *The classic ESP32 cannot be an FTM responder* (ESP32-S2/S3/C3/C6
       can), so phone RTT to classic nodes is SIM-only in principle, not
-      only by ADR-008 d16.
+      only by ADR-013 d16.
     - `edge/dsp/bench/run_bench.sh` and `run_size_report.sh` still print
       `python3 spec/golden/generate.py`, which `generate.py` now refuses
       (it runs only on CPython 3.14); `edge/` was left untouched.

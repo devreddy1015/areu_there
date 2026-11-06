@@ -18,7 +18,7 @@
 //! | `GET /api/alerts/{id}` | one alert | as the event |
 //! | `POST /api/alerts/{id}/ack` | acknowledge; audited | admin, safety; in scope |
 //! | `POST /api/alerts/{id}/resolve` | `{"note"}` optional; audited | admin, safety; in scope |
-//! | `GET /roomsim` | the room demo page (ADR-008); `roomsim` feature only | anyone |
+//! | `GET /roomsim` | the room demo page (ADR-013); `roomsim` feature only | anyone |
 //! | `GET /roomsim/roomsim.js`, `/roomsim/roomsim.css` | the demo's own script and stylesheet | anyone |
 //! | `GET /roomsim/vendor/{rev}/{file}` | vendored three.js, three named files, cached immutable | anyone |
 //! | `GET /roomsim/sim/{rev}/roomsim-sim.js` | the page's SIM layer, named by its own digest, cached immutable | anyone |
@@ -200,7 +200,7 @@ pub fn router(deps: HttpDeps) -> Router {
             get(move || async move { crate::site::asset_response(a) }),
         );
     }
-    // The room demo is compiled in only on purpose (ADR-008 decision 13).
+    // The room demo is compiled in only on purpose (ADR-013 decision 13).
     #[cfg(feature = "roomsim")]
     let r = r
         .merge(crate::roomsim::routes())
@@ -1061,7 +1061,7 @@ mod tests {
         assert!(DASHBOARD_HTML.contains("not a medical device"));
     }
 
-    /// ADR-008 decision 12: the demo page does not ship before the
+    /// ADR-013 decision 12: the demo page does not ship before the
     /// self-containment check covers it.
     #[cfg(feature = "roomsim")]
     #[test]

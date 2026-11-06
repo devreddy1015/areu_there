@@ -1,7 +1,7 @@
 //! The radius (spec/locate.md §8) and the published estimate (§11).
 //!
 //! An estimate is always a position **with a radius**, or an abstention
-//! with a reason; never a bare point (ADR-008 decision 5). The radius is a
+//! with a reason; never a bare point (ADR-013 decision 5). The radius is a
 //! model statement, uncalibrated in Phase 4: every [`Estimate`] carries
 //! `radius_calibrated: false`.
 
@@ -118,7 +118,7 @@ pub fn radius95(a: f64, b: f64, d: f64) -> f64 {
 /// The radius half of §8's publication test: `isfinite(r) and r > 0.0
 /// and r >= min_plausible_radius_m` (NaN fails). `r > 0` holds even for a
 /// caller that passes a zero (or negative) minimum, so a bare point is
-/// never published (ADR-008 d5).
+/// never published (ADR-013 d5).
 pub fn plausible(r: f64, min_plausible_radius_m: f64) -> bool {
     finite_at_least(r, min_plausible_radius_m) && r > 0.0
 }

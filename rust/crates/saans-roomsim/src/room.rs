@@ -1,7 +1,7 @@
 //! The scene adapter of spec/roomsim.md §3.1: a `saans_scene::Scene`, read
 //! only, as the geometry the simulator works with.
 //!
-//! The room comes from the scene file and nothing else (ADR-008): no
+//! The room comes from the scene file and nothing else (ADR-013): no
 //! number here is ever derived from CSI.
 
 use crate::config::Config;

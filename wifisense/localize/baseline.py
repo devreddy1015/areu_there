@@ -1,6 +1,6 @@
 """Weighted-link-midpoint baseline (spec/locate.md §5): a position with a radius, or an abstention.
 
-The baseline ADR-008 decision 9 asks every other person estimator to be
+The baseline ADR-013 decision 9 asks every other person estimator to be
 published beside: each disturbed link votes for its midpoint, weighted by
 how disturbed it is. Two things make it more than `evaluate_localize.py`'s
 version, which is left unchanged:

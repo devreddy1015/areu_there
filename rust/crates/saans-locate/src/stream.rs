@@ -17,7 +17,7 @@
 //!
 //! No `Person.id` or `Phone.id` is kept: a setup's scene is a copy with
 //! both cleared (Room Sim never reads them), and neither type prints its
-//! scene, frames or simulator (ADR-008 decision 3).
+//! scene, frames or simulator (ADR-013 decision 3).
 
 // NaN fails closed: deciding comparisons are written `!(a >= b)` on purpose.
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
@@ -142,7 +142,7 @@ fn phone_run(
 }
 
 /// `scene` with every `Person.id` and the `Phone.id` cleared. Room Sim
-/// never reads them, so the setup keeps no id (ADR-008 decision 3).
+/// never reads them, so the setup keeps no id (ADR-013 decision 3).
 fn without_ids(scene: &Scene) -> Scene {
     let mut s = scene.clone();
     for p in &mut s.people {

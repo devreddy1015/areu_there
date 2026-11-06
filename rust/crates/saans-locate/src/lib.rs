@@ -3,8 +3,8 @@
 //! Everything this crate produces in Phase 4 is **SIM**: its inputs are
 //! Room Sim packets and truth, its geometry is the scene (SCENE). An
 //! estimate is always a position with a radius, or an abstention with a
-//! reason; never a bare point (ADR-008 decision 5). The phone is simulated
-//! only (ADR-008 decision 16).
+//! reason; never a bare point (ADR-013 decision 5). The phone is simulated
+//! only (ADR-013 decision 16).
 //!
 //! The ported modules (`geometry`, `invert`, `measure`, `track`) follow the
 //! Python reference `wifisense/localize` line by line (ADR-002); the new

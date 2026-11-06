@@ -1,6 +1,6 @@
 """Scene loading and validation for Room Sim (spec/roomsim.md §3.1).
 
-A scene is read only (ADR-008 decision 1): this module parses
+A scene is read only (ADR-013 decision 1): this module parses
 `spec/scene.schema.json` files with the standard `json` module, ports
 every check of `rust/crates/saans-scene/src/validate.rs` (deserialisation
 included: required fields, types, enum names, u8 node ids, duplicate keys

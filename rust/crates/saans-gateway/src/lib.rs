@@ -16,7 +16,7 @@
 //! - [`roles`], [`auth`], [`audit`]: who may see what, and the record of it.
 //! - [`outputs`]: the fan-out MQTT ([`mqtt`]) and alerting ([`alerts`]) consume.
 //! - `roomsim` (private, `roomsim` feature only): the static room demo at
-//!   `/roomsim`, drawing a declared scene with vendored three.js (ADR-008).
+//!   `/roomsim`, drawing a declared scene with vendored three.js (ADR-013).
 //!   Serves no sensor data.
 //! - `roomstream` (`roomsim` feature only): the room stream at
 //!   `/api/roomsim`, a simulated (SIM) or recorded (REPLAY) Room Sim run

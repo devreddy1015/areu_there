@@ -1,6 +1,6 @@
 """Room Sim v1 — the Python reference (spec/roomsim.md).
 
-Reads a room from a scene file (SCENE, ADR-008) and computes what ESP32
+Reads a room from a scene file (SCENE, ADR-013) and computes what ESP32
 nodes in that room would report: ITU-R P.2040 wall, floor and ceiling
 slabs to second order, furniture as boxes, clutter and a diffuse tail,
 people as moving point clouds with cylinder shadowing, and the ESP32's

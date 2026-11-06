@@ -1,7 +1,7 @@
 # three.js 0.186.1, vendored
 
 Served by `saans-gateway` (with the `roomsim` feature) at
-`/roomsim/vendor/0.186.1-saans1/` for the static room demo (ADR-008). Vendored rather than fetched so the gateway works on a box with
+`/roomsim/vendor/0.186.1-saans1/` for the static room demo (ADR-013). Vendored rather than fetched so the gateway works on a box with
 no route out, and so the demo page's CSP can be `script-src 'self'`.
 
 | | |

@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 # The Room Sim pipeline (spec/locate.md §10): reads scenes WITHOUT
-# saans-scene's `write` (ADR-008 decision 1; tests/boundary.rs READERS).
+# saans-scene's `write` (ADR-013 decision 1; tests/boundary.rs READERS).
 # The live demo's streaming driver, score and records (spec/livedemo.md
 # §8) need serde_json, with float_roundtrip for an exact records round trip.
 roomsim = ["dep:saans-roomsim", "dep:saans-scene", "dep:serde", "dep:serde_json"]

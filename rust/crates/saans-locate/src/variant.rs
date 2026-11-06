@@ -3,7 +3,7 @@
 //!
 //! The names are `declared`, `with_walker` and `empty`, never `walker`:
 //! the shipped hall has a `Person.id` "walker", and a variant name travels
-//! in every frame (ADR-008 decision 3).
+//! in every frame (ADR-013 decision 3).
 
 use saans_roomsim::Config as RoomSimConfig;
 use saans_scene::Scene;

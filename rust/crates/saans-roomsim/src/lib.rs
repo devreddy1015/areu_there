@@ -8,7 +8,7 @@
 //! not model, before drawing a conclusion from its output.
 //!
 //! - **The room comes from the scene file, never from WiFi.** Walls,
-//!   furniture and nodes are read from a `saans_scene::Scene` (ADR-008).
+//!   furniture and nodes are read from a `saans_scene::Scene` (ADR-013).
 //!   This crate depends on `saans-scene` without its `write` feature, so
 //!   it cannot write a scene by any route.
 //! - **Static paths** per link (§6): line of sight, wall/floor/ceiling

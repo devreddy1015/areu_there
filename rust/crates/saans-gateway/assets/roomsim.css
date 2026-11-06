@@ -1,4 +1,4 @@
-/* Saans room demo (ADR-008). Same colour tokens as dashboard.html, so the
+/* Saans room demo (ADR-013). Same colour tokens as dashboard.html, so the
    two pages read as one product. No literal colours in components.
    Served under a CSP with no 'unsafe-inline', so every rule lives here. */
 :root {

@@ -1,8 +1,13 @@
-# ADR-009: Learned models offline, for research only
+# ADR-014: Learned models offline, for research only
 
 **Status:** accepted, 2026-10-25, under the owner's blanket permission of
 that day ("continue all the task by your self i given all permission to
 do"); flagged for the owner's review (ROOMSIM.md open item 3).
+
+**Renumbered 2026-11-06.** Accepted as ADR-009 on the research branch
+(`saans/scene-format`); renumbered to 014 when it was merged into `main`,
+where 009 is the static copy. Its references to the research branch's
+ADR-008 now read ADR-013, the number that ADR took in the same merge.
 
 ## Context
 The Room Sim / ML plan (ROOMSIM.md) trains a neural model on simulated
@@ -10,7 +15,7 @@ data (Phase 8), fine-tunes it on public ESP32 data (Phase 9) and on the
 owner's recordings (Phase 11), and exports it (Phase 12). ADR-007 keeps
 neural networks and trained classifiers out of the S0-S5 path until the
 DSP version is measured on real rooms and the learned one beats it
-leave-one-room-out; ADR-008 decision 9 adds that a learned estimator is
+leave-one-room-out; ADR-013 decision 9 adds that a learned estimator is
 not admissible in the room demo and that beating the baseline in
 simulation earns nothing. Neither says whether a model may be trained and
 evaluated *offline*, and ROOMSIM.md open item 3 asked for that carve-out
@@ -28,11 +33,11 @@ to be written down before Phase 8.
    beside every accuracy that uses abstention; an estimate is reported
    with its uncertainty.
 3. **What a result earns.** A SIM result says nothing about real rooms
-   (ADR-008 d9). A learned model becomes a runtime candidate only by
+   (ADR-013 d9). A learned model becomes a runtime candidate only by
    ADR-007's condition — it beats the DSP measured on real rooms,
    leave-one-room-out — and through a new ADR that also settles what it
    would read (ADR-001 keeps raw CSI on the node) and who may see its
-   output (ADR-005, ADR-008 d10).
+   output (ADR-005, ADR-013 d10).
 4. **Exports are artefacts.** Phase 12's ONNX export and the note on
    loading it in the gateway are research artefacts; integrating one is
    the new ADR of decision 3.

@@ -39,7 +39,7 @@ pub struct Scene {
     pub schema_version: u32,
     pub name: String,
     /// Where this geometry came from. Shown next to every drawing of the
-    /// scene (ADR-008 decision 4), so a viewer can tell a surveyed room
+    /// scene (ADR-013 decision 4), so a viewer can tell a surveyed room
     /// from a scan with guessed materials from an illustrative example.
     pub provenance: Provenance,
     pub room: Room,

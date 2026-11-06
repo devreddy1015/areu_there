@@ -654,7 +654,7 @@ fn records_out_never_replaces_a_file() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// §10 and ADR-008 decision 3: the scene is read as `roomsim-export` reads
+/// §10 and ADR-013 decision 3: the scene is read as `roomsim-export` reads
 /// it, so an id problem is refused naming `--scene` without quoting the
 /// id, and a valid id appears in no output.
 #[test]

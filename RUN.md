@@ -236,10 +236,10 @@ Edit the file, then re-run the schema check above against it.
 ## 4b. The room demo (Phase 2)
 
 A three.js view of the example scenes, served by the gateway at
-`/roomsim` (ADR-008). Its static view draws declared geometry only: no
+`/roomsim` (ADR-013). Its static view draws declared geometry only: no
 people, no estimates, no sensor data. People and estimates appear only in
 its SIM view, from simulated WiFi (§4e). It is compiled in only with the
-`roomsim` cargo feature, which is off by default (ADR-008 decision 13); a
+`roomsim` cargo feature, which is off by default (ADR-013 decision 13); a
 normal build answers 404 there, and a test proves it.
 
 ```bash
@@ -417,7 +417,7 @@ are circles whose size is the (uncalibrated) model radius, the phone's
 RTT and RSSI estimates leave trails, and true positions with the error
 in metres can be switched on. Everything it shows is **SIM**: simulated
 people, estimated from simulated WiFi. There is no LIVE room view and no
-LIVE phone (ADR-008 d13, d16).
+LIVE phone (ADR-013 d13, d16).
 
 Use a release build: a session calibrates for about 1.3 s (bedroom) to
 3.3 s (hall) before its first frame, against 2.2-5.2 s in the dev profile.
@@ -437,7 +437,7 @@ nobody) and `#seed=N`. Play, pause, six speeds (0.25x-8x), restart, and a
 
 Who may watch: on this loopback config authentication is off and every
 caller is the local admin. With `[auth] required = true` only `admin` and
-`safety` accounts get the stream (ADR-008 d10); sign in at `/` first, the
+`safety` accounts get the stream (ADR-013 d10); sign in at `/` first, the
 room page has no login of its own. At most 4 simulations run at once
 across all viewers; a fifth is told so. Behind a reverse proxy, forward
 the browser's `Host` unchanged (nginx: `proxy_set_header Host $host;`,
@@ -672,7 +672,7 @@ SAANS_OPENCSI=1 .venv/bin/python -m unittest ml.tests.test_opencsi ml.tests.test
 `datasets/public/opencsi/parsed/`. The splits are leave-one-room-out, and
 the fine-tuning recipe was fixed before any test figure existed
 (spec/phase9.md §4). LoFi and WiCount are not used: they have no licence
-(ADR-009 d6).
+(ADR-014 d6).
 
 ## 4j. Sionna audit and calibration (Phase 10)
 
@@ -715,7 +715,7 @@ It writes Phase 9's REAL cache format, so every Phase 9 method runs on it.
 It exports one checkpoint (opset 17, dynamic batch and link axes), then
 checks onnxruntime against PyTorch on random and cached batches; the bar
 is 1e-4. `docs/onnx-ort.md` is the note on loading it from Rust. Nothing
-loads it in the gateway (ADR-009 d4).
+loads it in the gateway (ADR-014 d4).
 
 ## 5. Datasets
 

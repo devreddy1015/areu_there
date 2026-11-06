@@ -9,7 +9,7 @@ Rust crate `saans-locate` — and the two must agree (§12).
 Everything this produces in Phase 4 is **SIM**: its inputs are Room Sim
 packets and truth (spec/roomsim.md), its geometry is the scene (SCENE).
 An estimate is always a position **with a radius**, or an abstention with
-a reason; never a bare point (ADR-008 decision 5).
+a reason; never a bare point (ADR-013 decision 5).
 
 **Decisions recorded for the owner** (each reversible; none changes an
 existing crate's public API):
@@ -25,23 +25,23 @@ existing crate's public API):
    sees AGC steps, not bodies. A new `RssiSignal` (the datagram's RSSI,
    which the AGC does not touch) is the default for Room Sim input; the
    existing signals stay available. A FeatureFrame-based disturbance
-   (ADR-008 decision 9's runtime input) is Phase 5's; the estimators here
+   (ADR-013 decision 9's runtime input) is Phase 5's; the estimators here
    take any per-link `y`.
 3. **The radius is a model, flagged uncalibrated** (§8): a conservative
    95% circle of a covariance, times `*_radius_scale` (1.0). Every
    estimate carries `radius_calibrated: false` until Phase 5 sets the
    scales from measured coverage; Phase 4's checks print the coverage they
    see. A non-finite radius, or one below `min_plausible_radius_m`
-   (0.3 m), is never published (ADR-008 d5).
+   (0.3 m), is never published (ADR-013 d5).
 4. **The baseline abstains** instead of falling back to the room centre,
    behind a significance gate whose false-alarm rate is measured, and
    gains a radius (§5). `evaluate_localize.py` is unchanged.
-5. **The phone is SIM only** (ADR-008 d16) and its radio model lives here,
+5. **The phone is SIM only** (ADR-013 d16) and its radio model lives here,
    not in Room Sim (§6). Ranging a cooperative device is not the
    multilateration of people that CAMPUS_SENSING_PROMPT.md §3 bans:
    people are located only by the links they disturb (§4–§5).
 6. **One person estimate per estimator**; the existing tracker is
-   single-target. Multi-person tracking and zones (ADR-008 d2, d8: no zone
+   single-target. Multi-person tracking and zones (ADR-013 d2, d8: no zone
    type exists) are not in Phase 4. Scenes with `roles` (some nodes
    transmit-only or receive-only) or with two nodes at one `(x, y)` are
    refused by the person pipeline (§2).
@@ -136,7 +136,7 @@ REAL one is known to differ, the gap stated). Every record carries
 Sim pipeline (§10) refuses any label but `"SIM"`. A person pipeline fed by
 a caller takes its label from the caller and accepts `"SIM"`, `"REAL"` or
 `"SIM->REAL"` (SCENE labels geometry, never an estimate); the phone
-functions refuse any label but `"SIM"` (ADR-008 d16). Every refusal names
+functions refuse any label but `"SIM"` (ADR-013 d16). Every refusal names
 `label` without echoing the value.
 
 ## 2. Inputs
@@ -257,7 +257,7 @@ signal's name; config `wlm_gate_z` (3.0), `wlm_floor` (0.25 for
 
 ## 6. Phone radio simulation (new: `wifisense/localize/phone.py`, SIM)
 
-ADR-008 d16: simulated only. The phone ranges to every node by Wi-Fi RTT
+ADR-013 d16: simulated only. The phone ranges to every node by Wi-Fi RTT
 (IEEE 802.11mc FTM) and reads every node's RSSI, at epochs.
 
 ### 6.1 Epochs and truth
@@ -432,7 +432,7 @@ or last accepted update). At each fired epoch at time `t`, in this order:
    `P = sym((A·P)·Aᵀ + (K·R)·Kᵀ)` (Joseph form), `t_acc = t`, and the
    estimate `(s0, s1)` with `P[0:2][0:2]` is **published** (§7.4).
 
-Nothing is published at an epoch without an accepted fix (ADR-008 d6).
+Nothing is published at an epoch without an accepted fix (ADR-013 d6).
 
 ### 7.4 Published phone estimate
 `(x, y)` and `r = phone_radius_scale * radius95(P00 + B00, P01 + B01,
@@ -516,7 +516,7 @@ is not specified), every test NaN-safe. Every number finite;
 `phone_rate_hz`, `huber_k`, `rssi_far_exponent`, `rssi_est_exponent`,
 `phone_accel_psd`, `phone_init_speed_std`, `tick_hz`, `calib_s`,
 `window_s`, `carrier_hz`, `min_plausible_radius_m` and the three
-`*_radius_scale` (a zero radius would publish a bare point, ADR-008 d5).
+`*_radius_scale` (a zero radius would publish a bare point, ADR-013 d5).
 `>= 0`: `rtt_nlos_sigma_scale`, `rtt_nlos_bias_m`, `rtt_offset_sigma_m`,
 `rtt_persist_sigma_m`, `rssi_nlos_loss_db`, `rssi_device_sigma_db`,
 `rssi_persist_sigma_db`, `rssi_jitter_db`, `phone_max_coast_s`,
@@ -579,7 +579,7 @@ phone `(x, y, z)`. `reports`: one entry per node in id order,
 `{node, rtt_m or null, rssi_dbm or null, blocked}`. No `Person.id` or
 `Phone.id` appears in any record, log or error. Records are SIM, of
 simulated people, and may be written to golden files as Room Sim's truth
-is; nothing here writes records from REPLAY or LIVE input (ADR-008 d11).
+is; nothing here writes records from REPLAY or LIVE input (ADR-013 d11).
 
 ## 12. Agreement
 

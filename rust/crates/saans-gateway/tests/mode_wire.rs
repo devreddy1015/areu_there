@@ -1,5 +1,5 @@
 //! The gateway's mode on the wire and the position scope in `/api/me`
-//! (spec/livedemo.md §1, §2.3; ADR-008 d10, d15), against real gateways
+//! (spec/livedemo.md §1, §2.3; ADR-013 d10, d15), against real gateways
 //! over real sockets: the enum keeps the lower-case spelling `hello`,
 //! `/api/me` and `/api/health` always had, every view maps it with no
 //! default branch, and `can.position` answers per role. Also the e2e

@@ -1,4 +1,4 @@
-"""Browser check for the room demo (ADR-008), in a real Chrome.
+"""Browser check for the room demo (ADR-013), in a real Chrome.
 
 The gateway's Rust tests prove the demo is *served* correctly: routes,
 headers, CSP, no people in the served scenes, and the room stream's
@@ -448,7 +448,7 @@ with sync_playwright() as p:
     })(SCRIPT);"""
     # Every animation frame, looks at the simulation labels as placed: an
     # estimate's under a corner box of the view, or any of them hidden by
-    # the declutter, is counted (spec/livedemo.md §9.3; ADR-008 d5).
+    # the declutter, is counted (spec/livedemo.md §9.3; ADR-013 d5).
     WATCH_LABELS = """(() => {
       const u = window.checkLabels = { frames: 0, under: 0, hidden: 0, seen: [] };
       const tick = () => {
@@ -749,7 +749,7 @@ with sync_playwright() as p:
             errs = [t for t, _ in drawn["errs"]]
             check("sim: each scored estimate gets an error segment labelled like 'WLM error to P2: 1.23 m (SIM)'",
                   errs and all(ERR_LABEL.fullmatch(t) for t in errs), errs)
-            check("sim: no truth cross or error segment is drawn without its label shown (ADR-008 d5)",
+            check("sim: no truth cross or error segment is drawn without its label shown (ADR-013 d5)",
                   len(drawn["truths"]) == drawn["truth"] and len(drawn["errs"]) == drawn["err"]
                   and all(w == "shown" for _, w in drawn["truths"] + drawn["errs"]), drawn)
             printed = [float(re.search(r": (\d+\.\d\d) m \(SIM\)$", t).group(1)) for t in errs]
@@ -1201,7 +1201,7 @@ with sync_playwright() as p:
             shot(pg, "sim-signed-out.png")
         finally:
             ctx.close()
-        # A role without position scope (ADR-008 d10), as /api/me reports it.
+        # A role without position scope (ADR-013 d10), as /api/me reports it.
         ctx = sim_ctx()
         try:
             ctx.route("**/api/me", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(
@@ -1310,7 +1310,7 @@ def expected(c):
 errs = [c for c in results["console"] if " error:" in c and not expected(c)]
 check("no CSP violations in the console", not csp, csp[:3])
 check("no console errors", not errs, errs[:5])
-# ADR-008 d11: nothing position-like in the console. The simulation view
+# ADR-013 d11: nothing position-like in the console. The simulation view
 # logs nothing at all, so nothing it holds can leak there.
 said = [c for c in results["console"] if c.startswith("[sim") and not expected(c)]
 check("the simulation view logs nothing to the console", not said, said[:3])

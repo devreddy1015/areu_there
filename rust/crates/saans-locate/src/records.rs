@@ -16,14 +16,14 @@
 //!   and read back as `f64::NAN` (§4), and [`write_records`] refuses any
 //!   other non-finite value rather than write it changed.
 //! - **No ids.** People are `i`, their index. Nothing here reads a
-//!   `Person.id` or a `Phone.id` (ADR-008 decision 3). A refusal names the
+//!   `Person.id` or a `Phone.id` (ADR-013 decision 3). A refusal names the
 //!   line and the key, never a value or an unknown key from the file.
 //! - **Format only.** [`read_records`] makes every §6.2 refusal that needs
 //!   no embedded scene. Matching [`Manifest::scene_sha256`] to an embedded
 //!   scene, and allowing one file per scene, are the gateway's.
 //! - **SIM only.** Records are SIM, of simulated people (spec/locate.md
 //!   §11). [`write_records`] refuses a record with any other label, so
-//!   nothing here writes a position from REPLAY or LIVE input (ADR-008
+//!   nothing here writes a position from REPLAY or LIVE input (ADR-013
 //!   decision 11).
 
 // NaN fails closed: deciding comparisons are written `!(a < b)` on purpose.
@@ -89,13 +89,13 @@ const PHONE_REASONS: &[Reason] = &[
 /// The first line of a records file (§6.1). SIM.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Manifest {
-    /// The scene's `name` (SCENE, ADR-008 decision 4).
+    /// The scene's `name` (SCENE, ADR-013 decision 4).
     pub scene_name: String,
     /// The lower-case hex sha256 of the scene file's bytes. The gateway
     /// matches it to an embedded scene (§6.2); the reader checks only its
     /// form, 64 lower-case hex digits.
     pub scene_sha256: String,
-    /// The scene's `provenance` (ADR-008 decision 4).
+    /// The scene's `provenance` (ADR-013 decision 4).
     pub provenance: Provenance,
     pub variant: Variant,
     /// Room Sim's `seed`; equal to `roomsim_config.seed`.
@@ -1222,7 +1222,7 @@ fn exact(records: &Records) -> Result<(), String> {
 /// round-trip form. Give it a `BufWriter` for a file.
 ///
 /// Refused (`InvalidInput`, before anything is written): a tick or epoch
-/// whose label is not `"SIM"` (ADR-008 decision 11), a `links` list count
+/// whose label is not `"SIM"` (ADR-013 decision 11), a `links` list count
 /// other than one per tick, a tick's list not one value per
 /// [`Manifest::links`] pair, and a non-finite value other than a link's
 /// `y`, which JSON cannot carry exactly (the error names where). Records
@@ -1237,7 +1237,7 @@ pub fn write_records(w: &mut impl Write, records: &Records) -> io::Result<()> {
     } = records;
     if ticks.iter().any(|r| r.label != LABEL) || epochs.iter().any(|r| r.label != LABEL) {
         return Err(invalid(
-            "label: only SIM records are written (ADR-008 decision 11)".into(),
+            "label: only SIM records are written (ADR-013 decision 11)".into(),
         ));
     }
     if links.len() != ticks.len() {

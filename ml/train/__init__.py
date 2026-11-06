@@ -1,6 +1,6 @@
 """Phase 8 (spec/model.md): SIM pre-training of model v1 — the cache, data,
 model, training, evaluation, baselines, metrics and sweep. Every number
-these modules produce is SIM (ADR-008 d9, ADR-009).
+these modules produce is SIM (ADR-013 d9, ADR-014).
 
 Data side: `cache` (every second label tick's window preprocessed once into
 float16 memory maps, with the labels and the stored WLM/RTI), `data` (the

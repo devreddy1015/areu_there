@@ -382,7 +382,7 @@ def _link_positions(links: np.ndarray, pos: dict | None) -> tuple:
             if node == -1:
                 continue
             if node not in pos:
-                raise ValueError(f"node {node} is not in the declared scene; positions are never guessed (ADR-008)")
+                raise ValueError(f"node {node} is not in the declared scene; positions are never guessed (ADR-013)")
             link_pos[i, end] = pos[node]
             known[i, end] = True
     return link_pos, known

@@ -13,10 +13,10 @@ name = "saans-gateway"
 path = "src/main.rs"
 
 [features]
-# The room demo at /roomsim and its room stream at /api/roomsim (ADR-008,
+# The room demo at /roomsim and its room stream at /api/roomsim (ADR-013,
 # spec/livedemo.md). Off by default: decision 13 says the view is compiled
 # in only on purpose. The stream runs Room Sim and Locate in the gateway,
-# and reads scenes WITHOUT saans-scene's `write` (ADR-008 decision 1;
+# and reads scenes WITHOUT saans-scene's `write` (ADR-013 decision 1;
 # saans-scene/tests/boundary.rs READERS).
 roomsim = ["dep:saans-roomsim", "dep:saans-locate", "dep:saans-scene"]
 

@@ -72,20 +72,20 @@ def check_roomsim_label(label) -> str:
     """The Room Sim pipeline (§10): its input is simulated, so only "SIM",
     else `LocateError('label')`."""
     if not (isinstance(label, str) and label == "SIM"):
-        raise LocateError("label", 'Room Sim input is simulated (ADR-008 d16); the only label is "SIM"')
+        raise LocateError("label", 'Room Sim input is simulated (ADR-013 d16); the only label is "SIM"')
     return label
 
 
 def check_sim_label(label) -> str:
-    """The phone's label: only "SIM" (ADR-008 d16), else `LocateError('label')`."""
+    """The phone's label: only "SIM" (ADR-013 d16), else `LocateError('label')`."""
     if not (isinstance(label, str) and label == "SIM"):
-        raise LocateError("label", 'the phone is simulated only (ADR-008 d16); the only label is "SIM"')
+        raise LocateError("label", 'the phone is simulated only (ADR-013 d16); the only label is "SIM"')
     return label
 
 
 # §9 groups, for validation.
 # A zero `min_plausible_radius_m` or `*_radius_scale` would publish a bare
-# point (ADR-008 d5); `carrier_hz` guards `C / carrier_hz`.
+# point (ADR-013 d5); `carrier_hz` guards `C / carrier_hz`.
 _POSITIVE = (
     "rtt_sigma_m", "rssi_shadow_sigma_db", "rssi_shadow_corr_m", "rssi_breakpoint_m",
     "phone_rate_hz", "huber_k", "rssi_far_exponent", "rssi_est_exponent",

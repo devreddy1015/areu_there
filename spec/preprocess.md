@@ -177,7 +177,7 @@ for SIM shards and `"pcap:<sha256 of the file, 12 hex>"` for pcaps;
   `n_subcarriers` values seen, and a receiver whose wrong-count datagrams
   outnumber its good ones is refused. The file is hashed and parsed from
   the same bytes. Positions come only from
-  a declared `scene` (ADR-008), never guessed. The layout check of §8 runs
+  a declared `scene` (ADR-013), never guessed. The layout check of §8 runs
   on REAL data. A datagram whose `(rx, seq)` is missing from a supplied link
   map is refused; a `.sim.pcap` without its manifest is read only with
   `single_tx=True`; malformed counts go to a `stats` argument.

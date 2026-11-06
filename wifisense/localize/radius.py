@@ -1,7 +1,7 @@
 """The published radius and the estimate/abstention records (spec/locate.md §8, §11).
 
 Every position this package publishes is a point **with a radius**, or an
-abstention with a reason; never a bare point (ADR-008 decision 5). The
+abstention with a reason; never a bare point (ADR-013 decision 5). The
 radius is a *model* statement: a conservative 95% circle of a covariance,
 times an uncalibrated `*_radius_scale`. Every estimate therefore says
 `radius_calibrated: False` until Phase 5 measures coverage on held-out
@@ -65,7 +65,7 @@ def publishable(r: float, min_plausible_radius_m: float) -> bool:
     """The radius half of §8's publication test: `isfinite(r) and r > 0.0
     and r >= min_plausible_radius_m` (a NaN fails it). `r > 0` holds even
     for a caller that passes a zero (or negative) minimum, so a bare point
-    is never published (ADR-008 d5). An estimator publishes only through
+    is never published (ADR-013 d5). An estimator publishes only through
     `publishable_estimate`, which also needs a finite position."""
     return math.isfinite(r) and r > 0.0 and r >= min_plausible_radius_m
 

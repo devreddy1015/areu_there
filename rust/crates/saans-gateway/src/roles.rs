@@ -86,7 +86,7 @@ impl Principal {
         self.role == Role::Admin
     }
 
-    /// Positions of people, simulated or estimated (ADR-008 d10,
+    /// Positions of people, simulated or estimated (ADR-013 d10,
     /// spec/livedemo.md §2.3). `space` is the configured space the
     /// positions belong to; `None` is a simulated scene bound to no space.
     ///

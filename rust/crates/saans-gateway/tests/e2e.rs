@@ -837,7 +837,7 @@ async fn websocket_streams_state_and_events() {
     g.stop().await;
 }
 
-/// ADR-008 decision 12: the room demo is its own page, served from the
+/// ADR-013 decision 12: the room demo is its own page, served from the
 /// binary, under a CSP stricter than the dashboard's, and does not ship
 /// without a self-containment check. This is that check, against a real
 /// gateway rather than the constants, over the page, its script, its
@@ -990,7 +990,7 @@ async fn room_demo_is_served_self_contained_and_its_scenes_carry_no_one() {
             assert!(SERVED_KEYS.contains(&k.as_str()), "{id}: {k} is outside the allowlist");
         }
         assert!(v["nodes"].as_array().is_some_and(|n| !n.is_empty()), "{id} has nodes");
-        // ADR-008 decision 3, checked by value as well as by key: no id
+        // ADR-013 decision 3, checked by value as well as by key: no id
         // of a person or the phone appears anywhere in what is served.
         let raw: Value = serde_json::from_str(&file).unwrap();
         let mut ids: Vec<&str> = raw["people"].as_array().unwrap().iter().filter_map(|p| p["id"].as_str()).collect();
@@ -1004,7 +1004,7 @@ async fn room_demo_is_served_self_contained_and_its_scenes_carry_no_one() {
     g.stop().await;
 }
 
-/// ADR-008 decision 13: a gateway built without the `roomsim` feature
+/// ADR-013 decision 13: a gateway built without the `roomsim` feature
 /// has no room view at all.
 #[cfg(not(feature = "roomsim"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

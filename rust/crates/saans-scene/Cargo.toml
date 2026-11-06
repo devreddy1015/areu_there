@@ -9,7 +9,7 @@ license.workspace = true
 # Everything that writes a scene: Serialize on the scene types, Scene::save,
 # Scene::to_json_pretty and the RoomPlan importer. Off by default; only
 # human tools (saans-cli) enable it. A crate that carries CSI depends on
-# this crate WITHOUT it (ADR-008 decision 1, enforced by tests/boundary.rs).
+# this crate WITHOUT it (ADR-013 decision 1, enforced by tests/boundary.rs).
 write = []
 
 [dependencies]

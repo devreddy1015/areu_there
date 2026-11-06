@@ -344,7 +344,7 @@ fn a_scene_without_a_phone_writes_no_null() {
 }
 
 /// The examples are illustrative rooms, not surveys of real ones, and the
-/// demo prints this field next to the drawing (ADR-008 decision 4). An
+/// demo prints this field next to the drawing (ADR-013 decision 4). An
 /// example that claimed to be `surveyed` would be a false statement on
 /// screen.
 #[test]

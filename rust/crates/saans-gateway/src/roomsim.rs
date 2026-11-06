@@ -1,8 +1,8 @@
-//! The room demo (ADR-008): a three.js view of a declared scene, and the
+//! The room demo (ADR-013): a three.js view of a declared scene, and the
 //! page's simulation layer.
 //!
 //! Compiled only with the `roomsim` cargo feature, which is off by
-//! default (ADR-008 decision 13): a production gateway does not carry a
+//! default (ADR-013 decision 13): a production gateway does not carry a
 //! room view nobody asked for. The decision's other half — refusing at
 //! config load to serve the view LIVE without the feature — waits for a
 //! LIVE source; there is none (spec/livedemo.md §7), so there is nothing

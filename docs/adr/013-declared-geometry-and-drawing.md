@@ -1,6 +1,12 @@
-# ADR-008: Room geometry is declared, and what the demo may draw
+# ADR-013: Room geometry is declared, and what the demo may draw
 
 **Status:** accepted, 2026-10-21
+
+**Renumbered 2026-11-06.** Accepted as ADR-008 on the research branch
+(`saans/scene-format`), which split from `main` before `main` took 008 for
+one origin and 009 for the static copy. Renumbered to 013 when the two
+lines were merged; the text is otherwise as accepted, with its references
+to itself updated to the new number.
 
 ## Context
 UI_IMPLEMENTATION_PLAN §9 lists "Floor plan, person position, 3D room"
@@ -157,14 +163,14 @@ So the room became describable. The person did not.
 
 ## Amendments made on acceptance
 - UI_IMPLEMENTATION_PLAN §9's floor-plan bullet now reads *superseded by
-  ADR-008* and states what may be drawn.
+  ADR-013* and states what may be drawn.
 - UI_GAP_ANALYSIS §1.4's three **Blocked** rows are re-stated: the floor
   plan is "Unblocked, not built", the 3D observatory is "Unblocked for
   SIM/REPLAY", and "Person position in a room" is "Blocked for LIVE" with
   "Do not render a position" replaced by decision 5.
 - UI_GAP_ANALYSIS §1.1's "SYNTHETIC label — N/A" row records that this
   ADR adds the third mode.
-- SAANS_PLAN §6 gains an 008 row; §3.1 gains `rust/crates/saans-scene`.
+- SAANS_PLAN §6 gains a 013 row; §3.1 gains `rust/crates/saans-scene`.
 
 One edit deliberately waits. The topology caption in `dashboard.html`
 says it is "not a floor plan: the gateway configuration has no room

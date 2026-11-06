@@ -3,12 +3,12 @@
 **Status:** spec for Phase 5, 2026-10-24. Revised after a four-lens
 adversarial review: 48 findings, of which 46 were confirmed or partly
 confirmed and adopted, and 2 refuted. It builds on spec/roomsim.md (Room
-Sim, SIM data), spec/locate.md (Locate, estimates with radii) and ADR-008
+Sim, SIM data), spec/locate.md (Locate, estimates with radii) and ADR-013
 (what may be drawn, and to whom).
 
 **Owner decisions, 2026-10-24** (asked and answered):
 1. **API.** Additive public-API changes are approved:
-   - `saans-gateway` gains `Principal::can_see_position` (ADR-008 d10)
+   - `saans-gateway` gains `Principal::can_see_position` (ADR-013 d10)
      and a room-stream handle on `Shared` (§2.5).
    - `saans-locate` gains a streaming driver (§8.1: `RoomSimSetup` and
      `RoomSimStream`), a score function (§8.2) and a records file format
@@ -17,7 +17,7 @@ Sim, SIM data), spec/locate.md (Locate, estimates with radii) and ADR-008
      (approved 2026-10-21).
    
    No other existing signature changes.
-2. **Frame type adapted to ADR-008.** The brief's sketch predates the ADR.
+2. **Frame type adapted to ADR-013.** The brief's sketch predates the ADR.
    - Person estimates are keyed by estimator (`wlm`, `rti`), each an
      estimate with its radius or an abstention, never a bare point.
    - Truth people are named by index and sent in SIM only.
@@ -27,11 +27,11 @@ Sim, SIM data), spec/locate.md (Locate, estimates with radii) and ADR-008
    back a recorded Locate run written by `roomsim-eval`; it is labelled
    SIM and its truth is stripped. LIVE room frames are not produced at all
    (§7).
-4. **Baseline (ADR-008 d9).** RTI is never drawn without the baseline
+4. **Baseline (ADR-013 d9).** RTI is never drawn without the baseline
    beside it. The baseline may be drawn alone, with RTI's abstention shown.
 
 **Decisions taken here.** Each is flagged in the phase report.
-1. The wire spelling of modes stays lower case (ADR-008 d15, "as
+1. The wire spelling of modes stays lower case (ADR-013 d15, "as
    before"). The page shows upper case. A `label` field sits beside `mode`.
 2. The stream is `/api/roomsim`.
    - Its handshake checks `Origin`.
@@ -64,12 +64,12 @@ Sim, SIM data), spec/locate.md (Locate, estimates with radii) and ADR-008
     spec/roomsim.md §16 and ROOMSIM.md item 10 are amended to match (§1).
 14. No page text, control or hash key calls this stream "live".
 15. Nothing in this spec writes a position from REPLAY or LIVE input to
-    disk (ADR-008 d11).
+    disk (ADR-013 d11).
 
 **Rules.**
 - No unsafe Rust.
 - New gateway code lives behind the existing `roomsim` cargo feature,
-  which is off by default (ADR-008 d13). That feature now also pulls in
+  which is off by default (ADR-013 d13). That feature now also pulls in
   `saans-roomsim`, `saans-locate` (with its `roomsim` feature) and
   `saans-scene` (without `write`).
 - `saans-gateway` joins READERS in `saans-scene/tests/boundary.rs`.
@@ -94,7 +94,7 @@ carry (SCENE, SIM, REAL, SIM->REAL, LIVE).
 | `mode` (wire) | Source | `label` | Truth and errors | Phone |
 |---|---|---|---|---|
 | `sim` | Room Sim + Locate in the gateway | `SIM` | yes | yes (simulated) |
-| `replay` | a recorded Locate run (§6) | `SIM` | **no** (keys deleted) | yes (simulated, ADR-008 d16) |
+| `replay` | a recorded Locate run (§6) | `SIM` | **no** (keys deleted) | yes (simulated, ADR-013 d16) |
 | `live` | none in Phase 5 (§7) | — | — | — |
 
 **Serialisation.** `Mode` serialises as `"sim"`, `"replay"` and `"live"`
@@ -227,7 +227,7 @@ asserts that a running session puts nothing on either channel.
 
 **Persistence.** Nothing from the room stream is written to disk, the
 event log or the history. The only exception is the audit `Denied`
-entries of §2.3, which carry no position (ADR-008 d11).
+entries of §2.3, which carry no position (ADR-013 d11).
 
 ## 3. Session
 
@@ -386,7 +386,7 @@ from them only.
   "t": T,                           // the session clock, SIM seconds
   "mode": "sim" | "replay",
   "label": "SIM",
-  "scene": {"id", "name", "sha256", "provenance"},          // ADR-008 d4
+  "scene": {"id", "name", "sha256", "provenance"},          // ADR-013 d4
   "speed": v, "effective_speed": e | null, "paused": bool, "ended": bool,
   "state": "warming_up" | "running",
   "persons": {"t": t_k, "wlm": Outcome, "rti": Outcome} | null,
@@ -457,7 +457,7 @@ An estimate published on a tick whose truth has no person is
 
 **Rules for every frame.**
 - A 10 Hz frame repeats the latest records unchanged, with their own
-  timestamps. Nothing is interpolated, extrapolated or predicted (ADR-008
+  timestamps. Nothing is interpolated, extrapolated or predicted (ADR-013
   d6).
 - People appear only as `i`, the index, never by their scene file's
   `Person.id`. The phone is never named by its `Phone.id` (d3).
@@ -632,7 +632,7 @@ No code path produces a LIVE room frame or a LIVE phone. The room
 stream's sources are Room Sim (SIM) and record files (REPLAY), and
 `Mode::Live` is never a session mode.
 
-ADR-008 d13's other gates are unmet: a surveyed scene bound to a space,
+ADR-013 d13's other gates are unmet: a surveyed scene bound to a space,
 and a view of what is not covered. Adding a LIVE source is therefore a
 later decision, and it must arrive with d13's config-load refusal.
 
@@ -779,7 +779,7 @@ frames.
 **Estimates** (persons and phone).
 - **One function draws every estimate.** It draws nothing, and shows
   "estimate not drawn: radius", when `radius_m` is absent, non-finite,
-  `<= 0` or `< 0.3` m (`min_plausible_radius_m`; ADR-008 d5).
+  `<= 0` or `< 0.3` m (`min_plausible_radius_m`; ADR-013 d5).
 - **What is drawn:** a ring of `radius_m` around `(x, y)`, with a centre
   mark.
   - The ring is never clipped to the footprint.

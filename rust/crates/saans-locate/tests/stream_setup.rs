@@ -319,7 +319,7 @@ fn advance_to_takes_time_forward_only() {
 
 /// No `Person.id` or `Phone.id` in what the driver prints: the setup, its
 /// empty room, a stream and everything it emits, for every shipped scene
-/// (ADR-008 decision 3). The ids are looked for as quoted strings, since
+/// (ADR-013 decision 3). The ids are looked for as quoted strings, since
 /// "phone" is also a field name.
 #[test]
 fn no_scene_id_in_anything_printed() {

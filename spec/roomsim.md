@@ -7,7 +7,7 @@ agree (§14).
 
 Everything this simulator produces is **SIM**: a physically motivated
 model, not a measurement. It reads a room from a scene file (SCENE,
-ADR-008) and computes what ESP32 nodes in that room would report. Read §16,
+ADR-013) and computes what ESP32 nodes in that room would report. Read §16,
 what it does not model, before drawing a conclusion from its output.
 
 **Where it lives — a decision recorded for the owner.** The Phase 3 brief
@@ -24,7 +24,7 @@ whose shadowing law differs.
 
 **Rules.** `wifisense/roomsim` imports only the standard library and
 `wifisense`. `saans-roomsim` starts with `#![forbid(unsafe_code)]` and
-depends on `saans-scene` **without** its `write` feature (ADR-008
+depends on `saans-scene` **without** its `write` feature (ADR-013
 decision 1; `saans-scene/tests/boundary.rs` lists it as a reader). Where
 this spec and the Python reference disagree, the Python reference and its
 golden vectors are normative (ADR-002) and this spec is corrected in the
@@ -36,7 +36,7 @@ the Phase 2 demo and unrelated to this crate.
 ## 1. Conventions
 
 **Units.** Metres, seconds, hertz, radians, decibels where named `_db`.
-Scene frame (ADR-008): right-handed, +z up, origin at a room corner,
+Scene frame (ADR-013): right-handed, +z up, origin at a room corner,
 floor at z = 0.
 
 **Evaluation.** IEEE-754 binary64. Every formula is evaluated exactly as

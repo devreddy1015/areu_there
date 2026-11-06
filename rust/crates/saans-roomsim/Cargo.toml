@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 # Only the RNG (saans_sim::rng::Rng, spec/roomsim.md §2) is used.
 saans-sim = { path = "../saans-sim" }
-# READ only: without the `write` feature (ADR-008 decision 1). This crate
+# READ only: without the `write` feature (ADR-013 decision 1). This crate
 # carries CSI, so it may never write a scene; saans-scene/tests/boundary.rs
 # lists it as a reader.
 saans-scene = { path = "../saans-scene" }

@@ -3,9 +3,9 @@
 **Status:** spec for Phase 8, 2026-10-25. Revised after review (12
 findings, all adopted, each settled by a measurement). Trains and
 evaluates a neural model offline on the SIM dataset (spec/dataset.md)
-through the shared preprocessing (spec/preprocess.md), under ADR-009
+through the shared preprocessing (spec/preprocess.md), under ADR-014
 (learned models offline, for research only). Every number it produces is
-**SIM**: it says nothing about real rooms (ADR-008 d9).
+**SIM**: it says nothing about real rooms (ADR-013 d9).
 
 **The brief (owner, Phase 8):** a per-link encoder (1D conv or small
 transformer over time x subcarriers) + link geometry embedding (tx/rx
@@ -194,7 +194,7 @@ and a false estimate (also reported at 1 m).
   windows called occupied), miss rate, AUC.
 - **Count:** accuracy, mean absolute error, the 4 x 4 confusion.
 - **Zone:** per-cell F1 averaged over reachable cells, each reachable
-  cell's confusion counts (ADR-008 d8), and the exact-set accuracy over
+  cell's confusion counts (ADR-013 d8), and the exact-set accuracy over
   the reachable cells.
 - **xy (multi-person):** median and p90 error of matched people (m),
   matching recall and precision, the median predicted 95% radius and its
@@ -285,8 +285,8 @@ scenes). The sweep table on val carries the same interval.
 ## 8. Limits
 
 - SIM only: the scenes are random, the people simulated, the impairments
-  uncalibrated; nothing here is a claim about real rooms (ADR-008 d9,
-  ADR-009).
+  uncalibrated; nothing here is a claim about real rooms (ADR-013 d9,
+  ADR-014).
 - The dataset assumes the planned TDMA mesh (spec/dataset.md §12); §5.6's
   link-subset evaluations are the closest SIM proxies for today's hardware
   and for Phase 9's single link.

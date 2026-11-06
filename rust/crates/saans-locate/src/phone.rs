@@ -1,7 +1,7 @@
 //! The simulated phone (spec/locate.md §6, §7) and Locate's configuration
 //! (§9).
 //!
-//! ADR-008 decision 16: **the phone is simulated only**. Every function
+//! ADR-013 decision 16: **the phone is simulated only**. Every function
 //! here that starts a phone run refuses any label but `"SIM"`. The phone
 //! ranges to every node by Wi-Fi RTT (IEEE 802.11mc FTM) and reads every
 //! node's RSSI at epochs (§6); a Gauss-Newton fix per method and epoch
@@ -63,7 +63,7 @@ pub enum Error {
     /// A §9 parameter failed validation; `param` names it.
     Config { param: &'static str, reason: String },
     /// A label other than `"SIM"` was given to a phone function
-    /// (ADR-008 decision 16). The given label is not repeated.
+    /// (ADR-013 decision 16). The given label is not repeated.
     Label,
     /// Invalid input data; `field` names it.
     Input { field: &'static str, reason: String },
@@ -74,7 +74,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Config { param, reason } => write!(f, "{param}: {reason}"),
             Error::Label => f.write_str(
-                "label: the phone is simulated only (ADR-008 decision 16); the only label is \"SIM\"",
+                "label: the phone is simulated only (ADR-013 decision 16); the only label is \"SIM\"",
             ),
             Error::Input { field, reason } => write!(f, "{field}: {reason}"),
         }
@@ -141,7 +141,7 @@ pub struct Config {
     pub wlm_floor: Option<f64>,
     // --- Radius (§8) ---
     /// 1.0, uncalibrated. `> 0` (a zero radius would publish a bare point,
-    /// ADR-008 d5).
+    /// ADR-013 d5).
     pub wlm_radius_scale: f64,
     /// 1.0, uncalibrated. `> 0`.
     pub rti_radius_scale: f64,

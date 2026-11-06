@@ -11,7 +11,7 @@
 //! - A position is an `Outcome` estimate, which always has its radius, or
 //!   it is truth.
 //! - Truth exists only in mode `sim`. Elsewhere its key is never built,
-//!   so redaction deletes rather than nulls (ADR-008 decisions 10, 15).
+//!   so redaction deletes rather than nulls (ADR-013 decisions 10, 15).
 //! - People are `i`, their index; the phone has no name (decision 3).
 
 use saans_locate::phone::EpochRecord;
@@ -32,7 +32,7 @@ use crate::shared::Mode;
 /// The room stream's only label: every number on it is SIM.
 pub(crate) const LABEL: &str = saans_locate::LABEL;
 
-/// Whether frames of `mode` carry truth: `sim` only (ADR-008 decision 15).
+/// Whether frames of `mode` carry truth: `sim` only (ADR-013 decision 15).
 /// Exhaustive, with no default branch.
 pub(crate) fn shows_truth(mode: Mode) -> bool {
     match mode {
@@ -41,7 +41,7 @@ pub(crate) fn shows_truth(mode: Mode) -> bool {
     }
 }
 
-/// `scene` (ADR-008 decision 4): the embedded id, the scene's name, the
+/// `scene` (ADR-013 decision 4): the embedded id, the scene's name, the
 /// sha256 of the file as embedded and its provenance.
 pub(crate) fn scene_block(e: Embedded, scene: &Scene) -> Value {
     json!({

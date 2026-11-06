@@ -116,7 +116,7 @@ impl Scene {
     /// Serialize as the pretty JSON a human will edit, with a trailing
     /// newline so the file ends the way every other text file does.
     ///
-    /// Only with the `write` feature (ADR-008 decision 1): a crate that
+    /// Only with the `write` feature (ADR-013 decision 1): a crate that
     /// carries CSI depends on this crate without it, so it cannot write a
     /// scene by any route — the types do not even implement `Serialize`.
     #[cfg(feature = "write")]
