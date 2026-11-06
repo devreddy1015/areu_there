@@ -173,9 +173,9 @@
       <a href="scenes/bedroom.json">bedroom.json</a> (4.2 x 3.6 x 2.7 m),
       <a href="scenes/office.json">office.json</a> (6 x 5 x 2.9 m) and
       <a href="scenes/hall-l.json">hall-l.json</a> (an L-shaped floor of 35.75 m&sup2; inside an
-      8 x 6 m box). The format is <code>scenes/scene.schema.json</code> in the repository, and the same
-      three files are compiled into the simulator, so a room cannot mean one thing here and another
-      there.</p>
+      8 x 6 m box). The format is <code>scenes/scene.schema.json</code> in the repository. The
+      simulator does not read these files; its scene reader, and the Python one, check them in their
+      tests, so a file this page draws is a file both readers accept.</p>
     <p class="body">Material constants are <a href="scenes/materials.json">materials.json</a>: ITU-R
       P.2040 Table 3, evaluated at 2.437 GHz, which is 802.11 channel 6. They are a sourced default and
       not a calibration — nothing in that file has been checked against a measurement made with this

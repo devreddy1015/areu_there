@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 /// that a single inlined document did not.
 ///
 /// `'self'` for scripts and styles: the stylesheet and the script are
-/// real files shared by seven pages, rather than the same few thousand
+/// real files shared by every page, rather than the same few thousand
 /// lines pasted into each one.
 ///
 /// `font-src 'self'`: without it the self-hosted Geist files fall through
@@ -59,6 +59,13 @@ pub struct Page {
 /// The site, in reading order. The router walks this, so adding a page is
 /// adding a line here and a file beside the others — there is no second
 /// place to register it and therefore no second place to forget.
+///
+/// Seven pages in a default build. `/room-sim`, the 3-D scene viewer, is
+/// research rather than product and is compiled in only with the
+/// `roomsim` feature, with its script, three.js and the scene files
+/// (issue #34: parked, kept, default off). No other page links to it, so
+/// the default site has no link that goes nowhere; with the feature on it
+/// is reached by its address.
 pub const PAGES: &[Page] = &[
     Page {
         path: "/",
@@ -72,6 +79,7 @@ pub const PAGES: &[Page] = &[
         path: "/demo",
         html: include_str!("../assets/site/demo.html"),
     },
+    #[cfg(feature = "roomsim")]
     Page {
         path: "/room-sim",
         html: include_str!("../assets/site/room-sim.html"),
@@ -153,7 +161,10 @@ pub const ASSETS: &[Asset] = &[
     },
     // The room viewer. A module, because it imports three.js; the
     // `type="module"` is on the tag in the page, not here. Revalidated
-    // every time, like the other scripts we write.
+    // every time, like the other scripts we write. This and every asset
+    // below the fonts exist for `/room-sim` only, so they share its
+    // feature gate.
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/room-sim.js",
         bytes: include_bytes!("../assets/site/room-sim.js"),
@@ -191,6 +202,7 @@ pub const ASSETS: &[Asset] = &[
     // renders nothing. `vendored_relative_imports_resolve` holds them
     // together. Held for a day, like the fonts — the bytes change only
     // when the pinned version does, and the version is changed by hand.
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/vendor/three.module.min.js",
         bytes: include_bytes!("../assets/site/vendor/three.module.min.js"),
@@ -198,6 +210,7 @@ pub const ASSETS: &[Asset] = &[
         cache: "public, max-age=86400",
         vendored: true,
     },
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/vendor/three.core.min.js",
         bytes: include_bytes!("../assets/site/vendor/three.core.min.js"),
@@ -209,6 +222,7 @@ pub const ASSETS: &[Asset] = &[
     // notice travel with the code, and a licence nobody can reach is not
     // travelling with it. It is in the repository's NOTICE as well; this
     // is the copy a reader of the running site can open.
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/vendor/three-LICENSE.txt",
         bytes: include_bytes!("../assets/site/vendor/three-LICENSE.txt"),
@@ -216,13 +230,15 @@ pub const ASSETS: &[Asset] = &[
         cache: "public, max-age=86400",
         vendored: true,
     },
-    // The example scenes, served from the same files `saans-sim` and the
-    // Python reader compile in, so a room cannot mean one thing to the
-    // page and another to the simulator. A scene is typed in: every
+    // The example scenes, the files in `scenes/`. The page parses them in
+    // the browser; `saans-sim`'s scene reader and `wifisense/scene.py`
+    // check the same files in their own tests, but the simulator does not
+    // read scenes. A scene is typed in: every
     // dimension and every label in these files was written by a person,
     // and none of it was measured by a radio. Revalidated every time,
     // like the stylesheet, because they keep their names while they are
     // edited.
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/scenes/bedroom.json",
         bytes: include_bytes!("../../../../scenes/bedroom.json"),
@@ -230,6 +246,7 @@ pub const ASSETS: &[Asset] = &[
         cache: "no-cache",
         vendored: false,
     },
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/scenes/office.json",
         bytes: include_bytes!("../../../../scenes/office.json"),
@@ -237,6 +254,7 @@ pub const ASSETS: &[Asset] = &[
         cache: "no-cache",
         vendored: false,
     },
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/scenes/hall-l.json",
         bytes: include_bytes!("../../../../scenes/hall-l.json"),
@@ -250,6 +268,7 @@ pub const ASSETS: &[Asset] = &[
     // have to either invent a permittivity or go blank. `fabric` has a
     // null row on purpose — ITU-R P.2040 has no fabric — and the page
     // says so rather than leaving a gap.
+    #[cfg(feature = "roomsim")]
     Asset {
         path: "/scenes/materials.json",
         bytes: include_bytes!("../../../../scenes/materials.json"),
@@ -381,7 +400,7 @@ mod tests {
                     p.path
                 );
             }
-            // A page can fetch too: /room-sim carries an inline script,
+            // A page can fetch too: /room-sim (with `roomsim`) carries an inline script,
             // and ASSETS never sees it. Same normalised patterns as the
             // asset check, so an inline `fetch("https://...")` cannot
             // slip through the gap between the two tests.
@@ -505,6 +524,11 @@ mod tests {
     /// would be a permission slip written for a file that does not
     /// exist. Both are checked here, through the real handler rather
     /// than by reading the table twice.
+    ///
+    /// Only three.js is vendored, and it ships with `/room-sim`, so a
+    /// default build has no vendored file and this test runs with the
+    /// `roomsim` feature (CI tests the gateway both ways).
+    #[cfg(feature = "roomsim")]
     #[test]
     fn vendored_assets_are_served() {
         let vendored: Vec<&'static Asset> = ASSETS.iter().filter(|a| a.vendored).collect();

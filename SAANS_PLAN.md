@@ -200,7 +200,9 @@ S5 needs hardware.
   how confident it is.
 - Breathing and heart data are health data under India's DPDP Act 2023:
   opt-in per space, written consent for vitals, retention limits
-  (events 30 days raw, then 15-minute aggregates), no identities.
+  (events 30 days; one summary per space per day, kept 90 days; the
+  audit log 365 days and never less than events: the gateway's config
+  defaults, README "How long it is kept", ADR-010), no identities.
 - Ethics committee approval before any human-subject data collection (S5).
 - A false "breathing pause" alarm costs trust; a missed one costs more.
   Both rates are reported per detector, never one without the other.

@@ -274,27 +274,6 @@ def band_peak(
     return SpectralPeak(peak_f, peak_p, confidence)
 
 
-def _noise_calibrated_confidence(
-    peak_power: float,
-    mean_power: float,
-    n_samples: int,
-    sample_rate_hz: float,
-    f_low: float,
-    f_high: float,
-    enbw: float = 1.5,
-) -> float:
-    """Shared confidence scale — see the long note inside `band_peak`."""
-    if peak_power <= 0.0 or mean_power <= 0.0 or sample_rate_hz <= 0.0:
-        return 0.0
-    duration_s = n_samples / sample_rate_hz
-    n_ind = max((f_high - f_low) * duration_s, 2.0)
-    noise_ratio = math.log(n_ind) + 0.5772156649
-    span = (n_ind / enbw) - noise_ratio
-    if span <= 0.0:
-        return 0.0
-    return max(0.0, min(1.0, ((peak_power / mean_power) - noise_ratio) / span))
-
-
 def sideband_peak(
     signal: list[float],
     sample_rate_hz: float,

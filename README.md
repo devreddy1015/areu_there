@@ -81,18 +81,19 @@ Directories have not been moved to match; this table is the boundary.
 
 | | Product | Research |
 |---|---|---|
-| Python | `wifisense/` (the reference DSP and FeatureFrame), `spec/wire.md`, the DSP golden vectors | `wifisense/roomsim/`, `wifisense/localize/`, and their `roomsim_*`, `localize_*`, `locate_*` golden sets |
+| Python | `wifisense/` (the reference DSP and FeatureFrame), `spec/wire.md`, the DSP golden vectors | `wifisense/roomsim/`, `wifisense/localize/`, and their `roomsim_*`, `localize_*`, `locate_*` golden sets; `wifisense/scene.py` and `wifisense/roomplan_import.py` (the `scenes/` format); `evaluate_localize.py` (the P0b sweep) |
 | Sensor | `edge/` (C++ DSP and the ESP32-S3 firmware) | — |
-| Rust | `saans-dsp`, `saans-health`, `saans-sim` (the evaluation simulator), `saans-gateway` with default features, `saans-cli` | `saans-roomsim` (Room Sim), `saans-locate` (Locate), `saans-scene` (declared room geometry) |
-| Pages | the site, and the dashboard at `/app` | the room demo at `/roomsim` (`saans-gateway --features roomsim`, off by default) and the site's `/room-sim` page, which draws a scene file and nothing measured |
-| Specs | `spec/wire.md`, SAANS_PLAN.md | `spec/{scene.schema.json,roomsim,locate,livedemo,dataset,preprocess,model,phase9,calibration,sionna_audit,recording}.md`, ROOMSIM.md, RUN.md |
+| Rust | `saans-dsp`, `saans-health`, `saans-sim` (the evaluation simulator), `saans-gateway` with default features, `saans-cli` | `saans-roomsim` (Room Sim), `saans-locate` (Locate), `saans-scene` (declared room geometry), `saans-sim`'s `scene` module (the `scenes/` reader; nothing outside its tests calls it) |
+| Pages | the site (seven pages), and the dashboard at `/app` | both 3-D views, compiled in only with `saans-gateway --features roomsim`: the room demo at `/roomsim`, and the site's `/room-sim` page, which draws a scene file and nothing measured |
+| Specs and notes | `spec/wire.md`, SAANS_PLAN.md | `spec/{scene.schema.json,roomsim,locate,livedemo,dataset,preprocess,model,phase9,calibration,sionna_audit,recording}.md`, ROOMSIM.md, RUN.md, NOTES-localize.md, P0B_TASK.md, `phase6-samples/` |
 | Learned models | none ([ADR-007](docs/adr/007-no-learned-models-yet.md)) | `ml/`, offline only, on the GPU box ([ADR-014](docs/adr/014-offline-learned-models.md)) |
 
 What keeps them apart, in code rather than in prose:
 
 - The gateway compiles the research crates in only under its `roomsim`
   feature, which is off by default ([ADR-013](docs/adr/013-declared-geometry-and-drawing.md)
-  decision 13); a default build serves no room view. `saans-cli` links them
+  decision 13); a default build serves no room view, neither `/roomsim`
+  nor the site's `/room-sim`. `saans-cli` links them
   for its research subcommands (`import-roomplan`, `roomsim-export`,
   `roomsim-eval`, `gen-dataset`).
 - `rust/crates/saans-scene/tests/boundary.rs` fails if a crate that carries
@@ -107,9 +108,31 @@ What keeps them apart, in code rather than in prose:
   evidence.
 
 Two scene formats exist side by side since the merge, and unifying them
-is open work: `scenes/` (read by `wifisense/scene.py`, `saans-sim`'s box
-model and the `/room-sim` page) and `spec/scene.schema.json` with
+is open work: `scenes/` (drawn by the `/room-sim` page, and checked by
+`wifisense/scene.py` and `saans-sim`'s scene reader in their tests; the
+simulator itself reads no scene) and `spec/scene.schema.json` with
 `spec/scenes/` (read by `saans-scene`, Room Sim and the room demo).
+
+### Parked: off by default, kept in the tree
+
+The first customer is an older person living alone ([docs/ELDER_CARE.md](docs/ELDER_CARE.md)).
+What a default build runs for them: occupancy, a still person, breathing
+rate in spaces that opt in (`vitals = true`, off by default), and the
+inactivity alert (`inactivity_alert_min`, on, 30 min by default). The rest
+is kept but switched off, because it is not reliable enough to put in
+front of a family:
+
+| Feature | Why it is off | Where it is switched | Default |
+|---|---|---|---|
+| Heart rate | Unreliable from WiFi CSI in a way breathing is not (NOTES.md §4.6) | The node's `SAANS_HEART_ENABLED` (`edge/firmware/main/Kconfig.projbuild`), which needs vitals on too. The gateway never shows or stores heart rate: no API field, MQTT topic, history series or dashboard view carries it | off |
+| Fall / collapse detector | It also fires on a heavy sit-down: WiFi cannot tell them apart | `collapse_detection` per space (`saans.example.toml`); the test `defaults_are_conservative` pins the default | off |
+| Positioning (RTI) | Did not beat a weighted link-midpoint baseline: 0.72 m median at 13–18% coverage against 0.709 m at 100% (NOTES-localize.md) | Not in the gateway's default build; `--features roomsim` only. `saans-cli` keeps its research subcommands | off |
+| Headcount | Research only: no implementation exists, only a use case on `/hardware` marked "research" | — | none |
+| 3-D room views | Draw declared geometry, not anything measured | `saans-gateway --features roomsim` (`/roomsim` and `/room-sim`) | off |
+
+The long-lie path for elder care is the inactivity alert. Holding presence
+after a fall-shaped motion, so that a person lying still is not read as an
+empty room, is opt-in work in progress (PR #31).
 
 Checking the research line: `cargo test -p saans-gateway --features roomsim`,
 `cargo test -p saans-locate --features roomsim`, and on the GPU box
@@ -513,7 +536,7 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `evaluate.py` | Ground-truth accuracy sweeps (`--suite legacy`, `--suite nulls`) |
 | `tests/` | 829 tests in 30 files (counted 2026-11-06, after the research merge): 308 in `test_localize_*` (the P0b localization work), 136 in `test_locate_*` and 100 in `test_roomsim_*` (research), 285 elsewhere. How they were counted: [docs/EVIDENCE.md](docs/EVIDENCE.md) §2.3 |
 | `rust/crates/saans-gateway/assets/dashboard.html` | The whole dashboard, one file, served from the binary |
-| `rust/crates/saans-gateway/assets/site/` | The eight public pages, the stylesheet, the scripts and the fonts |
+| `rust/crates/saans-gateway/assets/site/` | The public pages (seven; `room-sim.html` is served only with `--features roomsim`), the stylesheet, the scripts and the fonts |
 | `rust/crates/saans-gateway/src/site.rs` | The route table for those pages, and the offline and link tests |
 | `docs/HARDWARE.md` | What to buy for the first bench run, and how to bring it up |
 | `docs/PROTOCOL_S5.md` | The recording protocol, to be followed before any human-subject data exists |
