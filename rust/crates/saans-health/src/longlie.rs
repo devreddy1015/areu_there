@@ -27,10 +27,6 @@
 use crate::detectors::{BLIND_END_S, BURST_INDEX, COLLAPSE_SETTLE_S, VACANCY_GRACE_S};
 use crate::types::{EventKind, HealthEvent, LongLieStatus, Severity};
 
-/// Fixed, deliberately modest: lying down quickly for a nap looks the
-/// same, so this is never a confident call (as `COLLAPSE_CONFIDENCE`).
-pub const LONG_LIE_CONFIDENCE: f64 = 0.5;
-
 /// One sample, as the space monitor sees it.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Input {
@@ -73,6 +69,8 @@ struct Count {
     blind_since: Option<f64>,
     samples: u64,
     held_samples: u64,
+    /// Samples in which the links measured someone present (not held).
+    seen_samples: u64,
     held_now: bool,
     /// The `long_lie_elsewhere` spaces have been seen without motion
     /// since the count began: motion there from now on is new.
@@ -164,6 +162,7 @@ impl LongLie {
                         blind_since: None,
                         samples: 0,
                         held_samples: 0,
+                        seen_samples: 0,
                         held_now: false,
                         elsewhere_quiet: false,
                     });
@@ -206,6 +205,8 @@ impl LongLie {
         c.samples += 1;
         if x.held {
             c.held_samples += 1;
+        } else if x.present {
+            c.seen_samples += 1;
         }
         c.held_now = x.held;
         let still_s = x.t - c.still_since;
@@ -237,7 +238,11 @@ impl LongLie {
             t_s: x.t,
             t_start_s: Some(c.burst_t),
             severity: Severity::Check,
-            confidence: LONG_LIE_CONFIDENCE,
+            // The share of the lie in which the links measured someone:
+            // held presence keeps it running but is not a sighting. Ported
+            // from PR #59. It is not the chance that this is a fall; a nap
+            // after lying down quickly scores the same.
+            confidence: c.seen_samples as f64 / c.samples.max(1) as f64,
             evidence,
             kind: EventKind::LongLie {
                 still_min: still_s / 60.0,
@@ -358,7 +363,7 @@ mod tests {
         assert_eq!(e.severity, Severity::Check);
         assert!((e.t_s - (61.0 + 180.0)).abs() <= 1.0, "fired at {}", e.t_s);
         assert!((e.t_start_s.unwrap() - 60.5).abs() < 1e-9, "the burst");
-        assert!((e.confidence - super::LONG_LIE_CONFIDENCE).abs() < 1e-12);
+        assert_eq!(e.confidence, 1.0, "measured present throughout");
         match e.kind {
             EventKind::LongLie {
                 still_min,
@@ -438,6 +443,14 @@ mod tests {
             lies(&ev).len()
         };
         assert_eq!(short(10.0), 1, "10 s read empty: still counted");
+        let mut m = SpaceMonitor::new(cfg(3.0));
+        let mut ev = arrive_and_drop(&mut m);
+        ev.extend(run(&mut m, 61.0, 120.0, still));
+        ev.extend(run(&mut m, 120.0, 130.0, |t| sample(t, Some(false), 0.5)));
+        ev.extend(run(&mut m, 130.0, 600.0, still));
+        let c = lies(&ev)[0].confidence;
+        // 20 of 360 samples read empty.
+        assert!((c - 340.0 / 360.0).abs() < 0.01, "{c}");
         assert_eq!(short(60.0), 0, "60 s read empty: the count stops");
     }
 
@@ -481,6 +494,8 @@ mod tests {
             }
             _ => unreachable!(),
         }
+        // Held presence keeps the lie running but is not a sighting.
+        assert!(l[0].confidence < 0.1, "{}", l[0].confidence);
         assert!(
             l[0].evidence.contains("inferred, not measured"),
             "{}",
