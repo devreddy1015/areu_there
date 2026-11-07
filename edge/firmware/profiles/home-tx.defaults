@@ -1,0 +1,24 @@
+# A home kit's TX board. Layered on ../sdkconfig.defaults by
+# `PROFILE=home-tx ./build.sh build` (edge/build.sh); `tools/homekit node
+# --role tx` does that for you (docs/HOME_KIT.md). Same values as
+# bench-tx.defaults: the TX does the same job at home as on the bench.
+#
+# SAANS_NODE_ID and SAANS_WIFI_CHANNEL from the environment override the
+# two below, so the channel can follow the home's WiFi without editing this.
+
+CONFIG_SAANS_ROLE_TX=y
+CONFIG_SAANS_ROLE_RX=n
+
+# Not on the wire (the RX writes tx_id 0xFF); names the board in its log.
+CONFIG_SAANS_NODE_ID=0
+
+# Must equal every RX's channel, and the home WiFi's: the receivers send
+# over that network and sense on the same radio (HARDWARE.md, "The uplink
+# channel").
+CONFIG_SAANS_WIFI_CHANNEL=6
+
+# Must equal the RX's CSI rate (home-rx: 20).
+CONFIG_SAANS_TX_RATE_HZ=20
+
+CONFIG_SAANS_WATCHDOG_S=15
+CONFIG_SAANS_TELEMETRY_S=60

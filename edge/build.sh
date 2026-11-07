@@ -11,6 +11,7 @@
 #   ./build.sh size            report binary size
 #   ./build.sh flash           flash over USB (needs a board and --device)
 #   ./build.sh tests           run the host DSP tests instead (no Docker)
+#   ./build.sh chip            say which chip is on PORT (esptool chip_id)
 #
 #   PROFILE=bench-rx ./build.sh build        one board, from firmware/profiles/
 #   PROFILE=bench-rx PORT=… ./build.sh flash-monitor
@@ -23,6 +24,9 @@
 #               build-$PROFILE/ with its own sdkconfig (see below)
 #   SAANS_GATEWAY_IP, SAANS_WIFI_SSID, SAANS_WIFI_PASSWORD
 #               with PROFILE: the site's values, kept out of committed files
+#   SAANS_NODE_ID, SAANS_WIFI_CHANNEL
+#               with PROFILE: this board's id and the home WiFi's channel,
+#               over the profile's (tools/homekit node sets them)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,6 +96,19 @@ case "${CMD}" in
                     printf 'CONFIG_%s="%s"\n' "${var}" "${value//\"/\\\"}" >> "${local_defaults}"
                 fi
             done
+            # Numbers, unquoted, and only in the range Kconfig.projbuild allows:
+            # a value outside it would be dropped by kconfgen with a warning
+            # that scrolls away, and the board would be built as the profile.
+            for spec in SAANS_NODE_ID:0:254 SAANS_WIFI_CHANNEL:1:13; do
+                IFS=: read -r var lo hi <<< "${spec}"
+                if [ -n "${!var:-}" ]; then
+                    if ! [[ "${!var}" =~ ^[0-9]+$ ]] || [ "${!var}" -lt "${lo}" ] || [ "${!var}" -gt "${hi}" ]; then
+                        echo "error: ${var}=${!var}: must be ${lo}..${hi}" >&2
+                        exit 2
+                    fi
+                    printf 'CONFIG_%s=%d\n' "${var}" "$((10#${!var}))" >> "${local_defaults}"
+                fi
+            done
             # Regenerated from the profile every time; see PROFILES above.
             rm -f "${HERE}/firmware/${BUILD_REL}/sdkconfig" "${HERE}/firmware/${BUILD_REL}/sdkconfig.old"
         fi
@@ -135,6 +152,15 @@ case "${CMD}" in
             monitor)       run_idf idf.py "${IDF_OPTS[@]}" -p "${PORT}" monitor ;;
             flash-monitor) run_idf idf.py "${IDF_OPTS[@]}" -p "${PORT}" flash monitor ;;
         esac
+        ;;
+    chip)
+        # Which chip is on PORT, before anything is written to it: the
+        # firmware is for the S3 only. Reads the chip id; writes nothing.
+        if [ -z "${PORT:-}" ]; then
+            echo "error: set PORT, e.g. PORT=/dev/ttyUSB0 ./build.sh chip" >&2
+            exit 1
+        fi
+        run_idf python -m esptool -p "${PORT}" chip_id
         ;;
     tests)
         # Host tests need no container; they are the same headers the firmware
@@ -208,7 +234,7 @@ PY
         '
         ;;
     *)
-        echo "usage: $0 {build|menuconfig|clean|size|flash|monitor|flash-monitor|tests|provision}" >&2
+        echo "usage: $0 {build|menuconfig|clean|size|flash|monitor|flash-monitor|tests|provision|chip}" >&2
         exit 2
         ;;
 esac
