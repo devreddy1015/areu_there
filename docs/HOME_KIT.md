@@ -121,7 +121,8 @@ should say empty.
 
 `selftest --serial /dev/ttyUSB0` reads one board's own log (what the node
 command does after flashing). `selftest --udp` listens on the sensor port
-itself, for when no gateway is running. The log is never saved, because
+itself, for when no gateway is running, on this machine's network address
+(the one the boards send to; `--bind` to choose another). The log is never saved, because
 the WiFi driver prints the network's name in it.
 
 ## When something is wrong

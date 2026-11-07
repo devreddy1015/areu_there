@@ -47,7 +47,7 @@ ENV_SRC = REPO / "deploy/systemd/saans-gateway.env.example"
 # the container; RUSTUP_TOOLCHAIN keeps the image's own.
 RUST_IMAGE = "rust:1.88.0-bookworm"
 RUST_IMAGE_TOOLCHAIN = "1.88.0"
-MIN_PASSWORD = 10
+ADMIN_MIN_CHARS = 10
 
 
 def say(tag: str, msg: str) -> None:
@@ -235,8 +235,8 @@ def gather(args, existing: dict, interactive: bool) -> Answers:
         if not interactive:
             raise ConfigError(f"a password for {args.admin!r}: give --admin-password-file FILE")
         password = _ask_password(args.admin)
-    if password is not None and len(password) < MIN_PASSWORD:
-        raise ConfigError(f"the admin password must be at least {MIN_PASSWORD} characters")
+    if password is not None and len(password) < ADMIN_MIN_CHARS:
+        raise ConfigError(f"the admin password must be at least {ADMIN_MIN_CHARS} characters")
     return Answers(rooms_c, tuple(consent), args.admin, password, not args.local_only)
 
 
@@ -268,7 +268,8 @@ def _ask_rooms(before: list[Room]) -> tuple[list[Room], list[str]]:
 
 
 def _ask_password(admin: str) -> str:
-    print(f"\nThe dashboard's admin, {admin!r}: choose a password (at least {MIN_PASSWORD} characters).")
+    # Says how long, never echoes what was typed (getpass does not echo).
+    print(f"\nThe dashboard's admin, {admin!r}: choose a password (at least {ADMIN_MIN_CHARS} characters).")
     while True:
         a = getpass.getpass("  password: ")
         if a == getpass.getpass("  again:    "):

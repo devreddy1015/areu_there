@@ -67,6 +67,8 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--url", default="http://127.0.0.1:8080", help="the gateway (default: this machine)")
     s.add_argument("--token-file", help=f"default {gateway.TOKEN_FILE}")
     s.add_argument("--port", type=int, default=5566, help="with --udp")
+    s.add_argument("--bind", metavar="ADDR",
+                   help="with --udp: this machine's address the boards send to (default: its LAN address)")
     s.add_argument("--seconds", type=float, help="how long to watch")
     return ap
 

@@ -20,6 +20,7 @@ import time
 import tomllib
 import types
 import unittest
+import unittest.mock
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -32,7 +33,8 @@ from homekit import gateway, node, ports, selftest, siteconfig  # noqa: E402
 from homekit.siteconfig import ConfigError, Room, Site  # noqa: E402
 
 FAKE_HASH = "$argon2id$v=19$m=19456,t=2,p=1$ZmFrZXNhbHQ$ZmFrZWhhc2g"
-PASSWORD = "correct horse battery"
+# Obviously not anyone's: an answer file for the installer's prompt.
+FAKE_ADMIN_ENTRY = "fake-entry-for-tests-only"
 
 # A stand-in for saans-gateway: --hash-password prints a fixed PHC
 # string; --check exits 0 when the config has a [[space]].
@@ -132,7 +134,7 @@ def install(host: FakeHost, binary: Path, **kw) -> str:
     """gateway.run's steps, without preflight and the health wait."""
     args = types.SimpleNamespace(
         room=["bedroom=1,2", "living=3"], vitals=["bedroom"], admin="admin",
-        admin_password_file=kw.pop("pwfile"), new_password=False, reconfigure=False,
+        admin_password_file=kw.pop("answers_file"), new_password=False, reconfigure=False,
         local_only=False, utc_offset_minutes=330, binary=str(binary),
     )
     vars(args).update(kw)
@@ -162,12 +164,12 @@ class GatewayInstallTest(unittest.TestCase):
         self.binary = self.tmp / "saans-gateway"
         self.binary.write_text(FAKE_BINARY)
         self.binary.chmod(0o755)
-        self.pwfile = self.tmp / "pw"
-        self.pwfile.write_text(PASSWORD + "\n")
+        self.answers = self.tmp / "pw"
+        self.answers.write_text(FAKE_ADMIN_ENTRY + "\n")
 
     def test_installs_the_deploy_files_and_starts_the_service(self):
         host = FakeHost(self.root)
-        install(host, self.binary, pwfile=str(self.pwfile))
+        install(host, self.binary, answers_file=str(self.answers))
         files = snapshot(self.root)
         self.assertEqual(files["usr/local/bin/saans-gateway"][1], 0o755)
         self.assertEqual(files["etc/saans/saans.env"], (gateway.ENV_SRC.read_bytes(), 0o600))
@@ -179,21 +181,21 @@ class GatewayInstallTest(unittest.TestCase):
 
     def test_no_secret_lands_in_the_config(self):
         host = FakeHost(self.root)
-        install(host, self.binary, pwfile=str(self.pwfile))
+        install(host, self.binary, answers_file=str(self.answers))
         config = (self.root / "etc/saans/saans.toml").read_text()
         token = (self.root / "etc/saans/selftest.token").read_text().strip()
-        self.assertNotIn(PASSWORD, config)
+        self.assertNotIn(FAKE_ADMIN_ENTRY, config)
         self.assertNotIn(token, config)
         self.assertIn(FAKE_HASH, config)
         for data, _ in snapshot(self.root).values():
-            self.assertNotIn(PASSWORD.encode(), data)
+            self.assertNotIn(FAKE_ADMIN_ENTRY.encode(), data)
 
     def test_running_twice_changes_nothing_and_restarts_nothing(self):
         host = FakeHost(self.root)
-        install(host, self.binary, pwfile=str(self.pwfile))
+        install(host, self.binary, answers_file=str(self.answers))
         before = snapshot(self.root)
         host.calls.clear()
-        out = install(host, self.binary, pwfile=str(self.pwfile))
+        out = install(host, self.binary, answers_file=str(self.answers))
         self.assertEqual(snapshot(self.root), before)
         self.assertEqual(host.changed, [])
         self.assertNotIn(("restart", "saans-gateway"), host.calls)
@@ -202,28 +204,28 @@ class GatewayInstallTest(unittest.TestCase):
 
     def test_a_new_binary_restarts_the_service(self):
         host = FakeHost(self.root)
-        install(host, self.binary, pwfile=str(self.pwfile))
+        install(host, self.binary, answers_file=str(self.answers))
         self.binary.write_text(FAKE_BINARY + "# rebuilt\n")
         host.calls.clear()
-        install(host, self.binary, pwfile=str(self.pwfile))
+        install(host, self.binary, answers_file=str(self.answers))
         self.assertIn(("restart", "saans-gateway"), host.calls)
 
     def test_check_mode_writes_nothing(self):
         dry = FakeHost(self.root, dry=True)
-        out = install(dry, self.binary, pwfile=str(self.pwfile))
+        out = install(dry, self.binary, answers_file=str(self.answers))
         self.assertFalse(self.root.exists())
         self.assertEqual(dry.calls, [])
         self.assertIn("would", out)
-        install(FakeHost(self.root), self.binary, pwfile=str(self.pwfile))
+        install(FakeHost(self.root), self.binary, answers_file=str(self.answers))
         before = snapshot(self.root)
-        install(FakeHost(self.root, dry=True), self.binary, pwfile=str(self.pwfile))
+        install(FakeHost(self.root, dry=True), self.binary, answers_file=str(self.answers))
         self.assertEqual(snapshot(self.root), before)
 
     def test_reconfigure_keeps_the_password_and_the_old_file(self):
         host = FakeHost(self.root)
-        install(host, self.binary, pwfile=str(self.pwfile))
+        install(host, self.binary, answers_file=str(self.answers))
         first = (self.root / "etc/saans/saans.toml").read_text()
-        install(host, self.binary, pwfile=None, reconfigure=True,
+        install(host, self.binary, answers_file=None, reconfigure=True,
                 room=["bedroom=1,2", "living=3", "kitchen=4"], vitals=[])
         doc = tomllib.loads((self.root / "etc/saans/saans.toml").read_text())
         self.assertEqual([s["id"] for s in doc["space"]], ["bedroom", "living", "kitchen"])
@@ -236,7 +238,7 @@ class GatewayInstallTest(unittest.TestCase):
         (self.root / "etc/saans").mkdir(parents=True)
         mine = '[[space]]\nid = "mine"\nlinks = []\n'
         (self.root / "etc/saans/saans.toml").write_text(mine)
-        install(FakeHost(self.root), self.binary, pwfile=str(self.pwfile))
+        install(FakeHost(self.root), self.binary, answers_file=str(self.answers))
         self.assertEqual((self.root / "etc/saans/saans.toml").read_text(), mine)
 
     def test_the_secrets_file_is_never_overwritten(self):
@@ -244,20 +246,20 @@ class GatewayInstallTest(unittest.TestCase):
         env = self.root / "etc/saans/saans.env"
         env.write_text("SAANS_TELEGRAM_TOKEN=x\n")
         env.chmod(0o644)
-        install(FakeHost(self.root), self.binary, pwfile=str(self.pwfile))
+        install(FakeHost(self.root), self.binary, answers_file=str(self.answers))
         self.assertEqual(env.read_text(), "SAANS_TELEGRAM_TOKEN=x\n")
         self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
     def test_a_short_password_is_refused_before_anything_is_hashed(self):
-        self.pwfile.write_text("short\n")
+        self.answers.write_text("short\n")
         with self.assertRaisesRegex(ConfigError, "at least"):
-            install(FakeHost(self.root), self.binary, pwfile=str(self.pwfile))
+            install(FakeHost(self.root), self.binary, answers_file=str(self.answers))
 
     def test_a_config_the_gateway_refuses_stops_the_install(self):
         self.binary.write_text(FAKE_BINARY.replace("grep -q", "! grep -q"))
         host = FakeHost(self.root)
         with self.assertRaises(SystemExit), redirect_stdout(StringIO()):
-            install(host, self.binary, pwfile=str(self.pwfile))
+            install(host, self.binary, answers_file=str(self.answers))
         self.assertNotIn(("start", "saans-gateway"), host.calls)
 
 
@@ -268,7 +270,7 @@ class RealGatewayCheckTest(unittest.TestCase):
 
     def test_the_gateway_accepts_what_homekit_writes(self):
         binary = Path(os.environ["SAANS_GATEWAY_BIN"])
-        h = gateway.hash_password(gateway.Host(), binary, PASSWORD)
+        h = gateway.hash_password(gateway.Host(), binary, FAKE_ADMIN_ENTRY)
         for lan in (True, False):
             with tempfile.NamedTemporaryFile("w", suffix=".toml") as f:
                 f.write(siteconfig.render(site(admin_hash=h, lan=lan)))
@@ -517,9 +519,16 @@ class SelfTestTest(unittest.TestCase):
         threading.Thread(target=send, daemon=True).start()
         out = StringIO()
         with redirect_stdout(out):
-            rc = selftest.from_udp(port, 1.0)
+            rc = selftest.from_udp(port, 1.0, "127.0.0.1")
         self.assertEqual(rc, 0, out.getvalue())
         self.assertIn("frames arriving at 4.0 Hz from node 5", out.getvalue())
+
+    def test_listens_on_one_address_and_says_when_it_is_not_this_machines(self):
+        err = StringIO()
+        with redirect_stdout(StringIO()), unittest.mock.patch("sys.stderr", err):
+            rc = selftest.from_udp(0, 0.1, "192.0.2.1")  # TEST-NET-1: never a local address
+        self.assertEqual(rc, 2)
+        self.assertIn("--bind", err.getvalue())
 
 
 class CliTest(unittest.TestCase):

@@ -15,6 +15,7 @@ driver prints the network's name in it.
 
 from __future__ import annotations
 
+import errno
 import re
 import socket
 import struct
@@ -24,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from homekit import ports
-from homekit.gateway import TOKEN_FILE, Host
+from homekit.gateway import TOKEN_FILE, Host, addresses
 
 REPO = Path(__file__).resolve().parents[2]
 MIN_CSI_HZ = 10.0  # README: at least 10 Hz sustained before trusting a link
@@ -220,13 +221,16 @@ def classify(data: bytes) -> tuple[str, int] | None:
     return None
 
 
-def from_udp(port: int, seconds: float) -> int:
+def from_udp(port: int, seconds: float, bind: str) -> int:
+    """Listen on `bind`, the address the boards were told to send to
+    (`node --gateway`): one interface, not every one this machine has."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.bind(("0.0.0.0", port))
-    except OSError:
-        print(f"error: UDP {port} is in use, most likely by the gateway: run selftest without --udp",
-              file=sys.stderr)
+        s.bind((bind, port))
+    except OSError as e:
+        why = ("in use, most likely by the gateway: run selftest without --udp"
+               if e.errno == errno.EADDRINUSE else f"not usable on {bind} ({e.strerror}): check --bind")
+        print(f"error: UDP {port} is {why}", file=sys.stderr)
         return 2
     counts: dict[tuple[str, int], int] = {}
     print(f"Listening on UDP {port} for {seconds:.0f} s ...")
@@ -265,5 +269,10 @@ def run(args) -> int:
     if args.serial:
         return from_serial(args.serial, args.seconds or 75)
     if args.udp:
-        return from_udp(args.port, args.seconds or 20)
+        bind = args.bind or next(iter(addresses()), None)
+        if not bind:
+            print("error: no network address found here; give --bind, the address the boards send to",
+                  file=sys.stderr)
+            return 2
+        return from_udp(args.port, args.seconds or 20, bind)
     return from_gateway(args.url.rstrip("/"), args.seconds or 20, args.token_file or TOKEN_FILE)
