@@ -12,6 +12,12 @@ work, but none has been tried.
 | `rust/crates/saans-gateway/saans.example.toml` | `/etc/saans/saans.toml`, edited |
 | `rust/target/release/saans-gateway` | `/usr/local/bin/saans-gateway` |
 
+`sudo python3 tools/homekit gateway` does everything on this page up to
+"Operate" for one home: it builds, installs these files, writes the
+config from a few questions, and starts the service, and running it twice
+changes nothing ([docs/HOME_KIT.md](../docs/HOME_KIT.md)). The steps
+below are what it does, for doing them by hand.
+
 ## Install
 
 ```bash

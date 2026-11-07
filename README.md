@@ -39,6 +39,16 @@ python3 evaluate.py --suite legacy                # the original 64-scenario swe
 python3 evaluate.py --suite nulls --quick         # Fresnel blind-spot study, small
 ```
 
+**With boards: set up a home kit** in three commands, a gateway, each
+board, and a check. [docs/HOME_KIT.md](docs/HOME_KIT.md) is written for
+someone who does not program, and ends with the hardware-day checklist.
+
+```bash
+sudo python3 tools/homekit gateway                                   # the gateway, as a service
+python3 tools/homekit node --role rx --id 1 --gateway 192.168.1.20   # one board, flashed and checked
+sudo python3 tools/homekit selftest                                  # frames arriving, per node
+```
+
 ## Saans: the system built on this
 
 `wifisense` is now the **reference implementation** of Saans (साँस,
@@ -566,6 +576,8 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `CONTRIBUTING.md` | The rules every change is held to, and the commands that check them |
 | `bench/` | The first bench session (B1): its order of work, the gateway config and a recording helper; the board profiles are in `edge/firmware/profiles/` |
 | `deploy/` | The gateway as a systemd service: the unit, a secrets template, install and operation |
+| `tools/homekit/` | One-command home kit: gateway install, board flashing, self-test ([docs/HOME_KIT.md](docs/HOME_KIT.md)) |
+| `docs/HOME_KIT.md` | Setting up a home kit, and the hardware-day checklist |
 | `rust/crates/saans-gateway/tests/browser/` | Playwright smoke tests for the dashboard, against a SYNTHETIC replay |
 
 ## Licence
