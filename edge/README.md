@@ -25,7 +25,14 @@ edge/
 PORT=/dev/ttyUSB0 ./build.sh flash-monitor
 SAANS_NODE_KEY=… KEY_ID=0 PORT=/dev/ttyUSB0 ./build.sh provision   # signed frames, ADR-012; see docs/HARDWARE.md
 PROFILE=bench-rx ./build.sh build   # one board from firmware/profiles/; see bench/README.md
+PORT=/dev/ttyUSB0 ./build.sh chip   # which chip is on the port, before writing to it
 ```
+
+For a home kit, `python3 tools/homekit node --role rx --id 1 ...` wraps
+these: it finds the board, refuses a non-S3 chip, builds the `home-*`
+profile with the board's id and the WiFi's channel (`SAANS_NODE_ID`,
+`SAANS_WIFI_CHANNEL`), flashes it and reads its log
+([docs/HOME_KIT.md](../docs/HOME_KIT.md)).
 
 Nothing needs installing beyond Docker: the toolchain lives in
 `espressif/idf:v5.4.1`.

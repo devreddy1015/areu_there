@@ -49,6 +49,10 @@ recording anyone (§1.1 says why).
 
 ## 1. Build and flash the boards
 
+`python3 tools/homekit node --bench ...` does this section for one board,
+with the cable, socket and chip checks, and reads the board's log after
+(docs/HOME_KIT.md, "Hardware day checklist"). By hand:
+
 The site's values come from the environment, so no file holds the WiFi
 password:
 
