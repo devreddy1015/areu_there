@@ -1,4 +1,17 @@
-# wifisense
+# Saans
+
+Saans (साँस, "breath") is being built to tell a family that an older
+parent living alone is all right, from the WiFi signal already in the
+home. There is no camera, and nothing to wear, charge or press. Small
+ESP32 sensors notice presence, movement and breathing. A gateway in the
+home turns them into a picture of the night and the day, and into
+alerts when the day does not go as usual.
+
+**Where it stands:** every result here comes from simulation, and no
+board has run the firmware yet. Where it is going, and in what order:
+[SAANS_PLAN.md](SAANS_PLAN.md), "Where this is going".
+
+## `wifisense`: the reference pipeline
 
 A minimal, honest WiFi CSI sensing pipeline: detect room occupancy and
 measure breathing from ordinary WiFi radio signals, with no camera and no
@@ -51,13 +64,13 @@ sudo python3 tools/homekit selftest                                  # frames ar
 
 ## Saans: the system built on this
 
-`wifisense` is now the **reference implementation** of Saans (साँस,
-"breath"), a camera-free health and safety sensing system for campus
-spaces: ESP32 sensors run the DSP in C++ and send only 68-byte
-FeatureFrames (raw CSI never leaves the room; breathing data only where a
-space has opted in), and a Rust gateway fuses links, runs advisory health
-detectors and serves a dashboard. Plan: [SAANS_PLAN.md](SAANS_PLAN.md);
-decisions: [docs/adr/](docs/adr/); wire format: [spec/wire.md](spec/wire.md).
+`wifisense` is the **reference implementation** of Saans: ESP32 sensors
+run the DSP in C++ and send only 68-byte FeatureFrames (raw CSI never
+leaves the room; breathing data only where a space has opted in), and a
+Rust gateway fuses links, runs advisory health detectors and serves a
+dashboard. Product spec: [docs/ELDER_CARE.md](docs/ELDER_CARE.md);
+plan: [SAANS_PLAN.md](SAANS_PLAN.md); decisions:
+[docs/adr/](docs/adr/); wire format: [spec/wire.md](spec/wire.md).
 
 **Read the site without running anything:**
 <https://devreddy1015.github.io/areu_there/>. It is a static copy, so

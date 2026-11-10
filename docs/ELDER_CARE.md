@@ -4,6 +4,13 @@
 elder care is [ADR-015](adr/015-elder-care-first.md). Issues #38-#42
 and #47 build on this file.
 
+**2026-11-10: the order of the signals is changing
+([ADR-018](adr/018-daily-picture-first.md)).** The daily picture leads:
+the night's breathing trend (§3.4) and the routine (§3.2), sent to the
+family as a morning message. The long lie (§3.3) becomes one alert, and
+waits for issue #62. §3.3-§3.5, §4 and §7 have not been revised yet;
+where they differ from ADR-018, the ADR wins.
+
 Saans for elder care is a few small sensors in the home of an older
 person who lives alone, and a gateway on the same home network. When
 the person has been still for a long time after a sudden movement, or
