@@ -214,9 +214,9 @@ pub fn routine_for<'a>(
     principal: &Principal,
     spaces: impl IntoIterator<Item = &'a str>,
 ) -> Option<Value> {
-    spaces
-        .into_iter()
-        .all(|id| principal.can_see_health_alerts(id))
+    // `all` of nothing is true: with no spaces to check, withhold.
+    let mut spaces = spaces.into_iter().peekable();
+    (spaces.peek().is_some() && spaces.all(|id| principal.can_see_health_alerts(id)))
         .then(|| routine.clone())
 }
 
@@ -376,6 +376,9 @@ mod tests {
         for role in [Role::Ops, Role::Occupancy] {
             let v = routine_for(&routine, &p(role, None), spaces);
             assert!(v.is_none(), "{role:?}");
+            // No spaces to check is not "every space allows it".
+            let none = routine_for(&routine, &p(role, None), [] as [&str; 0]);
+            assert!(none.is_none(), "{role:?}, no spaces");
         }
     }
 
