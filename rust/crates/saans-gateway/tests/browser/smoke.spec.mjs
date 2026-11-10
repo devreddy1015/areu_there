@@ -162,6 +162,18 @@ test('signing out takes the routine out of the page, for whoever signs in next',
   await expect(rows).toHaveCount(0);
 });
 
+test('a getting-up time is a real clock time', async ({ page }) => {
+  // 06:59:45 is 07:00 to the minute, never "06:60".
+  const day = {
+    date: '2026-09-22', got_up_min: 419.75, got_up_known: true, active_hours: 12,
+    night_bathroom_visits: 1, observed_hours: 24, comparisons: [],
+  };
+  await page.route('**/api/routine', (r) => r.fulfill({ json: { today: null, days: [day], note: '' } }));
+  await signIn(page, 'admin');
+  await page.goto(`${base()}/app#overview`);
+  await expect(routine(page).locator('tbody td').first()).toHaveText('07:00');
+});
+
 test('no daily routine at all (404) leaves no panel', async ({ page }) => {
   // What a gateway where no space has a room answers: nothing is withheld,
   // so there is nothing to say.

@@ -1327,7 +1327,8 @@ async function refreshRoutine() {
 }
 function hhmm(min) {
   if (min == null) return 'not seen';
-  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  min = Math.round(min); // before splitting, or 419.75 reads "06:60"
+  const h = Math.floor(min / 60), m = min % 60;
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
 function renderRoutine() {
