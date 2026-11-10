@@ -3,6 +3,7 @@
 //
 // Spaces: `rest` (vitals consented, a breather at 14 BPM at the end) and
 // `hall` (not consented; its node leaks 17.25 BPM, which nobody may see).
+// `rest` is the home's bedroom, so the overview has a daily routine.
 // Users: admin, warden (safety, `rest` only), facilities (occupancy).
 
 import { expect, test } from '@playwright/test';
@@ -112,6 +113,48 @@ test('occupancy role: no long-lie countdown, which is a health inference', async
   await expect(card(page, 'Hall')).not.toContainText('Long lie');
   const seen = await (await page.request.get(base() + '/api/spaces/hall')).json();
   expect('long_lie' in seen.state).toBe(false);
+});
+
+const routine = (page) => page.locator('#ov-routine');
+
+test('the daily routine: a room that was not seen reads "unknown", not "not seen" or 0', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.goto(`${base()}/app#overview`);
+  const day = routine(page).locator('tbody tr').first();
+  await expect(day.locator('th')).toHaveText('2026-09-21 (so far)');
+  // Half an hour of one evening. The bedroom's morning was not seen and no
+  // space is a bathroom, so neither value is known.
+  await expect(day.locator('td').nth(0), 'got up').toHaveText('unknown');
+  await expect(day.locator('td').nth(2), 'night bathroom visits').toHaveText('unknown');
+  // The hall's sudden movement at 22:27 is the one active hour.
+  await expect(day.locator('td').nth(1), 'active hours').toHaveText('1');
+});
+
+test('the daily routine withheld from a role is "not shown to your role", never hidden', async ({ browser }) => {
+  // facilities sees no health alerts. warden sees them in `rest` only, and
+  // the hall's motion feeds the routine too.
+  for (const name of ['facilities', 'warden']) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await signIn(page, name);
+    await page.goto(`${base()}/app#overview`);
+    await expect(routine(page), name).toContainText('not shown to your role');
+    await expect(routine(page).locator('table'), name).toBeHidden();
+    expect((await page.request.get(base() + '/api/routine')).status(), name).toBe(403);
+    await context.close();
+  }
+});
+
+test('no daily routine at all (404) leaves no panel', async ({ page }) => {
+  // What a gateway where no space has a room answers: nothing is withheld,
+  // so there is nothing to say.
+  await page.route('**/api/routine', (r) => r.fulfill({ status: 404, json: { error: 'no daily routine' } }));
+  await signIn(page, 'admin');
+  const answered = page.waitForResponse('**/api/routine');
+  await page.goto(`${base()}/app#overview`);
+  await answered;
+  await expect(card(page, 'Rest room')).toContainText('14.0 BPM');
+  await expect(routine(page)).toBeHidden();
 });
 
 test('dark and light themes both render', async ({ browser }) => {

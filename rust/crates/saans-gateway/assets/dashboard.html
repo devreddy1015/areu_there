@@ -321,11 +321,13 @@ footer { padding: 18px 16px 26px; color: var(--faint); font-size: 11.5px; text-a
     <div id="ov-routine" hidden>
       <h2 class="sec">Daily routine</h2>
       <p id="rt-note"></p>
-      <table id="rt-table" aria-label="Daily routine, newest day first">
-        <thead><tr><th scope="col">Day</th><th scope="col">Got up</th><th scope="col">Active hours</th>
-          <th scope="col">Night bathroom visits</th><th scope="col">Hours seen</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="scroll">
+        <table id="rt-table" aria-label="Daily routine, newest day first">
+          <thead><tr><th scope="col">Day</th><th scope="col">Got up</th><th scope="col">Active hours</th>
+            <th scope="col">Night bathroom visits</th><th scope="col">Hours seen</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -1305,9 +1307,11 @@ async function refreshAlerts() {
   renderAlerts();
 }
 // The home's daily routine (issue #39), on the overview. /api/routine
-// answers 404 when no space has a room and 403 to a role that does not see
-// health alerts in every room it reads; either way there is no panel.
-S.routine = null;
+// answers 404 when no space has a room: there is no routine, and no panel.
+// It answers 403 to a role that does not see health alerts in every space:
+// there is one and it is withheld, which the panel says. Withheld is not
+// absent.
+S.routine = null; // the body; 'withheld' after a 403; null after a 404
 let routineAt = 0;
 async function refreshRoutine() {
   routineAt = Date.now();
@@ -1315,7 +1319,8 @@ async function refreshRoutine() {
     S.routine = await getJSON('/api/routine');
   } catch (e) {
     if (handleAuthLoss(e)) return;
-    if (e instanceof HttpError && (e.status === 404 || e.status === 403)) S.routine = null;
+    if (e instanceof HttpError && e.status === 404) S.routine = null;
+    if (e instanceof HttpError && e.status === 403) S.routine = 'withheld';
   }
   renderRoutine();
 }
@@ -1329,8 +1334,12 @@ function renderRoutine() {
   const r = S.routine;
   box.hidden = !r;
   if (!r) return;
-  document.getElementById('rt-note').textContent = r.note || '';
+  const withheld = r === 'withheld';
+  document.getElementById('rt-note').textContent = withheld
+    ? 'The daily routine is not shown to your role.' : r.note || '';
   const tb = document.querySelector('#rt-table tbody');
+  tb.closest('.scroll').hidden = withheld;
+  if (withheld) return;
   tb.replaceChildren();
   for (const d of [r.today, ...(r.days || [])].filter(Boolean)) {
     const unusual = (m) => (d.comparisons || []).some((c) => c.metric === m && c.unusual);
