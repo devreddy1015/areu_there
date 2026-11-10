@@ -13,7 +13,8 @@
 //!
 //! So each day after the first should read: up at about 06:30, two night
 //! bathroom visits, active most hours from 06 to 21. The first day starts
-//! with every room empty for calibration and has one night visit.
+//! with every room empty for calibration. Its night began before the
+//! recording, so its night bathroom visits read unknown.
 //!
 //! Nodes: bedroom 10 -> 11, bathroom 20 -> 21, living room 30 -> 31.
 //! Times are anchored at a UTC midnight, so with `utc_offset_minutes = 0`

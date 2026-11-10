@@ -385,6 +385,9 @@ impl Hub {
                 m.insert("date".into(), date_string(d.day).into());
                 m.insert("active_hours".into(), d.active_hours().into());
                 m.insert("observed_hours".into(), d.observed_hours().into());
+                // A null `got_up_min` is "nobody got up" only when this is
+                // true; a null `night_bathroom_visits` is always unknown.
+                m.insert("got_up_known".into(), d.got_up_known().into());
             }
             v
         };
@@ -408,7 +411,8 @@ impl Hub {
             "today": r.today().map(day_json),
             "days": days,
             "note": "Advisory: it describes a day and diagnoses nothing. Each day is compared with this \
-                     home's own previous complete days (at least 7). Unusual quiet is not computed yet.",
+                     home's own previous complete days (at least 7). A value is unknown when its room \
+                     was not seen for the whole of its window. Unusual quiet is not computed yet.",
         })
     }
 

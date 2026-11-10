@@ -64,6 +64,24 @@ async fn the_routine_is_served_to_the_roles_that_see_health_alerts() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_room_that_was_not_seen_reads_as_unknown_not_zero() {
+    // The bathroom's link never reports, and the morning has not been seen:
+    // its night visits are null, not 0, and no getting-up claims nothing.
+    let home = format!(
+        "{HOME}[[space]]\nid = \"bath\"\nroom = \"bathroom\"\nlinks = [{{ rx = 5, tx = 6 }}]\n"
+    );
+    let mut g = TestGw::start(config("routine-unseen", &home)).await;
+    g.run(5.0, |i| {
+        vec![occupied_frame(3, 4, i, None), empty_frame(1, 2, i)]
+    })
+    .await;
+    let v = g.json("/api/routine").await;
+    assert_eq!(v["today"]["night_bathroom_visits"], Value::Null, "{v}");
+    assert_eq!(v["today"]["got_up_min"], Value::Null, "{v}");
+    assert_eq!(v["today"]["got_up_known"], json!(false), "{v}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_safety_user_scoped_to_some_rooms_does_not_get_the_whole_home() {
     // Every space's motion feeds the routine's active hours, so seeing the
     // bedroom is not enough: the hall's motion would leak through it.

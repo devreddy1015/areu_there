@@ -17,6 +17,12 @@
 //!   (`BOUT_INDEX`, as the per-space bout counter).
 //! - **night bathroom visits:** bathroom occupancy sessions that start in
 //!   the night window. A night belongs to the morning it ends in.
+//! - **not seen is unknown, not zero:** a value is known only if its room
+//!   was visible in every hour of its window: the bathroom through the
+//!   night, the bedroom from two hours before the morning window to its
+//!   end. Otherwise the night's visits are `None` and a day without a
+//!   getting-up claims nothing (`DailyRoutine::got_up_known`). An unknown
+//!   value is not compared and is no part of a baseline.
 //! - **compared with the person's own baseline:** when a day closes, each
 //!   value is set against the median of up to `ROUTINE_BASELINE_DAYS`
 //!   previous complete days, flagged beyond the larger of
@@ -102,13 +108,21 @@ pub struct Comparison {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DailyRoutine {
     pub day: i64,
-    /// Minutes after local midnight; `None` if no getting-up was seen.
+    /// Minutes after local midnight. `None`: no getting-up was seen, which
+    /// says there was none only if `got_up_known()`.
     pub got_up_min: Option<f64>,
     /// Bit h: a motion bout somewhere in the home during local hour h.
     pub active_hours_mask: u32,
-    pub night_bathroom_visits: u32,
+    /// `None`: unknown, not zero. The bathroom was not visible in every
+    /// hour of the night.
+    pub night_bathroom_visits: Option<u32>,
     /// Bit h: some room was visible during local hour h.
     pub observed_hours_mask: u32,
+    /// Bit h: the bedroom was visible during local hour h.
+    pub bedroom_observed_mask: u32,
+    /// Bit h: the bathroom was visible during hour h of this day's night
+    /// (an hour after `night_start_h` is the evening before).
+    pub bathroom_night_mask: u32,
     /// Filled when the day closes; empty for the day in progress.
     pub comparisons: Vec<Comparison>,
 }
@@ -119,10 +133,21 @@ impl DailyRoutine {
             day,
             got_up_min: None,
             active_hours_mask: 0,
-            night_bathroom_visits: 0,
+            night_bathroom_visits: None,
             observed_hours_mask: 0,
+            bedroom_observed_mask: 0,
+            bathroom_night_mask: 0,
             comparisons: Vec::new(),
         }
+    }
+
+    /// Whether `got_up_min` says what happened: a getting-up was seen, or
+    /// the bedroom was visible in every hour a morning rise needs (from
+    /// `GOT_UP_MIN_REST_S` before the morning window to its end), so `None`
+    /// is a morning without one and not a morning nobody saw.
+    pub fn got_up_known(&self) -> bool {
+        let needed = hours_mask(MORNING_START_H - GOT_UP_MIN_REST_S / 3600.0, MORNING_END_H);
+        self.got_up_min.is_some() || self.bedroom_observed_mask & needed == needed
     }
 
     pub fn active_hours(&self) -> u32 {
@@ -143,9 +168,13 @@ impl DailyRoutine {
 pub struct HomeRoutine {
     cfg: RoutineConfig,
     today: Option<DailyRoutine>,
-    /// Night bathroom visits after `night_start_h`: they belong to the
-    /// next day.
+    /// Bathroom visits in today's night so far. Whether they are the whole
+    /// night's is `DailyRoutine::night_bathroom_visits`'s to say.
+    night_visits: u32,
+    /// Night bathroom visits after `night_start_h`, and the hours the
+    /// bathroom was seen then: they belong to the next day.
     carry_bathroom: u32,
+    carry_night_mask: u32,
     /// A bedroom rest period that ended in the morning, awaiting a bout.
     got_up_candidate: Option<f64>,
     /// The last bathroom session start or end, to merge a flickering visit.
@@ -160,6 +189,21 @@ fn hour_of(t: f64) -> f64 {
 
 fn bit(t: f64) -> u32 {
     1 << (hour_of(t).floor() as u32).min(23)
+}
+
+/// Bit h for each local hour with a part in [start, end). `start > end`
+/// wraps past midnight, as a night window does.
+fn hours_mask(start: f64, end: f64) -> u32 {
+    (0..24u32)
+        .filter(|&h| {
+            let (after, before) = (f64::from(h + 1) > start, f64::from(h) < end);
+            if start > end {
+                after || before
+            } else {
+                after && before
+            }
+        })
+        .fold(0, |m, h| m | 1 << h)
 }
 
 /// The day whose night a bathroom visit at `t` belongs to, or `None` if it
@@ -200,7 +244,9 @@ impl HomeRoutine {
         Self {
             cfg,
             today: None,
+            night_visits: 0,
             carry_bathroom: 0,
+            carry_night_mask: 0,
             got_up_candidate: None,
             bathroom_last_t: None,
             history: BTreeMap::new(),
@@ -250,6 +296,15 @@ impl HomeRoutine {
         let today = self.today.as_mut()?;
         if s.occupied.is_some() {
             today.observed_hours_mask |= bit(t);
+            match room {
+                Room::Bedroom => today.bedroom_observed_mask |= bit(t),
+                Room::Bathroom => match night_of(&self.cfg, t) {
+                    Some(n) if n == today.day => today.bathroom_night_mask |= bit(t),
+                    Some(_) => self.carry_night_mask |= bit(t),
+                    None => {}
+                },
+                Room::Other => {}
+            }
         }
         if self
             .got_up_candidate
@@ -286,7 +341,7 @@ impl HomeRoutine {
                         continue;
                     }
                     match night_of(&self.cfg, ev.t_s) {
-                        Some(n) if n == today.day => today.night_bathroom_visits += 1,
+                        Some(n) if n == today.day => self.night_visits += 1,
                         Some(n) if n == today.day + 1 => self.carry_bathroom += 1,
                         _ => {}
                     }
@@ -297,6 +352,10 @@ impl HomeRoutine {
                 _ => {}
             }
         }
+        // A night the bathroom was not seen through is unknown, not zero.
+        let night = hours_mask(self.cfg.night_start_h, self.cfg.night_end_h);
+        today.night_bathroom_visits =
+            (today.bathroom_night_mask == night).then_some(self.night_visits);
         closed
     }
 
@@ -309,12 +368,14 @@ impl HomeRoutine {
             r
         });
         let mut today = DailyRoutine::new(d);
-        // Visits after the night began belong to the morning after; a gap
-        // of more than a day drops them with the day they belonged to.
-        if closed.as_ref().is_some_and(|c| c.day == d - 1) {
-            today.night_bathroom_visits = self.carry_bathroom;
-        }
+        // Visits after the night began belong to the morning after, and so
+        // do the hours the bathroom was seen; a gap of more than a day
+        // drops them with the day they belonged to.
+        let next = closed.as_ref().is_some_and(|c| c.day == d - 1);
+        self.night_visits = if next { self.carry_bathroom } else { 0 };
+        today.bathroom_night_mask = if next { self.carry_night_mask } else { 0 };
         self.carry_bathroom = 0;
+        self.carry_night_mask = 0;
         self.got_up_candidate = None;
         self.today = Some(today);
         closed
@@ -342,7 +403,7 @@ impl HomeRoutine {
             ),
             (
                 "night_bathroom_visits",
-                |d| Some(d.night_bathroom_visits as f64),
+                |d| d.night_bathroom_visits.map(f64::from),
                 FLOOR_NIGHT_BATHROOM,
             ),
         ];
@@ -516,19 +577,28 @@ mod tests {
     #[test]
     fn a_night_belongs_to_the_morning_it_ends_in() {
         let mut r = HomeRoutine::new(RoutineConfig::default());
-        still(&mut r, 0.0);
         let bath = |r: &mut HomeRoutine, t: f64| {
             r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
         };
+        // The bathroom is seen through both nights, from 22:00 the evening
+        // before day 0.
+        for h in -2..24 {
+            seen(&mut r, Room::Bathroom, h);
+        }
         bath(&mut r, 23.5 * H); // day 0 after 22:00: day 1's night
+        for h in 24..30 {
+            seen(&mut r, Room::Bathroom, h);
+        }
         bath(&mut r, DAY_S + 2.0 * H); // day 1 before 06:00
         bath(&mut r, DAY_S + 10.0 * H); // day 1 daytime: not a night visit
-                                        // An arrival in a room that is not the bathroom does not count.
+
+        // An arrival in a room that is not the bathroom does not count.
         let t = DAY_S + 3.0 * H;
         r.observe(Room::Other, &sample(t, 0.5), &[arrived(t)]);
         assert_eq!(r.today().unwrap().day, 1);
-        assert_eq!(r.today().unwrap().night_bathroom_visits, 2);
-        assert_eq!(r.history()[0].night_bathroom_visits, 0);
+        assert_eq!(r.today().unwrap().night_bathroom_visits, Some(2));
+        let day0 = r.history().pop().unwrap();
+        assert_eq!(day0.night_bathroom_visits, Some(0));
     }
 
     #[test]
@@ -554,29 +624,35 @@ mod tests {
             night_end_h: 6.0,
         });
         still(&mut r, 0.0);
+        for h in 1..6 {
+            seen(&mut r, Room::Bathroom, h);
+        }
         for h in [2.0, 14.0, 23.0] {
             let t = h * H;
             r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
         }
-        assert_eq!(r.today().unwrap().night_bathroom_visits, 1, "only 02:00");
-        let next = DAY_S + 0.5 * H;
-        still(&mut r, next);
-        assert_eq!(
-            r.today().unwrap().night_bathroom_visits,
-            0,
-            "nothing carried"
-        );
+        let visits = |r: &HomeRoutine| r.today().unwrap().night_bathroom_visits;
+        assert_eq!(visits(&r), Some(1), "only 02:00");
+        for h in 25..30 {
+            seen(&mut r, Room::Bathroom, h);
+        }
+        assert_eq!(r.today().unwrap().day, 1);
+        assert_eq!(visits(&r), Some(0), "nothing carried");
     }
 
     #[test]
     fn a_visit_just_before_midnight_seen_after_it_is_tonights() {
         let mut r = HomeRoutine::new(RoutineConfig::default());
-        still(&mut r, 0.0);
+        seen(&mut r, Room::Bathroom, 22);
+        seen(&mut r, Room::Bathroom, 23);
         // Day 1 has begun when the 23:59:50 arrival is processed.
         let t = DAY_S - 10.0;
         r.observe(Room::Bathroom, &sample(DAY_S + 5.0, 0.5), &[arrived(t)]);
+        for h in 24..30 {
+            seen(&mut r, Room::Bathroom, h);
+        }
         assert_eq!(r.today().unwrap().day, 1);
-        assert_eq!(r.today().unwrap().night_bathroom_visits, 1);
+        assert_eq!(r.today().unwrap().night_bathroom_visits, Some(1));
     }
 
     #[test]
@@ -600,7 +676,9 @@ mod tests {
         // A still person on one link can read empty for a few seconds: in
         // `saans export-home`'s replay one 4-minute visit was 3 sessions.
         let mut r = HomeRoutine::new(RoutineConfig::default());
-        still(&mut r, 0.0);
+        for h in -2..6 {
+            seen(&mut r, Room::Bathroom, h);
+        }
         let bath = |r: &mut HomeRoutine, ev: HealthEvent| {
             let t = ev.t_s;
             r.observe(Room::Bathroom, &sample(t, 0.5), &[ev]);
@@ -613,7 +691,113 @@ mod tests {
         // Twenty minutes later is another visit.
         bath(&mut r, arrived(v + 1500.0));
         bath(&mut r, left(v + 1700.0));
-        assert_eq!(r.today().unwrap().night_bathroom_visits, 2);
+        assert_eq!(r.today().unwrap().night_bathroom_visits, Some(2));
+    }
+
+    /// `room` visible and still, once in hour `h` (counted from day 0's
+    /// midnight; negative is the day before).
+    fn seen(r: &mut HomeRoutine, room: Room, h: i64) {
+        r.observe(room, &sample(h as f64 * H + 60.0, 0.5), &[]);
+    }
+
+    /// The bathroom visible in every hour of day `d`, with an arrival at
+    /// each of `visits` (hours).
+    fn bathroom_day(r: &mut HomeRoutine, d: i64, visits: &[f64]) {
+        for h in 0..24 {
+            seen(r, Room::Bathroom, d * 24 + h);
+        }
+        for &h in visits {
+            let t = d as f64 * DAY_S + h * H;
+            r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
+        }
+    }
+
+    #[test]
+    fn a_night_the_bathroom_was_not_seen_through_is_unknown_not_zero() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        // The night that ends on day 0, from 22:00. The living room is seen
+        // throughout; the bathroom's link is down from 02:00 to 04:00.
+        for h in -2..6 {
+            seen(&mut r, Room::Other, h);
+            if (2..4).contains(&h) {
+                let down = SpaceSample {
+                    occupied: None,
+                    links_usable: 0,
+                    ..sample(h as f64 * H + 60.0, 0.5)
+                };
+                r.observe(Room::Bathroom, &down, &[]);
+            } else {
+                seen(&mut r, Room::Bathroom, h);
+            }
+        }
+        assert_eq!(r.today().unwrap().night_bathroom_visits, None);
+        // The next night it is seen in every hour and nobody goes: zero.
+        for h in 6..30 {
+            seen(&mut r, Room::Bathroom, h);
+        }
+        assert_eq!(r.today().unwrap().day, 1);
+        assert_eq!(r.today().unwrap().night_bathroom_visits, Some(0));
+        let day0 = r.history().pop().unwrap();
+        assert_eq!(day0.night_bathroom_visits, None, "day 0 closed unknown");
+    }
+
+    #[test]
+    fn an_evening_before_a_gap_is_not_the_evening_before() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        // The evening of day 0: the bathroom is seen, and visited.
+        seen(&mut r, Room::Bathroom, 22);
+        seen(&mut r, Room::Bathroom, 23);
+        r.observe(Room::Bathroom, &sample(23.5 * H, 0.5), &[arrived(23.5 * H)]);
+        // The gateway is off for day 1 and back at midnight of day 2.
+        for h in 48..54 {
+            seen(&mut r, Room::Bathroom, h);
+        }
+        assert_eq!(r.today().unwrap().day, 2);
+        assert_eq!(r.today().unwrap().night_bathroom_visits, None);
+    }
+
+    #[test]
+    fn nights_the_bathroom_was_not_seen_are_not_a_baseline() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        // The bathroom's link is down until day 8: no visit was seen, which
+        // is not "no visits".
+        for d in 0..9 {
+            day(&mut r, d, Some(6.5), &[9.5]);
+        }
+        bathroom_day(&mut r, 8, &[]);
+        // The first night it is seen through has two visits.
+        day(&mut r, 9, Some(6.5), &[9.5]);
+        bathroom_day(&mut r, 9, &[2.0, 4.0]);
+        let closed = day(&mut r, 10, None, &[]);
+        assert_eq!(closed[0].day, 9);
+        assert_eq!(closed[0].night_bathroom_visits, Some(2));
+        assert!(
+            closed[0]
+                .comparisons
+                .iter()
+                .all(|c| c.metric != "night_bathroom_visits"),
+            "compared with nights nobody saw: {:?}",
+            closed[0].comparisons
+        );
+    }
+
+    #[test]
+    fn no_getting_up_is_known_only_if_the_bedroom_was_seen_all_morning() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        // The living room is seen all day; the bedroom's link is down.
+        day(&mut r, 0, None, &[9.5]);
+        assert_eq!(r.today().unwrap().got_up_min, None);
+        assert!(!r.today().unwrap().got_up_known());
+        // Seen from 01:00 (a rise at 03:00 ends a rest that began by then)
+        // to noon, and nobody got up: that is known.
+        day(&mut r, 1, None, &[9.5]);
+        for h in 1..11 {
+            seen(&mut r, Room::Bedroom, 24 + h);
+        }
+        assert!(!r.today().unwrap().got_up_known(), "11:00-12:00 not seen");
+        seen(&mut r, Room::Bedroom, 24 + 11);
+        assert_eq!(r.today().unwrap().got_up_min, None);
+        assert!(r.today().unwrap().got_up_known());
     }
 
     #[test]

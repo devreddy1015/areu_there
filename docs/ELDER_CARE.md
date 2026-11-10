@@ -216,6 +216,18 @@ accurate the routine is across homes.
   that ends between 03:00 and 12:00, followed by a motion bout 10 to 30
   minutes later. The latest such rise wins, so a night-time trip and a nap
   do not count.
+- **A room that was not seen is unknown, not zero.** A value is known
+  only if its room was visible in every hour of its window: the bathroom
+  through the night, the bedroom from two hours before the morning window
+  to its end. Otherwise the night's bathroom visits are unknown (`null`,
+  never 0) and a day without a getting-up says "unknown", not "did not
+  get up". An unknown value is not compared and is no part of the
+  baseline. So a home's first night reads unknown: it began before the
+  gateway did.
+- **Not covered yet:** active hours have no such check per room. A room
+  that is neither the bedroom nor the bathroom and is down all day lowers
+  them, and can hide the motion that confirms a getting-up. Only the
+  whole-day rule (some room seen in 20 hours) applies there.
 - **Restarts:** a gateway restart loses the day in progress. That day
   closes partial, and if fewer than 20 hours were observed it is not used.
 - **Starting values:** every threshold is a starting value for pilots

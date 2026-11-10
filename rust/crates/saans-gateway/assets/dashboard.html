@@ -1338,9 +1338,10 @@ function renderRoutine() {
       m && unusual(m) ? text + ' (unusual)' : text);
     add(tb, add(el('tr'),
       el('th', { scope: 'row' }, d.date + (d === r.today ? ' (so far)' : '')),
-      cell(hhmm(d.got_up_min), 'got_up_min'),
+      // A room that was not seen is unknown: not "not seen", and not 0.
+      cell(d.got_up_min == null && !d.got_up_known ? 'unknown' : hhmm(d.got_up_min), 'got_up_min'),
       cell(String(d.active_hours), 'active_hours'),
-      cell(String(d.night_bathroom_visits), 'night_bathroom_visits'),
+      cell(String(d.night_bathroom_visits ?? 'unknown'), 'night_bathroom_visits'),
       cell(String(d.observed_hours))));
   }
 }
