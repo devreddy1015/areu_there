@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 const RUST = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 // Who signs in. `warden` is limited to `rest`, so `hall` is out of scope.
+// `rest` is the home's bedroom, so there is a daily routine (/api/routine)
+// for admin; warden and facilities are refused it.
 const USERS = [
   { name: 'admin', role: 'admin', spaces: [] },
   { name: 'warden', role: 'safety', spaces: ['rest'] },
@@ -79,6 +81,7 @@ required = true
 id = "rest"
 name = "Rest room"
 vitals = true
+room = "bedroom"
 links = [{ rx = 3, tx = 4 }, { rx = 5, tx = 4 }]
 
 [[space]]

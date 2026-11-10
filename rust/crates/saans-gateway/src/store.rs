@@ -293,6 +293,69 @@ pub fn save_history(
     fs::rename(&tmp, history_path(dir))
 }
 
+/// The home's closed routine days (issue #39), beside `history.json` and on
+/// the same retention clock (`history_retention_days`).
+pub fn routine_path(dir: &Path) -> PathBuf {
+    dir.join("routine.json")
+}
+
+/// Read `routine.json`. A file that does not parse is moved aside (never
+/// overwritten), as `history.json` is, and the routine starts empty.
+pub fn load_routine(dir: &Path) -> (Vec<saans_health::DailyRoutine>, Option<String>) {
+    let path = routine_path(dir);
+    let text = match fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return (Vec::new(), None),
+        Err(e) => return (Vec::new(), Some(format!("{}: {e}", path.display()))),
+    };
+    let parsed = serde_json::from_str::<Value>(&text)
+        .ok()
+        .and_then(|v| serde_json::from_value(v.get("days")?.clone()).ok());
+    match parsed {
+        Some(days) => (days, None),
+        None => {
+            let aside = dir.join(format!(
+                "routine.json.unreadable-{}",
+                crate::timefmt::now_unix_ms()
+            ));
+            let what = if fs::rename(&path, &aside).is_ok() {
+                format!("moved to {}", aside.display())
+            } else {
+                "left in place".into()
+            };
+            (
+                Vec::new(),
+                Some(format!(
+                    "{} did not parse ({what}); the routine starts empty",
+                    path.display()
+                )),
+            )
+        }
+    }
+}
+
+/// Write `routine.json` atomically (temp file + rename).
+pub fn save_routine(
+    dir: &Path,
+    days: &[saans_health::DailyRoutine],
+    saved_time: &str,
+) -> io::Result<()> {
+    fs::create_dir_all(dir)?;
+    let doc = serde_json::json!({ "version": 1, "saved": saved_time, "days": days });
+    let tmp = dir.join("routine.json.tmp");
+    {
+        let mut f = File::create(&tmp)?;
+        f.write_all(
+            serde_json::to_string_pretty(&doc)
+                .map_err(io::Error::other)?
+                .as_bytes(),
+        )?;
+        f.write_all(b"\n")?;
+        f.sync_all()?;
+    }
+    fs::rename(&tmp, routine_path(dir))
+}
+
 /// The replay floors of signed frames (ADR-012), so a gateway restart does
 /// not reopen frames it has already accepted.
 pub const FRAME_COUNTERS_FILE: &str = "frame_counters.json";
@@ -533,6 +596,69 @@ mod tests {
         let (_, err) = load_history(&dir);
         assert!(err.unwrap().contains("does not parse"));
         assert!(!history_path(&dir).exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Two closed routine days: one with nothing known, one with every
+    /// value and a comparison.
+    fn routine_days() -> Vec<saans_health::DailyRoutine> {
+        let mut r = saans_health::HomeRoutine::new(Default::default());
+        for day in 0..3 {
+            let s = saans_health::SpaceSample {
+                t_s: f64::from(day) * 86_400.0,
+                occupied: Some(true),
+                presence_index: 3.0,
+                motion_index: 0.5,
+                links_usable: 1,
+                links_total: 1,
+                breathing: None,
+                heart: None,
+            };
+            r.observe(saans_health::Room::Bedroom, &s, false, &[]);
+        }
+        let mut days = r.history();
+        days[1].got_up_min = Some(390.5);
+        days[1].night_bathroom_visits = Some(2);
+        days[1].comparisons.push(saans_health::routine::Comparison {
+            metric: "got_up_min".into(),
+            value: 390.5,
+            median: 390.0,
+            mad: 4.5,
+            days: 8,
+            unusual: true,
+        });
+        days
+    }
+
+    #[test]
+    fn routine_days_round_trip() {
+        let dir = tmpdir("routine");
+        assert_eq!(load_routine(&dir), (Vec::new(), None), "no file yet");
+        let days = routine_days();
+        assert_eq!(days.len(), 2);
+        save_routine(&dir, &days, "2026-11-10T10:00:00.000Z").unwrap();
+        assert_eq!(load_routine(&dir), (days, None));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_unreadable_routine_file_is_moved_aside_and_the_routine_starts_empty() {
+        let dir = tmpdir("routine-bad");
+        // It parses as JSON; its days are not routine days.
+        let bad = "{\"version\": 1, \"days\": [{\"day\": \"yesterday\"}]}";
+        fs::write(routine_path(&dir), bad).unwrap();
+        let (days, note) = load_routine(&dir);
+        assert!(days.is_empty());
+        assert!(note.expect("a startup note").contains("did not parse"));
+        assert!(!routine_path(&dir).exists(), "a save would overwrite it");
+        let kept: Vec<PathBuf> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        let name = kept[0].file_name().unwrap().to_string_lossy();
+        assert!(name.starts_with("routine.json.unreadable-"), "{name}");
+        assert_eq!(fs::read_to_string(&kept[0]).unwrap(), bad);
         let _ = fs::remove_dir_all(&dir);
     }
 }

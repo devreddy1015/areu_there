@@ -54,6 +54,10 @@ pub struct GatewayConfig {
     /// Offset of local time from UTC, in minutes (IST = 330). Sets the day
     /// boundary of the event logs and the offset printed in timestamps.
     pub utc_offset_minutes: i32,
+    /// The home's settings for the daily routine (`[home]`): the night
+    /// window for bathroom visits. The routine runs only when some space
+    /// has a `room` (bedroom or bathroom).
+    pub home: saans_health::RoutineConfig,
     pub raw: RawConfig,
     /// Bounded in-memory time series behind `/api/history`. Never
     /// persisted: the window is the retention policy.
@@ -235,6 +239,7 @@ impl Default for GatewayConfig {
             history_retention_days: 90,
             audit_retention_days: 365,
             utc_offset_minutes: 0,
+            home: saans_health::RoutineConfig::default(),
             raw: RawConfig::default(),
             spaces: Vec::new(),
             frame_keys: Vec::new(),
@@ -331,6 +336,20 @@ impl GatewayConfig {
                  the record of who read an event must outlive the event (ADR-010)",
                 self.audit_retention_days, self.event_retention_days
             ));
+        }
+        for (key, h) in [
+            ("night_start_h", self.home.night_start_h),
+            ("night_end_h", self.home.night_end_h),
+        ] {
+            if !(0.0..=24.0).contains(&h) {
+                return err(format!("home.{key} must be an hour from 0 to 24"));
+            }
+        }
+        // A window with no hours in it has no nights, and every night
+        // would then read as a known 0 bathroom visits.
+        let (start, end) = (self.home.night_start_h, self.home.night_end_h);
+        if start == end || (start == 24.0 && end == 0.0) {
+            return err("home.night_start_h and home.night_end_h leave no night window");
         }
         if !(-1440..=1440).contains(&self.utc_offset_minutes) {
             return err("utc_offset_minutes must be within +-1440");
@@ -832,6 +851,34 @@ mod tests {
     }
 
     const ONE_SPACE: &str = "[[space]]\nid = \"a\"\nlinks = [{ rx = 1, tx = 2 }]\n";
+
+    #[test]
+    fn rooms_and_the_night_window_parse_and_nonsense_is_refused() {
+        let cfg = GatewayConfig::from_toml(&format!("{ONE_SPACE}room = \"bathroom\"\n")).unwrap();
+        assert_eq!(cfg.spaces[0].room, saans_health::Room::Bathroom);
+        let d = GatewayConfig::from_toml(ONE_SPACE).unwrap();
+        assert_eq!(d.spaces[0].room, saans_health::Room::Other);
+        assert_eq!((d.home.night_start_h, d.home.night_end_h), (22.0, 6.0));
+        let h = GatewayConfig::from_toml(&format!(
+            "[home]\nnight_start_h = 21\nnight_end_h = 7\n{ONE_SPACE}"
+        ))
+        .unwrap();
+        assert_eq!((h.home.night_start_h, h.home.night_end_h), (21.0, 7.0));
+        for bad in [
+            "night_start_h = 25",
+            "night_end_h = -1",
+            "night_start_h = nan",
+            // No hours in the window: every night would read as 0 visits.
+            "night_start_h = 6\nnight_end_h = 6",
+            "night_start_h = 24\nnight_end_h = 0",
+        ] {
+            let e = GatewayConfig::from_toml(&format!("[home]\n{bad}\n{ONE_SPACE}"))
+                .expect_err(bad)
+                .to_string();
+            assert!(e.contains("night"), "{bad}: {e}");
+        }
+        assert!(GatewayConfig::from_toml(&format!("{ONE_SPACE}room = \"kitchen\"\n")).is_err());
+    }
 
     #[test]
     fn the_fall_hold_is_off_by_default_and_refuses_nonsense() {

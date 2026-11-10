@@ -74,6 +74,17 @@ cadence_s = 2.0      # one point per this many seconds (min 0.5)
 # node); tx = 255 means "an access point / unknown". Each link belongs to at
 # most one space; frames from links no space lists are counted in
 # /api/health so a misconfigured node is easy to find.
+#
+# The daily routine (docs/ELDER_CARE.md §3.2) runs when some space says what
+# the room is for: room = "bedroom" or room = "bathroom" (default "other").
+# It reports per day: when the person got up, active hours, night bathroom
+# visits, each against their own previous days, at /api/routine and on the
+# dashboard's overview. A value whose room is not set here, or was not seen
+# through its window, reads unknown. [home] sets the night window, in local
+# hours:
+# [home]
+# night_start_h = 22
+# night_end_h = 6
 [[space]]
 id = "reading-room"
 name = "Reading room"

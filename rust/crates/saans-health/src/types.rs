@@ -71,9 +71,23 @@ pub struct SpaceConfig {
     /// neighbour through a shared wall). Applied by the gateway, which
     /// sees every space ([`crate::SpaceMonitor::note_motion_elsewhere`]).
     pub long_lie_elsewhere: Vec<String>,
+    /// What the room is for, as far as the daily routine is concerned
+    /// (`routine.rs`, issue #39). It reads the bedroom's rest periods and
+    /// the bathroom's visits; every room's motion counts as activity.
+    pub room: Room,
     pub breathing_pause_min_s: f64,
     pub rate_high_bpm: f64,
     pub rate_low_bpm: f64,
+}
+
+/// A room's role in the daily routine. Most rooms are `Other`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Room {
+    #[default]
+    Other,
+    Bedroom,
+    Bathroom,
 }
 
 impl Default for SpaceConfig {
@@ -89,6 +103,7 @@ impl Default for SpaceConfig {
             fall_hold_min: 0.0,
             long_lie_min: 0.0,
             long_lie_elsewhere: Vec::new(),
+            room: Room::Other,
             breathing_pause_min_s: 10.0,
             rate_high_bpm: 24.0,
             rate_low_bpm: 8.0,

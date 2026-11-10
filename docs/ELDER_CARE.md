@@ -203,10 +203,63 @@ sessions, rest periods (`REST_MIN_S` 1200 s), and the per-space
 
 **Measured (SIM).** Only rest periods: at least one was reported in 31
 of 36 night runs ("S3 health detectors, held-out seeds") and 36 of 36
-in the box model. Nothing at the level of a routine: the simulator has
-no multi-room or multi-day timelines.
+in the box model. Nothing at the level of a routine has been *measured*.
 
-**Not built.** All of it (#39). It is advisory: it describes a day and
+`saans export-home` now writes one fixed multi-room, multi-day plan to
+replay. That shows the routine working on that plan; it does not say how
+accurate the routine is across homes.
+
+**Built (#39), except unusual quiet.**
+
+- **Where:** `saans-health/src/routine.rs`.
+- **What:** got up, active hours and night bathroom visits, each compared
+  with up to 28 previous complete days, once there are at least 7.
+- **How to use it:**
+  - set `room = "bedroom"` or `room = "bathroom"` on a space;
+  - set the night window under `[home]`;
+  - read it at `/api/routine` or on the dashboard's overview. It goes
+    to admin, or to safety with every space of the home in scope
+    (`privacy::routine_for`): every room's motion feeds it. Anyone else
+    is told it is not shown to their role.
+- **Getting up**, as built: a bedroom rest period of at least two hours
+  that ends between 03:00 and 12:00, followed by a motion bout 10 to 30
+  minutes later. The latest such rise wins, so a night-time trip and a nap
+  do not count.
+- **Active hours**, as built: hours in which some room's detector saw
+  the person moving, as the long lie does: measured present, with one
+  sample at the bout level or three in a row above the stillness level.
+  Motion in a room measured empty does not count. The same motion
+  confirms a getting-up.
+- **A room that was not seen is unknown, not zero.** A value is known
+  only if its room was visible in every hour of its window: the bathroom
+  through the night, the bedroom from two hours before the morning window
+  to its end. Otherwise the night's bathroom visits are unknown (`null`,
+  never 0) and a day without a getting-up says "unknown", not "did not
+  get up". An unknown value is not compared and is no part of the
+  baseline. So a home's first night reads unknown: it began before the
+  gateway did.
+- **Not covered yet:**
+  - Active hours have no such check per room. A room that is neither the
+    bedroom nor the bathroom and is down all day lowers them, and can
+    hide the motion that confirms a getting-up. Only the whole-day rule
+    (some room seen in 20 hours) applies there.
+  - The check is per room role, not per space: with two bathrooms, one
+    of them seen is enough. And "seen in an hour" is one sample in it, so
+    an outage shorter than an hour does not show.
+  - A morning without a getting-up is not flagged, even with the bedroom
+    seen. The rise is missed when the person slept in another room or
+    first moved where there is no sensor, so its absence is not yet
+    evidence. The "day did not start" alert of ADR-018 has to settle
+    what is.
+- **Restarts:** a gateway restart loses the day in progress. That day
+  closes partial, and if fewer than 20 hours were observed it is not used.
+- **Starting values:** every threshold is a starting value for pilots
+  [proposal].
+- **Simulated home:** `saans export-home` writes a simulated home over whole
+  days for a replay (SIM).
+
+Unusual quiet is not built: it needs 14 days and per-time-of-day
+baselines. It is advisory: it describes a day and
 diagnoses nothing.
 
 ### 3.3 Long lie: the lead safety signal (issue #38)

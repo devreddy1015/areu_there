@@ -167,6 +167,7 @@ pub fn router(deps: HttpDeps) -> Router {
         .route("/api/spaces/{id}", get(space))
         .route("/api/events", get(events))
         .route("/api/history", get(history))
+        .route("/api/routine", get(routine))
         .route("/api/links", get(links))
         .route("/api/health", get(health))
         .route("/api/alerts", get(alerts_list))
@@ -633,6 +634,38 @@ async fn history(
         }
     }
     no_store(Json(v).into_response())
+}
+
+/// The home's daily routine (issue #39). 404 when no space has a room:
+/// there is no routine. 403 when `privacy::routine_for` withholds it: it
+/// goes only to a principal who sees health alerts in every space.
+async fn routine(State(app): State<AppState>, h: HeaderMap) -> Response {
+    let p = match principal(&app, &h, "/api/routine") {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    let rooms: Vec<&str> = app
+        .cfg
+        .spaces
+        .iter()
+        .filter(|s| s.room != saans_health::Room::Other)
+        .map(|s| s.id.as_str())
+        .collect();
+    if rooms.is_empty() {
+        return error(
+            StatusCode::NOT_FOUND,
+            "no daily routine: no space has a room (bedroom or bathroom)",
+        );
+    }
+    let ids = app.cfg.spaces.iter().map(|s| s.id.as_str());
+    let visible = privacy::routine_for(&app.shared.read().routine, &p, ids);
+    match visible {
+        Some(v) => no_store(Json(v).into_response()),
+        None => error(
+            StatusCode::FORBIDDEN,
+            "the daily routine needs a role that sees health alerts in every space it reads",
+        ),
+    }
 }
 
 async fn links(State(app): State<AppState>, h: HeaderMap) -> Response {

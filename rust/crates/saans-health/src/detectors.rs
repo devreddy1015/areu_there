@@ -670,6 +670,12 @@ impl SpaceMonitor {
         &self.config
     }
 
+    /// The last sample fed to `update`, as measured: what the home-level
+    /// routine (`routine.rs`) reads alongside the events.
+    pub fn last_sample(&self) -> Option<SpaceSample> {
+        self.last
+    }
+
     /// Whether presence is being held after a fall-shaped motion as of the
     /// last sample: [`SpaceState::presence_held`] without building the
     /// whole state.
