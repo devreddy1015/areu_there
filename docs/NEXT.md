@@ -534,6 +534,12 @@ helper, each tested without a board. What each one changes in this plan:
 - **B3** produces the first REAL column in any table in the tree.
   Until then §1.2's `RESULTS.md` is entirely SYNTHETIC and says so in
   every row.
+- **The first nights (ADR-018, added 2026-11-10).** After B1, the first
+  real recording is a bedroom: one link across the bed for three
+  nights with a counted reference, and the floor test for #62
+  (`docs/HOME_KIT.md`, "First nights and the floor test"). The morning
+  message and the "day did not start" alert that ADR-018 calls for are
+  not built.
 
 ---
 

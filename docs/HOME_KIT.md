@@ -187,6 +187,14 @@ The home kit comes after it.
 - [ ] The dashboard shows every room empty, then occupied when you walk in
 - [ ] Write down each receiver's rate and loss from the self-test, labelled **REAL**
 
+**First nights and the floor test (ADR-018, #46, #62)**
+
+- [ ] Bedroom: one link across the bed. The TX on one side and a receiver on the other, both a hand's width above the mattress. Breathing switched on for that room in `tools/homekit gateway`. Positions noted: ______
+- [ ] Three nights. Each morning write down, labelled **REAL**: the hours that gave a breathing rate, and the night's median
+- [ ] A reference for each night: breaths counted over 60 s, five times, while lying still and awake; and a watch's sleeping breathing rate if you have one
+- [ ] Floor test, for #62: two receivers on one wall, one 15 cm above the floor and one at 1.2 m, set up as two rooms named `low` and `high` so that each shows its own breathing. The TX on the opposite wall at knee height. Three minutes each: lying on the floor, sitting on a chair, lying on the bed
+- [ ] For each posture write down which receiver reported a breathing rate, and its confidence. The question is whether `low` carries the breathing on the floor and `high` on the chair
+
 ## What has been checked, and what waits for hardware
 
 Checked without boards (`tests/test_homekit.py`, 2026-11-07):
