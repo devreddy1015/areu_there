@@ -92,8 +92,8 @@ Saans is in the third group, and so are its closest competitors.
 | Consumer camera | Qubo, Tapo, Xiaomi | about ₹1,400–2,800, plus cloud (§3.1) | no | yes | no; motion or person alerts | none |
 | Elder-care camera | none found | none (US: $99.99 plus $45 a month, §3.2) | no | yes, processed or deleted | yes | SafelyYou: observational studies, authors tied to the company |
 | Pendant or SOS service | NSS pendant; Emoha | ₹9,300 device; ₹1,999 a month service (§4.3) | yes | no | some | wearables in general: poor in real use (§4.4) |
-| Smartwatch | Apple, Samsung, Google | ₹29,900 (Apple Watch SE 3) | yes, charged daily | no | "hard falls" | none peer-reviewed for these watches |
-| Radar | NoBlink (installed); Aqara FP2 (imported) | ₹499 for a bare module; FP2 ₹7,999–11,777 [price tracker] (§5) | no | no | yes, most | Vayyar: one lab test, one 26-resident pilot |
+| Smartwatch | Apple, Samsung, Google; AGEasy Empower | ₹4,999 (AGEasy Empower, §4.3); ₹29,900 (Apple Watch SE 3) | yes, charged daily | no | "hard falls" | none peer-reviewed for these watches |
+| Radar | NoBlink (installed); Aqara FP2 (imported) | ₹499 for a bare module; FP2 ₹7,999–11,777 [price tracker] (§5) | no | no | yes, most | Vayyar: one lab test, one nursing-home pilot in 13 residents' rooms (§5.2) |
 | Under-mattress | Dozee | $345 plus $25 a month, priced in US dollars (§6) | no; works only in bed | no | no | Dozee: FDA-cleared vital signs; company-authored studies |
 | WiFi sensing | WiZ SpaceSense lights; XZent (pilot) | about ₹1,740 a light, two needed (§7) | no | no | no | none for any product sold |
 | **Saans** | none | **unpriced; not a product** | no | no | **no**; a long lie instead | **none: simulation only** |
@@ -807,8 +807,8 @@ elder-care effort found
   "Contactless respiration and wellness trend tracking" and for
   "Presence, room occupancy, and mobility monitoring".
 - **Privacy:** "only lightweight, encrypted event alerts are
-  transmitted" from "local microcontrollers". That is the same
-  architecture as Saans (ADR-001).
+  transmitted" from "local microcontrollers". That describes an
+  architecture similar to Saans's (ADR-001).
 - **Evidence:** no accuracy figures and no price.
 - **Stage:** the company calls PulsEye its "long-term ambient sensing
   engine". The product it is rolling out commercially is BedExit, which
@@ -896,8 +896,8 @@ of deployments behind them.
    - Vayyar has a lab test and a nursing-home pilot.
    - Origin has a peer-reviewed six-home breathing study.
    - Dozee and Xandar Kardian have FDA clearances for vital signs.
-   - NoBlink has paying installs, and the US alarm services have
-     decades of them.
+   - NoBlink installs in five cities, by its own site (§5.1), and the
+     US alarm services have decades of paying customers.
    - Saans has a simulator. That does not change until the first bench
      session and the first real recording (#45, #46).
 2. **It does not detect falls.**
@@ -909,12 +909,18 @@ of deployments behind them.
    - The long lie alerts only after N minutes of stillness, so by design
      it is slower than a button press, and slower than products that
      claim to react to the fall itself.
-   - Whether a nap after lying down quickly looks like a long lie is
-     unmeasured (#38).
-   - So are the movements that fooled the Vayyar pilot: bending to the
-     floor, and prayer. A sudden movement followed by stillness on the
-     floor is exactly what a long lie looks for. #38 should include
-     them.
+   - In simulation the long lie (#38, PR #60) catches most falls but
+     cannot tell them from ordinary stillness. It alerts on nearly
+     every person who sits down hard and stays still, on most readers
+     and on most people who get into bed quickly, and it misses about
+     half of slow slides to the floor
+     ([`docs/RESULTS.md`](RESULTS.md), "Long lie: miss rate and false
+     alarms together, by N"). So the long lie ships off as well, and it
+     is not yet a family alert (#62).
+   - Still unmeasured are the movements that fooled the Vayyar pilot:
+     bending to the floor, and prayer. A sudden movement followed by
+     stillness on the floor is exactly what a long lie looks for. #62
+     should include them.
 3. **It covers only the sensed rooms of one home.** A watch or a mobile
    pendant goes to the market and the temple with the person. A room
    with no nodes is a room Saans cannot see.
@@ -953,7 +959,7 @@ of deployments behind them.
    - Kubo Care is piloting radar fall detection.
    - Dozee sends WhatsApp alerts from a bed sensor with FDA-cleared vital
      signs.
-   - XZent describes the same on-device WiFi-CSI architecture as Saans,
+   - XZent describes a similar on-device WiFi-CSI architecture,
      at an earlier stage.
 
    Against NoBlink, Saans's differences today are openness, published
