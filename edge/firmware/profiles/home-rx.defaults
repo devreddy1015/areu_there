@@ -1,0 +1,39 @@
+# A home kit's receiver, breathing OFF. Layered on ../sdkconfig.defaults by
+# `PROFILE=home-rx ./build.sh build` (edge/build.sh); `tools/homekit node
+# --role rx` does that for you (docs/HOME_KIT.md). For a room whose person
+# has given written consent, home-rx-vitals.defaults is this file with
+# breathing on.
+#
+# The gateway IP, the WiFi name and its password are NOT here: they come
+# from SAANS_GATEWAY_IP, SAANS_WIFI_SSID and SAANS_WIFI_PASSWORD at build
+# time, and SAANS_NODE_ID and SAANS_WIFI_CHANNEL override the two below.
+# They are compiled into the firmware and written to build-home-rx/, which
+# git ignores.
+
+CONFIG_SAANS_ROLE_RX=y
+CONFIG_SAANS_ROLE_TX=n
+
+# Each receiver its own id, and the same id in the gateway's room
+# (`tools/homekit gateway --room bedroom=1,2`).
+CONFIG_SAANS_NODE_ID=1
+
+CONFIG_SAANS_WIFI_CHANNEL=6
+
+CONFIG_SAANS_CSI_RATE_HZ=20
+# An assumption until the first bench session measures it (HARDWARE.md §9).
+CONFIG_SAANS_N_SUBCARRIERS=56
+CONFIG_SAANS_FRAME_RATE_HZ=2
+# Plus ~50 s of filter warmup: keep the room empty for ~80 s after power-on.
+CONFIG_SAANS_CALIBRATION_S=30
+CONFIG_SAANS_COMPUTE_BNR=y
+
+# Off: health data, opt-in per room (ADR-005).
+CONFIG_SAANS_VITALS_ENABLED=n
+CONFIG_SAANS_HEART_ENABLED=n
+
+# Off: raw CSI stays on the node (ADR-001). bench-rx turns it on.
+CONFIG_SAANS_RAW_MODE=n
+
+CONFIG_SAANS_GATEWAY_PORT=5566
+CONFIG_SAANS_WATCHDOG_S=15
+CONFIG_SAANS_TELEMETRY_S=60
