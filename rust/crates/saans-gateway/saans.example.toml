@@ -79,7 +79,9 @@ cadence_s = 2.0      # one point per this many seconds (min 0.5)
 # the room is for: room = "bedroom" or room = "bathroom" (default "other").
 # It reports per day: when the person got up, active hours, night bathroom
 # visits, each against their own previous days, at /api/routine and on the
-# dashboard's overview. [home] sets the night window, in local hours:
+# dashboard's overview. A value whose room is not set here, or was not seen
+# through its window, reads unknown. [home] sets the night window, in local
+# hours:
 # [home]
 # night_start_h = 22
 # night_end_h = 6

@@ -235,7 +235,9 @@ accurate the routine is across homes.
 - **Not covered yet:** active hours have no such check per room. A room
   that is neither the bedroom nor the bathroom and is down all day lowers
   them, and can hide the motion that confirms a getting-up. Only the
-  whole-day rule (some room seen in 20 hours) applies there.
+  whole-day rule (some room seen in 20 hours) applies there. The check
+  is also per room role, not per space: with two bathrooms, one of them
+  seen is enough.
 - **Restarts:** a gateway restart loses the day in progress. That day
   closes partial, and if fewer than 20 hours were observed it is not used.
 - **Starting values:** every threshold is a starting value for pilots
