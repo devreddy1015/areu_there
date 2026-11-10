@@ -345,6 +345,12 @@ impl GatewayConfig {
                 return err(format!("home.{key} must be an hour from 0 to 24"));
             }
         }
+        // A window with no hours in it has no nights, and every night
+        // would then read as a known 0 bathroom visits.
+        let (start, end) = (self.home.night_start_h, self.home.night_end_h);
+        if start == end || (start == 24.0 && end == 0.0) {
+            return err("home.night_start_h and home.night_end_h leave no night window");
+        }
         if !(-1440..=1440).contains(&self.utc_offset_minutes) {
             return err("utc_offset_minutes must be within +-1440");
         }
@@ -862,6 +868,9 @@ mod tests {
             "night_start_h = 25",
             "night_end_h = -1",
             "night_start_h = nan",
+            // No hours in the window: every night would read as 0 visits.
+            "night_start_h = 6\nnight_end_h = 6",
+            "night_start_h = 24\nnight_end_h = 0",
         ] {
             let e = GatewayConfig::from_toml(&format!("[home]\n{bad}\n{ONE_SPACE}"))
                 .expect_err(bad)
