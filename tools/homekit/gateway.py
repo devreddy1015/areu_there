@@ -248,7 +248,8 @@ def _ask(q: str, default: str = "") -> str:
 def _ask_rooms(before: list[Room]) -> tuple[list[Room], list[str]]:
     print("\nThe rooms. Each room has the receiver boards (RX) that watch it, by node")
     print("number: 1, 2, 3 ... The TX board is node 0 and is not listed.")
-    print("docs/ELDER_CARE.md §2: bathroom and bedroom first, two receivers each.")
+    print("docs/ELDER_CARE.md §2: the bedroom first, with a link across the bed, then the")
+    print("bathroom; two receivers each.")
     default_n = str(len(before) or 2)
     n = int(_ask("How many rooms", default_n) or default_n)
     rooms, consent, next_node = [], [], 1

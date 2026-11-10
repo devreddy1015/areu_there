@@ -1,5 +1,5 @@
-//! Long lie (issue #38, docs/ELDER_CARE.md §3.3): the elder-care safety
-//! signal. In one space, an urgent (`Check`) alert when
+//! Long lie (issue #38, docs/ELDER_CARE.md §3.3): one elder-care alert,
+//! off by default. In one space, an urgent (`Check`) alert when
 //!
 //! 1. a sudden movement, motion index at least `BURST_INDEX`, stops
 //!    within `COLLAPSE_SETTLE_S` (the possible-collapse arming, unchanged);
