@@ -331,7 +331,11 @@ impl HomeRoutine {
         }
         for ev in events {
             match ev.kind {
-                EventKind::RestEnded { duration_min, .. } if room == Room::Bedroom => {
+                // A rest the detector closed because the bedroom went blind
+                // arrives with a blind sample: the link dropped, nobody rose.
+                EventKind::RestEnded { duration_min, .. }
+                    if room == Room::Bedroom && s.occupied.is_some() =>
+                {
                     let end = ev.t_start_s.unwrap_or(ev.t_s) + duration_min * 60.0;
                     if (MORNING_START_H..MORNING_END_H).contains(&hour_of(end))
                         && (end / DAY_S).floor() as i64 == today.day
@@ -825,6 +829,25 @@ mod tests {
         seen(&mut r, Room::Bedroom, 24 + 11);
         assert_eq!(r.today().unwrap().got_up_min, None);
         assert!(r.today().unwrap().got_up_known());
+    }
+
+    #[test]
+    fn a_rest_closed_because_the_bedroom_went_blind_is_not_getting_up() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        still(&mut r, 0.0);
+        // The bedroom's link drops at 05:00. The detector closes the rest
+        // there, and reports it while the room is still blind.
+        let end = 5.0 * H;
+        let blind = SpaceSample {
+            occupied: None,
+            links_usable: 0,
+            ..sample(end + 130.0, 0.5)
+        };
+        r.observe(Room::Bedroom, &blind, false, &[rest_ended(end, 300.0)]);
+        // Motion in another room a quarter of an hour later confirms nothing.
+        bout(&mut r, end + 15.0 * 60.0);
+        assert_eq!(r.today().unwrap().got_up_min, None);
+        assert!(!r.today().unwrap().got_up_known());
     }
 
     #[test]
