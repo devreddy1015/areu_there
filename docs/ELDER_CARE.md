@@ -210,8 +210,9 @@ accurate the routine is across homes.
 - **How to use it:**
   - set `room = "bedroom"` or `room = "bathroom"` on a space;
   - set the night window under `[home]`;
-  - read it at `/api/routine` (admin, or safety with every such room in
-    scope) or on the dashboard's overview.
+  - read it at `/api/routine` or on the dashboard's overview. It goes
+    to admin, or to safety with every space of the home in scope
+    (`privacy::routine_for`): every room's motion feeds it.
 - **Getting up**, as built: a bedroom rest period of at least two hours
   that ends between 03:00 and 12:00, followed by a motion bout 10 to 30
   minutes later. The latest such rise wins, so a night-time trip and a nap

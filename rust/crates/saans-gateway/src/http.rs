@@ -636,12 +636,9 @@ async fn history(
     no_store(Json(v).into_response())
 }
 
-/// The home's daily routine (issue #39). Every space's motion feeds its
-/// active hours, and the bedroom and bathroom feed the rest, so it goes only
-/// to a principal who sees health alerts in *every* space: admin, or safety
-/// with all of them in scope. A safety user scoped to some rooms would
-/// otherwise learn about motion in the others. 404 when no space has a
-/// room: there is no routine.
+/// The home's daily routine (issue #39). 404 when no space has a room:
+/// there is no routine. 403 when `privacy::routine_for` withholds it: it
+/// goes only to a principal who sees health alerts in every space.
 async fn routine(State(app): State<AppState>, h: HeaderMap) -> Response {
     let p = match principal(&app, &h, "/api/routine") {
         Ok(p) => p,
@@ -660,19 +657,15 @@ async fn routine(State(app): State<AppState>, h: HeaderMap) -> Response {
             "no daily routine: no space has a room (bedroom or bathroom)",
         );
     }
-    if !app
-        .cfg
-        .spaces
-        .iter()
-        .all(|s| p.can_see_health_alerts(&s.id))
-    {
-        return error(
+    let ids = app.cfg.spaces.iter().map(|s| s.id.as_str());
+    let visible = privacy::routine_for(&app.shared.read().routine, &p, ids);
+    match visible {
+        Some(v) => no_store(Json(v).into_response()),
+        None => error(
             StatusCode::FORBIDDEN,
             "the daily routine needs a role that sees health alerts in every space it reads",
-        );
+        ),
     }
-    let v = app.shared.read().routine.clone();
-    no_store(Json(v).into_response())
 }
 
 async fn links(State(app): State<AppState>, h: HeaderMap) -> Response {

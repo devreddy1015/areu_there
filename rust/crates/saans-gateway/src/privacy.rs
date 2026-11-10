@@ -200,6 +200,26 @@ pub fn event_for(v: &Value, principal: &Principal) -> Option<Value> {
     Some(out)
 }
 
+/// The home's daily routine (issue #39) as `principal` may see it: whole,
+/// or not at all. Every space's motion feeds its active hours, and the
+/// bedroom and the bathroom feed the rest, so it goes only to a principal
+/// who sees health alerts in every one of `spaces` (the gateway's): admin,
+/// or safety with all of them in scope. A safety user scoped to some rooms
+/// would otherwise learn about motion in the others.
+///
+/// It is made from presence and motion, never from vital signs, so there
+/// is no consent to check first, as for the long lie.
+pub fn routine_for<'a>(
+    routine: &Value,
+    principal: &Principal,
+    spaces: impl IntoIterator<Item = &'a str>,
+) -> Option<Value> {
+    spaces
+        .into_iter()
+        .all(|id| principal.can_see_health_alerts(id))
+        .then(|| routine.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,6 +356,26 @@ mod tests {
         assert!(event_for(&ev, &p(Role::Safety, None)).is_some());
         for role in [Role::Ops, Role::Occupancy] {
             assert!(event_for(&ev, &p(role, None)).is_none(), "{role:?}");
+        }
+    }
+
+    #[test]
+    fn the_routine_goes_only_to_who_sees_health_alerts_in_every_space() {
+        // Every space's motion feeds the home's active hours, so one space
+        // out of scope is enough to withhold all of it.
+        let routine = json!({"today": {"active_hours": 3}});
+        let spaces = ["bedroom", "hall"];
+        for role in [Role::Admin, Role::Safety] {
+            let all = routine_for(&routine, &p(role, None), spaces);
+            assert_eq!(all, Some(routine.clone()), "{role:?}");
+            let both = p(role, Some(&["bedroom", "hall"]));
+            assert!(routine_for(&routine, &both, spaces).is_some(), "{role:?}");
+            let one = p(role, Some(&["bedroom"]));
+            assert!(routine_for(&routine, &one, spaces).is_none(), "{role:?}");
+        }
+        for role in [Role::Ops, Role::Occupancy] {
+            let v = routine_for(&routine, &p(role, None), spaces);
+            assert!(v.is_none(), "{role:?}");
         }
     }
 
