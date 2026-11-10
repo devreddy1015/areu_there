@@ -82,6 +82,34 @@ async fn a_room_that_was_not_seen_reads_as_unknown_not_zero() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn active_hours_follow_the_detectors_motion_not_a_raw_sample() {
+    // Gross motion well above `BOUT_INDEX` (index 10).
+    let moving = |mut f: saans_dsp::features::FeatureFrame| {
+        f.gross_motion = 0.5;
+        f
+    };
+    let mut g = TestGw::start(config("routine-active", HOME)).await;
+    // The hall's link reports it in a room it measures as empty (noise, or
+    // a neighbour through the wall): that is not an active hour.
+    g.run(2.0, |i| {
+        vec![occupied_frame(3, 4, i, None), moving(empty_frame(1, 2, i))]
+    })
+    .await;
+    let v = g.json("/api/routine").await;
+    assert_eq!(v["today"]["active_hours"], json!(0), "{v}");
+    // Someone moving in the bedroom is. The body is rebuilt once a minute.
+    g.run(61.0, |i| {
+        vec![
+            moving(occupied_frame(3, 4, i + 10, None)),
+            empty_frame(1, 2, i + 10),
+        ]
+    })
+    .await;
+    let v = g.json("/api/routine").await;
+    assert_eq!(v["today"]["active_hours"], json!(1), "{v}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_safety_user_scoped_to_some_rooms_does_not_get_the_whole_home() {
     // Every space's motion feeds the routine's active hours, so seeing the
     // bedroom is not enough: the hall's motion would leak through it.

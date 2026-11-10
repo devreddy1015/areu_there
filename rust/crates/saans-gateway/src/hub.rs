@@ -341,7 +341,7 @@ impl Hub {
                 .filter(|(j, _)| *j == i)
                 .map(|(_, e)| e.clone())
                 .collect();
-            closed.extend(r.observe(sp.config.room, &s, &evs));
+            closed.extend(r.observe(sp.config.room, &s, sp.monitor.moving_now(), &evs));
         }
         // A first day, or a new one: republish now rather than within the
         // minute.

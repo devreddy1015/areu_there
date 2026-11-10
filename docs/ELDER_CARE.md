@@ -216,6 +216,10 @@ accurate the routine is across homes.
   that ends between 03:00 and 12:00, followed by a motion bout 10 to 30
   minutes later. The latest such rise wins, so a night-time trip and a nap
   do not count.
+- **Active hours**, as built: hours in which some room's detector saw
+  the person moving, which means measured present with the debounced
+  motion the long lie listens for. A raw motion sample in a room measured
+  empty does not count, and the same motion confirms a getting-up.
 - **A room that was not seen is unknown, not zero.** A value is known
   only if its room was visible in every hour of its window: the bathroom
   through the night, the bedroom from two hours before the morning window

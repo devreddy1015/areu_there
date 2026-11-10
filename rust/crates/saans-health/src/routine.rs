@@ -13,8 +13,11 @@
 //! in progress (and a night visit already carried to tomorrow); that day
 //! then closes with fewer observed hours, and below
 //! `ROUTINE_MIN_OBSERVED_H` it is neither compared nor a baseline.
-//! - **active hours:** hours of the day with a motion bout in any room
-//!   (`BOUT_INDEX`, as the per-space bout counter).
+//! - **active hours:** hours of the day in which some room's monitor saw
+//!   the person moving (`SpaceMonitor::moving_now`: measured present, with
+//!   the debounced motion the long lie listens for). The same motion
+//!   confirms a getting-up. A raw sample above `BOUT_INDEX` in a room
+//!   measured empty is neither.
 //! - **night bathroom visits:** bathroom occupancy sessions that start in
 //!   the night window. A night belongs to the morning it ends in.
 //! - **not seen is unknown, not zero:** a value is known only if its room
@@ -37,7 +40,7 @@
 //! Every threshold here is a starting value [proposal] for pilots to test,
 //! not a measured one.
 
-use crate::detectors::{BOUT_INDEX, DAY_S, HISTORY_MAX_DAYS, MAD_TO_SIGMA, TREND_MAD_K};
+use crate::detectors::{DAY_S, HISTORY_MAX_DAYS, MAD_TO_SIGMA, TREND_MAD_K};
 use crate::types::{EventKind, HealthEvent, Room, SpaceSample};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -271,12 +274,15 @@ impl HomeRoutine {
         self.prune();
     }
 
-    /// One space's fused sample and the events it produced. Returns the day
-    /// that closed, if this sample began a new one.
+    /// One space's fused sample, whether its monitor calls it moving
+    /// (`SpaceMonitor::moving_now`: measured present, with debounced gross
+    /// motion) and the events it produced. Returns the day that closed, if
+    /// this sample began a new one.
     pub fn observe(
         &mut self,
         room: Room,
         s: &SpaceSample,
+        moving: bool,
         events: &[HealthEvent],
     ) -> Option<DailyRoutine> {
         let t = s.t_s;
@@ -312,7 +318,7 @@ impl HomeRoutine {
         {
             self.got_up_candidate = None;
         }
-        if s.occupied.is_some() && s.motion_index > BOUT_INDEX {
+        if moving {
             today.active_hours_mask |= bit(t);
             if let Some(end) = self.got_up_candidate {
                 if t - end >= GOT_UP_ACTIVE_S {
@@ -489,17 +495,18 @@ mod tests {
     }
 
     fn still(r: &mut HomeRoutine, t: f64) -> Option<DailyRoutine> {
-        r.observe(Room::Other, &sample(t, 0.5), &[])
+        r.observe(Room::Other, &sample(t, 0.5), false, &[])
     }
 
     fn bout(r: &mut HomeRoutine, t: f64) -> Option<DailyRoutine> {
-        r.observe(Room::Other, &sample(t, 5.0), &[])
+        r.observe(Room::Other, &sample(t, 5.0), true, &[])
     }
 
     fn bedroom_rest_ends(r: &mut HomeRoutine, end: f64, minutes: f64) {
         r.observe(
             Room::Bedroom,
             &sample(end + 130.0, 0.5),
+            false,
             &[rest_ended(end, minutes)],
         );
     }
@@ -530,8 +537,9 @@ mod tests {
         bout(&mut r, 7.2 * H);
         bout(&mut r, 7.9 * H);
         bout(&mut r, 13.5 * H);
-        // Motion below BOUT_INDEX is not a bout.
-        r.observe(Room::Other, &sample(15.0 * H, 2.0), &[]);
+        // A raw index above `BOUT_INDEX` that the room's monitor does not
+        // call moving (one in a room measured empty, say) is not a bout.
+        r.observe(Room::Other, &sample(15.0 * H, 5.0), false, &[]);
         let t = r.today().unwrap();
         assert_eq!(t.active_hours_mask, (1 << 7) | (1 << 13));
         assert_eq!(t.active_hours(), 2);
@@ -568,6 +576,7 @@ mod tests {
         r.observe(
             Room::Other,
             &sample(morning + 130.0, 0.5),
+            false,
             &[rest_ended(morning, 420.0)],
         );
         bout(&mut r, morning + 15.0 * 60.0);
@@ -578,7 +587,7 @@ mod tests {
     fn a_night_belongs_to_the_morning_it_ends_in() {
         let mut r = HomeRoutine::new(RoutineConfig::default());
         let bath = |r: &mut HomeRoutine, t: f64| {
-            r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
+            r.observe(Room::Bathroom, &sample(t, 0.5), false, &[arrived(t)]);
         };
         // The bathroom is seen through both nights, from 22:00 the evening
         // before day 0.
@@ -594,7 +603,7 @@ mod tests {
 
         // An arrival in a room that is not the bathroom does not count.
         let t = DAY_S + 3.0 * H;
-        r.observe(Room::Other, &sample(t, 0.5), &[arrived(t)]);
+        r.observe(Room::Other, &sample(t, 0.5), false, &[arrived(t)]);
         assert_eq!(r.today().unwrap().day, 1);
         assert_eq!(r.today().unwrap().night_bathroom_visits, Some(2));
         let day0 = r.history().pop().unwrap();
@@ -629,7 +638,7 @@ mod tests {
         }
         for h in [2.0, 14.0, 23.0] {
             let t = h * H;
-            r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
+            r.observe(Room::Bathroom, &sample(t, 0.5), false, &[arrived(t)]);
         }
         let visits = |r: &HomeRoutine| r.today().unwrap().night_bathroom_visits;
         assert_eq!(visits(&r), Some(1), "only 02:00");
@@ -647,7 +656,12 @@ mod tests {
         seen(&mut r, Room::Bathroom, 23);
         // Day 1 has begun when the 23:59:50 arrival is processed.
         let t = DAY_S - 10.0;
-        r.observe(Room::Bathroom, &sample(DAY_S + 5.0, 0.5), &[arrived(t)]);
+        r.observe(
+            Room::Bathroom,
+            &sample(DAY_S + 5.0, 0.5),
+            false,
+            &[arrived(t)],
+        );
         for h in 24..30 {
             seen(&mut r, Room::Bathroom, h);
         }
@@ -681,7 +695,7 @@ mod tests {
         }
         let bath = |r: &mut HomeRoutine, ev: HealthEvent| {
             let t = ev.t_s;
-            r.observe(Room::Bathroom, &sample(t, 0.5), &[ev]);
+            r.observe(Room::Bathroom, &sample(t, 0.5), false, &[ev]);
         };
         let v = 2.5 * H;
         for (a, b) in [(0.0, 80.0), (85.0, 180.0), (186.0, 270.0)] {
@@ -697,7 +711,7 @@ mod tests {
     /// `room` visible and still, once in hour `h` (counted from day 0's
     /// midnight; negative is the day before).
     fn seen(r: &mut HomeRoutine, room: Room, h: i64) {
-        r.observe(room, &sample(h as f64 * H + 60.0, 0.5), &[]);
+        r.observe(room, &sample(h as f64 * H + 60.0, 0.5), false, &[]);
     }
 
     /// The bathroom visible in every hour of day `d`, with an arrival at
@@ -708,7 +722,7 @@ mod tests {
         }
         for &h in visits {
             let t = d as f64 * DAY_S + h * H;
-            r.observe(Room::Bathroom, &sample(t, 0.5), &[arrived(t)]);
+            r.observe(Room::Bathroom, &sample(t, 0.5), false, &[arrived(t)]);
         }
     }
 
@@ -725,7 +739,7 @@ mod tests {
                     links_usable: 0,
                     ..sample(h as f64 * H + 60.0, 0.5)
                 };
-                r.observe(Room::Bathroom, &down, &[]);
+                r.observe(Room::Bathroom, &down, false, &[]);
             } else {
                 seen(&mut r, Room::Bathroom, h);
             }
@@ -747,7 +761,12 @@ mod tests {
         // The evening of day 0: the bathroom is seen, and visited.
         seen(&mut r, Room::Bathroom, 22);
         seen(&mut r, Room::Bathroom, 23);
-        r.observe(Room::Bathroom, &sample(23.5 * H, 0.5), &[arrived(23.5 * H)]);
+        r.observe(
+            Room::Bathroom,
+            &sample(23.5 * H, 0.5),
+            false,
+            &[arrived(23.5 * H)],
+        );
         // The gateway is off for day 1 and back at midnight of day 2.
         for h in 48..54 {
             seen(&mut r, Room::Bathroom, h);
