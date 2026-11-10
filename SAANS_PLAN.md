@@ -5,9 +5,55 @@ health and safety signals, without cameras, wearables or microphones. It
 uses an ESP32 sensor running C++, a Rust gateway, and the existing Python
 `wifisense` package as the reference implementation.
 
-This plan supersedes nothing in `CAMPUS_SENSING_PROMPT.md`; it is the build
-plan for the system that prompt describes, re-centred on health monitoring.
-The physics constraints there and in `RESEARCH.md` still bind.
+It began as the build plan for the campus system that
+`CAMPUS_SENSING_PROMPT.md` describes, re-centred on health monitoring.
+The first customer is now an older person living alone (ADR-015), and
+the product leads with the daily picture (ADR-018). The physics
+constraints in that prompt and in `RESEARCH.md` still bind.
+
+---
+
+## Where this is going
+
+*Written 2026-11-10, with ADR-018. The numbered sections below are the
+engineering plan and keep their numbers.*
+
+**The idea.** Every home already has WiFi. Saans turns it into
+something that notices whether the person living there is breathing
+well, sleeping, and going about their day, and tells their family every
+morning in one short message. Nothing is worn, charged, pressed or
+filmed.
+
+**Who it is for first.** An older parent who lives alone, and the
+grown-up child who worries from another city or another country
+(`docs/ELDER_CARE.md`).
+
+**What it leads with**, in the order the physics is strongest:
+
+| | Signal | Why it is in this place |
+|---|---|---|
+| 1 | The night: breathing rate, time in bed, times up, restlessness | A sleeping person is still for hours in a known place, which is the best case for breathing over WiFi |
+| 2 | The day: up, active, room to room, home or away | Presence is what the radio does most reliably |
+| 3 | The morning message to the family | The reason to open it on the days nothing is wrong |
+| 4 | Alerts: the day did not start; no movement while home; then the long lie | Each waits for its own evidence, and the long lie waits for issue #62 |
+
+**The stages.** Each one ends in something a stranger can check.
+
+| Stage | What | It ends with |
+|---|---|---|
+| A. Real proof | The boards, the bench (#45), one bedroom, then 14 nights in one home | The first REAL table in `docs/RESULTS.md`, and an uncut video of a night and its morning message (#47) |
+| B. Ten homes | Ten older people's homes for four weeks, with the morning message on a phone their family already uses | Nights that gave a breathing trend; false alerts per home per week; how many mornings the family read it; whether they would pay |
+| C. Paying homes | The kit sold with a monthly fee | Homes that pay, and stay |
+| D. A product | One plug-in node in place of a devkit; the relay and the app (PRs #54, #55, #57) | A hundred homes, set up by the families themselves |
+| E. Beyond the kit | Learned models trained on real homes (ADR-014's line, resumed); the same software on routers, as WiFi sensing reaches them (IEEE 802.11bf); breathing monitoring after a hospital stay | Not planned in detail yet |
+
+**What waits, and for what.**
+
+- The relay and the native app wait for stage B to show that the
+  interim channel is not enough.
+- New simulation studies and model training wait for real recordings.
+- The campus pilot (S7 in §7), positioning, and room geometry from WiFi
+  wait for a customer who asks for them.
 
 ---
 
@@ -192,6 +238,10 @@ S5 needs hardware.
 | **S5** | Hardware bring-up (= P1) | Presence F1, still-person false-empty, breathing vs belt — the P1 gates |
 | **S6** | Multi-link spaces (= P2) | Blind-spot rate with 1 vs 2 vs 3 links measured, sim then real |
 | **S7** | Pilot | 2-week run, uptime ≥ 99%, alarm rates per space per day reported |
+
+S5 to S7 are the engineering gates behind stages A and B in "Where this
+is going": S5 is the bench and the first bedroom, and S7's pilot is the
+ten homes.
 
 ## 8. Safety, privacy, governance
 

@@ -27,6 +27,7 @@ how ADRs stop meaning anything, so `docs/NEXT.md` carries each as an item.
 | [013](013-declared-geometry-and-drawing.md) | Room geometry is declared in a scene file, never inferred from WiFi; what the room demo may draw, and for whom (accepted as 008 on the research branch) | 2026-10-21 | yes, SIM and REPLAY only, behind the `roomsim` feature; no LIVE room view |
 | [014](014-offline-learned-models.md) | Learned models are trained and evaluated offline, for research only; none runs in the product (accepted as 009 on the research branch) | 2026-10-25 | n/a — a boundary; nothing loads a model |
 | [015](015-elder-care-first.md) | Lead with elder care: an older person living alone, alerts to family; a long lie, not fall detection | 2026-11-06 | **no** — the signals, relay and app are issues #38-#42 |
+| [018](018-daily-picture-first.md) | Lead with the daily picture: the night's breathing and the day's routine in a morning message; the long lie becomes one alert (amends 015; 016 and 017 are PRs #54 and #55) | 2026-11-10 | **no** — the morning message and the "day did not start" alert are not built, and the first real nights are owed |
 
 Writing a new one: copy the shape of the existing files — title line,
 `**Status:**` with a date, then Context, Decision, Consequences — and

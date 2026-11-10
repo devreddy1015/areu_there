@@ -164,3 +164,11 @@ alternatives scan is issue #48 and has not been done.
   honest wording, and the cost of that route is out of reach.
 
 Either result is a reason to write a new ADR, not to edit this one.
+
+## Amendment, 2026-11-10
+[ADR-018](018-daily-picture-first.md) changes points 2 and 5. The long
+lie was measured in simulation (PR #60) and alerts on most ordinary
+stillness, so it is one alert that waits for issue #62, not the lead
+signal. The night's breathing trend becomes part of the product, with
+the monitored person's agreement at setup. The rest of this decision
+stands, and its body is left as it was written.
