@@ -64,9 +64,11 @@ async fn the_routine_is_served_to_the_roles_that_see_health_alerts() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_room_that_was_not_seen_reads_as_unknown_not_zero() {
-    // The bathroom's link never reports, and the morning has not been seen:
-    // its night visits are null, not 0, and no getting-up claims nothing.
+async fn an_unknown_value_is_null_on_the_wire_never_zero() {
+    // Five seconds of an afternoon, with a bathroom whose link never
+    // reports: no night and no morning has been seen through. This pins
+    // how unknown goes out: null and `got_up_known: false`, never 0. When
+    // a value becomes known is unit-tested in saans-health.
     let home = format!(
         "{HOME}[[space]]\nid = \"bath\"\nroom = \"bathroom\"\nlinks = [{{ rx = 5, tx = 6 }}]\n"
     );
@@ -82,7 +84,7 @@ async fn a_room_that_was_not_seen_reads_as_unknown_not_zero() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn active_hours_follow_the_detectors_motion_not_a_raw_sample() {
+async fn motion_in_a_room_measured_empty_is_not_an_active_hour() {
     // Gross motion well above `BOUT_INDEX` (index 10).
     let moving = |mut f: saans_dsp::features::FeatureFrame| {
         f.gross_motion = 0.5;
