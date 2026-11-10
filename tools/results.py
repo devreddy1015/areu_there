@@ -29,6 +29,14 @@ checked, so the commit that last touched a slow section is its date.
 table fast: its seeds are 0-1, which are the threshold-tuning seeds, and a
 table computed on the data the thresholds were fitted to is not a result.
 
+A THIRD, MANUAL TIER
+--------------------
+`baselines` (issue #43) measures the software rather than the sensing: CI
+wall time from GitHub's records, and gateway CPU and the node's DSP budget
+on the machine that runs it. It needs gh, the network and a quiet machine,
+and its numbers move with all three, so only `--only baselines` regenerates
+it; neither --slow nor --check runs it. Its quotes are checked when it is.
+
 WHAT VARIES BETWEEN RUNS, AND IS SCRUBBED
 -----------------------------------------
 Measured before this was written: every suite here was run twice on one
@@ -85,8 +93,10 @@ class Suite:
     title: str
     cmd: list[str]
     cwd: str
-    tier: str  # "ci" or "slow"
+    tier: str  # "ci", "slow" or "manual"
     note: str = ""
+    # Prose after the table: for a reading that has to follow the numbers.
+    after: str = ""
     scrub: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -95,6 +105,34 @@ SCRUB_COMMON = [
     (r"^ran in \d+s$", None),
     (r"Workers: \d+\.", "Workers: N."),
 ]
+
+
+# Issue #43: the reading under the baselines table. Every figure in it is a
+# registered quote (QUOTES, "baselines"), checked when the section is
+# regenerated with `--only baselines`.
+BASELINES_READING = """\
+**What is worth optimising, ranked by the numbers.** Nothing is optimised in
+the change that added this section; these are the candidates, most pressing
+first.
+
+1. **The node's 2 Hz frame.** 97% of a link's DSP instructions run in the one
+   frame in ten that emits a FeatureFrame. On the S3 that frame is estimated
+   at 24 to 48 ms, and the worst frame (the one that also scores BNR) at 35 to
+   69 ms, against a 50 ms frame period. The mean is small (4.9 to 9.8% of a
+   core per link); the risk is the spike, which several links can line up.
+   Switching vitals off does not save it: the `default` row costs what
+   `vitals+heart` does. ESTIMATE until #45 times it on a board, because the
+   CPI bracket is an assumption.
+2. **Memory, not CPU, caps links per node.** 3 links fit in 171 KB with
+   `best_bnr` on and 10 with it off, while the CPU estimate leaves room for 10
+   or more.
+3. **The Python suite is CI's critical path.** `python / unittest` takes 6:42
+   (median of the last ten runs) and the whole run 6:48 wall; the next slowest
+   step, `results.py --check`, takes 3:27. Only a faster Python job shortens
+   the wall time.
+4. **Not the gateway.** Twelve links of the product load take 0.04% of one
+   core here, and raw mode at twelve links 0.29%, about 1% of a Pi 5 core even
+   at the pessimistic x4 (ESTIMATE). Peak RSS about 11 MiB."""
 
 
 def suites() -> list[Suite]:
@@ -211,6 +249,19 @@ def suites() -> list[Suite]:
             "The case the fusion octave rule exists for: one link in a "
             "whole-band null reads 2f. NOTES.md §10 has the same table with "
             "the rule off, on identical scenarios.",
+        ),
+        Suite(
+            "baselines", "Baselines: CI wall time, gateway CPU per link, node DSP budget",
+            [PY, "tools/baselines.py"], ROOT, "manual",
+            "Issue #43: measured before anything is optimised. Each figure says where it "
+            "came from: MEASURED (GitHub's run records), MEASURED-HOST (the machine at "
+            "the top, on SYNTHETIC input) or ESTIMATE (a host figure carried to other "
+            "hardware under the assumptions printed beside it). The gateway rows time "
+            "the real binary replaying a SIM pcap (`examples/link_load.rs`); the node "
+            "rows count instructions in the node's own extractor type "
+            "(`edge/dsp/bench/node_budget.cpp`). Every S3 figure stays an ESTIMATE until "
+            "the bench session (#45) measures it on a board.",
+            after=BASELINES_READING,
         ),
     ]
 
@@ -510,6 +561,43 @@ QUOTES = [
     Quote("NOTES.md", "impairment",
           r"\| 0\.020 \(committed\) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \|",
           [r"^0\.020\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)$"]),
+    # The baselines reading (issue #43), manual tier: checked when
+    # `--only baselines` regenerates the section.
+    Quote("docs/RESULTS.md", "baselines",
+          r"(\d+)% of a link's DSP instructions",
+          [r"^   vitals\+heart\s+(\d+)% of the instructions are in the 2 Hz frames"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"estimated\s+at (\d+) to (\d+) ms, and the worst frame[^)]*\)\s+at (\d+) to\s+(\d+) ms",
+          [r"^   vitals\+heart\s+[\d.]+ \.\. [\d.]+%\s+(\d+) \.\. (\d+)\s+(\d+) \.\. (\d+)\s"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"\(([\d.]+) to ([\d.]+)% of a\s+core per link\)",
+          [r"^   vitals\+heart\s+([\d.]+) \.\. ([\d.]+)%"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"(\d+) links fit in 171 KB with\s+`best_bnr` on and (\d+) with it off",
+          [r"SaansNodeExtractor \(best_bnr on\)\s+[\d,]+\s+[\d,]+\s+(\d+)$",
+           r"SaansNodeExtractorNoBnr\s+[\d,]+\s+[\d,]+\s+(\d+)$"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"leaves room for (\d+)\s+or more",
+          [r"^   vitals\+heart\s+[\d.]+ \.\. [\d.]+%\s+\d+ \.\. \d+\s+\d+ \.\. \d+\s+(\d+) \.\."]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"`python / unittest` takes (\d+):(\d+)",
+          [r"python / unittest\s+\d+\s+(\d+):(\d+)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"the whole run (\d+):(\d+) wall",
+          [r"TOTAL wall, first job start to last job end\s+\d+\s+(\d+):(\d+)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"`results\.py --check`, takes (\d+):(\d+)",
+          [r"results\.py --check\s*\d+\s+(\d+):(\d+)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"product load take ([\d.]+)% of one\s+core here",
+          [r"features: FeatureFrames[\s\S]*?^\s*!?\s*12\s+[\d.]+ / [\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.]+)%"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"raw mode at twelve links ([\d.]+)%, about (\d+)% of a Pi 5 core",
+          [r"raw: raw CSI[\s\S]*?^\s*!?\s*12\s+[\d.]+ / [\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.]+)%"
+           r"\s+[\d.]+\s+[\d.]+% \([\d.]+ \.\. ([\d.]+)%\)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"Peak RSS about (\d+) MiB",
+          [r"features: FeatureFrames[\s\S]*?^\s*!?\s*12\s+[\d.]+ / [\d.]+\s+[\d.]+\s+[\d.]+\s+[\d.]+%\s+([\d.]+)"]),
 ]
 
 
@@ -542,13 +630,19 @@ def command_text(s: Suite) -> str:
 
 
 def section(s: Suite, body: str) -> str:
-    tier = ("checked by CI on every push" if s.tier == "ci"
-            else "slow: regenerated by hand with `--slow`, not checked by CI")
+    tier = {
+        "ci": "checked by CI on every push",
+        "slow": "slow: regenerated by hand with `--slow`, not checked by CI",
+        "manual": "manual: regenerated only by `tools/results.py --only "
+                  f"{s.key}`, never by CI",
+    }[s.tier]
+    after = f"\n{s.after}\n" if s.after else ""
     return (f"<!-- results:begin {s.key} -->\n"
             f"## {s.title}\n\n"
             f"`{command_text(s)}` — {tier}\n\n"
             f"{s.note}\n\n"
             f"```text\n{body}\n```\n"
+            f"{after}"
             f"<!-- results:end {s.key} -->")
 
 
@@ -558,16 +652,19 @@ Generated by `tools/results.py` from the commands named in each section.
 **Do not edit by hand**: the next regeneration overwrites it, and CI fails
 if a CI-tier section no longer matches what its command prints.
 
-**Every number in this file is SYNTHETIC.** No board has ever run this
-firmware (`docs/CAPABILITY_LIMITS.md`). These tables say the DSP is
+**Every sensing number in this file is SYNTHETIC.** No board has ever run
+this firmware (`docs/CAPABILITY_LIMITS.md`). These tables say the DSP is
 internally consistent and behaves as designed on a simulator written by
 the same project; they say nothing about real rooms, radios or bodies.
+The last section measures the software instead (CI time, CPU, memory),
+and labels each figure MEASURED, MEASURED-HOST or ESTIMATE.
 
-Two tiers. *CI-checked* sections are regenerated on every push and must
+Three tiers. *CI-checked* sections are regenerated on every push and must
 match to one unit in the last printed place. *Slow* sections are
-regenerated by hand; `git log -- docs/RESULTS.md` dates them. Prose that
-quotes a figure from a CI-checked section is checked too: the quotes are
-registered in `tools/results.py` and a mismatch fails the build.
+regenerated by hand; `git log -- docs/RESULTS.md` dates them. The *manual*
+section is regenerated alone, on purpose, because it measures a machine.
+Prose that quotes a figure from a CI-checked section is checked too: the
+quotes are registered in `tools/results.py` and a mismatch fails the build.
 """
 
 
