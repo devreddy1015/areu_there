@@ -18,9 +18,9 @@ and what waits for hardware day, is at the end.
 | A laptop with Docker | 1 | Builds and flashes the boards. It can be the gateway machine |
 | The home WiFi's name, password and channel | | 2.4 GHz. The boards sense on the WiFi's channel, so it must not change: fix it in the router (§5, "The uplink channel") |
 
-Four boards make **one TX and three receivers**: two receivers in the room
-that matters most (bedroom or bathroom; two links, because one can miss a
-person lying still, ELDER_CARE.md §2) and one in a second room. The TX
+Four boards make **one TX and three receivers**: two receivers in the
+bedroom, which comes first (two links, because one can miss a person
+lying still, ELDER_CARE.md §2), and one in a second room. The TX
 is node 0. The receivers are nodes 1, 2, 3. Write the number on each
 board with a marker.
 
