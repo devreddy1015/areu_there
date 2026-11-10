@@ -725,6 +725,7 @@ async function signOut() {
   try { await postJSON('/api/logout', {}); } catch (e) { /* ending a session is best-effort */ }
   stopLive();
   S.spaces = []; S.events = []; S.links = []; S.health = null; S.history = null; S.lastState = 0;
+  S.routine = null; renderRoutine();
   await start();
 }
 
@@ -1331,16 +1332,17 @@ function hhmm(min) {
 }
 function renderRoutine() {
   const box = document.getElementById('ov-routine');
+  const tb = document.querySelector('#rt-table tbody');
   const r = S.routine;
   box.hidden = !r;
+  // Whatever is shown next, an earlier account's days leave the page.
+  tb.replaceChildren();
   if (!r) return;
   const withheld = r === 'withheld';
   document.getElementById('rt-note').textContent = withheld
     ? 'The daily routine is not shown to your role.' : r.note || '';
-  const tb = document.querySelector('#rt-table tbody');
   tb.closest('.scroll').hidden = withheld;
   if (withheld) return;
-  tb.replaceChildren();
   for (const d of [r.today, ...(r.days || [])].filter(Boolean)) {
     const unusual = (m) => (d.comparisons || []).some((c) => c.metric === m && c.unusual);
     const cell = (text, m) => el('td', m && unusual(m) ? { 'data-k': 'warn' } : null,

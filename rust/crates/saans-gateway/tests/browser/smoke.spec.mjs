@@ -145,6 +145,23 @@ test('the daily routine withheld from a role is "not shown to your role", never 
   }
 });
 
+test('signing out takes the routine out of the page, for whoever signs in next', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.goto(`${base()}/app#overview`);
+  const rows = routine(page).locator('tbody tr');
+  await expect(rows).toHaveCount(1);
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.locator('#view-login')).toBeVisible();
+  // Out of sight under the sign-in screen is not gone from the page.
+  await expect(rows).toHaveCount(0);
+  // The next account here is one the routine is withheld from.
+  await page.fill('#login-user', 'facilities');
+  await page.fill('#login-pass', users().facilities.password);
+  await page.click('#login-go');
+  await expect(routine(page)).toContainText('not shown to your role');
+  await expect(rows).toHaveCount(0);
+});
+
 test('no daily routine at all (404) leaves no panel', async ({ page }) => {
   // What a gateway where no space has a room answers: nothing is withheld,
   // so there is nothing to say.
