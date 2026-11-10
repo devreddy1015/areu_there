@@ -314,8 +314,25 @@ moves inside the home, not for leaving it. It is not built or measured.
 own echo, lying on the side, nodes at other heights, real floors. Real
 recordings of someone lying on a floor (#46) settle it.
 
-**Measured for the long lie itself: nothing.** Its parts are measured
-as above.
+**Measured for the long lie itself (SIM**, `docs/RESULTS.md`, "Long
+lie"; read in `NOTES.md` §15). Built in #38, off by default
+(`long_lie_min`). 120 simulated runs per scenario in the 2.7 m box,
+presence hold off:
+
+- falls that end still: 6.7% missed at every N from 3 to 30 minutes,
+  and 2/40 on two links at N = 15 (the staged target is 1 in 20);
+- slow slides to the floor: 46.7% missed at N = 15, because most never
+  reach `BURST_INDEX`;
+- a heavy sit-down and then 45 minutes still: alerted in 118 of 120 at
+  N = 30, so the inference above holds, and no N fixes it;
+- lying down into bed quickly and turning over now and then: alerted in
+  94 of 120 at N = 15;
+- walking in and reading for 40 minutes: alerted in 101 of 120 at every
+  N, because walking in reaches `BURST_INDEX` too; a two-hour fidgeting
+  night: 78 of 120 at N = 15;
+- an empty room: never; a walk-out with the presence hold on: 33 of 120
+  alert on the empty room, and none when the person is seen moving in
+  another room (`long_lie_elsewhere`).
 
 ### 3.4 Sleep breathing rate trend (only where opted in)
 

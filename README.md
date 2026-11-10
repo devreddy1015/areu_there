@@ -39,6 +39,16 @@ python3 evaluate.py --suite legacy                # the original 64-scenario swe
 python3 evaluate.py --suite nulls --quick         # Fresnel blind-spot study, small
 ```
 
+**With boards: set up a home kit** in three commands, a gateway, each
+board, and a check. [docs/HOME_KIT.md](docs/HOME_KIT.md) is written for
+someone who does not program, and ends with the hardware-day checklist.
+
+```bash
+sudo python3 tools/homekit gateway                                   # the gateway, as a service
+python3 tools/homekit node --role rx --id 1 --gateway 192.168.1.20   # one board, flashed and checked
+sudo python3 tools/homekit selftest                                  # frames arriving, per node
+```
+
 ## Saans: the system built on this
 
 `wifisense` is now the **reference implementation** of Saans (साँस,
@@ -373,6 +383,25 @@ Resolve work from the dashboard, from `POST /api/alerts/{id}/ack|resolve`
 (admin and safety, in their spaces), and from Telegram's buttons (users
 in `allowed_user_ids`), and every one is in the audit log.
 
+**Holding presence after a fall (opt-in).** A person on the floor can be
+too weak a breather for the links to see ([NOTES.md](NOTES.md) §14), and
+an empty reading then stops the inactivity alert from ever counting. With
+`fall_hold_min` set (35 for the default 30-minute inactivity alert), the
+monitor does the following:
+- **When it holds.** After a burst of motion that stops abruptly, followed
+  within a minute by the links reading empty with nothing moving, it holds
+  presence for that long.
+- **What ends it.** Any motion.
+- **It is inferred, not measured.** `occupied` stays what the links say,
+  and `presence_held` says presence is being held; only admin and safety
+  see it. The dashboard says so, and so does every alert raised during a
+  hold.
+
+It is off by default, like collapse detection and for the same reason: it
+cannot tell a fall out of sight from someone walking out. In simulation
+about one departure in four engages it, and in a room that then stays
+empty each of those is an inactivity alert 30 minutes later.
+
 **What leaves the building** is, by default, only that an alert of a given
 kind is open in a given space. The evidence sentence, the confidence and
 every number stay home unless a route sets `include_health_details`.
@@ -547,6 +576,8 @@ CYW43455) are the other real option and cost more hassle than an ESP32.
 | `CONTRIBUTING.md` | The rules every change is held to, and the commands that check them |
 | `bench/` | The first bench session (B1): its order of work, the gateway config and a recording helper; the board profiles are in `edge/firmware/profiles/` |
 | `deploy/` | The gateway as a systemd service: the unit, a secrets template, install and operation |
+| `tools/homekit/` | One-command home kit: gateway install, board flashing, self-test ([docs/HOME_KIT.md](docs/HOME_KIT.md)) |
+| `docs/HOME_KIT.md` | Setting up a home kit, and the hardware-day checklist |
 | `rust/crates/saans-gateway/tests/browser/` | Playwright smoke tests for the dashboard, against a SYNTHETIC replay |
 
 ## Licence

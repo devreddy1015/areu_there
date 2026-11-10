@@ -29,6 +29,14 @@ checked, so the commit that last touched a slow section is its date.
 table fast: its seeds are 0-1, which are the threshold-tuning seeds, and a
 table computed on the data the thresholds were fitted to is not a result.
 
+A THIRD, MANUAL TIER
+--------------------
+`baselines` (issue #43) measures the software rather than the sensing: CI
+wall time from GitHub's records, and gateway CPU and the node's DSP budget
+on the machine that runs it. It needs gh, the network and a quiet machine,
+and its numbers move with all three, so only `--only baselines` regenerates
+it; neither --slow nor --check runs it. Its quotes are checked when it is.
+
 WHAT VARIES BETWEEN RUNS, AND IS SCRUBBED
 -----------------------------------------
 Measured before this was written: every suite here was run twice on one
@@ -85,8 +93,10 @@ class Suite:
     title: str
     cmd: list[str]
     cwd: str
-    tier: str  # "ci" or "slow"
+    tier: str  # "ci", "slow" or "manual"
     note: str = ""
+    # Prose after the table: for a reading that has to follow the numbers.
+    after: str = ""
     scrub: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -95,6 +105,34 @@ SCRUB_COMMON = [
     (r"^ran in \d+s$", None),
     (r"Workers: \d+\.", "Workers: N."),
 ]
+
+
+# Issue #43: the reading under the baselines table. Every figure in it is a
+# registered quote (QUOTES, "baselines"), checked when the section is
+# regenerated with `--only baselines`.
+BASELINES_READING = """\
+**What is worth optimising, ranked by the numbers.** Nothing is optimised in
+the change that added this section; these are the candidates, most pressing
+first.
+
+1. **The node's 2 Hz frame.** 97% of a link's DSP instructions run in the one
+   frame in ten that emits a FeatureFrame. On the S3 that frame is estimated
+   at 24 to 48 ms, and the worst frame (the one that also scores BNR) at 35 to
+   69 ms, against a 50 ms frame period. The mean is small (4.9 to 9.8% of a
+   core per link); the risk is the spike, which several links can line up.
+   Switching vitals off does not save it: the `default` row costs what
+   `vitals+heart` does. ESTIMATE until #45 times it on a board, because the
+   CPI bracket is an assumption.
+2. **Memory, not CPU, caps links per node.** 3 links fit in 171 KB with
+   `best_bnr` on and 10 with it off, while the CPU estimate leaves room for 10
+   or more.
+3. **The Python suite is CI's critical path.** `python / unittest` takes 6:42
+   (median of the last ten runs) and the whole run 6:48 wall; the next slowest
+   step, `results.py --check`, takes 3:27. Only a faster Python job shortens
+   the wall time.
+4. **Not the gateway.** Twelve links of the product load take 0.04% of one
+   core here, and raw mode at twelve links 0.29%, about 1% of a Pi 5 core even
+   at the pessimistic x4 (ESTIMATE). Peak RSS about 11 MiB."""
 
 
 def suites() -> list[Suite]:
@@ -186,6 +224,15 @@ def suites() -> list[Suite]:
             "NOTES.md §14 reads this.",
         ),
         Suite(
+            "longlie", "Long lie: miss rate and false alarms together, by N",
+            [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "longlie", "--seeds", "20"],
+            rust, "slow",
+            "Issue #38. Lies (a fall, a slow slide, a fall with a limb moving) and "
+            "everything that is not one, simulated once each and replayed through the "
+            "long lie for every N, presence hold off and on. docs/ELDER_CARE.md §3.3 "
+            "and NOTES.md §15 read this.",
+        ),
+        Suite(
             "links", "What each extra link buys, one transmitter",
             [cargo(), "run", "-q", "--release", "-p", "saans-cli", "--", "links",
              "--seats", "600", "--blind-seats", "5000"],
@@ -202,6 +249,19 @@ def suites() -> list[Suite]:
             "The case the fusion octave rule exists for: one link in a "
             "whole-band null reads 2f. NOTES.md §10 has the same table with "
             "the rule off, on identical scenarios.",
+        ),
+        Suite(
+            "baselines", "Baselines: CI wall time, gateway CPU per link, node DSP budget",
+            [PY, "tools/baselines.py"], ROOT, "manual",
+            "Issue #43: measured before anything is optimised. Each figure says where it "
+            "came from: MEASURED (GitHub's run records), MEASURED-HOST (the machine at "
+            "the top, on SYNTHETIC input) or ESTIMATE (a host figure carried to other "
+            "hardware under the assumptions printed beside it). The gateway rows time "
+            "the real binary replaying a SIM pcap (`examples/link_load.rs`); the node "
+            "rows count instructions in the node's own extractor type "
+            "(`edge/dsp/bench/node_budget.cpp`). Every S3 figure stays an ESTIMATE until "
+            "the bench session (#45) measures it on a board.",
+            after=BASELINES_READING,
         ),
     ]
 
@@ -222,6 +282,22 @@ class Quote:
     suite: str
     doc: str
     out: list[str]
+
+
+def _ll_miss(hold: str, n: str) -> str:
+    """The `longlie` miss-rate row for N = n, hold OFF or ON, up to its first cell."""
+    return (r"MISS RATE AND FALSE ALARMS TOGETHER, presence hold " + hold
+            + r"[^\n]*\n[^\n]*\n(?:[^\n]*\n)*?\s+" + n + r"\s+")
+
+
+# The `longlie` miss-rate row from the miss rates up to the "before lie" cell.
+_LL_TAIL = r"[\d.]+%\s+[\d.]+%\s+-?\d+ s\s+\d+\s+[\d.]+\s+[\d.]+\s+"
+
+
+def _ll_runs(hold: str, row: str, col: int) -> str:
+    """One cell (runs alerted) of a `longlie` RUNS ALERTED table."""
+    return (r"RUNS ALERTED, presence hold " + hold + r"[\s\S]*?^  " + row
+            + r"(?:\s+\d+/120){" + str(col) + r"}\s+(\d+)/120")
 
 
 QUOTES = [
@@ -374,6 +450,99 @@ QUOTES = [
           r"as often lying as upright \((\d+) spots\s+against (\d+)\)",
           [r"lying\s+matched SNR.*under half of matched: (\d+) spots",
            r"upright\s+matched SNR.*under half of matched: (\d+) spots"]),
+    # NOTES.md §14, the presence hold: benefit from `lying`, cost per
+    # column from `detectors` and `detectors-box`.
+    Quote("NOTES.md", "lying",
+          r"\| share of the still period read empty, links only \| ([\d.]+)% \| ([\d.]+)% \|\n"
+          r"\| the same, after the hold \| \*\*([\d.]+)%\*\* \| \*\*([\d.]+)%\*\* \|\n"
+          r"\| spots read mostly empty, after the hold, of 1200 \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|",
+          [r"^  all\s+([\d.]+)%\s+([\d.]+)%",
+           r"AFTER THE PRESENCE HOLD[\s\S]*?^  all\s+([\d.]+)%\s+([\d.]+)%",
+           r"AFTER THE PRESENCE HOLD[\s\S]*?^  all\s+[\d.]+%\s+[\d.]+%\s+(\d+)/1200\s+(\d+)/1200"]),
+    *[Quote("NOTES.md", suite,
+            r"\| departures that engaged the hold \| " + (r"[^|]*\| " if col else "")
+            + r"\*\*(\d+) of (\d+)\*\*[^\n]*\n"
+            r"\| falls flagged as a possible collapse, with / without \| " + (r"[^|]*\| " if col else "")
+            + r"(\d+) / (\d+)[^\n]*\n"
+            r"\| inactivity alerts raised while holding an empty room \| " + (r"[^|]*\| " if col else "")
+            + r"(\d+)",
+            [r"departures that engaged the hold: (\d+) of (\d+)",
+             r"^  collapse\s+36\s+\d+\s+[\d.]+\s+[\d.]+\s+\d+\s+\d+\s+\S+\s+(\d+)/36 \((\d+)\)$",
+             r"raised while holding an empty room: inactivity (\d+)"])
+      for suite, col in (("detectors", 0), ("detectors-box", 1))],
+    # NOTES.md §15 and docs/ELDER_CARE.md §3.3: the long lie, slow tier.
+    # Columns of the "RUNS ALERTED" tables are N = 3, 5, 10, 15, 20, 30.
+    Quote("NOTES.md", "longlie",
+          "".join(r"\| " + n + r" min \| ([\d.]+)% \| ([\d.]+)% \| (\d+)/120 \| (\d+)/120 \| (\d+)/120 \| ([\d.]+) \|\n"
+                  for n in ("3", "15", "30")),
+          [p for n, col in (("3", 0), ("15", 3), ("30", 5)) for p in (
+              _ll_miss("OFF", n) + r"([\d.]+)%\s+([\d.]+)%",
+              _ll_runs("OFF", "sit down hard, still 45m", col),
+              _ll_runs("OFF", "into bed quickly, 90m", col),
+              _ll_runs("OFF", "sit down, fidgeting 45m", col),
+              _ll_miss("OFF", n) + r"[\d.]+%\s+[\d.]+%\s+-?\d+ s\s+\d+\s+([\d.]+)",
+          )]),
+    Quote("NOTES.md", "longlie",
+          r"comes (\d+) s after N \(median\), and an empty room\nraised none",
+          [_ll_miss("OFF", "15") + r"[\d.]+%\s+[\d.]+%\s+(-?\d+) s"]),
+    Quote("NOTES.md", "longlie",
+          r"In\s+(\d+) of (\d+) falls the motion reached the burst threshold, and (\d+)\s+were caught",
+          [r"^  fall, then still \(\+\)\s+(\d+)/(\d+)$", _ll_runs("OFF", r"fall, then still \(\+\)", 0)]),
+    Quote("NOTES.md", "longlie",
+          r"by\s+layout: (\d+)/40 on one link, (\d+)/40 on two and (\d+)/40 on three",
+          [r"^  1 link\s+falls missed\s+(\d+)/40", r"^  2 links\s+falls missed\s+(\d+)/40",
+           r"^  3 links\s+falls missed\s+(\d+)/40"]),
+    Quote("NOTES.md", "longlie",
+          r"Only (\d+) of 120 slides reach the burst threshold, yet (\d+) are caught\s+at N = 15",
+          [r"^  slide to the floor \(\+\)\s+(\d+)/120$", _ll_runs("OFF", r"slide to the floor \(\+\)", 3)]),
+    Quote("NOTES.md", "longlie",
+          r"every 2-6 minutes, (\d+) of 120 are caught at N = 15",
+          [_ll_runs("OFF", r"fall, a limb moves \(\+\)", 3)]),
+    Quote("NOTES.md", "longlie",
+          r"is alerted in (\d+) of 120 runs at N = 30",
+          [_ll_runs("OFF", "sit down hard, still 45m", 5)]),
+    Quote("NOTES.md", "longlie",
+          r"alerted (\d+) times in 120 at N = 15",
+          [_ll_runs("OFF", "sit down, fidgeting 45m", 3)]),
+    Quote("NOTES.md", "longlie",
+          r"it is alerted in (\d+) of\s+120 runs at N = 15 and (\d+) at N = 30",
+          [_ll_runs("OFF", "into bed quickly, 90m", 3), _ll_runs("OFF", "into bed quickly, 90m", 5)]),
+    Quote("NOTES.md", "longlie",
+          r"falls missed drop from ([\d.]+)% to ([\d.]+)%\. The\ncost is the walk-out: in (\d+) of 120 runs",
+          [_ll_miss("OFF", "15") + r"([\d.]+)%", _ll_miss("ON", "15") + r"([\d.]+)%",
+           r"^  left the home\s+(\d+)/120"]),
+    Quote("NOTES.md", "longlie",
+          r"No lie\nrun alerted before its lie began, at any N, hold off or on\. Alerts after\n"
+          r"the window were (\d+) at N = 3, (\d+) at N = 5, (\d+) at N = 10 and none from\nN = 15\.",
+          [_ll_miss("OFF", n) + _LL_TAIL + r"\d+\s+(\d+)$" for n in ("3", "5", "10")]
+          + [_ll_miss(hold, n) + _LL_TAIL + r"0\s+\d+$"
+             for hold in ("OFF", "ON") for n in ("3", "5", "10", "15", "20", "30")]
+          + [_ll_miss("OFF", n) + _LL_TAIL + r"\d+\s+0$" for n in ("15", "20", "30")]),
+    Quote("NOTES.md", "longlie",
+          r"night\) is alerted in (\d+) of 120 at N = 15 and (\d+) at\n   N = 30",
+          [_ll_runs("OFF", "fidgeting night, 2h", 3), _ll_runs("OFF", "fidgeting night, 2h", 5)]),
+    Quote("NOTES.md", "longlie",
+          r"reader\) is alerted in (\d+) of\n  120 runs at N = 3 and (\d+) at N = 30",
+          [_ll_runs("OFF", "walks in, reads 40m", 0), _ll_runs("OFF", "walks in, reads 40m", 5)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"reading for 40 minutes: alerted in (\d+) of 120 at every\n  N,[\s\S]*?night: (\d+) of 120 at N = 15",
+          [r"RUNS ALERTED, presence hold OFF[\s\S]*?^  walks in, reads 40m\s+(\d+)/120(?:\s+\1/120){5}$",
+           _ll_runs("OFF", "fidgeting night, 2h", 3)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"falls that end still: ([\d.]+)% missed at every N from 3 to 30 minutes,\n  and (\d+)/40 on two links at N = 15",
+          [_ll_miss("OFF", "15") + r"([\d.]+)%", r"^  2 links\s+falls missed\s+(\d+)/40"]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"slow slides to the floor: ([\d.]+)% missed at N = 15",
+          [_ll_miss("OFF", "15") + r"[\d.]+%\s+([\d.]+)%"]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"alerted in (\d+) of 120 at\n  N = 30",
+          [_ll_runs("OFF", "sit down hard, still 45m", 5)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"alerted in\n  (\d+) of 120 at N = 15",
+          [_ll_runs("OFF", "into bed quickly, 90m", 3)]),
+    Quote("docs/ELDER_CARE.md", "longlie",
+          r"presence hold on: (\d+) of 120\n  alert on the empty room",
+          [r"^  left the home\s+(\d+)/120"]),
     Quote("NOTES.md", "impairment",
           r"\| breathing BNR, best subcarrier, dB \| (-?[\d.]+) \| (-?[\d.]+) \| (-?[\d.]+) \| \*\*(-?[\d.]+)\*\* \|",
           [r"breathing BNR, best subcarrier, dB\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)"]),
@@ -392,6 +561,43 @@ QUOTES = [
     Quote("NOTES.md", "impairment",
           r"\| 0\.020 \(committed\) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \|",
           [r"^0\.020\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)$"]),
+    # The baselines reading (issue #43), manual tier: checked when
+    # `--only baselines` regenerates the section.
+    Quote("docs/RESULTS.md", "baselines",
+          r"(\d+)% of a link's DSP instructions",
+          [r"^   vitals\+heart\s+(\d+)% of the instructions are in the 2 Hz frames"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"estimated\s+at (\d+) to (\d+) ms, and the worst frame[^)]*\)\s+at (\d+) to\s+(\d+) ms",
+          [r"^   vitals\+heart\s+[\d.]+ \.\. [\d.]+%\s+(\d+) \.\. (\d+)\s+(\d+) \.\. (\d+)\s"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"\(([\d.]+) to ([\d.]+)% of a\s+core per link\)",
+          [r"^   vitals\+heart\s+([\d.]+) \.\. ([\d.]+)%"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"(\d+) links fit in 171 KB with\s+`best_bnr` on and (\d+) with it off",
+          [r"SaansNodeExtractor \(best_bnr on\)\s+[\d,]+\s+[\d,]+\s+(\d+)$",
+           r"SaansNodeExtractorNoBnr\s+[\d,]+\s+[\d,]+\s+(\d+)$"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"leaves room for (\d+)\s+or more",
+          [r"^   vitals\+heart\s+[\d.]+ \.\. [\d.]+%\s+\d+ \.\. \d+\s+\d+ \.\. \d+\s+(\d+) \.\."]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"`python / unittest` takes (\d+):(\d+)",
+          [r"python / unittest\s+\d+\s+(\d+):(\d+)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"the whole run (\d+):(\d+) wall",
+          [r"TOTAL wall, first job start to last job end\s+\d+\s+(\d+):(\d+)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"`results\.py --check`, takes (\d+):(\d+)",
+          [r"results\.py --check\s*\d+\s+(\d+):(\d+)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"product load take ([\d.]+)% of one\s+core here",
+          [r"features: FeatureFrames[\s\S]*?^\s*!?\s*12\s+[\d.]+ / [\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.]+)%"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"raw mode at twelve links ([\d.]+)%, about (\d+)% of a Pi 5 core",
+          [r"raw: raw CSI[\s\S]*?^\s*!?\s*12\s+[\d.]+ / [\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.]+)%"
+           r"\s+[\d.]+\s+[\d.]+% \([\d.]+ \.\. ([\d.]+)%\)"]),
+    Quote("docs/RESULTS.md", "baselines",
+          r"Peak RSS about (\d+) MiB",
+          [r"features: FeatureFrames[\s\S]*?^\s*!?\s*12\s+[\d.]+ / [\d.]+\s+[\d.]+\s+[\d.]+\s+[\d.]+%\s+([\d.]+)"]),
 ]
 
 
@@ -424,13 +630,19 @@ def command_text(s: Suite) -> str:
 
 
 def section(s: Suite, body: str) -> str:
-    tier = ("checked by CI on every push" if s.tier == "ci"
-            else "slow: regenerated by hand with `--slow`, not checked by CI")
+    tier = {
+        "ci": "checked by CI on every push",
+        "slow": "slow: regenerated by hand with `--slow`, not checked by CI",
+        "manual": "manual: regenerated only by `tools/results.py --only "
+                  f"{s.key}`, never by CI",
+    }[s.tier]
+    after = f"\n{s.after}\n" if s.after else ""
     return (f"<!-- results:begin {s.key} -->\n"
             f"## {s.title}\n\n"
             f"`{command_text(s)}` — {tier}\n\n"
             f"{s.note}\n\n"
             f"```text\n{body}\n```\n"
+            f"{after}"
             f"<!-- results:end {s.key} -->")
 
 
@@ -440,16 +652,19 @@ Generated by `tools/results.py` from the commands named in each section.
 **Do not edit by hand**: the next regeneration overwrites it, and CI fails
 if a CI-tier section no longer matches what its command prints.
 
-**Every number in this file is SYNTHETIC.** No board has ever run this
-firmware (`docs/CAPABILITY_LIMITS.md`). These tables say the DSP is
+**Every sensing number in this file is SYNTHETIC.** No board has ever run
+this firmware (`docs/CAPABILITY_LIMITS.md`). These tables say the DSP is
 internally consistent and behaves as designed on a simulator written by
 the same project; they say nothing about real rooms, radios or bodies.
+The last section measures the software instead (CI time, CPU, memory),
+and labels each figure MEASURED, MEASURED-HOST or ESTIMATE.
 
-Two tiers. *CI-checked* sections are regenerated on every push and must
+Three tiers. *CI-checked* sections are regenerated on every push and must
 match to one unit in the last printed place. *Slow* sections are
-regenerated by hand; `git log -- docs/RESULTS.md` dates them. Prose that
-quotes a figure from a CI-checked section is checked too: the quotes are
-registered in `tools/results.py` and a mismatch fails the build.
+regenerated by hand; `git log -- docs/RESULTS.md` dates them. The *manual*
+section is regenerated alone, on purpose, because it measures a machine.
+Prose that quotes a figure from a CI-checked section is checked too: the
+quotes are registered in `tools/results.py` and a mismatch fails the build.
 """
 
 

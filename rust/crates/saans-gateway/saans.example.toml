@@ -92,6 +92,26 @@ vitals = false
 inactivity_alert_min = 30.0
 # Off by default: WiFi cannot tell "fell" from "sat down heavily".
 collapse_detection = false
+# After a fall-shaped motion (a burst that stops abruptly) the links can
+# lose a weak breather on the floor. With this set, presence is then held
+# this long so the inactivity alert still counts; it is inferred, not
+# measured, and every alert says so. Motion ends it. Off by default, like
+# collapse detection: it cannot tell a fall out of sight from walking out,
+# and in simulation about one departure in four engages it (NOTES.md §14).
+# To turn it on, set it longer than inactivity_alert_min, e.g. 35.
+fall_hold_min = 0
+# Long lie (docs/ELDER_CARE.md §3.3): an urgent (check) alert when a sudden
+# movement stops and the room then stays present without gross motion for
+# this many minutes. It reads presence and motion only, so it works with
+# vitals off and without collapse_detection. Off by default: in simulation
+# it also fires for a person who sits down heavily and then reads still
+# for longer than this, and it cannot catch a slow slide to the floor
+# (docs/RESULTS.md, "Long lie"). With the presence hold on, fall_hold_min
+# must be longer than this.
+long_lie_min = 0
+# Other spaces in which someone seen moving means nobody is lying here, so
+# a count stops: in a home, its other sensed rooms. Needs long_lie_min.
+# long_lie_elsewhere = ["rest-room-1"]
 
 [[space]]
 id = "rest-room-1"
@@ -136,6 +156,14 @@ rate_low_bpm = 8.0
 # ack_timeout_min = 5                      # still unacknowledged after this: escalate, once
 # escalate_to = ["webhook:pager"]
 # include_health_details = false
+#
+## The long lie as a family alert. Movement seen after it goes to the same
+## channels as an update ("movement seen"); it never opens an alert, and
+## the alert stays open until someone resolves it.
+# [[alert_route]]
+# name = "family"
+# kinds = ["long_lie"]
+# channels = ["telegram:wardens"]
 
 # ------------------------------------------------------------ signed frames
 # FeatureFrame v2 (ADR-012): with a site key here, only signed frames are

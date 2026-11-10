@@ -393,8 +393,46 @@ impl GatewayConfig {
                     s.id
                 ));
             }
+            if !(s.fall_hold_min.is_finite() && s.fall_hold_min >= 0.0) {
+                return err(format!(
+                    "space {:?}: fall_hold_min must be 0 (off) or a positive number of minutes",
+                    s.id
+                ));
+            }
+            self.validate_long_lie(s)?;
         }
         self.validate_outputs(&ids)
+    }
+
+    fn validate_long_lie(&self, s: &SpaceConfig) -> Result<(), ConfigError> {
+        if !(s.long_lie_min.is_finite() && s.long_lie_min >= 0.0) {
+            return err(format!(
+                "space {:?}: long_lie_min must be 0 (off) or a positive number of minutes",
+                s.id
+            ));
+        }
+        if s.long_lie_min > 0.0 && s.fall_hold_min > 0.0 && s.fall_hold_min <= s.long_lie_min {
+            return err(format!(
+                "space {:?}: fall_hold_min ({}) must be longer than long_lie_min ({}), or 0: a hold that \
+                 ends first can never let a held long lie reach its time",
+                s.id, s.fall_hold_min, s.long_lie_min
+            ));
+        }
+        if !s.long_lie_elsewhere.is_empty() && s.long_lie_min <= 0.0 {
+            return err(format!(
+                "space {:?}: long_lie_elsewhere is set but long_lie_min is 0 (off)",
+                s.id
+            ));
+        }
+        for other in &s.long_lie_elsewhere {
+            if other == &s.id || !self.spaces.iter().any(|x| &x.id == other) {
+                return err(format!(
+                    "space {:?}: long_lie_elsewhere names {other:?}, which is not another space here",
+                    s.id
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Auth is required when the API is reachable beyond this machine.
@@ -667,7 +705,8 @@ mod tests {
                 .join("\n")
             + &text[end..];
         let cfg = GatewayConfig::from_toml(&live).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(cfg.alert_routes.len(), 1);
+        assert_eq!(cfg.alert_routes.len(), 2);
+        assert_eq!(cfg.alert_routes[1].kinds, vec!["long_lie".to_string()]);
         assert_eq!(
             cfg.alert_routes[0].escalate_to,
             vec!["webhook:pager".to_string()]
@@ -830,6 +869,52 @@ mod tests {
             assert!(e.contains("night"), "{bad}: {e}");
         }
         assert!(GatewayConfig::from_toml(&format!("{ONE_SPACE}room = \"kitchen\"\n")).is_err());
+    }
+
+    #[test]
+    fn the_fall_hold_is_off_by_default_and_refuses_nonsense() {
+        let cfg = GatewayConfig::from_toml(ONE_SPACE).unwrap();
+        assert_eq!(cfg.spaces[0].fall_hold_min, 0.0);
+        let on = GatewayConfig::from_toml(&format!("{ONE_SPACE}fall_hold_min = 35\n")).unwrap();
+        assert_eq!(on.spaces[0].fall_hold_min, 35.0);
+        for bad in ["-1", "nan", "inf"] {
+            let e = GatewayConfig::from_toml(&format!("{ONE_SPACE}fall_hold_min = {bad}\n"))
+                .expect_err(bad)
+                .to_string();
+            assert!(e.contains("fall_hold_min"), "{bad}: {e}");
+        }
+    }
+
+    #[test]
+    fn the_long_lie_is_off_by_default_and_refuses_what_could_not_work() {
+        let cfg = GatewayConfig::from_toml(ONE_SPACE).unwrap();
+        assert_eq!(cfg.spaces[0].long_lie_min, 0.0);
+        assert!(cfg.spaces[0].long_lie_elsewhere.is_empty());
+        let on = GatewayConfig::from_toml(&format!("{ONE_SPACE}long_lie_min = 15\n")).unwrap();
+        assert_eq!(on.spaces[0].long_lie_min, 15.0);
+        let two = "[[space]]\nid = \"bath\"\nlinks = [{ rx = 1, tx = 2 }]\nlong_lie_min = 15\n\
+                   long_lie_elsewhere = [\"living\"]\n\
+                   [[space]]\nid = \"living\"\nlinks = [{ rx = 3, tx = 2 }]\n";
+        let ok = GatewayConfig::from_toml(two).unwrap();
+        assert_eq!(ok.spaces[0].long_lie_elsewhere, vec!["living".to_string()]);
+        let refused = [
+            format!("{ONE_SPACE}long_lie_min = -1\n"),
+            format!("{ONE_SPACE}long_lie_min = nan\n"),
+            format!("{ONE_SPACE}long_lie_min = inf\n"),
+            // A hold shorter than N ends before a held lie can reach N.
+            format!("{ONE_SPACE}long_lie_min = 15\nfall_hold_min = 10\n"),
+            format!("{ONE_SPACE}long_lie_min = 15\nlong_lie_elsewhere = [\"nowhere\"]\n"),
+            format!("{ONE_SPACE}long_lie_min = 15\nlong_lie_elsewhere = [\"a\"]\n"),
+            two.replace("long_lie_min = 15\n", ""),
+        ];
+        for bad in &refused {
+            let e = GatewayConfig::from_toml(bad).expect_err(bad).to_string();
+            assert!(e.contains("long_lie"), "{bad}: {e}");
+        }
+        let held = GatewayConfig::from_toml(&format!(
+            "{ONE_SPACE}long_lie_min = 15\nfall_hold_min = 20\n"
+        ));
+        assert!(held.is_ok());
     }
 
     #[test]

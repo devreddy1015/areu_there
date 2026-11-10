@@ -2,6 +2,7 @@
 //!
 //!     saans eval [--quick] [--seeds N] [--threads N] [--room-height M]
 //!     saans lying [--spots N] [--threads N]
+//!     saans longlie [--seeds N] [--threads N]
 //!     saans export SCENARIO --out FILE.pcap [--seed N] [--vitals]
 //!     saans export-home --out FILE.pcap [--days N] [--seed N]
 //!     saans import-roomplan FILE.json --out SCENE.json [--name NAME]
@@ -37,6 +38,7 @@ mod eval;
 mod gen_dataset;
 mod home;
 mod links;
+mod longlie;
 mod lying;
 mod octave;
 mod pcap;
@@ -50,7 +52,7 @@ use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans export-home --out FILE.pcap [--days N] [--seed N]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}\n  {}",
+        "usage:\n  saans eval [--quick] [--seeds N] [--seed-offset N] [--threads N] [--room-height M]\n  saans octave [--seeds N] [--per-class N] [--threads N]\n  saans links [--seats N] [--blind-seats N] [--threads N]\n  saans lying [--spots N] [--threads N]\n  saans longlie [--seeds N] [--threads N]\n  saans export {{empty|reader|night|lone_worker|collapse|sit_down|tachypnea}} --out FILE.pcap [--seed N] [--layout 1|2|3] [--no-vitals]\n  saans export-home --out FILE.pcap [--days N] [--seed N]\n  saans import-roomplan FILE.json --out SCENE.json [--name NAME]\n  saans roomsim-export SCENE.json --out PREFIX [--seed N] [--duration S] [--config CONFIG.json] [--overwrite]\n  {}\n  {}",
         roomsim_eval::USAGE,
         gen_dataset::USAGE
     );
@@ -122,6 +124,12 @@ fn main() -> ExitCode {
             let threads = arg(&args, "--threads")
                 .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get()));
             lying::run(arg(&args, "--spots").unwrap_or(60), threads);
+            ExitCode::SUCCESS
+        }
+        Some("longlie") => {
+            let threads = arg(&args, "--threads")
+                .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get()));
+            longlie::run(arg(&args, "--seeds").unwrap_or(20), threads);
             ExitCode::SUCCESS
         }
         Some("export") => export(&args),

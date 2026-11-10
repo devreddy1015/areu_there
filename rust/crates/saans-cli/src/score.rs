@@ -12,6 +12,9 @@ pub struct Run {
     pub label: String,
     pub hours: f64,
     pub samples: Vec<(Truth, SpaceSample)>,
+    /// Per sample: presence held after a fall-shaped motion
+    /// (`SpaceMonitor::presence_held`).
+    pub held: Vec<bool>,
     pub events: Vec<HealthEvent>,
     pub truth_events: Vec<TruthEvent>,
 }
@@ -19,6 +22,8 @@ pub struct Run {
 /// Seconds after start excluded from scoring: filter warmup (50 s) plus
 /// presence calibration (30 s) plus margin. The empty room is required then.
 pub const SETTLE_S: f64 = 95.0;
+/// The evaluation samples the fused state every this many seconds.
+pub const SAMPLE_S: f64 = 0.5;
 /// Seconds either side of a truth transition not scored: presence holds for
 /// 10 s by design, and the 8 s energy window needs time to fill.
 pub const TRANSITION_GUARD_S: f64 = 15.0;

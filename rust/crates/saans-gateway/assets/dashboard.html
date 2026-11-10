@@ -453,6 +453,7 @@ const ALERT_LABEL = {
   blind: 'Cannot see this space', breathing_pause: 'Breathing pause', inactivity: 'No movement',
   inactivity_no_breathing: 'No movement and no breathing detected', possible_collapse: 'Possible collapse',
   rate_high: 'Fast breathing', rate_low: 'Slow breathing',
+  long_lie: 'No movement for a long time after a sudden movement',
 };
 const SEV_RANK = { info: 0, advisory: 1, check: 2 };
 
@@ -463,6 +464,21 @@ function dur(s) {
   if (s < 90) return Math.round(s) + ' s';
   if (s < 5400) return Math.round(s / 60) + ' min';
   return (s / 3600).toFixed(1) + ' h';
+}
+// "2:40": a countdown, to the second.
+function mmss(s) {
+  if (s == null || !isFinite(s)) return '—';
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+// The long-lie countdown ("Long lie: 2:40 of 3:00"), or null when none is
+// counting. Absent for a role that may not see health alerts.
+function longLieText(s) {
+  const l = s.long_lie;
+  if (!l) return null;
+  const held = l.held ? ' (presence held, inferred, not measured)' : '';
+  return (l.alerted ? 'Long lie: alert raised after ' + mmss(l.limit_s)
+    : 'Long lie: ' + mmss(l.still_s) + ' of ' + mmss(l.limit_s)) + held;
 }
 function ago(ms) {
   if (!ms) return '—';
@@ -788,7 +804,10 @@ function spaceCard(s) {
       'node sends vitals without consent: ' + s.vitals_gated_links.join(', ')));
   }
   if (s.collapse_detection) badges.append(el('span', { class: 'badge' }, 'collapse detection'));
+  if (s.presence_held) badges.append(el('span', { class: 'badge', 'data-k': 'warn' }, 'presence held after a fall-shaped motion'));
   if (s.resting) badges.append(el('span', { class: 'badge' }, 'resting'));
+  const ll = longLieText(s);
+  if (ll) badges.append(el('span', { class: 'badge', 'data-k': s.long_lie.alerted ? 'bad' : 'warn' }, ll));
   add(body, badges);
 
   const st = el('div', { class: 'state' });
@@ -797,6 +816,8 @@ function spaceCard(s) {
     add(st, el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
   } else if (kind === 'blind') {
     add(st, el('small', null, 'no usable link — not "empty"'));
+  } else if (kind === 'empty' && s.presence_held) {
+    add(st, el('small', null, 'by the links — presence held after a fall-shaped motion (inferred, not measured)'));
   }
   add(body, st);
 
@@ -863,7 +884,11 @@ function renderDetail(d, hist) {
   add(head, el('b', null, stateWord(kind)));
   if (kind === 'occ' && s.occupied_since_s != null && s.t_s != null) add(head, el('small', null, 'for ' + dur(s.t_s - s.occupied_since_s)));
   if (kind === 'blind') add(head, el('small', null, 'no usable link — not "empty"'));
+  if (kind === 'empty' && s.presence_held) add(head, el('small', null, 'by the links — presence held after a fall-shaped motion (inferred, not measured)'));
   add(body, head);
+
+  const ll = longLieText(s);
+  if (ll) add(body, el('p', null, ll));
 
   const dl = el('dl');
   const row = (k, v) => add(dl, el('dt', null, k), el('dd', null, v));
