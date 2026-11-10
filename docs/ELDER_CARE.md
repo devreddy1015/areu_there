@@ -230,6 +230,8 @@ accurate the routine is across homes.
   get up". An unknown value is not compared and is no part of the
   baseline. So a home's first night reads unknown: it began before the
   gateway did.
+- **A morning without a getting-up** is flagged when the bedroom was seen
+  through it and at least 7 previous days have one.
 - **Not covered yet:** active hours have no such check per room. A room
   that is neither the bedroom nor the bathroom and is down all day lowers
   them, and can hide the motion that confirms a getting-up. Only the

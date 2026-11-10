@@ -31,7 +31,8 @@
 //!   previous complete days, flagged beyond the larger of
 //!   `TREND_MAD_K * MAD_TO_SIGMA * MAD` and a fixed floor, the rule the
 //!   breathing trend uses. Fewer than `ROUTINE_MIN_DAYS` previous days: no
-//!   comparison.
+//!   comparison. A day without a getting-up, on a morning the bedroom was
+//!   seen through, is flagged against days that have one.
 //!
 //! **Unusual quiet** is not computed. The spec's MVP cut (§7.2) leaves it
 //! until there are 14 days of data, and it needs per-time-of-day baselines
@@ -99,7 +100,8 @@ impl Default for RoutineConfig {
 pub struct Comparison {
     /// `got_up_min`, `active_hours` or `night_bathroom_visits`.
     pub metric: String,
-    pub value: f64,
+    /// `None`: no getting-up, on a morning the bedroom was seen through.
+    pub value: Option<f64>,
     pub median: f64,
     pub mad: f64,
     /// Previous complete days in the baseline.
@@ -415,7 +417,13 @@ impl HomeRoutine {
         ];
         let mut out = Vec::new();
         for (name, get, floor) in metrics {
-            let Some(value) = get(r) else { continue };
+            let value = get(r);
+            // A value that is not there is unknown and is not compared,
+            // with one exception: no getting-up, on a morning the bedroom
+            // was seen through, is unusual against days that have one.
+            if value.is_none() && !(name == "got_up_min" && r.got_up_known()) {
+                continue;
+            }
             let mut prev: Vec<f64> = self
                 .history
                 .range(..r.day)
@@ -437,7 +445,7 @@ impl HomeRoutine {
                 median: med,
                 mad,
                 days: prev.len(),
-                unusual: (value - med).abs() > limit,
+                unusual: value.is_none_or(|v| (v - med).abs() > limit),
             });
         }
         out
@@ -817,6 +825,30 @@ mod tests {
         seen(&mut r, Room::Bedroom, 24 + 11);
         assert_eq!(r.today().unwrap().got_up_min, None);
         assert!(r.today().unwrap().got_up_known());
+    }
+
+    #[test]
+    fn a_morning_without_a_getting_up_is_flagged_against_days_that_have_one() {
+        let mut r = HomeRoutine::new(RoutineConfig::default());
+        for d in 0..8 {
+            day(&mut r, d, Some(6.5), &[9.5]);
+        }
+        // Day 8: the bedroom is seen all morning and nobody gets up.
+        day(&mut r, 8, None, &[9.5]);
+        for h in 1..12 {
+            seen(&mut r, Room::Bedroom, 8 * 24 + h);
+        }
+        // Day 9: its link is down. Not seen is not "did not get up".
+        let closed = day(&mut r, 9, None, &[9.5]);
+        let up = |c: &DailyRoutine| {
+            let found = c.comparisons.iter().find(|x| x.metric == "got_up_min");
+            found.cloned()
+        };
+        let missing = up(&closed[0]).expect("day 8 is compared");
+        assert!(missing.unusual && missing.value.is_none(), "{missing:?}");
+        assert_eq!(missing.days, 8);
+        let closed = day(&mut r, 10, None, &[9.5]);
+        assert_eq!(up(&closed[0]), None, "day 9: the bedroom was not seen");
     }
 
     #[test]
