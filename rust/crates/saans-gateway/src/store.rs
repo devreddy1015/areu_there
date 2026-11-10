@@ -600,7 +600,7 @@ mod tests {
     }
 
     /// Two closed routine days: one with nothing known, one with every
-    /// value and a comparison whose value is missing.
+    /// value and a comparison.
     fn routine_days() -> Vec<saans_health::DailyRoutine> {
         let mut r = saans_health::HomeRoutine::new(Default::default());
         for day in 0..3 {
@@ -621,7 +621,7 @@ mod tests {
         days[1].night_bathroom_visits = Some(2);
         days[1].comparisons.push(saans_health::routine::Comparison {
             metric: "got_up_min".into(),
-            value: None,
+            value: 390.5,
             median: 390.0,
             mad: 4.5,
             days: 8,

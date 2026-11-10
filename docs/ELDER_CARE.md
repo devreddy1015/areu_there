@@ -226,9 +226,10 @@ accurate the routine is across homes.
   minutes later. The latest such rise wins, so a night-time trip and a nap
   do not count.
 - **Active hours**, as built: hours in which some room's detector saw
-  the person moving, which means measured present with the debounced
-  motion the long lie listens for. A raw motion sample in a room measured
-  empty does not count, and the same motion confirms a getting-up.
+  the person moving, as the long lie does: measured present, with one
+  sample at the bout level or three in a row above the stillness level.
+  Motion in a room measured empty does not count. The same motion
+  confirms a getting-up.
 - **A room that was not seen is unknown, not zero.** A value is known
   only if its room was visible in every hour of its window: the bathroom
   through the night, the bedroom from two hours before the morning window
@@ -237,14 +238,19 @@ accurate the routine is across homes.
   get up". An unknown value is not compared and is no part of the
   baseline. So a home's first night reads unknown: it began before the
   gateway did.
-- **A morning without a getting-up** is flagged when the bedroom was seen
-  through it and at least 7 previous days have one.
-- **Not covered yet:** active hours have no such check per room. A room
-  that is neither the bedroom nor the bathroom and is down all day lowers
-  them, and can hide the motion that confirms a getting-up. Only the
-  whole-day rule (some room seen in 20 hours) applies there. The check
-  is also per room role, not per space: with two bathrooms, one of them
-  seen is enough.
+- **Not covered yet:**
+  - Active hours have no such check per room. A room that is neither the
+    bedroom nor the bathroom and is down all day lowers them, and can
+    hide the motion that confirms a getting-up. Only the whole-day rule
+    (some room seen in 20 hours) applies there.
+  - The check is per room role, not per space: with two bathrooms, one
+    of them seen is enough. And "seen in an hour" is one sample in it, so
+    an outage shorter than an hour does not show.
+  - A morning without a getting-up is not flagged, even with the bedroom
+    seen. The rise is missed when the person slept in another room or
+    first moved where there is no sensor, so its absence is not yet
+    evidence. The "day did not start" alert of ADR-018 has to settle
+    what is.
 - **Restarts:** a gateway restart loses the day in progress. That day
   closes partial, and if fewer than 20 hours were observed it is not used.
 - **Starting values:** every threshold is a starting value for pilots

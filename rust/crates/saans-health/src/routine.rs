@@ -14,10 +14,11 @@
 //! then closes with fewer observed hours, and below
 //! `ROUTINE_MIN_OBSERVED_H` it is neither compared nor a baseline.
 //! - **active hours:** hours of the day in which some room's monitor saw
-//!   the person moving (`SpaceMonitor::moving_now`: measured present, with
-//!   the debounced motion the long lie listens for). The same motion
-//!   confirms a getting-up. A raw sample above `BOUT_INDEX` in a room
-//!   measured empty is neither.
+//!   the person moving (`SpaceMonitor::moving_now`, what the long lie
+//!   listens for): measured present, with one sample at or above
+//!   `BOUT_INDEX` or `MOVE_CONFIRM_SAMPLES` in a row at or above
+//!   `STILL_INDEX`. The same motion confirms a getting-up. Motion in a
+//!   room measured empty is neither.
 //! - **night bathroom visits:** bathroom occupancy sessions that start in
 //!   the night window. A night belongs to the morning it ends in.
 //! - **not seen is unknown, not zero:** a value is known only if its room
@@ -25,14 +26,18 @@
 //!   night, the bedroom from two hours before the morning window to its
 //!   end. Otherwise the night's visits are `None` and a day without a
 //!   getting-up claims nothing (`DailyRoutine::got_up_known`). An unknown
-//!   value is not compared and is no part of a baseline.
+//!   value is not compared and is no part of a baseline. "Visible in an
+//!   hour" is one sample in it, so an outage shorter than that does not
+//!   show, and the rooms are told apart by role, not by space.
+//! - **no getting-up is not flagged.** Even with the bedroom seen all
+//!   morning, a rise is missed when the person slept in another room or
+//!   first moved where there is no sensor, so its absence is not compared.
 //! - **compared with the person's own baseline:** when a day closes, each
 //!   value is set against the median of up to `ROUTINE_BASELINE_DAYS`
 //!   previous complete days, flagged beyond the larger of
 //!   `TREND_MAD_K * MAD_TO_SIGMA * MAD` and a fixed floor, the rule the
 //!   breathing trend uses. Fewer than `ROUTINE_MIN_DAYS` previous days: no
-//!   comparison. A day without a getting-up, on a morning the bedroom was
-//!   seen through, is flagged against days that have one.
+//!   comparison.
 //!
 //! **Unusual quiet** is not computed. The spec's MVP cut (§7.2) leaves it
 //! until there are 14 days of data, and it needs per-time-of-day baselines
@@ -100,8 +105,7 @@ impl Default for RoutineConfig {
 pub struct Comparison {
     /// `got_up_min`, `active_hours` or `night_bathroom_visits`.
     pub metric: String,
-    /// `None`: no getting-up, on a morning the bedroom was seen through.
-    pub value: Option<f64>,
+    pub value: f64,
     pub median: f64,
     pub mad: f64,
     /// Previous complete days in the baseline.
@@ -113,8 +117,8 @@ pub struct Comparison {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DailyRoutine {
     pub day: i64,
-    /// Minutes after local midnight. `None`: no getting-up was seen, which
-    /// says there was none only if `got_up_known()`.
+    /// Minutes after local midnight. `None`: no getting-up was seen, and
+    /// `got_up_known()` says whether the bedroom was watched.
     pub got_up_min: Option<f64>,
     /// Bit h: a motion bout somewhere in the home during local hour h.
     pub active_hours_mask: u32,
@@ -146,10 +150,11 @@ impl DailyRoutine {
         }
     }
 
-    /// Whether `got_up_min` says what happened: a getting-up was seen, or
-    /// the bedroom was visible in every hour a morning rise needs (from
-    /// `GOT_UP_MIN_REST_S` before the morning window to its end), so `None`
-    /// is a morning without one and not a morning nobody saw.
+    /// Whether the bedroom was watched: a getting-up was seen, or the
+    /// bedroom was visible in every hour a morning rise needs (from
+    /// `GOT_UP_MIN_REST_S` before the morning window to its end). `None`
+    /// is then "no rise was seen from this bed", not "nobody looked". It is
+    /// still not "the person stayed in bed": see the module's last rule.
     pub fn got_up_known(&self) -> bool {
         let needed = hours_mask(MORNING_START_H - GOT_UP_MIN_REST_S / 3600.0, MORNING_END_H);
         self.got_up_min.is_some() || self.bedroom_observed_mask & needed == needed
@@ -277,9 +282,9 @@ impl HomeRoutine {
     }
 
     /// One space's fused sample, whether its monitor calls it moving
-    /// (`SpaceMonitor::moving_now`: measured present, with debounced gross
-    /// motion) and the events it produced. Returns the day that closed, if
-    /// this sample began a new one.
+    /// (`SpaceMonitor::moving_now`: measured present, with gross motion)
+    /// and the events it produced. Returns the day that closed, if this
+    /// sample began a new one.
     pub fn observe(
         &mut self,
         room: Room,
@@ -421,13 +426,7 @@ impl HomeRoutine {
         ];
         let mut out = Vec::new();
         for (name, get, floor) in metrics {
-            let value = get(r);
-            // A value that is not there is unknown and is not compared,
-            // with one exception: no getting-up, on a morning the bedroom
-            // was seen through, is unusual against days that have one.
-            if value.is_none() && !(name == "got_up_min" && r.got_up_known()) {
-                continue;
-            }
+            let Some(value) = get(r) else { continue };
             let mut prev: Vec<f64> = self
                 .history
                 .range(..r.day)
@@ -449,7 +448,7 @@ impl HomeRoutine {
                 median: med,
                 mad,
                 days: prev.len(),
-                unusual: value.is_none_or(|v| (v - med).abs() > limit),
+                unusual: (value - med).abs() > limit,
             });
         }
         out
@@ -832,6 +831,32 @@ mod tests {
     }
 
     #[test]
+    fn the_hours_of_a_window_are_the_hours_night_of_can_fill() {
+        // `night_bathroom_visits` is known when the seen hours equal the
+        // window's, so the two must agree, minute by minute.
+        let bits = |hours: &[u32]| hours.iter().fold(0, |m, h| m | 1 << h);
+        assert_eq!(hours_mask(22.0, 6.0), bits(&[22, 23, 0, 1, 2, 3, 4, 5]));
+        assert_eq!(hours_mask(1.0, 6.0), bits(&[1, 2, 3, 4, 5]));
+        assert_eq!(hours_mask(22.5, 5.5), bits(&[22, 23, 0, 1, 2, 3, 4, 5]));
+        for (start, end) in [
+            (22.0, 6.0),
+            (1.0, 6.0),
+            (22.5, 5.5),
+            (0.0, 24.0),
+            (20.0, 24.0),
+        ] {
+            let cfg = RoutineConfig {
+                night_start_h: start,
+                night_end_h: end,
+            };
+            let filled = (0..24 * 60)
+                .filter(|m| night_of(&cfg, f64::from(*m) * 60.0).is_some())
+                .fold(0, |mask, m| mask | 1 << (m / 60));
+            assert_eq!(hours_mask(start, end), filled, "{start}-{end}");
+        }
+    }
+
+    #[test]
     fn a_rest_closed_because_the_bedroom_went_blind_is_not_getting_up() {
         let mut r = HomeRoutine::new(RoutineConfig::default());
         still(&mut r, 0.0);
@@ -848,30 +873,6 @@ mod tests {
         bout(&mut r, end + 15.0 * 60.0);
         assert_eq!(r.today().unwrap().got_up_min, None);
         assert!(!r.today().unwrap().got_up_known());
-    }
-
-    #[test]
-    fn a_morning_without_a_getting_up_is_flagged_against_days_that_have_one() {
-        let mut r = HomeRoutine::new(RoutineConfig::default());
-        for d in 0..8 {
-            day(&mut r, d, Some(6.5), &[9.5]);
-        }
-        // Day 8: the bedroom is seen all morning and nobody gets up.
-        day(&mut r, 8, None, &[9.5]);
-        for h in 1..12 {
-            seen(&mut r, Room::Bedroom, 8 * 24 + h);
-        }
-        // Day 9: its link is down. Not seen is not "did not get up".
-        let closed = day(&mut r, 9, None, &[9.5]);
-        let up = |c: &DailyRoutine| {
-            let found = c.comparisons.iter().find(|x| x.metric == "got_up_min");
-            found.cloned()
-        };
-        let missing = up(&closed[0]).expect("day 8 is compared");
-        assert!(missing.unusual && missing.value.is_none(), "{missing:?}");
-        assert_eq!(missing.days, 8);
-        let closed = day(&mut r, 10, None, &[9.5]);
-        assert_eq!(up(&closed[0]), None, "day 9: the bedroom was not seen");
     }
 
     #[test]
